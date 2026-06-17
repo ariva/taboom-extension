@@ -1,0 +1,50 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>TabsManager</title>
+  <link rel="stylesheet" href="sidepanel.css" />
+</head>
+<body>
+  <header>
+    <div class="titlebar">
+      <h1>TabsManager</h1>
+      <button id="settings-btn" class="icon-btn" title="Settings" aria-label="Settings">⚙</button>
+    </div>
+    <input id="search" type="search" placeholder="Search tabs…  ( / )" autofocus />
+    <div id="filters" class="segmented" role="tablist" aria-label="Filter tabs">
+      <button data-filter="all" aria-pressed="true">All <span class="count"></span></button>
+      <button data-filter="awake" aria-pressed="false">Awake <span class="count"></span></button>
+      <button data-filter="snoozed" aria-pressed="false">Snoozed <span class="count"></span></button>
+      <button data-filter="protected" aria-pressed="false">Protected <span class="count"></span></button>
+    </div>
+    <div class="toolbar">
+      <label class="select-all"><input type="checkbox" id="select-all" aria-label="Select all visible tabs" /></label>
+      <select id="scope" aria-label="Window scope">
+        <option value="all-windows">All windows</option>
+        <option value="current-window">Current window</option>
+      </select>
+      <select id="sort" aria-label="Sort order">
+        <option value="recent">Recently used</option>
+        <option value="oldest">Least recently used</option>
+        <option value="title">Title</option>
+        <option value="domain">Domain</option>
+      </select>
+    </div>
+  </header>
+
+  <main id="tab-list" role="listbox" aria-label="Open tabs"></main>
+
+  <div id="toast" role="status" hidden></div>
+
+  <footer id="bulk-bar" hidden>
+    <span id="bulk-count"></span>
+    <button id="bulk-snooze">Snooze</button>
+    <button id="bulk-protect">Protect</button>
+    <button id="bulk-close">Close</button>
+    <button id="bulk-clear" class="icon-btn" title="Clear selection" aria-label="Clear selection">✕</button>
+  </footer>
+
+  <script type="module" src="sidepanel.js"></script>
+</body>
+</html>

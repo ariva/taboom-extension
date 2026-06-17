@@ -1,0 +1,7 @@
+{
+  "name": "tabs-manager",
+  "private": true,
+  "version": "0.2.1",
+  "type": "module",
+  "description": "Node tooling metadata only (ES modules for node --test). Chrome ignores this file."
+}

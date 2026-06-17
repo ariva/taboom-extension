@@ -1,0 +1,66 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>TabsManager Settings</title>
+  <style>
+    :root { color-scheme: light dark; font-family: system-ui, sans-serif; font-size: 14px; }
+    body { margin: 0 auto; max-width: 560px; padding: 24px 16px; }
+    h1 { font-size: 18px; }
+    h2 { font-size: 15px; margin-top: 28px; border-bottom: 1px solid light-dark(#ddd, #444); padding-bottom: 4px; }
+    label { display: block; margin: 8px 0; }
+    input[type="number"] { width: 80px; }
+    ul { list-style: none; padding: 0; }
+    li { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid light-dark(#eee, #333); }
+    #links a { white-space: nowrap; }
+    #links span { text-align: right; margin-left: 16px; }
+    button { cursor: pointer; }
+    .row { display: flex; gap: 8px; margin-top: 8px; }
+    .muted { color: light-dark(#666, #aaa); font-size: 13px; }
+    #danger { color: light-dark(#b00020, #ff8a80); }
+  </style>
+</head>
+<body>
+  <h1>TabsManager Settings</h1>
+
+  <h2>Automatic Snooze</h2>
+  <label><input type="checkbox" id="autoSnoozeEnabled" /> Automatically snooze inactive tabs</label>
+  <label>Inactive for <input type="number" id="inactivityMinutes" min="1" /> minutes</label>
+  <label>Check every <input type="number" id="checkIntervalMinutes" min="1" /> minutes</label>
+  <label><input type="checkbox" id="excludePinned" /> Never auto-snooze pinned tabs</label>
+  <label><input type="checkbox" id="excludeAudible" /> Never auto-snooze tabs playing audio</label>
+  <label>Keep at least <input type="number" id="minAwakePerWindow" min="0" /> awake tabs per window <span class="muted">(0 = no limit)</span></label>
+  <p class="muted">Active, protected, and already-snoozed tabs are always excluded.</p>
+
+  <h2>Protected Sites</h2>
+  <p class="muted">Exact host (<code>mail.google.com</code>) or domain with subdomains (<code>*.github.com</code>).</p>
+  <ul id="rules"></ul>
+  <div class="row">
+    <input type="text" id="new-rule" placeholder="*.example.com" />
+    <button id="add-rule">Add</button>
+  </div>
+
+  <h2>Interface</h2>
+  <label>Side panel font size <input type="number" id="fontSize" min="0.6" max="1.5" step="0.05" /> rem <span class="muted">(0.8 default; 1 = browser base size)</span></label>
+
+  <h2>Useful Links</h2>
+  <ul id="links">
+    <li><a href="#" data-url="chrome://extensions/shortcuts">chrome://extensions/shortcuts</a><span class="muted">configure keyboard shortcuts</span></li>
+    <li><a href="#" data-url="chrome://settings/performance">chrome://settings/performance</a><span class="muted">Memory Saver — native ring indicator on snoozed tabs</span></li>
+    <li><a href="#" data-url="chrome://settings/appearance">chrome://settings/appearance</a><span class="muted">side panel position: left / right</span></li>
+    <li><a href="#" data-url="chrome://discards">chrome://discards</a><span class="muted">per-tab discard state, verify snoozing</span></li>
+    <li><a href="#" data-url="chrome://extensions">chrome://extensions</a><span class="muted">reload extension, view service-worker logs</span></li>
+  </ul>
+  <p class="muted">Chrome Task Manager (<kbd>Shift+Esc</kbd>) shows per-tab memory; snoozed tabs have no process row.</p>
+
+  <h2>Data</h2>
+  <button id="danger">Delete all TabsManager data</button>
+
+  <h2>About</h2>
+  <p class="muted" id="about"></p>
+  <p class="muted">Tab information and settings are processed locally in the browser.
+    TabsManager does not send browsing information to a remote service.</p>
+
+  <script type="module" src="options.js"></script>
+</body>
+</html>

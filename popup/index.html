@@ -1,0 +1,26 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>TabsManager</title>
+  <style>
+    :root { color-scheme: light dark; font-family: system-ui, sans-serif; font-size: 13px; }
+    body { margin: 0; padding: 10px; width: 240px; display: flex; flex-direction: column; gap: 8px; }
+    h1 { font-size: 13px; margin: 0; border-bottom: 1px solid light-dark(#ddd, #444); padding-bottom: 6px; }
+    #current { color: light-dark(#555, #bbb); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    button { padding: 6px 8px; border: 1px solid light-dark(#ccc, #555); border-radius: 6px; background: none; cursor: pointer; text-align: left; }
+    button:hover { background: light-dark(#f0f0f0, #333); }
+    #stats { color: light-dark(#555, #bbb); font-size: 12px; line-height: 1.5; }
+    #open-manager { font-weight: 600; text-align: center; }
+  </style>
+</head>
+<body>
+  <h1>TabsManager</h1>
+  <div id="current"></div>
+  <button id="snooze">🌙 Snooze now</button>
+  <button id="protect-site">🛡 Protect site</button>
+  <div id="stats"></div>
+  <button id="open-manager">Open Tab Manager</button>
+  <script type="module" src="popup.js"></script>
+</body>
+</html>
