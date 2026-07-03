@@ -49,8 +49,8 @@ Panel position (left or right) is a global Chrome setting: `chrome://settings/ap
 - **Filters** — All / Awake / Snoozed / Protected, with live counts.
 - **Scope & sort** — current window vs all windows; recent / oldest / title / domain.
 - **Row click** — focuses the window and activates the tab (snoozed tabs reload).
-- **Visual states** — each window's active tab has an accent left edge + bold title; snoozed tabs are dimmed with a 🌙 title prefix and `SNOOZED` badge.
-- **Hover actions** — 🌙 snooze, 🛡 protect/unprotect site, ✕ close.
+- **Visual states** — each window's active tab has an accent left edge + bold title; snoozed tabs are dimmed with a ⏸ title prefix and `SNOOZED` badge.
+- **Hover actions** — ⏸ snooze, 🛡 protect/unprotect site, ✕ close.
 - **Checkboxes** — select several tabs, then bulk Snooze / Protect / Close from the bottom bar. Closing more than one tab asks for confirmation.
 - **Select all** — checkbox left of the scope selector selects/unselects every tab currently shown (i.e. matching the active search and filter). Search first, select all, then bulk-act.
 

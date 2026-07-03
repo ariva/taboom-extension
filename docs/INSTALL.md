@@ -25,7 +25,7 @@ TabsManager is plain JavaScript with no build step — the repository folder loa
 1. Click the TabsManager toolbar icon → small popup with current-tab actions.
 2. Click **Open Tab Manager** → side panel opens listing all tabs.
 3. Type in the search box → list filters instantly.
-4. Hover a non-active tab row and click the 🌙 button → the tab gets a `SNOOZED` badge and Chrome shows it discarded (its title turns faded in the tab strip).
+4. Hover a non-active tab row and click the ⏸ button → the tab gets a `SNOOZED` badge and Chrome shows it discarded (its title turns faded in the tab strip).
 5. Click that tab in Chrome → it reloads normally.
 
 ## After changing code
