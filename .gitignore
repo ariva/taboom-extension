@@ -1,0 +1,4 @@
+dist
+.logs
+.private
+.DS_Store
