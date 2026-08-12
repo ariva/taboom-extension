@@ -16,7 +16,7 @@ export const DEFAULTS = {
     defaultFilter: "all",
     scope: "all-windows",
     sort: "recent",
-    fontSize: 0.8, // rem, relative to browser default
+    fontSize: 1, // rem, relative to browser default
   },
 };
 

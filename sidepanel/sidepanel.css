@@ -6,7 +6,7 @@
   --accent: light-dark(#1a63d4, #6fa8ff);
   --badge-bg: light-dark(#e8e8e8, #3a3a3a);
   font-family: system-ui, sans-serif;
-  font-size: 0.8rem; /* overridden by ui.fontSize (rem) setting in sidepanel.js */
+  font-size: 1rem; /* overridden by ui.fontSize (rem) setting in sidepanel.js */
 }
 
 * { box-sizing: border-box; }
@@ -135,6 +135,7 @@ main {
   display: none;
   gap: 2px;
   flex: none;
+  align-self: center;
 }
 
 .row:hover .actions, .row.cursor .actions, .row:focus-within .actions { display: flex; }
@@ -155,7 +156,7 @@ main {
 
 .icon-btn:hover, .row .actions button:hover { background: var(--badge-bg); }
 
-.row .actions button svg { width: 14px; height: 14px; display: block; }
+.icon-btn svg, .row .actions button svg { width: 14px; height: 14px; display: block; }
 
 footer {
   display: flex;

@@ -42,7 +42,7 @@ async function render() {
     list.append(li);
   }
 
-  document.getElementById("fontSize").value = state.ui.fontSize ?? 0.8;
+  document.getElementById("fontSize").value = state.ui.fontSize ?? 1;
 
   document.getElementById("about").textContent =
     `TabsManager ${chrome.runtime.getManifest().version}`;
@@ -65,7 +65,7 @@ for (const id of SETTING_IDS) {
 
 document.getElementById("fontSize").addEventListener("change", async () => {
   const input = document.getElementById("fontSize");
-  const fontSize = Math.min(1.5, Math.max(0.6, Number(input.value) || 0.8));
+  const fontSize = Math.min(1.5, Math.max(0.6, Number(input.value) || 1));
   input.value = fontSize;
   const state = await loadState();
   await saveState({ ui: { ...state.ui, fontSize } });

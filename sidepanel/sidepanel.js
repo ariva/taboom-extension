@@ -29,7 +29,7 @@ async function refresh() {
   ]);
   rules = persisted.protectionRules;
   uiPrefs = persisted.ui;
-  document.documentElement.style.fontSize = `${uiPrefs.fontSize ?? 0.8}rem`;
+  document.documentElement.style.fontSize = `${uiPrefs.fontSize ?? 1}rem`;
   currentWindowId = win.id;
   allTabs = tabs;
   render();
