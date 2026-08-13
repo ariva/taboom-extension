@@ -21,7 +21,10 @@ let currentWindowId = null;
 
 // ---------- data ----------
 
-async function refresh() {
+// animate only for user-initiated refreshes; background event echoes
+// (tab/storage/focus changes — incl. renders triggered in OTHER open panels)
+// re-render without a view transition
+async function refresh(animate = false) {
   const [persisted, tabs, win] = await Promise.all([
     loadState(),
     chrome.tabs.query({}),
@@ -32,7 +35,7 @@ async function refresh() {
   document.documentElement.style.fontSize = `${uiPrefs.fontSize ?? 1}rem`;
   currentWindowId = win.id;
   allTabs = tabs;
-  render();
+  render(animate);
 }
 
 function filteredTabs() {
@@ -70,9 +73,15 @@ function counts() {
 const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
 
 // animate=false for high-frequency renders (typing, cursor moves) where a
-// view transition would add latency and caret flicker
+// view transition would add latency and caret flicker.
+// VT snapshot cost scales with per-row view-transition-names, so big lists
+// (1000-tab users) skip animation entirely — snappy beats pretty there.
+const VT_MAX_ROWS = 100;
+
 function render(animate = true) {
-  if (animate && document.startViewTransition && !reducedMotion.matches) {
+  visible = filteredTabs();
+  const heavy = Math.max(visible.length, listEl.childElementCount) > VT_MAX_ROWS;
+  if (animate && !heavy && document.startViewTransition && !reducedMotion.matches) {
     document.startViewTransition(renderNow);
   } else {
     renderNow();
@@ -88,7 +97,6 @@ function renderNow() {
   }
 
   listEl.classList.toggle("compact", uiPrefs.density === "compact");
-  visible = filteredTabs();
   cursor = Math.min(cursor, visible.length - 1);
   listEl.textContent = "";
   if (visible.length === 0) {
@@ -247,7 +255,7 @@ async function snooze(tabIds) {
     toast(`Could not snooze ${failures.length} tab(s): ${failures[0]}`);
   }
   selected.clear();
-  refresh();
+  refresh(true);
 }
 
 async function closeTabs(tabIds) {
@@ -259,7 +267,7 @@ async function closeTabs(tabIds) {
     console.debug("close failed", error);
   }
   selected.clear();
-  refresh();
+  refresh(true);
 }
 
 async function protectSelected() {
@@ -270,7 +278,7 @@ async function protectSelected() {
     .filter(Boolean);
   await chrome.runtime.sendMessage({ type: "protect-hosts", hosts: [...new Set(hosts)] });
   selected.clear();
-  refresh();
+  refresh(true);
 }
 
 // ---------- events ----------
