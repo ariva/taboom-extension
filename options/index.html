@@ -6,14 +6,49 @@
   <link rel="stylesheet" href="../styles/common.css" />
   <style>
     :root { font-size: 14px; }
-    body { margin: 0 auto; max-width: 560px; padding: 24px 16px; background: var(--bg); }
-    h1 { font-size: 18px; }
+
+    /* brand backdrop from store promo art: navy gradient + moon */
+    body {
+      margin: 0 auto;
+      max-width: 560px;
+      min-height: 100vh;
+      padding: 24px 16px;
+      background: linear-gradient(135deg, #1c274c 0%, #2b3a6b 100%) fixed;
+    }
+    body::before {
+      content: "";
+      position: fixed;
+      top: -40px;
+      right: -60px;
+      width: 320px;
+      height: 320px;
+      background: url("../images/moon.svg") no-repeat center / contain;
+      opacity: 0.12;
+      pointer-events: none;
+    }
+
+    h1 {
+      font-size: 22px;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    h1::before {
+      content: "";
+      width: 28px;
+      height: 28px;
+      background: url("../images/moon.svg") no-repeat center / contain;
+    }
     h2 { font-size: 15px; margin: 0 0 10px; }
 
+    /* frosted glass cards over the gradient */
     .card {
-      background: var(--card-bg);
+      background: color-mix(in srgb, var(--card-bg) 82%, transparent);
+      backdrop-filter: blur(14px);
+      border: 1px solid light-dark(rgb(255 255 255 / 0.5), rgb(255 255 255 / 0.12));
       border-radius: var(--radius-l);
-      box-shadow: var(--shadow-1);
+      box-shadow: var(--shadow-2);
       padding: 16px;
       margin-top: 16px;
     }
