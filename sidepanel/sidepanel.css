@@ -82,6 +82,7 @@ main {
   gap: 6px;
   padding: 6px 8px;
   margin: 1px 6px;
+  border: 1px solid transparent; /* reserved so .current border causes no shift */
   border-radius: var(--radius-m);
   cursor: pointer;
   transition: background var(--transition), box-shadow var(--transition);
@@ -97,9 +98,38 @@ main.compact .row .meta { display: none; }
 .row.snoozed { opacity: 0.55; }
 .row.snoozed:hover, .row.snoozed.cursor { opacity: 1; }
 
-/* active tab of a window: accent edge + bold title */
-.row.active-tab { border-left: 3px solid var(--accent); padding-left: 5px; }
+/* active tab of a window: small straight vertical indicator + bold title */
+.row.active-tab { position: relative; }
+.row.active-tab:not(.current)::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--accent) 60%, #000);
+}
 .row.active-tab .title { font-weight: 600; }
+/* active tab of THE current window: full accent border + 3d depth
+   (inset shadow lip — dark inner wall on right edge, viewed from the left) */
+/* lit face — lighter left border (near side) + white inner highlight,
+   dark inset lip on right edge (inner wall) = viewed-from-left 3d */
+.row.active-tab.current {
+  border-color: var(--accent);
+  border-left: 3px solid color-mix(in srgb, var(--accent) 99%, #000);
+  padding-left: 6px; /* 3px border + 6px = 9px, matches other rows' text offset */
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  box-shadow:
+    inset 1px 0 0 rgb(255 255 255 / 0.35),
+    inset -4px 0 3px -1px color-mix(in srgb, var(--accent) 55%, #000);
+}
+.row.active-tab.current:hover {
+  box-shadow:
+    inset 1px 0 0 rgb(255 255 255 / 0.35),
+    inset -4px 0 3px -1px color-mix(in srgb, var(--accent) 55%, #000),
+    var(--shadow-1);
+}
 .row.cursor { outline: 2px solid var(--accent); outline-offset: -2px; }
 
 .row .favicon {

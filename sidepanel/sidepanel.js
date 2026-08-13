@@ -121,6 +121,7 @@ function renderRow(tab, index, now) {
   row.className = "row" + (index === cursor ? " cursor" : "");
   if (tab.discarded) row.classList.add("snoozed");
   if (tab.active) row.classList.add("active-tab");
+  if (tab.active && tab.windowId === currentWindowId) row.classList.add("current");
   row.setAttribute("role", "option");
   row.style.viewTransitionName = `tab-${tab.id}`;
 
