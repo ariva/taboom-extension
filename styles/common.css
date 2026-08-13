@@ -1,0 +1,37 @@
+/* Shared design tokens for sidepanel, options, popup. */
+:root {
+  color-scheme: light dark;
+  --bg: light-dark(#fafafa, #202124);
+  --card-bg: light-dark(#fff, #2a2b2e);
+  --border: light-dark(#d5d5d5, #444);
+  --muted: light-dark(#666, #aaa);
+  --hover: light-dark(#f0f0f0, #2c2c2c);
+  --accent: light-dark(#1a63d4, #6fa8ff);
+  --accent-fg: light-dark(#fff, #111);
+  --badge-bg: light-dark(#e8e8e8, #3a3a3a);
+  --danger: light-dark(#b00020, #ff8a80);
+  --ok-bg: light-dark(#e2f3e5, #1e3524);
+  --ok-fg: light-dark(#1a7f37, #7ee2a8);
+  --warn-bg: light-dark(#fdf0d5, #3d3020);
+  --warn-fg: light-dark(#9a6700, #eac54f);
+  --radius-s: 6px;
+  --radius-m: 8px;
+  --radius-l: 12px;
+  --shadow-1: 0 1px 2px rgb(0 0 0 / 0.08);
+  --shadow-2: 0 2px 8px rgb(0 0 0 / 0.12);
+  --transition: 120ms ease;
+  accent-color: var(--accent);
+  font-family: system-ui, sans-serif;
+  scrollbar-width: thin;
+}
+
+* { box-sizing: border-box; }
+
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; animation: none !important; }
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) { animation: none !important; }
+}

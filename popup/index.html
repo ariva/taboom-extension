@@ -3,22 +3,43 @@
 <head>
   <meta charset="utf-8" />
   <title>TabsManager</title>
+  <link rel="stylesheet" href="../styles/common.css" />
   <style>
-    :root { color-scheme: light dark; font-family: system-ui, sans-serif; font-size: 13px; }
-    body { margin: 0; padding: 10px; width: 240px; display: flex; flex-direction: column; gap: 8px; }
-    h1 { font-size: 13px; margin: 0; border-bottom: 1px solid light-dark(#ddd, #444); padding-bottom: 6px; }
-    #current { color: light-dark(#555, #bbb); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    button { padding: 6px 8px; border: 1px solid light-dark(#ccc, #555); border-radius: 6px; background: none; cursor: pointer; text-align: left; }
-    button:hover { background: light-dark(#f0f0f0, #333); }
-    #stats { color: light-dark(#555, #bbb); font-size: 12px; line-height: 1.5; }
-    #open-manager { font-weight: 600; text-align: center; }
+    :root { font-size: 13px; }
+    body { margin: 0; padding: 10px; width: 240px; display: flex; flex-direction: column; gap: 8px; background: var(--bg); }
+    h1 { font-size: 13px; margin: 0; border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+    #current { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    button {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 8px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-s);
+      background: var(--card-bg);
+      cursor: pointer;
+      font: inherit;
+      text-align: left;
+      transition: background var(--transition);
+    }
+    button:hover { background: var(--hover); }
+    button svg { width: 14px; height: 14px; flex: none; }
+    #stats { color: var(--muted); font-size: 12px; line-height: 1.5; }
+    #open-manager {
+      font-weight: 600;
+      justify-content: center;
+      background: var(--accent);
+      color: var(--accent-fg);
+      border-color: var(--accent);
+    }
+    #open-manager:hover { background: color-mix(in srgb, var(--accent) 88%, light-dark(#000, #fff)); }
   </style>
 </head>
 <body>
   <h1>TabsManager</h1>
   <div id="current"></div>
-  <button id="snooze">⏸ Snooze now</button>
-  <button id="protect-site">🛡 Protect site</button>
+  <button id="snooze"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 3v10M10 3v10"/></svg> Snooze now</button>
+  <button id="protect-site"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M8 1.8 13.2 3.7V8c0 3.2-2.3 5.1-5.2 6.2C5.1 13.1 2.8 11.2 2.8 8V3.7Z"/></svg> <span id="protect-label">Protect site</span></button>
   <div id="stats"></div>
   <button id="open-manager">Open Tab Manager</button>
   <script type="module" src="popup.js"></script>

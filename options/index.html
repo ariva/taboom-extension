@@ -3,63 +3,198 @@
 <head>
   <meta charset="utf-8" />
   <title>TabsManager Settings</title>
+  <link rel="stylesheet" href="../styles/common.css" />
   <style>
-    :root { color-scheme: light dark; font-family: system-ui, sans-serif; font-size: 14px; }
-    body { margin: 0 auto; max-width: 560px; padding: 24px 16px; }
+    :root { font-size: 14px; }
+    body { margin: 0 auto; max-width: 560px; padding: 24px 16px; background: var(--bg); }
     h1 { font-size: 18px; }
-    h2 { font-size: 15px; margin-top: 28px; border-bottom: 1px solid light-dark(#ddd, #444); padding-bottom: 4px; }
-    label { display: block; margin: 8px 0; }
+    h2 { font-size: 15px; margin: 0 0 10px; }
+
+    .card {
+      background: var(--card-bg);
+      border-radius: var(--radius-l);
+      box-shadow: var(--shadow-1);
+      padding: 16px;
+      margin-top: 16px;
+    }
+
+    label { display: flex; align-items: center; gap: 6px; margin: 10px 0; flex-wrap: wrap; }
+
+    input[type="number"], input[type="text"], select {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-s);
+      background: var(--card-bg);
+      padding: 4px 6px;
+      font: inherit;
+    }
     input[type="number"] { width: 80px; }
-    ul { list-style: none; padding: 0; }
-    li { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid light-dark(#eee, #333); }
-    #links a { white-space: nowrap; }
+
+    /* checkbox → switch; still a native checkbox for keyboard/AT */
+    input[type="checkbox"] {
+      appearance: none;
+      width: 32px;
+      height: 18px;
+      flex: none;
+      border-radius: 9px;
+      background: var(--badge-bg);
+      position: relative;
+      cursor: pointer;
+      transition: background var(--transition);
+      margin: 0;
+    }
+    input[type="checkbox"]::before {
+      content: "";
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: light-dark(#fff, #ddd);
+      box-shadow: var(--shadow-1);
+      transition: translate var(--transition);
+    }
+    input[type="checkbox"]:checked { background: var(--accent); }
+    input[type="checkbox"]:checked::before { translate: 14px 0; }
+
+    ul { list-style: none; padding: 0; margin: 8px 0; }
+
+    /* protected-site rules as chips */
+    #rules { display: flex; flex-wrap: wrap; gap: 6px; }
+    #rules li {
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+      background: var(--badge-bg);
+      border-radius: 999px;
+      padding: 2px 4px 2px 10px;
+      font-family: ui-monospace, monospace;
+      font-size: 12px;
+    }
+    #rules li.muted { background: none; padding: 0; font-family: inherit; font-size: inherit; }
+    #rules button {
+      border: none;
+      background: none;
+      cursor: pointer;
+      border-radius: 50%;
+      width: 18px;
+      height: 18px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: background var(--transition);
+    }
+    #rules button:hover { background: var(--hover); }
+    #rules button svg { width: 10px; height: 10px; display: block; }
+
+    #links li { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid light-dark(#eee, #333); }
+    #links li:last-child { border-bottom: none; }
+    #links a { white-space: nowrap; color: var(--accent); }
     #links span { text-align: right; margin-left: 16px; }
-    button { cursor: pointer; }
+
+    button { cursor: pointer; font: inherit; }
     .row { display: flex; gap: 8px; margin-top: 8px; }
-    .muted { color: light-dark(#666, #aaa); font-size: 13px; }
-    #danger { color: light-dark(#b00020, #ff8a80); }
+    .row button {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-s);
+      background: none;
+      padding: 4px 12px;
+      transition: background var(--transition);
+    }
+    .row button:hover { background: var(--hover); }
+    .row input { flex: 1; }
+    .muted { color: var(--muted); font-size: 13px; }
+
+    .card.danger-zone { border: 1px solid color-mix(in srgb, var(--danger) 40%, transparent); }
+    #danger {
+      color: var(--danger);
+      border: 1px solid currentColor;
+      border-radius: var(--radius-s);
+      background: none;
+      padding: 4px 12px;
+      transition: background var(--transition);
+    }
+    #danger:hover { background: color-mix(in srgb, var(--danger) 10%, transparent); }
+
+    #saved {
+      position: fixed;
+      bottom: 16px;
+      right: 16px;
+      background: var(--ok-bg);
+      color: var(--ok-fg);
+      border-radius: 999px;
+      padding: 4px 14px;
+      box-shadow: var(--shadow-2);
+      transition: opacity var(--transition), transform var(--transition),
+        display var(--transition) allow-discrete;
+    }
+    #saved[hidden] { display: none; opacity: 0; transform: translateY(6px); }
+    @starting-style {
+      #saved { opacity: 0; transform: translateY(6px); }
+    }
   </style>
 </head>
 <body>
   <h1>TabsManager Settings</h1>
 
-  <h2>Automatic Snooze</h2>
-  <label><input type="checkbox" id="autoSnoozeEnabled" /> Automatically snooze inactive tabs</label>
-  <label>Inactive for <input type="number" id="inactivityMinutes" min="1" /> minutes</label>
-  <label>Check every <input type="number" id="checkIntervalMinutes" min="1" /> minutes</label>
-  <label><input type="checkbox" id="excludePinned" /> Never auto-snooze pinned tabs</label>
-  <label><input type="checkbox" id="excludeAudible" /> Never auto-snooze tabs playing audio</label>
-  <label>Keep at least <input type="number" id="minAwakePerWindow" min="0" /> awake tabs per window <span class="muted">(0 = no limit)</span></label>
-  <p class="muted">Active, protected, and already-snoozed tabs are always excluded.</p>
+  <section class="card">
+    <h2>Automatic Snooze</h2>
+    <label><input type="checkbox" id="autoSnoozeEnabled" /> Automatically snooze inactive tabs</label>
+    <label>Inactive for <input type="number" id="inactivityMinutes" min="1" /> minutes</label>
+    <label>Check every <input type="number" id="checkIntervalMinutes" min="1" /> minutes</label>
+    <label><input type="checkbox" id="excludePinned" /> Never auto-snooze pinned tabs</label>
+    <label><input type="checkbox" id="excludeAudible" /> Never auto-snooze tabs playing audio</label>
+    <label>Keep at least <input type="number" id="minAwakePerWindow" min="0" /> awake tabs per window <span class="muted">(0 = no limit)</span></label>
+    <p class="muted">Active, protected, and already-snoozed tabs are always excluded.</p>
+  </section>
 
-  <h2>Protected Sites</h2>
-  <p class="muted">Exact host (<code>mail.google.com</code>) or domain with subdomains (<code>*.github.com</code>).</p>
-  <ul id="rules"></ul>
-  <div class="row">
-    <input type="text" id="new-rule" placeholder="*.example.com" />
-    <button id="add-rule">Add</button>
-  </div>
+  <section class="card">
+    <h2>Protected Sites</h2>
+    <p class="muted">Exact host (<code>mail.google.com</code>) or domain with subdomains (<code>*.github.com</code>).</p>
+    <ul id="rules"></ul>
+    <div class="row">
+      <input type="text" id="new-rule" placeholder="*.example.com" />
+      <button id="add-rule">Add</button>
+    </div>
+  </section>
 
-  <h2>Interface</h2>
-  <label>Side panel font size <input type="number" id="fontSize" min="0.6" max="1.5" step="0.05" /> rem <span class="muted">(1 = browser base size, default)</span></label>
+  <section class="card">
+    <h2>Interface</h2>
+    <label>Side panel font size <input type="number" id="fontSize" min="0.6" max="1.5" step="0.05" /> rem <span class="muted">(1 = browser base size, default)</span></label>
+    <label>Row density
+      <select id="density">
+        <option value="comfortable">Comfortable</option>
+        <option value="compact">Compact</option>
+      </select>
+    </label>
+  </section>
 
-  <h2>Useful Links</h2>
-  <ul id="links">
-    <li><a href="#" data-url="chrome://extensions/shortcuts">chrome://extensions/shortcuts</a><span class="muted">configure keyboard shortcuts</span></li>
-    <li><a href="#" data-url="chrome://settings/performance">chrome://settings/performance</a><span class="muted">Memory Saver — native ring indicator on snoozed tabs</span></li>
-    <li><a href="#" data-url="chrome://settings/appearance">chrome://settings/appearance</a><span class="muted">side panel position: left / right</span></li>
-    <li><a href="#" data-url="chrome://discards">chrome://discards</a><span class="muted">per-tab discard state, verify snoozing</span></li>
-    <li><a href="#" data-url="chrome://extensions">chrome://extensions</a><span class="muted">reload extension, view service-worker logs</span></li>
-  </ul>
-  <p class="muted">Chrome Task Manager (<kbd>Shift+Esc</kbd>) shows per-tab memory; snoozed tabs have no process row.</p>
+  <section class="card">
+    <h2>Useful Links</h2>
+    <ul id="links">
+      <li><a href="#" data-url="chrome://extensions/shortcuts">chrome://extensions/shortcuts</a><span class="muted">configure keyboard shortcuts</span></li>
+      <li><a href="#" data-url="chrome://settings/performance">chrome://settings/performance</a><span class="muted">Memory Saver — native ring indicator on snoozed tabs</span></li>
+      <li><a href="#" data-url="chrome://settings/appearance">chrome://settings/appearance</a><span class="muted">side panel position: left / right</span></li>
+      <li><a href="#" data-url="chrome://discards">chrome://discards</a><span class="muted">per-tab discard state, verify snoozing</span></li>
+      <li><a href="#" data-url="chrome://extensions">chrome://extensions</a><span class="muted">reload extension, view service-worker logs</span></li>
+    </ul>
+    <p class="muted">Chrome Task Manager (<kbd>Shift+Esc</kbd>) shows per-tab memory; snoozed tabs have no process row.</p>
+  </section>
 
-  <h2>Data</h2>
-  <button id="danger">Delete all TabsManager data</button>
+  <section class="card danger-zone">
+    <h2>Data</h2>
+    <p class="muted">Removes all settings and protection rules. Cannot be undone.</p>
+    <button id="danger">Delete all TabsManager data</button>
+  </section>
 
-  <h2>About</h2>
-  <p class="muted" id="about"></p>
-  <p class="muted">Tab information and settings are processed locally in the browser.
-    TabsManager does not send browsing information to a remote service.</p>
+  <section class="card">
+    <h2>About</h2>
+    <p class="muted" id="about"></p>
+    <p class="muted">Tab information and settings are processed locally in the browser.
+      TabsManager does not send browsing information to a remote service.</p>
+  </section>
+
+  <div id="saved" hidden>Saved ✓</div>
 
   <script type="module" src="options.js"></script>
 </body>

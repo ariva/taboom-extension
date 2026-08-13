@@ -21,7 +21,7 @@ test:
 build: check
     mkdir -p dist
     rm -f dist/tabs-manager.zip
-    zip -r dist/tabs-manager.zip manifest.json background core sidepanel popup options icons
+    zip -r dist/tabs-manager.zip manifest.json background core sidepanel popup options icons styles
     @echo "dist/tabs-manager.zip ready"
 
 clean:

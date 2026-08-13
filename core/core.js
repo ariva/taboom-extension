@@ -17,6 +17,7 @@ export const DEFAULTS = {
     scope: "all-windows",
     sort: "recent",
     fontSize: 1, // rem, relative to browser default
+    density: "comfortable", // or "compact"
   },
 };
 

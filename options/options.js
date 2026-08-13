@@ -31,11 +31,14 @@ async function render() {
     const span = document.createElement("span");
     span.textContent = rule.pattern;
     const remove = document.createElement("button");
-    remove.textContent = "Remove";
+    remove.innerHTML =
+      '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg>';
+    remove.title = remove.ariaLabel = `Remove ${rule.pattern}`;
     remove.addEventListener("click", async () => {
       await saveState({
         protectionRules: state.protectionRules.filter((r) => r.id !== rule.id),
       });
+      flashSaved();
       render();
     });
     li.append(span, remove);
@@ -43,6 +46,7 @@ async function render() {
   }
 
   document.getElementById("fontSize").value = state.ui.fontSize ?? 1;
+  document.getElementById("density").value = state.ui.density ?? "comfortable";
 
   document.getElementById("about").textContent =
     `TabsManager ${chrome.runtime.getManifest().version}`;
@@ -57,6 +61,15 @@ async function saveSettings() {
       input.type === "checkbox" ? input.checked : Math.max(floor, Number(input.value) || floor);
   }
   await saveState({ settings });
+  flashSaved();
+}
+
+let savedTimer;
+function flashSaved() {
+  const el = document.getElementById("saved");
+  el.hidden = false;
+  clearTimeout(savedTimer);
+  savedTimer = setTimeout(() => (el.hidden = true), 1200);
 }
 
 for (const id of SETTING_IDS) {
@@ -69,6 +82,14 @@ document.getElementById("fontSize").addEventListener("change", async () => {
   input.value = fontSize;
   const state = await loadState();
   await saveState({ ui: { ...state.ui, fontSize } });
+  flashSaved();
+});
+
+document.getElementById("density").addEventListener("change", async () => {
+  const density = document.getElementById("density").value;
+  const state = await loadState();
+  await saveState({ ui: { ...state.ui, density } });
+  flashSaved();
 });
 
 document.getElementById("add-rule").addEventListener("click", async () => {
@@ -78,6 +99,7 @@ document.getElementById("add-rule").addEventListener("click", async () => {
   const state = await loadState();
   if (!state.protectionRules.some((r) => r.pattern === rule.pattern)) {
     await saveState({ protectionRules: [...state.protectionRules, rule] });
+    flashSaved();
   }
   input.value = "";
   render();

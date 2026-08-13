@@ -67,7 +67,19 @@ function counts() {
 
 // ---------- render ----------
 
-function render() {
+const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
+
+// animate=false for high-frequency renders (typing, cursor moves) where a
+// view transition would add latency and caret flicker
+function render(animate = true) {
+  if (animate && document.startViewTransition && !reducedMotion.matches) {
+    document.startViewTransition(renderNow);
+  } else {
+    renderNow();
+  }
+}
+
+function renderNow() {
   const byFilter = counts();
   for (const button of filterBar.querySelectorAll("button")) {
     const name = button.dataset.filter;
@@ -75,13 +87,20 @@ function render() {
     button.setAttribute("aria-pressed", String(name === state.filter));
   }
 
+  listEl.classList.toggle("compact", uiPrefs.density === "compact");
   visible = filteredTabs();
   cursor = Math.min(cursor, visible.length - 1);
   listEl.textContent = "";
   if (visible.length === 0) {
     const empty = document.createElement("div");
     empty.className = "empty";
-    empty.textContent = "No tabs match.";
+    empty.textContent = state.query
+      ? "No tabs match — press Esc to clear the search."
+      : state.filter === "snoozed"
+        ? "Nothing snoozed yet. Hover a tab and use the pause button."
+        : state.filter === "protected"
+          ? "No protected tabs. Use the shield button on a tab to protect its site."
+          : "No open tabs.";
     listEl.append(empty);
   }
   const now = Date.now();
@@ -95,6 +114,7 @@ function renderRow(tab, index, now) {
   if (tab.discarded) row.classList.add("snoozed");
   if (tab.active) row.classList.add("active-tab");
   row.setAttribute("role", "option");
+  row.style.viewTransitionName = `tab-${tab.id}`;
 
   const checkbox = document.createElement("input");
   checkbox.type = "checkbox";
@@ -138,10 +158,10 @@ function renderRow(tab, index, now) {
     age.textContent = formatAge(now - tab.lastAccessed);
     meta.append(age);
   }
-  for (const badgeText of badges(tab)) {
+  for (const [label, kind] of badges(tab)) {
     const badge = document.createElement("span");
-    badge.className = "badge";
-    badge.textContent = badgeText;
+    badge.className = kind ? `badge ${kind}` : "badge";
+    badge.textContent = label;
     meta.append(badge);
   }
   main.append(title, meta);
@@ -166,10 +186,10 @@ function renderRow(tab, index, now) {
 
 function badges(tab) {
   const list = [];
-  if (tab.discarded) list.push("SNOOZED");
-  if (isProtected(tab.url, rules)) list.push("PROTECTED");
-  if (tab.pinned) list.push("PINNED");
-  if (tab.audible) list.push("🔊");
+  if (tab.discarded) list.push(["snoozed", "warn"]);
+  if (isProtected(tab.url, rules)) list.push(["protected", "ok"]);
+  if (tab.pinned) list.push(["pinned", ""]);
+  if (tab.audible) list.push(["🔊", ""]);
   return list;
 }
 
@@ -258,7 +278,7 @@ async function protectSelected() {
 searchInput.addEventListener("input", () => {
   state.query = searchInput.value;
   cursor = state.query ? 0 : -1;
-  render();
+  render(false);
 });
 
 filterBar.addEventListener("click", (event) => {
@@ -294,7 +314,7 @@ selectAllBox.addEventListener("change", () => {
   } else {
     for (const tab of visible) selected.delete(tab.id);
   }
-  render();
+  render(false);
 });
 
 document.getElementById("settings-btn").addEventListener("click", () => {
@@ -318,7 +338,7 @@ document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
     searchInput.value = "";
     state.query = "";
-    render();
+    render(false);
     searchInput.focus();
     return;
   }
@@ -328,7 +348,7 @@ document.addEventListener("keydown", (event) => {
     cursor = event.key === "ArrowDown"
       ? Math.min(cursor + 1, visible.length - 1)
       : Math.max(cursor - 1, 0);
-    render();
+    render(false);
     listEl.querySelector(".cursor")?.scrollIntoView({ block: "nearest" });
     return;
   }

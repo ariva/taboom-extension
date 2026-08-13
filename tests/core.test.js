@@ -139,3 +139,9 @@ test("makeRule", () => {
   assert.equal(makeRule("mail.google.com").type, "host");
   assert.equal(makeRule("Mail.Google.Com").pattern, "mail.google.com");
 });
+
+test("ui defaults", async () => {
+  const { DEFAULTS } = await import("../core/core.js");
+  assert.equal(DEFAULTS.ui.fontSize, 1);
+  assert.equal(DEFAULTS.ui.density, "comfortable");
+});

@@ -9,9 +9,9 @@ document.getElementById("current").textContent = `Current: ${tab?.title ?? "—"
 const protectButton = document.getElementById("protect-site");
 const host = tab ? hostnameOf(tab.url) : "";
 if (host) {
-  protectButton.textContent = isProtected(tab.url, state.protectionRules)
-    ? `🛡 Unprotect ${host}`
-    : `🛡 Protect ${host}`;
+  document.getElementById("protect-label").textContent = isProtected(tab.url, state.protectionRules)
+    ? `Unprotect ${host}`
+    : `Protect ${host}`;
 } else {
   protectButton.disabled = true;
 }
