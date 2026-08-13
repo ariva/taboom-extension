@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "TabsManager",
-  "description": "Search, protect, and snooze inactive Chrome tabs.",
-  "version": "0.2.3",
+  "name": "Taboom - Smart Tabs Manager by ariva-tools",
+  "description": "Taboom - Smart Tabs Manager Extension to search, snooze, and protect Chrome tabs. It saves memory and helps you manage your tabs efficiently.",
+  "version": "0.2.4",
   "minimum_chrome_version": "121",
 
   "permissions": ["tabs", "storage", "alarms", "contextMenus", "sidePanel", "favicon"],
@@ -13,7 +13,7 @@
   },
 
   "action": {
-    "default_title": "TabsManager",
+    "default_title": "Taboom - Smart Tabs Manager",
     "default_popup": "popup/index.html",
     "default_icon": {
       "16": "icons/icon16.png",
@@ -40,7 +40,7 @@
         "default": "Ctrl+Shift+Space",
         "mac": "Command+Shift+Space"
       },
-      "description": "Open TabsManager side panel"
+      "description": "Open Taboom side panel"
     },
     "snooze-current-tab": {
       "description": "Snooze current tab"
