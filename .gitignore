@@ -2,3 +2,4 @@ dist
 .logs
 .private
 .DS_Store
+node_modules/

@@ -3,5 +3,8 @@
   "private": true,
   "version": "0.2.5",
   "type": "module",
-  "description": "Node tooling metadata only (ES modules for node --test). Chrome ignores this file."
+  "description": "Node tooling metadata only (ES modules for node --test). Chrome ignores this file.",
+  "devDependencies": {
+    "happy-dom": "^20.11.2"
+  }
 }
