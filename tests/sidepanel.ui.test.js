@@ -91,3 +91,27 @@ test("UI - Sidepanel - Bulk bar appears on selection; Wake reloads only discarde
   const reloads = calls.filter((c) => c.startsWith("tabs.reload"));
   assert.deepEqual(reloads, ["tabs.reload 2"], "only the discarded tab is reloaded");
 });
+
+test("UI - Sidepanel - Activating a row scrolls the current tab into view after re-render", async () => {
+  const scrolled = [];
+  window.HTMLElement.prototype.scrollIntoView = function () {
+    scrolled.push(this.className);
+  };
+  // click a non-active row → activate() → event-driven refresh re-renders
+  const listEl = document.getElementById("tab-list");
+  listEl.scrollTop = 500; // pretend we're scrolled deep down
+  const rows = [...document.querySelectorAll(".row")];
+  rows.find((r) => !r.classList.contains("current")).click();
+  await tick();
+  await chrome.tabs.onActivated.fire({});
+  await new Promise((resolve) => setTimeout(resolve, 200)); // 150ms debounce
+  // activated tab sorts to the top → full scroll to top (not just nearest)
+  assert.equal(listEl.scrollTop, 0, "list scrolled fully to top");
+  // a plain event-driven refresh must NOT autoscroll
+  listEl.scrollTop = 500;
+  scrolled.length = 0;
+  await chrome.tabs.onActivated.fire({});
+  await new Promise((resolve) => setTimeout(resolve, 200));
+  assert.equal(listEl.scrollTop, 500, "no follow without user activation");
+  assert.equal(scrolled.length, 0);
+});

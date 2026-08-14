@@ -145,6 +145,16 @@ function renderNow() {
     }
     listEl.append(renderRow(tab, index, now));
   });
+  if (followCurrentAfterRender) {
+    followCurrentAfterRender = false;
+    const current = listEl.querySelector(".row.current");
+    // topmost row → scroll fully to top so headers/padding show; else just reveal it
+    if (current === listEl.querySelector(".row")) {
+      listEl.scrollTop = 0;
+    } else {
+      current?.scrollIntoView({ block: "nearest" });
+    }
+  }
   renderBulkBar();
 }
 
@@ -280,9 +290,14 @@ function renderBulkBar() {
 
 // ---------- actions ----------
 
+// after activating, the tab jumps in the list (top in recent/window sorts) —
+// follow it on the next event-driven re-render so it doesn't vanish off-screen
+let followCurrentAfterRender = false;
+
 async function activate(tab) {
   await chrome.windows.update(tab.windowId, { focused: true });
   await chrome.tabs.update(tab.id, { active: true });
+  followCurrentAfterRender = true;
 }
 
 let toastTimer;
