@@ -58,6 +58,12 @@ function filteredTabs() {
     case "oldest": tabs.sort((a, b) => last(a) - last(b)); break;
     case "title": tabs.sort((a, b) => (a.title ?? "").localeCompare(b.title ?? "")); break;
     case "domain": tabs.sort((a, b) => hostnameOf(a.url).localeCompare(hostnameOf(b.url))); break;
+    // current window first, then other windows by id; recent-first within each
+    case "window": {
+      const rank = (tab) => (tab.windowId === currentWindowId ? 0 : tab.windowId);
+      tabs.sort((a, b) => rank(a) - rank(b) || last(b) - last(a));
+      break;
+    }
   }
   return tabs;
 }
@@ -115,7 +121,20 @@ function renderNow() {
     listEl.append(empty);
   }
   const now = Date.now();
-  visible.forEach((tab, index) => listEl.append(renderRow(tab, index, now)));
+  let prevWindowId;
+  visible.forEach((tab, index) => {
+    if (state.sort === "window" && tab.windowId !== prevWindowId) {
+      prevWindowId = tab.windowId;
+      const header = document.createElement("div");
+      header.className = "group-header";
+      const count = visible.filter((t) => t.windowId === tab.windowId).length;
+      header.textContent =
+        (tab.windowId === currentWindowId ? "Current window" : `Window ${tab.windowId}`) +
+        ` · ${count}`;
+      listEl.append(header);
+    }
+    listEl.append(renderRow(tab, index, now));
+  });
   renderBulkBar();
 }
 

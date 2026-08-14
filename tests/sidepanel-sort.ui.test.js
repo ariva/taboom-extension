@@ -8,6 +8,7 @@ const tabs = [
   { id: 1, windowId: 1, active: false, discarded: false, url: "https://zeta.org/x", title: "Charlie", lastAccessed: NOW - 3 * HOUR },
   { id: 2, windowId: 1, active: false, discarded: false, url: "https://alpha.dev/y", title: "Bravo", lastAccessed: NOW - 1 * HOUR },
   { id: 3, windowId: 1, active: false, discarded: false, url: "https://mid.io/z", title: "Alpha", lastAccessed: NOW - 2 * HOUR },
+  { id: 4, windowId: 2, active: false, discarded: false, url: "https://bb.aa/q", title: "Delta", lastAccessed: NOW - 4 * HOUR },
 ];
 
 loadPage("../../sidepanel/index.html", makeChrome({ tabs, calls: [], stored: {} }));
@@ -23,21 +24,30 @@ function setSort(value) {
 }
 
 test("UI - Sidepanel Sort - Recent: most recently used first (default)", () => {
-  assert.deepEqual(titles(), ["Bravo", "Alpha", "Charlie"]);
+  assert.deepEqual(titles(), ["Bravo", "Alpha", "Charlie", "Delta"]);
 });
 
 test("UI - Sidepanel Sort - Oldest: least recently used first", () => {
   setSort("oldest");
-  assert.deepEqual(titles(), ["Charlie", "Alpha", "Bravo"]);
+  assert.deepEqual(titles(), ["Delta", "Charlie", "Alpha", "Bravo"]);
 });
 
 test("UI - Sidepanel Sort - Title: alphabetical", () => {
   setSort("title");
-  assert.deepEqual(titles(), ["Alpha", "Bravo", "Charlie"]);
+  assert.deepEqual(titles(), ["Alpha", "Bravo", "Charlie", "Delta"]);
 });
 
 test("UI - Sidepanel Sort - Domain: alphabetical by hostname", () => {
   setSort("domain");
-  // alpha.dev < mid.io < zeta.org
-  assert.deepEqual(titles(), ["Bravo", "Alpha", "Charlie"]);
+  // alpha.dev < bb.aa < mid.io < zeta.org
+  assert.deepEqual(titles(), ["Bravo", "Delta", "Alpha", "Charlie"]);
+});
+
+test("UI - Sidepanel Sort - Group by window: current window first, headers with counts", () => {
+  setSort("window");
+  assert.deepEqual(titles(), ["Bravo", "Alpha", "Charlie", "Delta"], "current window recent-first, then window 2");
+  const headers = [...document.querySelectorAll(".group-header")].map((el) => el.textContent);
+  assert.deepEqual(headers, ["Current window · 3", "Window 2 · 1"]);
+  setSort("recent");
+  assert.equal(document.querySelector(".group-header"), null, "headers only in window mode");
 });

@@ -252,6 +252,19 @@ footer button:hover { background: var(--hover); }
   #toast { opacity: 0; transform: translateY(6px); }
 }
 
+/* window-group headers (sort = Group by window), sticky while scrolling */
+.group-header {
+  position: sticky;
+  top: -4px; /* cancels main's 4px top padding */
+  z-index: 1;
+  padding: 6px 14px 2px;
+  font-size: 0.77rem;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: var(--bg);
+}
+
 .empty {
   padding: 24px;
   text-align: center;
