@@ -5,7 +5,7 @@ Taboom - Tabs Manager is plain JavaScript with no build step — the repository 
 ## Requirements
 
 - Google Chrome 121 or newer (the extension relies on `Tab.lastAccessed`).
-- Nothing else. No `npm install`, no bundler.
+- Nothing else for loading the extension itself.
 
 ## Load unpacked (development install)
 
@@ -50,9 +50,14 @@ Chrome may refuse the suggested key if another extension already claims it — a
 
 ## Packing a zip (optional)
 
-With [`just`](https://github.com/casey/just) installed:
+Prerequisites:
+
+- [`just`](https://github.com/casey/just) — command runner driving lint/test/build (see its [installation guide](https://github.com/casey/just#installation)).
+- Node.js + `npm install` — installs the test-only dev dependencies (`happy-dom`); `just build` runs the test suite before packing.
+- [`fd`](https://github.com/sharkdp/fd) — used by the lint step to enumerate JS files.
 
 ```bash
+npm install
 just build    # lint + test + dist/tabs-manager.zip
 ```
 
