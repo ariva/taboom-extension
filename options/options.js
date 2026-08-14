@@ -49,7 +49,7 @@ async function render() {
   document.getElementById("density").value = state.ui.density ?? "comfortable";
 
   document.getElementById("about").textContent =
-    `TabsManager ${chrome.runtime.getManifest().version}`;
+    `Taboom ${chrome.runtime.getManifest().version}`;
 }
 
 async function saveSettings() {
@@ -114,7 +114,7 @@ document.getElementById("links").addEventListener("click", (event) => {
 });
 
 document.getElementById("danger").addEventListener("click", async () => {
-  if (!confirm("Delete all TabsManager settings and protection rules?")) return;
+  if (!confirm("Delete all Taboom settings and protection rules?")) return;
   await chrome.storage.local.clear();
   await saveState(structuredClone(DEFAULTS));
   render();

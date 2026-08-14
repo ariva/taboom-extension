@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "Taboom - Smart Tabs Manager by ariva-tools",
-  "description": "Taboom - Smart Tabs Manager Extension to search, snooze, and protect Chrome tabs. It saves memory and helps you manage your tabs efficiently.",
+  "name": "Taboom - Tabs Manager by ariva-tools",
+  "description": "Taboom - Privacy-first smart Tabs Manager to search, snooze, and protect Chrome tabs. Saves memory, runs fully locally.",
   "version": "0.2.4",
   "minimum_chrome_version": "121",
 

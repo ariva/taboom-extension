@@ -1,6 +1,6 @@
-# Installing TabsManager Locally
+# Installing Taboom - Tabs Manager Locally
 
-TabsManager is plain JavaScript with no build step — the repository folder loads directly into Chrome.
+Taboom - Tabs Manager is plain JavaScript with no build step — the repository folder loads directly into Chrome.
 
 ## Requirements
 
@@ -15,15 +15,15 @@ TabsManager is plain JavaScript with no build step — the repository folder loa
 4. Select this extension's root folder — the one containing `manifest.json`:
 
    ```text
-   chrome/extensions/tabs-manager/
+   taboom-extension/chrome
    ```
 
-5. The **TabsManager** card appears. Pin the toolbar icon via the puzzle-piece menu if you want quick access.
+5. The **Taboom - Tabs Manager** card appears. Pin the toolbar icon via the puzzle-piece menu if you want quick access.
 
 ## Verify it works
 
-1. Click the TabsManager toolbar icon → small popup with current-tab actions.
-2. Click **Open Tab Manager** → side panel opens listing all tabs.
+1. Click the Taboom - Tabs Manager toolbar icon → small popup with current-tab actions.
+2. Click **Open Taboom** → side panel opens listing all tabs.
 3. Type in the search box → list filters instantly.
 4. Hover a non-active tab row and click the ⏸ button → the tab gets a `SNOOZED` badge and Chrome shows it discarded (its title turns faded in the tab strip).
 5. Click that tab in Chrome → it reloads normally.
@@ -31,7 +31,7 @@ TabsManager is plain JavaScript with no build step — the repository folder loa
 ## After changing code
 
 1. Go to `chrome://extensions`.
-2. Click the circular **reload** arrow on the TabsManager card.
+2. Click the circular **reload** arrow on the Taboom - Tabs Manager card.
 3. Reopen the side panel / popup (already-open extension pages keep old code until reopened).
 
 Service-worker logs: click **service worker** link on the extension card to open its DevTools console. Side panel / popup: right-click inside them → Inspect.
@@ -42,7 +42,7 @@ Defaults (customize at `chrome://extensions/shortcuts`):
 
 | Command | Default |
 |---|---|
-| Open TabsManager side panel | `Ctrl+Shift+Space` (`Cmd+Shift+Space` on Mac) |
+| Open Taboom - Tabs Manager side panel | `Ctrl+Shift+Space` (`Cmd+Shift+Space` on Mac) |
 | Snooze current tab | unassigned |
 | Toggle site protection for current tab | unassigned |
 

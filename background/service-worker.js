@@ -202,7 +202,7 @@ const MENU_ITEMS = [
 
 async function createContextMenus() {
   await chrome.contextMenus.removeAll();
-  chrome.contextMenus.create({ id: "root", title: "TabsManager", contexts: ["page"] });
+  chrome.contextMenus.create({ id: "root", title: "Taboom - Tabs Manager", contexts: ["page"] });
   for (const item of MENU_ITEMS) {
     chrome.contextMenus.create({
       id: item.id,

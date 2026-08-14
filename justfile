@@ -1,4 +1,4 @@
-# TabsManager — vanilla JS MV3 extension, no compile step.
+# Taboom - Tabs Manager — vanilla JS MV3 extension, no compile step.
 # `just build` packs a zip; loading unpacked needs no build at all.
 
 set shell := ["bash", "-uc"]
@@ -20,9 +20,9 @@ test:
 # pack distributable zip (excludes docs/tests/tooling)
 build: check
     mkdir -p dist
-    rm -f dist/tabs-manager.zip
-    zip -r dist/tabs-manager.zip manifest.json background core sidepanel popup options icons styles images/moon.svg
-    @echo "dist/tabs-manager.zip ready"
+    rm -f dist/taboom-tabs-manager.zip
+    zip -r dist/taboom-tabs-manager.zip manifest.json background core sidepanel popup options icons styles images/moon.svg
+    @echo "dist/taboom-tabs-manager.zip ready"
 
 clean:
     rm -rf dist

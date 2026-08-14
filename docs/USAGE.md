@@ -1,4 +1,4 @@
-# Using TabsManager
+# Using Taboom - Tabs Manager
 
 ## Concepts
 
@@ -20,14 +20,14 @@ Snoozing uses `chrome.tabs.discard()` — Chrome kills the tab's renderer proces
 
 1. Open a memory-heavy page (YouTube, Gmail, Figma…), let it load.
 2. Press `Shift+Esc` (or Menu → More tools → Task Manager). Find the row `Tab: <page title>` and note its **Memory footprint** — often 100–500 MB.
-3. Snooze the tab from TabsManager.
+3. Snooze the tab from Taboom - Tabs Manager.
 4. The row **disappears from Task Manager** — the renderer process is gone; that memory is returned to the OS. The tab itself stays in the tab strip.
 5. Click the tab → the row reappears as it reloads.
 
 ### chrome://discards (detailed)
 
 1. Open `chrome://discards`.
-2. Table lists every tab: **Discarded** column shows ✔ for snoozed tabs, plus last-active time. Sanity-check that TabsManager's Snoozed filter agrees with this table.
+2. Table lists every tab: **Discarded** column shows ✔ for snoozed tabs, plus last-active time. Sanity-check that Taboom - Tabs Manager's Snoozed filter agrees with this table.
 
 ### OS level (optional)
 
@@ -41,7 +41,7 @@ Watch total Chrome memory in the system monitor (`htop`, Activity Monitor, Windo
 
 ## Side panel (main UI)
 
-Open with the toolbar popup's **Open Tab Manager**, or `Ctrl+Shift+Space`.
+Open with the toolbar popup's **Open Taboom**, or `Ctrl+Shift+Space`.
 
 Panel position (left or right) is a global Chrome setting: `chrome://settings/appearance` → **Side panel**. Extensions cannot set it, and top/bottom docking does not exist for side panels.
 
@@ -74,15 +74,15 @@ Toggle and tune everything in **Settings** (⚙ in the side panel, or the extens
 
 - Popup: **Protect example.com** for the current site.
 - Side panel: 🛡 on any row.
-- Right-click a page → TabsManager → **Always protect this site**.
+- Right-click a page → Taboom - Tabs Manager → **Always protect this site**.
 - Settings page: add rules manually.
 
 Rule forms: `mail.google.com` (exact host) or `*.github.com` (domain incl. subdomains). Protect sites that lose state on reload: editors, admin consoles, forms, terminals, conferencing.
 
 ## Context menu
 
-Right-click any page → **TabsManager**: Snooze this tab · Always protect this site · Snooze all inactive tabs.
+Right-click any page → **Taboom - Tabs Manager**: Snooze this tab · Always protect this site · Snooze all inactive tabs.
 
 ## Privacy
 
-Everything runs locally: no server, no telemetry, no content scripts, no host permissions. **Settings → Delete all TabsManager data** wipes stored settings and rules.
+Everything runs locally: no server, no telemetry, no content scripts, no host permissions. **Settings → Delete all Extensions data** wipes stored settings and rules.
