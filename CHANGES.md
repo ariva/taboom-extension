@@ -1,5 +1,20 @@
 # CHANGES
 
+## v0.2.5 — 2026-08-14
+
+### New Features
+- Added grouping by window (e1ae9ea)
+- Added multi-window visual identifier (f3e798f)
+
+### Fixes
+- List not auto-scrolling to new tab's position (bee76d5)
+
+### Other
+- Added TESTING.md doc (5e9b10b)
+- Updated local instructions in INSTALL.md (4dd5e2c)
+- Added link to chrome extension store in README.md (65ff893)
+- Added more tests (3127785)
+
 ## v0.2.4 — 2026-08-14
 
 ### New Features
