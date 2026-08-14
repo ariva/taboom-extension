@@ -1,5 +1,14 @@
 # CHANGES
 
+## v0.2.4 — 2026-08-14
+
+### New Features
+- Added wake bulk action (3830836)
+- Enable to switch themes in options (24d6124)
+
+### Other
+- Restyle active-tab indicators (16e046e)
+
 ## v0.2.3 — 2026-08-12
 
 ### Fixes
