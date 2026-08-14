@@ -120,6 +120,16 @@ function renderNow() {
           : "No open tabs.";
     listEl.append(empty);
   }
+  // per-window color dots, only when tabs span multiple windows
+  const windowIds = [...new Set(allTabs.map((t) => t.windowId))].sort((a, b) => a - b);
+  windowDots = new Map();
+  if (windowIds.length > 1) {
+    let i = 0;
+    for (const id of windowIds) {
+      windowDots.set(id, id === currentWindowId ? "" : windowColor(i++));
+    }
+  }
+
   const now = Date.now();
   let prevWindowId;
   visible.forEach((tab, index) => {
@@ -210,7 +220,17 @@ function renderRow(tab, index, now) {
     actionButton("close", "Close", () => closeTabs([tab.id])),
   );
 
-  row.append(checkbox, favicon, main, actions);
+  if (windowDots.size > 0) {
+    const dot = document.createElement("span");
+    dot.className = "win-dot";
+    const color = windowDots.get(tab.windowId);
+    if (color) dot.style.background = color;
+    else dot.classList.add("current");
+    dot.title = tab.windowId === currentWindowId ? "Current window" : `Window ${tab.windowId}`;
+    row.append(checkbox, dot, favicon, main, actions);
+  } else {
+    row.append(checkbox, favicon, main, actions);
+  }
   row.addEventListener("click", () => activate(tab));
   return row;
 }
@@ -223,6 +243,12 @@ function badges(tab) {
   if (tab.audible) list.push(["🔊", ""]);
   return list;
 }
+
+// mid-saturation hues legible on both themes; current window uses --accent via CSS
+const WINDOW_DOT_COLORS = ["#e4572e", "#17bebb", "#ffc914", "#76b041", "#b96ac9", "#f28db2", "#8d99ae", "#c9a227"];
+// beyond the palette: golden-angle hue spacing — unlimited, no repeats
+const windowColor = (i) => WINDOW_DOT_COLORS[i] ?? `hsl(${Math.round(i * 137.508) % 360} 65% 55%)`;
+let windowDots = new Map(); // windowId → color; empty when single window
 
 // inline SVGs: unicode glyphs (⏸ 🛡 ✕) render at wildly different sizes/baselines per platform
 const ICONS = {

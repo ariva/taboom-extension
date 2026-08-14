@@ -18,6 +18,10 @@ await tick();
 const key = (k) => document.dispatchEvent(new window.KeyboardEvent("keydown", { key: k, bubbles: true }));
 const cursorTitle = () => document.querySelector(".row.cursor .title")?.textContent;
 
+test("UI - Sidepanel Keyboard - No window dots when all tabs share one window", () => {
+  assert.equal(document.querySelectorAll(".win-dot").length, 0);
+});
+
 test("UI - Sidepanel Keyboard - Slash focuses search", () => {
   document.getElementById("search").blur();
   key("/");

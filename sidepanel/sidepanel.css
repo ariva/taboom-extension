@@ -134,6 +134,19 @@ main.compact .row .meta { display: none; }
 }
 .row.cursor { outline: 2px solid var(--accent); outline-offset: -2px; }
 
+/* per-window color dot, present only when tabs span multiple windows */
+.row .win-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex: none;
+  /* top-aligned like the checkbox, nudged to the checkbox's vertical middle
+     (native checkbox ≈ 13px + 3px default margin → center ~9.5px) */
+  margin-top: 6px;
+}
+
+.row .win-dot.current { background: var(--accent); }
+
 .row .favicon {
   width: 16px;
   height: 16px;

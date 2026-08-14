@@ -51,3 +51,12 @@ test("UI - Sidepanel Sort - Group by window: current window first, headers with 
   setSort("recent");
   assert.equal(document.querySelector(".group-header"), null, "headers only in window mode");
 });
+
+test("UI - Sidepanel Sort - Window dots shown on every row when multiple windows", () => {
+  const dots = [...document.querySelectorAll(".win-dot")];
+  assert.equal(dots.length, 4, "one dot per row");
+  assert.equal(dots.filter((d) => d.classList.contains("current")).length, 3, "current-window rows use accent dot");
+  const other = dots.find((d) => !d.classList.contains("current"));
+  assert.ok(other.style.background, "other window dot has a palette color");
+  assert.equal(other.title, "Window 2");
+});
