@@ -262,6 +262,15 @@ async function snooze(tabIds) {
   refresh(true);
 }
 
+// background reload of snoozed tabs — wakes without switching to them;
+// non-discarded tabs are skipped so a mixed selection never force-reloads live pages
+async function wake(tabIds) {
+  const snoozed = tabIds.filter((tabId) => allTabs.find((tab) => tab.id === tabId)?.discarded);
+  await Promise.all(snoozed.map((tabId) => chrome.tabs.reload(tabId).catch(() => {})));
+  selected.clear();
+  refresh(true);
+}
+
 async function closeTabs(tabIds) {
   // Native confirm for multi-close; upgrade to undo snackbar if it annoys
   if (tabIds.length > 1 && !confirm(`Close ${tabIds.length} tabs?`)) return;
@@ -334,6 +343,7 @@ document.getElementById("settings-btn").addEventListener("click", () => {
 });
 
 document.getElementById("bulk-snooze").addEventListener("click", () => snooze([...selected]));
+document.getElementById("bulk-wake").addEventListener("click", () => wake([...selected]));
 document.getElementById("bulk-protect").addEventListener("click", protectSelected);
 document.getElementById("bulk-close").addEventListener("click", () => closeTabs([...selected]));
 document.getElementById("bulk-clear").addEventListener("click", () => {
