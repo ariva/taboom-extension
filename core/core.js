@@ -18,6 +18,7 @@ export const DEFAULTS = {
     sort: "recent",
     fontSize: 1, // rem, relative to browser default
     density: "comfortable", // or "compact"
+    theme: "auto", // "auto" | "light" | "dark"
   },
 };
 

@@ -33,6 +33,9 @@ async function refresh(animate = false) {
   rules = persisted.protectionRules;
   uiPrefs = persisted.ui;
   document.documentElement.style.fontSize = `${uiPrefs.fontSize ?? 1}rem`;
+  // light-dark() colors resolve via color-scheme, so forcing it flips the palette
+  document.documentElement.style.colorScheme =
+    uiPrefs.theme === "light" || uiPrefs.theme === "dark" ? uiPrefs.theme : "";
   currentWindowId = win.id;
   allTabs = tabs;
   render(animate);

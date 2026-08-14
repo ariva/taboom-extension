@@ -4,6 +4,10 @@ import { loadState } from "../core/storage.js";
 const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
 const state = await loadState();
 
+// light-dark() colors resolve via color-scheme, so forcing it flips the palette
+document.documentElement.style.colorScheme =
+  state.ui.theme === "light" || state.ui.theme === "dark" ? state.ui.theme : "";
+
 document.getElementById("current").textContent = `Current: ${tab?.title ?? "—"}`;
 
 const protectButton = document.getElementById("protect-site");

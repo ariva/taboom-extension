@@ -116,18 +116,20 @@ main.compact .row .meta { display: none; }
 /* lit face — lighter left border (near side) + white inner highlight,
    dark inset lip on right edge (inner wall) = viewed-from-left 3d */
 .row.active-tab.current {
+  --lip: light-dark(transparent, color-mix(in srgb, var(--accent) 55%, #000));
+  --lit: light-dark(transparent, rgb(255 255 255 / 0.35));
   border-color: var(--accent);
   border-left: 3px solid color-mix(in srgb, var(--accent) 99%, #000);
   padding-left: 6px; /* 3px border + 6px = 9px, matches other rows' text offset */
   background: color-mix(in srgb, var(--accent) 8%, transparent);
   box-shadow:
-    inset 1px 0 0 rgb(255 255 255 / 0.35),
-    inset -4px 0 3px -1px color-mix(in srgb, var(--accent) 55%, #000);
+    inset 1px 0 0 var(--lit),
+    inset -4px 0 3px -1px var(--lip);
 }
 .row.active-tab.current:hover {
   box-shadow:
-    inset 1px 0 0 rgb(255 255 255 / 0.35),
-    inset -4px 0 3px -1px color-mix(in srgb, var(--accent) 55%, #000),
+    inset 1px 0 0 var(--lit),
+    inset -4px 0 3px -1px var(--lip),
     var(--shadow-1);
 }
 .row.cursor { outline: 2px solid var(--accent); outline-offset: -2px; }

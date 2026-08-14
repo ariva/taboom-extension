@@ -47,6 +47,8 @@ async function render() {
 
   document.getElementById("fontSize").value = state.ui.fontSize ?? 1;
   document.getElementById("density").value = state.ui.density ?? "comfortable";
+  document.getElementById("theme").value = state.ui.theme ?? "auto";
+  applyTheme(state.ui.theme);
 
   document.getElementById("about").textContent =
     `Taboom ${chrome.runtime.getManifest().version}`;
@@ -62,6 +64,11 @@ async function saveSettings() {
   }
   await saveState({ settings });
   flashSaved();
+}
+
+// light-dark() colors resolve via color-scheme, so forcing it flips the palette
+function applyTheme(theme) {
+  document.documentElement.style.colorScheme = theme === "light" || theme === "dark" ? theme : "";
 }
 
 let savedTimer;
@@ -89,6 +96,14 @@ document.getElementById("density").addEventListener("change", async () => {
   const density = document.getElementById("density").value;
   const state = await loadState();
   await saveState({ ui: { ...state.ui, density } });
+  flashSaved();
+});
+
+document.getElementById("theme").addEventListener("change", async () => {
+  const theme = document.getElementById("theme").value;
+  applyTheme(theme);
+  const state = await loadState();
+  await saveState({ ui: { ...state.ui, theme } });
   flashSaved();
 });
 
