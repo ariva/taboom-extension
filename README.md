@@ -56,3 +56,4 @@ Options page:
 - [Installation](docs/INSTALL.md) — load unpacked in Chrome, requirements, troubleshooting.
   After installing, pin the Taboom - Tabs Manager icon via Chrome's puzzle-piece (🧩) menu so the popup is always one click away.
 - [Usage](docs/USAGE.md) — concepts, side panel, automatic snooze, protection rules, verifying freed memory.
+- [Testing](docs/TESTING.md) — setup (npm install, just, fd), running the suite, test layout and conventions.
