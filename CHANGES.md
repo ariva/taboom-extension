@@ -1,5 +1,19 @@
 # CHANGES
 
+## v0.2.6 — 2026-08-15
+
+### New Features
+- Added per-group collapse/expand in window view (572c52c)
+- Number windows sequentially (current = #1) and format headers as [Window #N - visible_tabs/total] (3a00896)
+- Show visible / total tab counts in window group headers (b36f2a9)
+
+### Fixes
+- Bottom buttons disappearing (79e6782)
+
+### Other
+- Refactoring of options and popup for better code flow and testability (4d7df68)
+- Refactoring of sidepanel for better code flow and testability (0a5d17d)
+
 ## v0.2.5 — 2026-08-14
 
 ### New Features
