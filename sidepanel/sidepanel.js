@@ -138,9 +138,10 @@ function renderNow() {
       const header = document.createElement("div");
       header.className = "group-header";
       const count = visible.filter((t) => t.windowId === tab.windowId).length;
+      const total = allTabs.filter((t) => t.windowId === tab.windowId).length;
       header.textContent =
         (tab.windowId === currentWindowId ? "Current window" : `Window ${tab.windowId}`) +
-        ` · ${count}`;
+        ` · ${count} / ${total}`;
       listEl.append(header);
     }
     listEl.append(renderRow(tab, index, now));

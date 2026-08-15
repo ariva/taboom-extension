@@ -47,7 +47,18 @@ test("UI - Sidepanel Sort - Group by window: current window first, headers with 
   setSort("window");
   assert.deepEqual(titles(), ["Bravo", "Alpha", "Charlie", "Delta"], "current window recent-first, then window 2");
   const headers = [...document.querySelectorAll(".group-header")].map((el) => el.textContent);
-  assert.deepEqual(headers, ["Current window · 3", "Window 2 · 1"]);
+  assert.deepEqual(headers, ["Current window · 3 / 3", "Window 2 · 1 / 1"]);
+
+  // filtered list → visible / total diverge
+  const search = document.getElementById("search");
+  search.value = "Bravo";
+  search.dispatchEvent(new window.Event("input", { bubbles: true }));
+  assert.deepEqual(
+    [...document.querySelectorAll(".group-header")].map((el) => el.textContent),
+    ["Current window · 1 / 3"],
+  );
+  search.value = "";
+  search.dispatchEvent(new window.Event("input", { bubbles: true }));
   setSort("recent");
   assert.equal(document.querySelector(".group-header"), null, "headers only in window mode");
 });
