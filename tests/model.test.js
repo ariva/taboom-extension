@@ -135,3 +135,57 @@ test("Model - BulkSummary states: none, partial, all selected", () => {
   assert.equal(all.allChecked, true);
   assert.equal(all.selectAllTitle, "Unselect all");
 });
+
+// ---------- popup/model.js ----------
+const { currentLine, protectAction, statsLine } = await import("../popup/model.js");
+
+test("Model - Popup - CurrentLine and protect action states", () => {
+  assert.equal(currentLine({ title: "A Gist" }), "Current: A Gist");
+  assert.equal(currentLine(undefined), "Current: —");
+
+  const rules = [{ id: "r", type: "domain", pattern: "*.github.com" }];
+  assert.deepEqual(protectAction({ url: "https://gist.github.com/x" }, rules), {
+    disabled: false, label: "Unprotect gist.github.com",
+  });
+  assert.deepEqual(protectAction({ url: "https://other.io/" }, rules), {
+    disabled: false, label: "Protect other.io",
+  });
+  assert.deepEqual(protectAction({ url: "about:blank" }, rules), { disabled: true, label: null });
+  assert.deepEqual(protectAction(undefined, rules), { disabled: true, label: null });
+});
+
+test("Model - Popup - StatsLine", () => {
+  const rules = [{ id: "r", type: "host", pattern: "example.com" }];
+  const tabs = [tab(), tab({ id: 2, discarded: true, url: "https://a.io/" })];
+  assert.equal(
+    statsLine(tabs, { autoSnoozeEnabled: true }, rules),
+    "Auto snooze: ON · Open: 2 · Snoozed: 1 · Protected: 1",
+  );
+  assert.match(statsLine([], { autoSnoozeEnabled: false }, []), /^Auto snooze: OFF · Open: 0/);
+});
+
+// ---------- options/model.js ----------
+const { aboutText, clampFontSize, clampedNumber, hasRule } = await import("../options/model.js");
+
+test("Model - Options - Clamps, rule lookup, about text", () => {
+  assert.equal(clampFontSize("9"), 1.5, "max");
+  assert.equal(clampFontSize("0.1"), 0.6, "min");
+  assert.equal(clampFontSize("1.2"), 1.2);
+  assert.equal(clampFontSize("garbage"), 1, "fallback then clamp");
+  assert.equal(clampedNumber("50", 1), 50);
+  assert.equal(clampedNumber("-3", 1), 1, "floor");
+  assert.equal(clampedNumber("", 5), 5, "empty → floor");
+  assert.equal(hasRule([{ pattern: "*.a.com" }], "*.a.com"), true);
+  assert.equal(hasRule([{ pattern: "*.a.com" }], "a.com"), false);
+  assert.equal(aboutText("1.2.3"), "Taboom 1.2.3");
+});
+
+// ---------- core resolveColorScheme ----------
+const { resolveColorScheme } = await import("../core/core.js");
+
+test("Model - ResolveColorScheme: explicit themes pass, anything else follows system", () => {
+  assert.equal(resolveColorScheme("light"), "light");
+  assert.equal(resolveColorScheme("dark"), "dark");
+  assert.equal(resolveColorScheme("auto"), "");
+  assert.equal(resolveColorScheme(undefined), "");
+});

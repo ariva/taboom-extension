@@ -1,6 +1,6 @@
 // Imperative shell: DOM + chrome.* effects only. All list/view logic lives in
 // model.js as pure functions; this file feeds them state and applies the results.
-import { hostnameOf } from "../core/core.js";
+import { hostnameOf, resolveColorScheme } from "../core/core.js";
 import { loadState, saveState } from "../core/storage.js";
 import {
   bulkSummary,
@@ -54,8 +54,7 @@ async function refresh(animate = false) {
   state.ui = persisted.ui;
   document.documentElement.style.fontSize = `${state.ui.fontSize ?? 1}rem`;
   // light-dark() colors resolve via color-scheme, so forcing it flips the palette
-  document.documentElement.style.colorScheme =
-    state.ui.theme === "light" || state.ui.theme === "dark" ? state.ui.theme : "";
+  document.documentElement.style.colorScheme = resolveColorScheme(state.ui.theme);
   state.currentWindowId = win.id;
   state.allTabs = tabs;
   render(animate);

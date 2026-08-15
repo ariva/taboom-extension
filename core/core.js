@@ -22,6 +22,12 @@ export const DEFAULTS = {
   },
 };
 
+// ui.theme → value for document.documentElement.style.colorScheme
+// ("auto" / unknown → "" = follow system; light-dark() colors key off this)
+export function resolveColorScheme(theme) {
+  return theme === "light" || theme === "dark" ? theme : "";
+}
+
 export function hostnameOf(url) {
   try {
     return new URL(url).hostname.toLowerCase().replace(/\.$/, "");

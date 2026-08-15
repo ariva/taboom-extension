@@ -1,5 +1,7 @@
-import { DEFAULTS, makeRule } from "../core/core.js";
+// Imperative shell: DOM + chrome.* effects only; view logic lives in model.js.
+import { DEFAULTS, makeRule, resolveColorScheme } from "../core/core.js";
 import { loadState, saveState } from "../core/storage.js";
+import { aboutText, clampFontSize, clampedNumber, hasRule } from "./model.js";
 
 const SETTING_IDS = [
   "autoSnoozeEnabled",
@@ -50,17 +52,17 @@ async function render() {
   document.getElementById("theme").value = state.ui.theme ?? "auto";
   applyTheme(state.ui.theme);
 
-  document.getElementById("about").textContent =
-    `Taboom ${chrome.runtime.getManifest().version}`;
+  document.getElementById("about").textContent = aboutText(chrome.runtime.getManifest().version);
 }
 
 async function saveSettings() {
   const settings = {};
   for (const id of SETTING_IDS) {
     const input = document.getElementById(id);
-    const floor = Number(input.min) || 0;
     settings[id] =
-      input.type === "checkbox" ? input.checked : Math.max(floor, Number(input.value) || floor);
+      input.type === "checkbox"
+        ? input.checked
+        : clampedNumber(input.value, Number(input.min) || 0);
   }
   await saveState({ settings });
   flashSaved();
@@ -68,7 +70,7 @@ async function saveSettings() {
 
 // light-dark() colors resolve via color-scheme, so forcing it flips the palette
 function applyTheme(theme) {
-  document.documentElement.style.colorScheme = theme === "light" || theme === "dark" ? theme : "";
+  document.documentElement.style.colorScheme = resolveColorScheme(theme);
 }
 
 let savedTimer;
@@ -85,7 +87,7 @@ for (const id of SETTING_IDS) {
 
 document.getElementById("fontSize").addEventListener("change", async () => {
   const input = document.getElementById("fontSize");
-  const fontSize = Math.min(1.5, Math.max(0.6, Number(input.value) || 1));
+  const fontSize = clampFontSize(input.value);
   input.value = fontSize;
   const state = await loadState();
   await saveState({ ui: { ...state.ui, fontSize } });
@@ -112,7 +114,7 @@ document.getElementById("add-rule").addEventListener("click", async () => {
   const rule = makeRule(input.value);
   if (!rule) return;
   const state = await loadState();
-  if (!state.protectionRules.some((r) => r.pattern === rule.pattern)) {
+  if (!hasRule(state.protectionRules, rule.pattern)) {
     await saveState({ protectionRules: [...state.protectionRules, rule] });
     flashSaved();
   }

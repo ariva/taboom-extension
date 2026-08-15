@@ -1,30 +1,25 @@
-import { hostnameOf, isProtected } from "../core/core.js";
+// Imperative shell: DOM + chrome.* effects only; view logic lives in model.js.
+import { resolveColorScheme } from "../core/core.js";
 import { loadState } from "../core/storage.js";
+import { currentLine, protectAction, statsLine } from "./model.js";
 
 const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
 const state = await loadState();
 
-// light-dark() colors resolve via color-scheme, so forcing it flips the palette
-document.documentElement.style.colorScheme =
-  state.ui.theme === "light" || state.ui.theme === "dark" ? state.ui.theme : "";
+document.documentElement.style.colorScheme = resolveColorScheme(state.ui.theme);
 
-document.getElementById("current").textContent = `Current: ${tab?.title ?? "—"}`;
+document.getElementById("current").textContent = currentLine(tab);
 
 const protectButton = document.getElementById("protect-site");
-const host = tab ? hostnameOf(tab.url) : "";
-if (host) {
-  document.getElementById("protect-label").textContent = isProtected(tab.url, state.protectionRules)
-    ? `Unprotect ${host}`
-    : `Protect ${host}`;
-} else {
+const protect = protectAction(tab, state.protectionRules);
+if (protect.disabled) {
   protectButton.disabled = true;
+} else {
+  document.getElementById("protect-label").textContent = protect.label;
 }
 
 const tabs = await chrome.tabs.query({});
-document.getElementById("stats").textContent =
-  `Auto snooze: ${state.settings.autoSnoozeEnabled ? "ON" : "OFF"} · ` +
-  `Open: ${tabs.length} · Snoozed: ${tabs.filter((t) => t.discarded).length} · ` +
-  `Protected: ${tabs.filter((t) => isProtected(t.url, state.protectionRules)).length}`;
+document.getElementById("stats").textContent = statsLine(tabs, state.settings, state.protectionRules);
 
 document.getElementById("snooze").addEventListener("click", async () => {
   const response = await chrome.runtime.sendMessage({ type: "snooze-tab", tabId: tab.id });
