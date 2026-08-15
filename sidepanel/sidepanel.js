@@ -120,8 +120,13 @@ function renderNow() {
           : "No open tabs.";
     listEl.append(empty);
   }
-  // per-window color dots, only when tabs span multiple windows
+  // stable small indexes instead of Chrome's real window ids:
+  // current window = #1, others by ascending id
   const windowIds = [...new Set(allTabs.map((t) => t.windowId))].sort((a, b) => a - b);
+  const ordered = [currentWindowId, ...windowIds.filter((id) => id !== currentWindowId)];
+  windowIndex = new Map(ordered.map((id, i) => [id, i + 1]));
+
+  // per-window color dots, only when tabs span multiple windows
   windowDots = new Map();
   if (windowIds.length > 1) {
     let i = 0;
@@ -139,9 +144,8 @@ function renderNow() {
       header.className = "group-header";
       const count = visible.filter((t) => t.windowId === tab.windowId).length;
       const total = allTabs.filter((t) => t.windowId === tab.windowId).length;
-      header.textContent =
-        (tab.windowId === currentWindowId ? "Current window" : `Window ${tab.windowId}`) +
-        ` · ${count} / ${total}`;
+      const label = tab.windowId === currentWindowId ? "Window Current" : "Window";
+      header.textContent = `${label} #${windowIndex.get(tab.windowId)} - ${count}/${total}`;
       listEl.append(header);
     }
     listEl.append(renderRow(tab, index, now));
@@ -237,7 +241,10 @@ function renderRow(tab, index, now) {
     const color = windowDots.get(tab.windowId);
     if (color) dot.style.background = color;
     else dot.classList.add("current");
-    dot.title = tab.windowId === currentWindowId ? "Current window" : `Window ${tab.windowId}`;
+    dot.title =
+      tab.windowId === currentWindowId
+        ? "Current window"
+        : `Window #${windowIndex.get(tab.windowId)}`;
     row.append(checkbox, dot, favicon, main, actions);
   } else {
     row.append(checkbox, favicon, main, actions);
@@ -260,6 +267,7 @@ const WINDOW_DOT_COLORS = ["#e4572e", "#17bebb", "#ffc914", "#76b041", "#b96ac9"
 // beyond the palette: golden-angle hue spacing — unlimited, no repeats
 const windowColor = (i) => WINDOW_DOT_COLORS[i] ?? `hsl(${Math.round(i * 137.508) % 360} 65% 55%)`;
 let windowDots = new Map(); // windowId → color; empty when single window
+let windowIndex = new Map(); // windowId → 1-based display index (current window = 1)
 
 // inline SVGs: unicode glyphs (⏸ 🛡 ✕) render at wildly different sizes/baselines per platform
 const ICONS = {

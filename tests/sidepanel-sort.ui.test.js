@@ -47,7 +47,7 @@ test("UI - Sidepanel Sort - Group by window: current window first, headers with 
   setSort("window");
   assert.deepEqual(titles(), ["Bravo", "Alpha", "Charlie", "Delta"], "current window recent-first, then window 2");
   const headers = [...document.querySelectorAll(".group-header")].map((el) => el.textContent);
-  assert.deepEqual(headers, ["Current window · 3 / 3", "Window 2 · 1 / 1"]);
+  assert.deepEqual(headers, ["Window Current #1 - 3/3", "Window #2 - 1/1"]);
 
   // filtered list → visible / total diverge
   const search = document.getElementById("search");
@@ -55,7 +55,7 @@ test("UI - Sidepanel Sort - Group by window: current window first, headers with 
   search.dispatchEvent(new window.Event("input", { bubbles: true }));
   assert.deepEqual(
     [...document.querySelectorAll(".group-header")].map((el) => el.textContent),
-    ["Current window · 1 / 3"],
+    ["Window Current #1 - 1/3"],
   );
   search.value = "";
   search.dispatchEvent(new window.Event("input", { bubbles: true }));
@@ -69,5 +69,5 @@ test("UI - Sidepanel Sort - Window dots shown on every row when multiple windows
   assert.equal(dots.filter((d) => d.classList.contains("current")).length, 3, "current-window rows use accent dot");
   const other = dots.find((d) => !d.classList.contains("current"));
   assert.ok(other.style.background, "other window dot has a palette color");
-  assert.equal(other.title, "Window 2");
+  assert.equal(other.title, "Window #2");
 });
