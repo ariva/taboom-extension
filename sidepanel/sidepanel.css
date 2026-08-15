@@ -228,6 +228,7 @@ main.compact .row .meta { display: none; }
 
 footer {
   display: flex;
+  flex-wrap: wrap; /* narrow panel: buttons flow to the next line instead of cropping */
   gap: 6px;
   align-items: center;
   padding: 8px;

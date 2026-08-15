@@ -128,6 +128,7 @@ test("UI - Sidepanel - [hidden] beats author display rules (computed style)", ()
 
   const bar = document.getElementById("bulk-bar");
   assert.notEqual(window.getComputedStyle(bar).display, "none", "bulk bar always visible");
+  assert.equal(window.getComputedStyle(bar).flexWrap, "wrap", "narrow panel: buttons wrap, not crop");
   bar.hidden = true;
   assert.equal(window.getComputedStyle(bar).display, "none");
   bar.hidden = false;
