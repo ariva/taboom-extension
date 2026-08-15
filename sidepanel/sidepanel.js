@@ -324,7 +324,10 @@ function actionButton(icon, label, onClick) {
 
 function renderBulkBar() {
   const summary = bulkSummary(state.visible, state.selected);
-  bulkBar.hidden = summary.hidden;
+  // bar is always visible; empty selection disables the actions instead
+  for (const button of bulkBar.querySelectorAll("button")) {
+    button.disabled = summary.hidden;
+  }
   bulkCount.textContent = summary.text;
   selectAllBox.checked = summary.allChecked;
   selectAllBox.indeterminate = summary.indeterminate;

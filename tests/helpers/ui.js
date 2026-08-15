@@ -97,9 +97,15 @@ export function makeChrome({ tabs = [], stored = {}, calls = [] }) {
 // Loads <page>/index.html into a happy-dom window and exposes the globals
 // the page scripts expect. Import the page script AFTER calling this.
 export function loadPage(htmlPath, chrome) {
-  const html = readFileSync(new URL(htmlPath, import.meta.url), "utf8")
+  const htmlUrl = new URL(htmlPath, import.meta.url);
+  const html = readFileSync(htmlUrl, "utf8")
     .replace(/<script[^>]*><\/script>/, "") // page script is imported manually
-    .replace(/<link[^>]*>/g, ""); // stylesheets are irrelevant and would 404
+    // inline real stylesheets so tests can assert COMPUTED styles — an attribute
+    // like [hidden] can be overridden by author CSS, and attribute-only asserts
+    // miss that (see the bulk-bar / collapse-all always-visible regression)
+    .replace(/<link rel="stylesheet" href="([^"]+)" \/>/g, (_, href) => {
+      return `<style>${readFileSync(new URL(href, htmlUrl), "utf8")}</style>`;
+    });
   const window = new Window();
   window.document.write(html);
   if (!window.HTMLElement.prototype.scrollIntoView) {

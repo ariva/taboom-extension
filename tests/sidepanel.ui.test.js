@@ -77,12 +77,13 @@ test("UI - Sidepanel - Snoozed filter shows only discarded tabs", () => {
 });
 
 test("UI - Sidepanel - Bulk bar appears on selection; Wake reloads only discarded tabs", async () => {
-  assert.equal(document.getElementById("bulk-bar").hidden, true);
+  assert.equal(document.getElementById("bulk-bar").hidden, false, "bar always visible");
+  assert.equal(document.getElementById("bulk-snooze").disabled, true, "actions disabled with no selection");
   // select all visible via the select-all checkbox
   const selectAll = document.getElementById("select-all");
   selectAll.checked = true;
   selectAll.dispatchEvent(new window.Event("change", { bubbles: true }));
-  assert.equal(document.getElementById("bulk-bar").hidden, false);
+  assert.equal(document.getElementById("bulk-snooze").disabled, false, "actions enabled with selection");
   assert.match(document.getElementById("bulk-count").textContent, /3 selected/);
 
   calls.length = 0;
@@ -114,4 +115,20 @@ test("UI - Sidepanel - Activating a row scrolls the current tab into view after 
   await new Promise((resolve) => setTimeout(resolve, 200));
   assert.equal(listEl.scrollTop, 500, "no follow without user activation");
   assert.equal(scrolled.length, 0);
+});
+
+// regression guard: [hidden] must actually hide even when author CSS sets a
+// display value (.icon-btn is inline-flex, footer is flex) — asserts COMPUTED style
+test("UI - Sidepanel - [hidden] beats author display rules (computed style)", () => {
+  const btn = document.getElementById("collapse-all");
+  btn.hidden = true;
+  assert.equal(window.getComputedStyle(btn).display, "none", "hidden icon-btn not displayed");
+  btn.hidden = false;
+  assert.notEqual(window.getComputedStyle(btn).display, "none");
+
+  const bar = document.getElementById("bulk-bar");
+  assert.notEqual(window.getComputedStyle(bar).display, "none", "bulk bar always visible");
+  bar.hidden = true;
+  assert.equal(window.getComputedStyle(bar).display, "none");
+  bar.hidden = false;
 });

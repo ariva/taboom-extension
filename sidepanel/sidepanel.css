@@ -245,6 +245,8 @@ footer button {
 }
 
 footer button:hover { background: var(--hover); }
+footer button:disabled { opacity: 0.4; cursor: default; }
+footer button:disabled:hover { background: none; }
 
 #bulk-count { flex: 1; }
 
