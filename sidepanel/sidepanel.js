@@ -129,10 +129,12 @@ function renderNow() {
     });
 
   let foldableGroups = [];
+  let anythingToFold = false;
   if (state.sort === "window") {
     const collapsed = effectiveCollapsed();
     const groups = groupByWindow(state.fullVisible);
     const collapsible = groups.length > 1; // lone window: nothing to fold away
+    anythingToFold = collapsible;
     if (collapsible && !state.query) foldableGroups = groups;
     let index = 0;
     for (const [windowId, groupTabs] of groups) {
@@ -144,7 +146,7 @@ function renderNow() {
   } else {
     state.visible.forEach((tab, index) => listEl.append(renderRow(tab, rowVm(tab, index))));
   }
-  renderCollapseAllButton(foldableGroups);
+  renderCollapseAllButton(foldableGroups, anythingToFold);
 
   if (state.followCurrent) {
     state.followCurrent = false;
@@ -159,10 +161,10 @@ function renderNow() {
   renderBulkBar();
 }
 
-// toolbar fold/unfold-all toggle; visible whenever Group by window is selected,
-// disabled when there is nothing foldable (single group / active search)
-function renderCollapseAllButton(groups) {
-  collapseAllBtn.hidden = state.sort !== "window";
+// toolbar fold/unfold-all toggle; visible in Group by window with 2+ window
+// groups (hidden for a lone window), disabled while a search is active
+function renderCollapseAllButton(groups, anythingToFold) {
+  collapseAllBtn.hidden = state.sort !== "window" || !anythingToFold;
   if (collapseAllBtn.hidden) return;
   collapseAllBtn.disabled = groups.length === 0;
   const allCollapsed =
