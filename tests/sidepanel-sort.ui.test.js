@@ -23,7 +23,14 @@ function setSort(value) {
   select.dispatchEvent(new window.Event("change", { bubbles: true }));
 }
 
-test("UI - Sidepanel Sort - Recent: most recently used first (default)", () => {
+test("UI - Sidepanel Sort - Default is Group by window on first launch", () => {
+  assert.equal(document.getElementById("sort").value, "window");
+  assert.equal(document.querySelectorAll(".group-header").length, 2, "grouped view by default");
+  assert.equal(document.getElementById("collapse-all").hidden, false, "fold-all visible");
+});
+
+test("UI - Sidepanel Sort - Recent: most recently used first", () => {
+  setSort("recent");
   assert.deepEqual(titles(), ["Bravo", "Alpha", "Charlie", "Delta"]);
 });
 
@@ -47,7 +54,7 @@ test("UI - Sidepanel Sort - Group by window: current window first, headers with 
   setSort("window");
   assert.deepEqual(titles(), ["Bravo", "Alpha", "Charlie", "Delta"], "current window recent-first, then window 2");
   const headers = [...document.querySelectorAll(".group-header")].map((el) => el.textContent);
-  assert.deepEqual(headers, ["Window Current #1 - 3/3", "Window #2 - 1/1"]);
+  assert.deepEqual(headers, ["▾ Window Current #1 - 3/3", "▾ Window #2 - 1/1"]);
 
   // filtered list → visible / total diverge
   const search = document.getElementById("search");
@@ -63,6 +70,35 @@ test("UI - Sidepanel Sort - Group by window: current window first, headers with 
   assert.equal(document.querySelector(".group-header"), null, "headers only in window mode");
 });
 
+test("UI - Sidepanel Sort - Collapse hides a group's rows; search auto-expands", () => {
+  setSort("window");
+  const headerFor = (needle) =>
+    [...document.querySelectorAll(".group-header")].find((el) => el.textContent.includes(needle));
+
+  headerFor("Window Current #1").click();
+  assert.equal(document.querySelectorAll(".row").length, 1, "only window 2's row left");
+  assert.match(headerFor("Window Current #1").textContent, /^▸/, "collapsed indicator");
+  assert.equal(document.querySelectorAll(".group-header").length, 2, "header stays visible");
+
+  // search finds a tab inside the collapsed group → group auto-expands
+  const search = document.getElementById("search");
+  search.value = "Charlie";
+  search.dispatchEvent(new window.Event("input", { bubbles: true }));
+  assert.equal(document.querySelectorAll(".row").length, 1);
+  assert.match(document.querySelector(".row .title").textContent, /Charlie/);
+  assert.ok(!headerFor("Window Current #1").textContent.startsWith("▸"), "not marked collapsed during search");
+  assert.ok(headerFor("Window Current #1").classList.contains("static"), "single visible group → no collapse UI");
+
+  // clearing the search restores the collapsed state
+  search.value = "";
+  search.dispatchEvent(new window.Event("input", { bubbles: true }));
+  assert.equal(document.querySelectorAll(".row").length, 1, "window 1 collapsed again");
+
+  headerFor("Window Current #1").click();
+  assert.equal(document.querySelectorAll(".row").length, 4, "expanded back");
+  setSort("recent");
+});
+
 test("UI - Sidepanel Sort - Window dots shown on every row when multiple windows", () => {
   const dots = [...document.querySelectorAll(".win-dot")];
   assert.equal(dots.length, 4, "one dot per row");
@@ -70,4 +106,24 @@ test("UI - Sidepanel Sort - Window dots shown on every row when multiple windows
   const other = dots.find((d) => !d.classList.contains("current"));
   assert.ok(other.style.background, "other window dot has a palette color");
   assert.equal(other.title, "Window #2");
+});
+
+test("UI - Sidepanel Sort - Collapse-all button folds and unfolds every group", () => {
+  const btn = document.getElementById("collapse-all");
+  assert.equal(btn.hidden, true, "hidden outside window sort");
+
+  setSort("window");
+  assert.equal(btn.hidden, false, "visible with 2+ groups");
+  assert.equal(btn.title, "Collapse all");
+
+  btn.click();
+  assert.equal(document.querySelectorAll(".row").length, 0, "all groups folded");
+  assert.equal(document.querySelectorAll(".group-header").length, 2, "headers remain");
+  assert.equal(btn.title, "Expand all");
+
+  btn.click();
+  assert.equal(document.querySelectorAll(".row").length, 4, "all groups unfolded");
+  assert.equal(btn.title, "Collapse all");
+  setSort("recent");
+  assert.equal(btn.hidden, true);
 });

@@ -6,6 +6,7 @@ import {
   bulkSummary,
   countsByFilter,
   emptyMessage,
+  groupByWindow,
   groupHeader,
   rowViewModel,
   selectVisible,
@@ -20,6 +21,12 @@ const listEl = document.getElementById("tab-list");
 const bulkBar = document.getElementById("bulk-bar");
 const bulkCount = document.getElementById("bulk-count");
 const selectAllBox = document.getElementById("select-all");
+const collapseAllBtn = document.getElementById("collapse-all");
+
+const FOLD_ICONS = {
+  fold: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 3l4 4 4-4M4 9l4 4 4-4"/></svg>',
+  unfold: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7l4-4 4 4M4 13l4-4 4 4"/></svg>',
+};
 
 // the single mutable state of the panel — handlers write here, render reads
 const state = {
@@ -30,7 +37,9 @@ const state = {
   ui: {},
   rules: [],
   allTabs: [],
-  visible: [],
+  visible: [], // rows the user can interact with (excludes collapsed groups)
+  fullVisible: [], // before collapsing — header counts + empty-state check
+  collapsedWindows: new Set(), // windowIds collapsed in group-by-window view (session only)
   selected: new Set(),
   cursor: -1,
   currentWindowId: null,
@@ -70,8 +79,15 @@ const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
 // (1000-tab users) skip animation entirely — snappy beats pretty there.
 const VT_MAX_ROWS = 100;
 
+// an active search auto-expands: matches must never hide under a collapsed group
+function effectiveCollapsed() {
+  return state.sort === "window" && !state.query ? state.collapsedWindows : new Set();
+}
+
 function render(animate = true) {
-  state.visible = selectVisible(state.allTabs, { ...state, now: Date.now() });
+  state.fullVisible = selectVisible(state.allTabs, { ...state, now: Date.now() });
+  const collapsed = effectiveCollapsed();
+  state.visible = state.fullVisible.filter((tab) => !collapsed.has(tab.windowId));
   const heavy = Math.max(state.visible.length, listEl.childElementCount) > VT_MAX_ROWS;
   if (animate && !heavy && document.startViewTransition && !reducedMotion.matches) {
     document.startViewTransition(renderNow);
@@ -91,7 +107,7 @@ function renderNow() {
   listEl.classList.toggle("compact", state.ui.density === "compact");
   state.cursor = Math.min(state.cursor, state.visible.length - 1);
   listEl.textContent = "";
-  if (state.visible.length === 0) {
+  if (state.fullVisible.length === 0) {
     const empty = document.createElement("div");
     empty.className = "empty";
     empty.textContent = emptyMessage(state.query, state.filter);
@@ -100,21 +116,8 @@ function renderNow() {
 
   const maps = windowMaps(state.allTabs, state.currentWindowId);
   const now = Date.now();
-  let prevWindowId;
-  state.visible.forEach((tab, index) => {
-    if (state.sort === "window" && tab.windowId !== prevWindowId) {
-      prevWindowId = tab.windowId;
-      const header = document.createElement("div");
-      header.className = "group-header";
-      header.textContent = groupHeader(tab.windowId, {
-        visible: state.visible,
-        tabs: state.allTabs,
-        currentWindowId: state.currentWindowId,
-        indexes: maps.indexes,
-      });
-      listEl.append(header);
-    }
-    const vm = rowViewModel(tab, {
+  const rowVm = (tab, index) =>
+    rowViewModel(tab, {
       index,
       cursor: state.cursor,
       now,
@@ -124,8 +127,24 @@ function renderNow() {
       dotColors: maps.dotColors,
       indexes: maps.indexes,
     });
-    listEl.append(renderRow(tab, vm));
-  });
+
+  let foldableGroups = [];
+  if (state.sort === "window") {
+    const collapsed = effectiveCollapsed();
+    const groups = groupByWindow(state.fullVisible);
+    const collapsible = groups.length > 1; // lone window: nothing to fold away
+    if (collapsible && !state.query) foldableGroups = groups;
+    let index = 0;
+    for (const [windowId, groupTabs] of groups) {
+      const isCollapsed = collapsible && collapsed.has(windowId);
+      listEl.append(renderGroupHeader(windowId, isCollapsed, maps.indexes, collapsible));
+      if (isCollapsed) continue;
+      for (const tab of groupTabs) listEl.append(renderRow(tab, rowVm(tab, index++)));
+    }
+  } else {
+    state.visible.forEach((tab, index) => listEl.append(renderRow(tab, rowVm(tab, index))));
+  }
+  renderCollapseAllButton(foldableGroups);
 
   if (state.followCurrent) {
     state.followCurrent = false;
@@ -138,6 +157,67 @@ function renderNow() {
     }
   }
   renderBulkBar();
+}
+
+// toolbar fold/unfold-all toggle; visible whenever Group by window is selected,
+// disabled when there is nothing foldable (single group / active search)
+function renderCollapseAllButton(groups) {
+  collapseAllBtn.hidden = state.sort !== "window";
+  if (collapseAllBtn.hidden) return;
+  collapseAllBtn.disabled = groups.length === 0;
+  const allCollapsed =
+    groups.length > 0 && groups.every(([windowId]) => state.collapsedWindows.has(windowId));
+  collapseAllBtn.innerHTML = allCollapsed ? FOLD_ICONS.unfold : FOLD_ICONS.fold;
+  collapseAllBtn.title = collapseAllBtn.ariaLabel = allCollapsed ? "Expand all" : "Collapse all";
+  collapseAllBtn.dataset.groups = JSON.stringify(groups.map(([windowId]) => windowId));
+}
+
+collapseAllBtn.addEventListener("click", () => {
+  const windowIds = JSON.parse(collapseAllBtn.dataset.groups ?? "[]");
+  const allCollapsed = windowIds.every((id) => state.collapsedWindows.has(id));
+  if (allCollapsed) {
+    state.collapsedWindows.clear();
+  } else {
+    for (const id of windowIds) state.collapsedWindows.add(id);
+  }
+  render();
+});
+
+// clickable group header: toggles collapse of that window's rows
+function renderGroupHeader(windowId, isCollapsed, indexes, collapsible) {
+  const header = document.createElement("div");
+  header.className = "group-header";
+  header.textContent = groupHeader(windowId, {
+    visible: state.fullVisible,
+    tabs: state.allTabs,
+    currentWindowId: state.currentWindowId,
+    indexes,
+    collapsed: isCollapsed,
+    collapsible,
+  });
+  if (!collapsible) {
+    header.classList.add("static");
+    return header;
+  }
+  header.setAttribute("role", "button");
+  header.tabIndex = 0;
+  header.title = isCollapsed ? "Expand" : "Collapse";
+  const toggle = () => {
+    if (state.query) return; // search shows everything; collapse resumes after
+    state.collapsedWindows.has(windowId)
+      ? state.collapsedWindows.delete(windowId)
+      : state.collapsedWindows.add(windowId);
+    render();
+  };
+  header.addEventListener("click", toggle);
+  header.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      event.stopPropagation();
+      toggle();
+    }
+  });
+  return header;
 }
 
 // translate a row view-model into DOM; wires event handlers to actions

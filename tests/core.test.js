@@ -208,4 +208,5 @@ test("Core - UI defaults", async () => {
   assert.equal(DEFAULTS.ui.fontSize, 1);
   assert.equal(DEFAULTS.ui.density, "comfortable");
   assert.equal(DEFAULTS.ui.theme, "auto");
+  assert.equal(DEFAULTS.ui.sort, "window", "group-by-window on first launch");
 });

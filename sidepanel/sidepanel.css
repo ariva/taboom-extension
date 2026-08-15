@@ -36,6 +36,8 @@ h1 { font-size: 1.08rem; margin: 0; }
   transition: border-color var(--transition), box-shadow var(--transition);
 }
 
+#search::-webkit-search-cancel-button { cursor: pointer; }
+
 #search:focus {
   outline: none;
   border-color: var(--accent);
@@ -219,6 +221,8 @@ main.compact .row .meta { display: none; }
 }
 
 .icon-btn:hover, .row .actions button:hover { background: var(--badge-bg); }
+.icon-btn:disabled { opacity: 0.4; cursor: default; }
+.icon-btn:disabled:hover { background: none; }
 
 .icon-btn svg, .row .actions button svg { width: 14px; height: 14px; display: block; }
 
@@ -276,7 +280,13 @@ footer button:hover { background: var(--hover); }
   text-transform: uppercase;
   color: var(--muted);
   background: var(--bg);
+  cursor: pointer;
+  user-select: none;
 }
+
+.group-header:hover { color: light-dark(#333, #ddd); }
+.group-header.static { cursor: default; }
+.group-header.static:hover { color: var(--muted); }
 
 .empty {
   padding: 24px;

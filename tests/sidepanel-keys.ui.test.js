@@ -52,3 +52,17 @@ test("UI - Sidepanel Keyboard - Enter activates the cursor tab", async () => {
   assert.ok(calls.includes("windows.update 1"), "window focused");
   assert.ok(calls.some((c) => c.startsWith("tabs.update 2") && c.includes('"active":true')), "tab 2 activated");
 });
+
+test("UI - Sidepanel Keyboard - Single visible window: header not collapsible", () => {
+  const sel = document.getElementById("sort");
+  sel.value = "window";
+  sel.dispatchEvent(new window.Event("change", { bubbles: true }));
+  const header = document.querySelector(".group-header");
+  assert.ok(header.classList.contains("static"));
+  assert.ok(!header.textContent.startsWith("▾"), "no collapse arrow");
+  assert.equal(header.getAttribute("role"), null, "not a button");
+  header.click();
+  assert.equal(document.querySelectorAll(".row").length, 3, "click does nothing");
+  sel.value = "recent";
+  sel.dispatchEvent(new window.Event("change", { bubbles: true }));
+});

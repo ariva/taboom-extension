@@ -6,6 +6,7 @@ import {
   bulkSummary,
   countsByFilter,
   emptyMessage,
+  groupByWindow,
   groupHeader,
   rowViewModel,
   selectVisible,
@@ -66,12 +67,21 @@ test("Model - WindowColor: palette first, unique golden-angle hues beyond", () =
   assert.equal(fifty.size, 50, "no repeats");
 });
 
-test("Model - GroupHeader formats current and other windows", () => {
+test("Model - GroupHeader formats current and other windows, collapse indicator", () => {
   const tabs = [tab({ id: 1 }), tab({ id: 2 }), tab({ id: 3, windowId: 2 })];
   const { indexes } = windowMaps(tabs, 1);
   const ctx = { visible: tabs.slice(0, 1), tabs, currentWindowId: 1, indexes };
-  assert.equal(groupHeader(1, ctx), "Window Current #1 - 1/2");
-  assert.equal(groupHeader(2, { ...ctx, visible: tabs }), "Window #2 - 1/1");
+  assert.equal(groupHeader(1, ctx), "▾ Window Current #1 - 1/2");
+  assert.equal(groupHeader(2, { ...ctx, visible: tabs }), "▾ Window #2 - 1/1");
+  assert.equal(groupHeader(2, { ...ctx, visible: tabs, collapsed: true }), "▸ Window #2 - 1/1");
+  assert.equal(groupHeader(1, { ...ctx, collapsible: false }), "Window Current #1 - 1/2", "no arrow when not collapsible");
+});
+
+test("Model - GroupByWindow keeps order and splits runs", () => {
+  const tabs = [tab({ id: 1 }), tab({ id: 2 }), tab({ id: 3, windowId: 2 }), tab({ id: 4, windowId: 2 })];
+  const groups = groupByWindow(tabs);
+  assert.deepEqual(groups.map(([id, list]) => [id, list.map((t) => t.id)]), [[1, [1, 2]], [2, [3, 4]]]);
+  assert.deepEqual(groupByWindow([]), []);
 });
 
 test("Model - EmptyMessage picks the right hint", () => {

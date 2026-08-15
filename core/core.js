@@ -15,7 +15,7 @@ export const DEFAULTS = {
   ui: {
     defaultFilter: "all",
     scope: "all-windows",
-    sort: "recent",
+    sort: "window",
     fontSize: 1, // rem, relative to browser default
     density: "comfortable", // or "compact"
     theme: "auto", // "auto" | "light" | "dark"

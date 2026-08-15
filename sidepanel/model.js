@@ -75,11 +75,23 @@ export function emptyMessage(query, filter) {
   return "No open tabs.";
 }
 
-export function groupHeader(windowId, { visible, tabs, currentWindowId, indexes }) {
+export function groupHeader(windowId, { visible, tabs, currentWindowId, indexes, collapsed = false, collapsible = true }) {
   const count = visible.filter((tab) => tab.windowId === windowId).length;
   const total = tabs.filter((tab) => tab.windowId === windowId).length;
   const label = windowId === currentWindowId ? "Window Current" : "Window";
-  return `${label} #${indexes.get(windowId)} - ${count}/${total}`;
+  const arrow = collapsible ? `${collapsed ? "▸" : "▾"} ` : "";
+  return `${arrow}${label} #${indexes.get(windowId)} - ${count}/${total}`;
+}
+
+// consecutive same-window runs → ordered [windowId, tabs[]] pairs
+export function groupByWindow(tabs) {
+  const groups = [];
+  for (const tab of tabs) {
+    const last = groups[groups.length - 1];
+    if (last && last[0] === tab.windowId) last[1].push(tab);
+    else groups.push([tab.windowId, [tab]]);
+  }
+  return groups;
 }
 
 // everything renderRow needs to build the DOM, as plain data
