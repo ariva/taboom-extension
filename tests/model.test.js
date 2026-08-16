@@ -147,7 +147,8 @@ test("Model - BulkSummary states: none, partial, all selected", () => {
 });
 
 // ---------- options/model.js ----------
-const { aboutText, clampFontSize, clampedNumber, hasRule } = await import("../options/model.js");
+const { aboutText, clampFontSize, clampedNumber, hasRule, releaseNotes, releaseSections } =
+  await import("../options/model.js");
 
 test("Model - Options - Clamps, rule lookup, about text", () => {
   assert.equal(clampFontSize("9"), 1.5, "max");
@@ -160,6 +161,23 @@ test("Model - Options - Clamps, rule lookup, about text", () => {
   assert.equal(hasRule([{ pattern: "*.a.com" }], "*.a.com"), true);
   assert.equal(hasRule([{ pattern: "*.a.com" }], "a.com"), false);
   assert.equal(aboutText("1.2.3"), "Taboom 1.2.3");
+});
+
+test("Model - Options - ReleaseNotes picks version section, falls back to newest", () => {
+  const md = "# CHANGES\n\n## v0.2.7 — 2026-08-16\n\n- new stuff\n\n## v0.2.6 — 2026-08-15\n\n- old stuff\n";
+  assert.deepEqual(releaseNotes(md, "0.2.6"), { title: "v0.2.6 — 2026-08-15", body: "- old stuff" });
+  assert.deepEqual(releaseNotes(md, "9.9.9"), { title: "v0.2.7 — 2026-08-16", body: "- new stuff" }, "fallback to newest");
+  assert.equal(releaseNotes("no sections here", "1.0.0"), null);
+});
+
+test("Model - Options - ReleaseSections caps history, newest first, drops file header", () => {
+  const md = "# CHANGES\n\n## v3 — a\n\n- c3\n\n## v2 — b\n\n- c2\n\n## v1 — c\n\n- c1\n";
+  assert.deepEqual(releaseSections(md, 2), [
+    { title: "v3 — a", body: "- c3" },
+    { title: "v2 — b", body: "- c2" },
+  ]);
+  assert.equal(releaseSections(md).length, 3, "count beyond sections is fine");
+  assert.deepEqual(releaseSections("no sections", 5), []);
 });
 
 // ---------- core resolveColorScheme ----------

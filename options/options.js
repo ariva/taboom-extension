@@ -1,7 +1,13 @@
 // Imperative shell: DOM + chrome.* effects only; view logic lives in model.js.
 import { DEFAULTS, makeRule, resolveColorScheme } from "../core/core.js";
 import { loadState, saveState } from "../core/storage.js";
-import { aboutText, clampFontSize, clampedNumber, hasRule } from "./model.js";
+import {
+  aboutText,
+  clampFontSize,
+  clampedNumber,
+  hasRule,
+  releaseSections,
+} from "./model.js";
 
 const SETTING_IDS = [
   "autoSnoozeEnabled",
@@ -138,3 +144,25 @@ document.getElementById("danger").addEventListener("click", async () => {
 });
 
 render();
+
+// What's new: bundled CHANGES.md — one collapsible per release, newest open
+fetch(chrome.runtime.getURL("CHANGES.md"))
+  .then((response) => response.text())
+  .then((markdown) => {
+    const sections = releaseSections(markdown);
+    if (sections.length === 0) return;
+    const box = document.getElementById("whats-new");
+    for (const [index, section] of sections.entries()) {
+      const details = document.createElement("details");
+      details.open = index === 0;
+      const summary = document.createElement("summary");
+      summary.textContent = index === 0 ? `What's new — ${section.title}` : section.title;
+      const pre = document.createElement("pre");
+      pre.className = "muted";
+      pre.textContent = section.body;
+      details.append(summary, pre);
+      box.append(details);
+    }
+    box.hidden = false;
+  })
+  .catch(() => {}); // CHANGES.md missing from a dev checkout — section stays hidden

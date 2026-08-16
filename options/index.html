@@ -27,6 +27,23 @@
       pointer-events: none;
     }
 
+    #whats-new details + details { margin-top: 0.75rem; }
+    #whats-new summary {
+      cursor: pointer;
+      user-select: none;
+      padding: 0.25rem 0.4rem;
+      margin: -0.25rem -0.4rem;
+      border-radius: 6px;
+    }
+    #whats-new summary:hover { background: var(--hover); color: var(--accent); }
+    /* pre defaults (monospace, no wrap) look oversized and overflow the card */
+    #whats-new pre {
+      font: inherit;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      margin: 0.5rem 0 0;
+    }
+
     h1 {
       font-size: 22px;
       color: #fff;
@@ -234,6 +251,7 @@
     <p class="muted" id="about"></p>
     <p class="muted">Tab information and settings are processed locally in the browser.
       Taboom - Tabs Manager does not send browsing information to a remote service.</p>
+    <div id="whats-new" hidden></div>
   </section>
 
   <div id="saved" hidden>Saved ✓</div>

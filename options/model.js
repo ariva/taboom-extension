@@ -19,3 +19,27 @@ export function hasRule(rules, pattern) {
 export function aboutText(version) {
   return `Taboom ${version}`;
 }
+
+// How many release sections the options "What's new" box shows.
+export const SHOW_MAX_CHANGES = 25;
+
+// Newest `count` release sections of CHANGES.md as [{ title, body }], newest first.
+export function releaseSections(markdown, count = SHOW_MAX_CHANGES) {
+  return markdown
+    .split(/^## /m)
+    .slice(1, count + 1)
+    .map((section) => {
+      const [title, ...body] = section.split("\n");
+      return { title: title.trim(), body: body.join("\n").trim() };
+    });
+}
+
+// Section of CHANGES.md for `version`, falling back to the newest section.
+// Returns { title, body } or null when the markdown has no "## " sections.
+export function releaseNotes(markdown, version) {
+  const sections = markdown.split(/^## /m).slice(1);
+  if (sections.length === 0) return null;
+  const match = sections.find((s) => s.startsWith(`v${version} `) || s.startsWith(`v${version}\n`));
+  const [title, ...body] = (match ?? sections[0]).split("\n");
+  return { title: title.trim(), body: body.join("\n").trim() };
+}
