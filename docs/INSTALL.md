@@ -22,19 +22,18 @@ Taboom - Tabs Manager is plain JavaScript with no build step — the repository 
 
 ## Verify it works
 
-1. Click the Taboom - Tabs Manager toolbar icon → small popup with current-tab actions.
-2. Click **Open Taboom** → side panel opens listing all tabs.
-3. Type in the search box → list filters instantly.
-4. Hover a non-active tab row and click the ⏸ button → the tab gets a `SNOOZED` badge and Chrome shows it discarded (its title turns faded in the tab strip).
-5. Click that tab in Chrome → it reloads normally.
+1. Click the Taboom - Tabs Manager toolbar icon → side panel opens listing all tabs.
+2. Type in the search box → list filters instantly.
+3. Hover a non-active tab row and click the ⏸ button → the tab gets a `SNOOZED` badge and Chrome shows it discarded (its title turns faded in the tab strip).
+4. Click that tab in Chrome → it reloads normally.
 
 ## After changing code
 
 1. Go to `chrome://extensions`.
 2. Click the circular **reload** arrow on the Taboom - Tabs Manager card.
-3. Reopen the side panel / popup (already-open extension pages keep old code until reopened).
+3. Reopen the side panel (already-open extension pages keep old code until reopened).
 
-Service-worker logs: click **service worker** link on the extension card to open its DevTools console. Side panel / popup: right-click inside them → Inspect.
+Service-worker logs: click **service worker** link on the extension card to open its DevTools console. Side panel / options: right-click inside them → Inspect.
 
 ## Keyboard shortcuts
 

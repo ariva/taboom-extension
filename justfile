@@ -21,7 +21,7 @@ test:
 build: check
     mkdir -p dist
     rm -f dist/taboom-tabs-manager.zip
-    zip -r dist/taboom-tabs-manager.zip manifest.json background core sidepanel popup options icons styles images/moon.svg
+    zip -r dist/taboom-tabs-manager.zip manifest.json background core sidepanel options icons styles images/moon.svg
     @echo "dist/taboom-tabs-manager.zip ready"
 
 clean:

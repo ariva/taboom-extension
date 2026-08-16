@@ -14,7 +14,6 @@
 
   "action": {
     "default_title": "Taboom - Smart Tabs Manager",
-    "default_popup": "popup/index.html",
     "default_icon": {
       "16": "icons/icon16.png",
       "32": "icons/icon32.png"

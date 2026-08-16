@@ -68,6 +68,7 @@ export function makeChrome({ tabs = [], stored = {}, calls = [] }) {
     contextMenus: {
       removeAll: async () => calls.push("contextMenus.removeAll"),
       create: (props) => calls.push(`contextMenus.create ${props.id}`),
+      update: (id, props) => calls.push(`contextMenus.update ${id} ${JSON.stringify(props)}`),
       onClicked: makeEvent(),
     },
     storage: {
@@ -90,7 +91,10 @@ export function makeChrome({ tabs = [], stored = {}, calls = [] }) {
       onInstalled: makeEvent(),
       onStartup: makeEvent(),
     },
-    sidePanel: { open: async () => calls.push("sidePanel.open") },
+    sidePanel: {
+      open: async () => calls.push("sidePanel.open"),
+      setPanelBehavior: async (opts) => calls.push(`sidePanel.setPanelBehavior ${JSON.stringify(opts)}`),
+    },
   };
 }
 

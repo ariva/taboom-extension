@@ -1,4 +1,4 @@
-/* Shared design tokens for sidepanel, options, popup. */
+/* Shared design tokens for sidepanel and options. */
 :root {
   color-scheme: light dark;
   --bg: light-dark(#fafafa, #202124);

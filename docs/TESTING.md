@@ -40,12 +40,11 @@ node --test --test-name-pattern="Service Worker" tests/*.test.js
 | `tests/sidepanel-keys.ui.test.js` | Keyboard navigation (`/`, arrows, Enter) | happy-dom |
 | `tests/sidepanel-sort.ui.test.js` | Sort orders, window grouping, window dots | happy-dom |
 | `tests/options.ui.test.js` | Options page: settings render/save, rules, theme, Saved pill | happy-dom |
-| `tests/popup.ui.test.js` | Popup: stats, labels, actions | happy-dom |
 | `tests/helpers/ui.js` | Shared harness: loads a page's real `index.html` into happy-dom, provides the `chrome.*` stub (capturing events, call log) | — |
 
 ## Conventions
 
-- Test names are prefixed by group: `Core - `, `Core - Storage - `, `Service Worker - `, `UI - Sidepanel - `, `UI - Options - `, `UI - Popup - `, description capitalized.
+- Test names are prefixed by group: `Core - `, `Core - Storage - `, `Service Worker - `, `UI - Sidepanel - `, `UI - Options - `, description capitalized.
 - Each test file runs in its own node process, so page-script module state never leaks between files; tests **within** one file share the imported page and run in order.
 - UI tests import the real page script after `loadPage(...)` sets up DOM + chrome globals; interactions are plain DOM events.
 - Chrome fires some listeners without awaiting them (e.g. `onAlarm`) — `await tick()` before asserting on their effects.

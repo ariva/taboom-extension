@@ -1,4 +1,4 @@
-// Pure logic shared by service worker, side panel, popup, options.
+// Pure logic shared by service worker, side panel, options.
 // No chrome.* usage here so it stays unit-testable under plain node.
 
 export const DEFAULTS = {

@@ -21,6 +21,7 @@ async function init() {
   await ensureAlarm(state.settings);
   await applyAutoDiscardable(state.protectionRules);
   await createContextMenus();
+  await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
 }
 
 async function ensureAlarm(settings) {
@@ -125,7 +126,7 @@ async function snoozeTab(tabId) {
   }
 }
 
-// ---------- messages from popup / side panel ----------
+// ---------- messages from side panel / options ----------
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   handleMessage(message)
@@ -158,12 +159,30 @@ chrome.storage.onChanged.addListener(async (changes, area) => {
   }
   if (changes.protectionRules) {
     await applyAutoDiscardable(changes.protectionRules.newValue ?? []);
+    const [active] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+    await syncProtectMenu(active);
   }
 });
 
+// Keep the protect menu item's title matching the active tab's protection state.
+async function syncProtectMenu(tab) {
+  if (!tab || !isSupportedUrl(tab.url)) return;
+  const { protectionRules } = await loadState();
+  chrome.contextMenus.update("protect-this-site", {
+    title: isProtected(tab.url, protectionRules)
+      ? "Remove site protection"
+      : "Protect site",
+  });
+}
+
+chrome.tabs.onActivated.addListener(async ({ tabId }) => {
+  syncProtectMenu(await chrome.tabs.get(tabId).catch(() => null));
+});
+
 // Re-evaluate protection flag when a tab navigates to a different URL.
-chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) => {
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   if (!changeInfo.url || !isSupportedUrl(changeInfo.url)) return;
+  if (tab?.active) await syncProtectMenu(tab);
   const { protectionRules } = await loadState();
   try {
     await chrome.tabs.update(tabId, {
@@ -194,9 +213,13 @@ chrome.commands.onCommand.addListener(async (command) => {
 
 // ---------- context menus ----------
 
+// per-tab items only appear on pages we can snooze/protect; global items show everywhere
+const PAGE_PATTERNS = ["http://*/*", "https://*/*", "file://*/*"];
 const MENU_ITEMS = [
-  { id: "snooze-this-tab", title: "Snooze this tab" },
-  { id: "protect-this-site", title: "Always protect this site" },
+  { id: "show-manager", title: "Show Taboom Manager" },
+  { id: "sep-1", type: "separator" },
+  { id: "snooze-this-tab", title: "Snooze this tab", documentUrlPatterns: PAGE_PATTERNS },
+  { id: "protect-this-site", title: "Protect site", documentUrlPatterns: PAGE_PATTERNS },
   { id: "snooze-all-inactive", title: "Snooze all inactive tabs" },
 ];
 
@@ -204,22 +227,20 @@ async function createContextMenus() {
   await chrome.contextMenus.removeAll();
   chrome.contextMenus.create({ id: "root", title: "Taboom - Tabs Manager", contexts: ["page"] });
   for (const item of MENU_ITEMS) {
-    chrome.contextMenus.create({
-      id: item.id,
-      parentId: "root",
-      title: item.title,
-      contexts: ["page"],
-    });
+    chrome.contextMenus.create({ ...item, parentId: "root", contexts: ["page"] });
   }
 }
 
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   switch (info.menuItemId) {
+    case "show-manager":
+      if (tab) await chrome.sidePanel.open({ windowId: tab.windowId });
+      break;
     case "snooze-this-tab":
       if (tab) await snoozeTab(tab.id);
       break;
     case "protect-this-site":
-      if (tab) await protectHosts([hostnameOf(tab.url)]);
+      if (tab && isSupportedUrl(tab.url)) await toggleSiteProtection(tab);
       break;
     case "snooze-all-inactive":
       await autoSnoozePass();

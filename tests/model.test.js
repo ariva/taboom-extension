@@ -146,34 +146,6 @@ test("Model - BulkSummary states: none, partial, all selected", () => {
   assert.equal(all.selectAllTitle, "Unselect all");
 });
 
-// ---------- popup/model.js ----------
-const { currentLine, protectAction, statsLine } = await import("../popup/model.js");
-
-test("Model - Popup - CurrentLine and protect action states", () => {
-  assert.equal(currentLine({ title: "A Gist" }), "Current: A Gist");
-  assert.equal(currentLine(undefined), "Current: —");
-
-  const rules = [{ id: "r", type: "domain", pattern: "*.github.com" }];
-  assert.deepEqual(protectAction({ url: "https://gist.github.com/x" }, rules), {
-    disabled: false, label: "Unprotect gist.github.com",
-  });
-  assert.deepEqual(protectAction({ url: "https://other.io/" }, rules), {
-    disabled: false, label: "Protect other.io",
-  });
-  assert.deepEqual(protectAction({ url: "about:blank" }, rules), { disabled: true, label: null });
-  assert.deepEqual(protectAction(undefined, rules), { disabled: true, label: null });
-});
-
-test("Model - Popup - StatsLine", () => {
-  const rules = [{ id: "r", type: "host", pattern: "example.com" }];
-  const tabs = [tab(), tab({ id: 2, discarded: true, url: "https://a.io/" })];
-  assert.equal(
-    statsLine(tabs, { autoSnoozeEnabled: true }, rules),
-    "Auto snooze: ON · Open: 2 · Snoozed: 1 · Protected: 1",
-  );
-  assert.match(statsLine([], { autoSnoozeEnabled: false }, []), /^Auto snooze: OFF · Open: 0/);
-});
-
 // ---------- options/model.js ----------
 const { aboutText, clampFontSize, clampedNumber, hasRule } = await import("../options/model.js");
 

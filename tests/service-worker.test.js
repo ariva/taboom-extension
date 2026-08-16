@@ -31,7 +31,7 @@ test("Service Worker - Init: alarm uses configured interval, menus created, prot
   await chrome.runtime.onInstalled.fire();
   assert.ok(calls.includes('alarms.create auto-snooze {"periodInMinutes":7}'));
   assert.ok(calls.includes("contextMenus.removeAll"));
-  for (const id of ["root", "snooze-this-tab", "protect-this-site", "snooze-all-inactive"]) {
+  for (const id of ["root", "show-manager", "snooze-this-tab", "protect-this-site", "snooze-all-inactive"]) {
     assert.ok(calls.includes(`contextMenus.create ${id}`), `menu ${id}`);
   }
   // protected mail tab gets autoDiscardable:false; others already true → untouched
@@ -100,6 +100,41 @@ test("Service Worker - Protect-hosts skips hosts already covered by a rule", asy
 test("Service Worker - Unknown message type returns an error", async () => {
   const response = await send({ type: "nonsense" });
   assert.match(response.error, /unknown message/);
+});
+
+test("Service Worker - Show-manager menu click opens the side panel", async () => {
+  calls.length = 0;
+  await chrome.contextMenus.onClicked.fire({ menuItemId: "show-manager" }, { id: 1, windowId: 1 });
+  await tick();
+  assert.ok(calls.includes("sidePanel.open"));
+});
+
+test("Service Worker - Protect menu title follows active tab's protection state", async () => {
+  calls.length = 0;
+  await chrome.tabs.onActivated.fire({ tabId: 3 }); // mail.google.com — protected
+  await tick();
+  assert.ok(calls.includes('contextMenus.update protect-this-site {"title":"Remove site protection"}'));
+
+  calls.length = 0;
+  await chrome.tabs.onActivated.fire({ tabId: 2 }); // old.example.com — not protected
+  await tick();
+  assert.ok(calls.includes('contextMenus.update protect-this-site {"title":"Protect site"}'));
+});
+
+test("Service Worker - Protect menu click toggles protection for the tab's site", async () => {
+  await chrome.contextMenus.onClicked.fire(
+    { menuItemId: "protect-this-site" },
+    tabs.find((t) => t.id === 2),
+  );
+  await tick();
+  assert.ok(stored.protectionRules.some((r) => r.pattern === "old.example.com"), "protects");
+
+  await chrome.contextMenus.onClicked.fire(
+    { menuItemId: "protect-this-site" },
+    tabs.find((t) => t.id === 2),
+  );
+  await tick();
+  assert.ok(!stored.protectionRules.some((r) => r.pattern === "old.example.com"), "unprotects");
 });
 
 test("Service Worker - Navigation to a protected url flips autoDiscardable off", async () => {

@@ -17,7 +17,7 @@ Taboom - Tabs Manager frees memory by snoozing (discarding) tabs you haven't use
 - **Side panel tab manager** — search across title/URL/hostname, filter by Awake / Snoozed / Protected, sort, and bulk snooze/protect/close.
 - **Automatic snooze** — periodically discards tabs inactive past a configurable threshold, skipping pinned, audible, active, and protected tabs.
 - **Site protection** — exclude sites (`mail.google.com`, `*.github.com`) from snoozing, also shielding them from Chrome's own Memory Saver.
-- **Popup, context menu, and keyboard shortcuts** for quick per-tab actions.
+- **Context menu and keyboard shortcuts** for quick per-tab actions.
 
 ## Privacy first
 
@@ -54,6 +54,6 @@ Options page:
 ## Documentation
 
 - [Installation](docs/INSTALL.md) — load unpacked in Chrome, requirements, troubleshooting.
-  After installing, pin the Taboom - Tabs Manager icon via Chrome's puzzle-piece (🧩) menu so the popup is always one click away.
+  After installing, pin the Taboom - Tabs Manager icon via Chrome's puzzle-piece (🧩) menu so the side panel is always one click away.
 - [Usage](docs/USAGE.md) — concepts, side panel, automatic snooze, protection rules, verifying freed memory.
 - [Testing](docs/TESTING.md) — setup (npm install, just, fd), running the suite, test layout and conventions.

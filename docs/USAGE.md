@@ -41,7 +41,7 @@ Watch total Chrome memory in the system monitor (`htop`, Activity Monitor, Windo
 
 ## Side panel (main UI)
 
-Open with the toolbar popup's **Open Taboom**, or `Ctrl+Shift+Space`.
+Open by clicking the Taboom toolbar icon, or `Ctrl+Shift+Space`.
 
 Panel position (left or right) is a global Chrome setting: `chrome://settings/appearance` → **Side panel**. Extensions cannot set it, and top/bottom docking does not exist for side panels.
 
@@ -72,9 +72,8 @@ Toggle and tune everything in **Settings** (⚙ in the side panel, or the extens
 
 ## Protecting sites
 
-- Popup: **Protect example.com** for the current site.
 - Side panel: 🛡 on any row.
-- Right-click a page → Taboom - Tabs Manager → **Always protect this site**.
+- Right-click a page → Taboom - Tabs Manager → **Protect site**.
 - Settings page: add rules manually.
 
 Rule forms: `mail.google.com` (exact host) or `*.github.com` (domain incl. subdomains). Protect sites that lose state on reload: editors, admin consoles, forms, terminals, conferencing.
