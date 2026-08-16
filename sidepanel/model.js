@@ -114,6 +114,7 @@ export function rowViewModel(tab, { index, cursor, now, currentWindowId, rules, 
     age: !tab.active && tab.lastAccessed ? formatAge(now - tab.lastAccessed) : null,
     badges: badges(tab, rules),
     canSnooze: !tab.discarded && isSupportedUrl(tab.url),
+    protected: isProtected(tab.url, rules),
     protectLabel: isProtected(tab.url, rules) ? "Unprotect site" : "Protect site",
     dot:
       dotColors.size > 0

@@ -285,7 +285,7 @@ function renderRow(tab, vm) {
     actions.append(actionButton("snooze", "Snooze", () => snooze([tab.id])));
   }
   actions.append(
-    actionButton("protect", vm.protectLabel, () =>
+    actionButton(vm.protected ? "unprotect" : "protect", vm.protectLabel, () =>
       chrome.runtime.sendMessage({ type: "toggle-site-protection", tabId: tab.id }),
     ),
     actionButton("close", "Close", () => closeTabs([tab.id])),
@@ -309,6 +309,7 @@ function renderRow(tab, vm) {
 const ICONS = {
   snooze: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 3v10M10 3v10"/></svg>',
   protect: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M8 1.8 13.2 3.7V8c0 3.2-2.3 5.1-5.2 6.2C5.1 13.1 2.8 11.2 2.8 8V3.7Z"/></svg>',
+  unprotect: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M8 1.8 13.2 3.7V8c0 3.2-2.3 5.1-5.2 6.2C5.1 13.1 2.8 11.2 2.8 8V3.7Z"/><path stroke-linecap="round" d="M3 2.5l10 11"/></svg>',
   close: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg>',
 };
 

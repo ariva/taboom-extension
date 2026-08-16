@@ -104,6 +104,7 @@ test("Model - RowViewModel maps tab state to plain data", () => {
   assert.equal(vm.checked, true);
   assert.equal(vm.viewTransitionName, "tab-1");
   assert.equal(vm.protectLabel, "Unprotect site");
+  assert.equal(vm.protected, true, "protected flag drives the shield-off icon");
   assert.equal(vm.age, null, "active tab shows no age");
   assert.equal(vm.dot.title, "Current window");
 
