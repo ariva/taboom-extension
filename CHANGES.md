@@ -1,5 +1,18 @@
 # CHANGES
 
+## v0.2.7 — 2026-08-16
+
+### New Features
+- Notify about pending extension updates (32a1035)
+- Render few latest release notes in options (dfd13c6)
+- Suppress collapse/expand-all icon for a single window (316413e)
+
+### Fixes
+- Bug where bottom actions part was not responsive (bb6eaec)
+
+### Other
+- Deleted popup code, tests, and docs mentions - shows directly side-panel on extension's icon click (78a68e9)
+
 ## v0.2.6 — 2026-08-15
 
 ### New Features
