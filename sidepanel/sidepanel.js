@@ -518,3 +518,16 @@ loadState().then((persisted) => {
   refresh();
   searchInput.focus();
 });
+
+// ---------- update notice ----------
+
+// reload() applies the deferred update (an open panel blocks auto-install)
+const updateBanner = document.getElementById("update-banner");
+updateBanner.addEventListener("click", () => chrome.runtime.reload());
+async function syncUpdateBanner() {
+  const { updateAvailable } = await chrome.storage.local.get("updateAvailable");
+  if (updateAvailable) updateBanner.textContent = `Update ${updateAvailable} ready — restart Taboom`;
+  updateBanner.hidden = !updateAvailable;
+}
+syncUpdateBanner();
+chrome.storage.onChanged.addListener(syncUpdateBanner);

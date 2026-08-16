@@ -137,6 +137,15 @@ test("Service Worker - Protect menu click toggles protection for the tab's site"
   assert.ok(!stored.protectionRules.some((r) => r.pattern === "old.example.com"), "unprotects");
 });
 
+test("Service Worker - Pending update stored for the panel, cleared once new version runs", async () => {
+  await chrome.runtime.onUpdateAvailable.fire({ version: "9.9.9" });
+  await tick();
+  assert.equal(stored.updateAvailable, "9.9.9");
+
+  await chrome.runtime.onInstalled.fire(); // new version booted
+  assert.equal(stored.updateAvailable, undefined);
+});
+
 test("Service Worker - Navigation to a protected url flips autoDiscardable off", async () => {
   calls.length = 0;
   await chrome.tabs.onUpdated.fire(1, { url: "https://mail.google.com/new" });

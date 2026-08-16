@@ -79,6 +79,10 @@ export function makeChrome({ tabs = [], stored = {}, calls = [] }) {
           Object.assign(stored, structuredClone(patch));
         },
         clear: async () => calls.push("storage.clear"),
+        remove: async (key) => {
+          calls.push(`storage.remove ${key}`);
+          for (const k of [].concat(key)) delete stored[k];
+        },
       },
       onChanged: makeEvent(),
     },
@@ -90,6 +94,8 @@ export function makeChrome({ tabs = [], stored = {}, calls = [] }) {
       onMessage: makeEvent(),
       onInstalled: makeEvent(),
       onStartup: makeEvent(),
+      onUpdateAvailable: makeEvent(),
+      reload: () => calls.push("runtime.reload"),
     },
     sidePanel: {
       open: async () => calls.push("sidePanel.open"),

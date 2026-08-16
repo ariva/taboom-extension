@@ -22,7 +22,14 @@ async function init() {
   await applyAutoDiscardable(state.protectionRules);
   await createContextMenus();
   await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
+  await chrome.storage.local.remove("updateAvailable"); // running the new version now
 }
+
+// An open side panel keeps the extension non-idle, deferring auto-update forever;
+// surface the pending version so the panel can offer a restart.
+chrome.runtime.onUpdateAvailable.addListener(({ version }) => {
+  chrome.storage.local.set({ updateAvailable: version });
+});
 
 async function ensureAlarm(settings) {
   await chrome.alarms.create(ALARM_NAME, {

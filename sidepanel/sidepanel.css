@@ -299,3 +299,15 @@ footer button:disabled:hover { background: none; }
 
 /* list view transitions: quick cross-fade / slide on re-render */
 ::view-transition-old(*), ::view-transition-new(*) { animation-duration: 150ms; }
+
+/* pending-update notice: panel blocks auto-install, click restarts to apply */
+#update-banner {
+  margin-top: 6px;
+  padding: 6px 10px;
+  width: 100%;
+  border: none;
+  border-radius: var(--radius-m);
+  background: var(--accent);
+  color: var(--accent-fg);
+  cursor: pointer;
+}
