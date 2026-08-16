@@ -145,6 +145,9 @@ document.getElementById("danger").addEventListener("click", async () => {
 
 render();
 
+// rules/settings can change from the side panel or context menu while this page is open
+chrome.storage.onChanged.addListener(() => render());
+
 // What's new: bundled CHANGES.md — one collapsible per release, newest open
 fetch(chrome.runtime.getURL("CHANGES.md"))
   .then((response) => response.text())

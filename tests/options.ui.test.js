@@ -75,3 +75,11 @@ test("UI - Options - FontSize is clamped to the allowed range", async () => {
   await tick();
   assert.equal(input.value, "1.5", "clamped to max");
 });
+
+test("UI - Options - External rule change re-renders the protection list", async () => {
+  stored.protectionRules = [{ id: "r9", type: "host", pattern: "elsewhere.example.com" }];
+  await chrome.storage.onChanged.fire({ protectionRules: {} }, "local");
+  await tick();
+  await tick();
+  assert.match(document.querySelector("#rules li").textContent, /elsewhere\.example\.com/);
+});
