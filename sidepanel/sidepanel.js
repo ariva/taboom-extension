@@ -12,6 +12,7 @@ import { loadFeatures, loadState, saveState } from "../core/storage.js";
 import {
   bulkSummary,
   countsByFilter,
+  deriveTabs,
   emptyMessage,
   groupByWindow,
   groupHeader,
@@ -80,6 +81,7 @@ const state = {
   ui: {},
   rules: [],
   allTabs: [],
+  derived: new Map(), // per-tab {host, haystack, protected} — rebuilt each refresh
   visible: [], // rows the user can interact with (excludes collapsed groups)
   fullVisible: [], // before collapsing — header counts + empty-state check
   collapsedWindows: new Set(), // windowIds collapsed in group-by-window view (session only)
@@ -110,6 +112,7 @@ async function refresh(animate = false) {
   document.documentElement.style.colorScheme = resolveColorScheme(state.ui.theme);
   state.currentWindowId = win.id;
   state.allTabs = tabs;
+  state.derived = deriveTabs(tabs, state.rules);
   const features = applyExperimental(FEATURES, state.ui.showExperimental ?? false);
   // flag turned off mid-navigation: drop the cursor so no stale outline lingers
   if (!featureEnabled(features, "SIDEBAR_KEYBOARD_NAVIGATION")) {
@@ -154,7 +157,7 @@ function renderNow() {
 }
 
 function renderNowImpl() {
-  const byFilter = countsByFilter(state.allTabs, state.rules);
+  const byFilter = countsByFilter(state.allTabs, state.derived);
   for (const button of filterBar.querySelectorAll("button")) {
     const name = button.dataset.filter;
     button.querySelector(".count").textContent = byFilter[name];
@@ -179,7 +182,7 @@ function renderNowImpl() {
       cursor: state.cursor,
       now,
       currentWindowId: state.currentWindowId,
-      rules: state.rules,
+      derived: state.derived,
       selected: state.selected,
       dotColors: maps.dotColors,
       indexes: maps.indexes,

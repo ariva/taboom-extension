@@ -5,6 +5,7 @@ import {
   badges,
   bulkSummary,
   countsByFilter,
+  deriveTabs,
   emptyMessage,
   groupByWindow,
   groupHeader,
@@ -21,9 +22,10 @@ const tab = (overrides = {}) => ({
   url: "https://example.com/x", title: "Example", lastAccessed: NOW - 2 * HOUR,
   ...overrides,
 });
-const view = (overrides = {}) => ({
+// derived defaults to no protection rules; pass rules when a test needs them
+const view = (tabs, overrides = {}, rules = []) => ({
   query: "", scope: "all-windows", filter: "all", sort: "recent",
-  currentWindowId: 1, rules: [], now: NOW,
+  currentWindowId: 1, derived: deriveTabs(tabs, rules), now: NOW,
   ...overrides,
 });
 
@@ -33,18 +35,27 @@ test("Model - SelectVisible combines search, scope, filter, and sort", () => {
     tab({ id: 2, title: "Beta", discarded: true, lastAccessed: NOW - 2 * HOUR }),
     tab({ id: 3, title: "Gamma", windowId: 2, lastAccessed: NOW - 3 * HOUR }),
   ];
-  assert.deepEqual(selectVisible(tabs, view()).map((t) => t.id), [1, 2, 3], "recent");
-  assert.deepEqual(selectVisible(tabs, view({ sort: "oldest" })).map((t) => t.id), [3, 2, 1]);
-  assert.deepEqual(selectVisible(tabs, view({ filter: "snoozed" })).map((t) => t.id), [2]);
-  assert.deepEqual(selectVisible(tabs, view({ scope: "current-window" })).map((t) => t.id), [1, 2]);
-  assert.deepEqual(selectVisible(tabs, view({ query: "gam" })).map((t) => t.id), [3]);
+  assert.deepEqual(selectVisible(tabs, view(tabs)).map((t) => t.id), [1, 2, 3], "recent");
+  assert.deepEqual(selectVisible(tabs, view(tabs, { sort: "oldest" })).map((t) => t.id), [3, 2, 1]);
+  assert.deepEqual(selectVisible(tabs, view(tabs, { filter: "snoozed" })).map((t) => t.id), [2]);
+  assert.deepEqual(selectVisible(tabs, view(tabs, { scope: "current-window" })).map((t) => t.id), [1, 2]);
+  assert.deepEqual(selectVisible(tabs, view(tabs, { query: "gam" })).map((t) => t.id), [3]);
   // window sort: current window (1) first, recent-first within
-  assert.deepEqual(selectVisible(tabs, view({ sort: "window" })).map((t) => t.id), [1, 2, 3]);
+  assert.deepEqual(selectVisible(tabs, view(tabs, { sort: "window" })).map((t) => t.id), [1, 2, 3]);
   assert.deepEqual(
-    selectVisible(tabs, view({ sort: "window", currentWindowId: 2 })).map((t) => t.id),
+    selectVisible(tabs, view(tabs, { sort: "window", currentWindowId: 2 })).map((t) => t.id),
     [3, 1, 2],
     "window 2 current → its tabs first",
   );
+});
+
+test("Model - DeriveTabs precomputes host, lowercase haystack, protected flag", () => {
+  const rules = [{ id: "r", type: "host", pattern: "example.com" }];
+  const derived = deriveTabs([tab({ title: "Example PAGE" }), tab({ id: 2, url: "https://other.io/" })], rules);
+  assert.equal(derived.get(1).host, "example.com");
+  assert.ok(derived.get(1).haystack.includes("example page"), "haystack lowercased");
+  assert.equal(derived.get(1).protected, true);
+  assert.equal(derived.get(2).protected, false);
 });
 
 test("Model - WindowMaps indexes current window as #1 and colors only when multi-window", () => {
@@ -93,8 +104,14 @@ test("Model - EmptyMessage picks the right hint", () => {
 
 test("Model - RowViewModel maps tab state to plain data", () => {
   const rules = [{ id: "r", type: "host", pattern: "example.com" }];
+  const rowTabs = [
+    tab({ active: true }),
+    tab({ id: 3, discarded: true, title: "Zzz" }),
+    tab({ id: 4, url: "chrome://settings" }),
+    tab({ id: 5, url: "about:blank" }),
+  ];
   const ctx = {
-    index: 0, cursor: 0, now: NOW, currentWindowId: 1, rules,
+    index: 0, cursor: 0, now: NOW, currentWindowId: 1, derived: deriveTabs(rowTabs, rules),
     selected: new Set([1]), ...windowMaps([tab(), tab({ id: 2, windowId: 2 })], 1),
     dotColors: windowMaps([tab(), tab({ id: 2, windowId: 2 })], 1).dotColors,
     indexes: windowMaps([tab(), tab({ id: 2, windowId: 2 })], 1).indexes,
@@ -121,16 +138,15 @@ test("Model - RowViewModel maps tab state to plain data", () => {
 });
 
 test("Model - Badges order and kinds", () => {
-  const rules = [{ id: "r", type: "host", pattern: "example.com" }];
-  const full = badges(tab({ discarded: true, pinned: true, audible: true }), rules);
+  const full = badges(tab({ discarded: true, pinned: true, audible: true }), true);
   assert.deepEqual(full, [["snoozed", "warn"], ["protected", "ok"], ["pinned", ""], ["🔊", ""]]);
-  assert.deepEqual(badges(tab(), []), []);
+  assert.deepEqual(badges(tab(), false), []);
 });
 
 test("Model - CountsByFilter", () => {
   const rules = [{ id: "r", type: "host", pattern: "example.com" }];
   const tabs = [tab(), tab({ id: 2, discarded: true }), tab({ id: 3, url: "https://other.io/" })];
-  assert.deepEqual(countsByFilter(tabs, rules), { all: 3, awake: 2, snoozed: 1, protected: 2 });
+  assert.deepEqual(countsByFilter(tabs, deriveTabs(tabs, rules)), { all: 3, awake: 2, snoozed: 1, protected: 2 });
 });
 
 test("Model - BulkSummary states: none, partial, all selected", () => {

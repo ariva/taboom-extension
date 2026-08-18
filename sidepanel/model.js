@@ -1,24 +1,43 @@
 // Pure view logic for the side panel - easier to test.
 
-import { formatAge, hostnameOf, isProtected, isSupportedUrl, matchesSearch } from "../core/core.js";
+import { formatAge, hostnameOf, isProtected, isSupportedUrl } from "../core/core.js";
+
+// Per-tab derived data (Map by tab id), computed once per refresh — tabs and
+// rules only change there. Renders and search keystrokes then never re-parse
+// URLs (hostnameOf) or re-scan protection rules per row.
+export function deriveTabs(tabs, rules) {
+  return new Map(
+    tabs.map((tab) => {
+      const host = hostnameOf(tab.url);
+      return [tab.id, {
+        host,
+        haystack: `${tab.title ?? ""} ${tab.url ?? ""} ${host}`.toLocaleLowerCase(),
+        protected: isProtected(tab.url, rules),
+      }];
+    }),
+  );
+}
 
 // filter + sort the full tab list down to what the panel shows
-export function selectVisible(tabs, { query, scope, filter, sort, currentWindowId, rules, now }) {
-  let result = tabs.filter((tab) => matchesSearch(tab, query));
+export function selectVisible(tabs, { query, scope, filter, sort, currentWindowId, derived, now }) {
+  const tokens = query.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
+  let result = tabs.filter((tab) =>
+    tokens.every((token) => derived.get(tab.id).haystack.includes(token)),
+  );
   if (scope === "current-window") {
     result = result.filter((tab) => tab.windowId === currentWindowId);
   }
   switch (filter) {
     case "awake": result = result.filter((tab) => !tab.discarded); break;
     case "snoozed": result = result.filter((tab) => tab.discarded); break;
-    case "protected": result = result.filter((tab) => isProtected(tab.url, rules)); break;
+    case "protected": result = result.filter((tab) => derived.get(tab.id).protected); break;
   }
   const last = (tab) => tab.lastAccessed ?? now;
   switch (sort) {
     case "recent": result.sort((a, b) => last(b) - last(a)); break;
     case "oldest": result.sort((a, b) => last(a) - last(b)); break;
     case "title": result.sort((a, b) => (a.title ?? "").localeCompare(b.title ?? "")); break;
-    case "domain": result.sort((a, b) => hostnameOf(a.url).localeCompare(hostnameOf(b.url))); break;
+    case "domain": result.sort((a, b) => derived.get(a.id).host.localeCompare(derived.get(b.id).host)); break;
     // current window first, then other windows by id; recent-first within each
     case "window": {
       const rank = (tab) => (tab.windowId === currentWindowId ? 0 : tab.windowId);
@@ -29,13 +48,19 @@ export function selectVisible(tabs, { query, scope, filter, sort, currentWindowI
   return result;
 }
 
-export function countsByFilter(tabs, rules) {
-  return {
-    all: tabs.length,
-    awake: tabs.filter((tab) => !tab.discarded).length,
-    snoozed: tabs.filter((tab) => tab.discarded).length,
-    protected: tabs.filter((tab) => isProtected(tab.url, rules)).length,
-  };
+export function countsByFilter(tabs, derived) {
+  const counts = { all: tabs.length, awake: 0, snoozed: 0, protected: 0 };
+  for (const tab of tabs) {
+    if (tab.discarded) {
+      counts.snoozed++;
+    } else {
+      counts.awake++;
+    }
+    if (derived.get(tab.id).protected) {
+      counts.protected++;
+    }
+  }
+  return counts;
 }
 
 // mid-saturation hues legible on both themes; current window uses --accent via CSS
@@ -59,10 +84,10 @@ export function windowMaps(tabs, currentWindowId) {
   return { indexes, dotColors };
 }
 
-export function badges(tab, rules) {
+export function badges(tab, isProtectedTab) {
   const list = [];
   if (tab.discarded) list.push(["snoozed", "warn"]);
-  if (isProtected(tab.url, rules)) list.push(["protected", "ok"]);
+  if (isProtectedTab) list.push(["protected", "ok"]);
   if (tab.pinned) list.push(["pinned", ""]);
   if (tab.audible) list.push(["🔊", ""]);
   return list;
@@ -95,7 +120,8 @@ export function groupByWindow(tabs) {
 }
 
 // everything renderRow needs to build the DOM, as plain data
-export function rowViewModel(tab, { index, cursor, now, currentWindowId, rules, selected, dotColors, indexes }) {
+export function rowViewModel(tab, { index, cursor, now, currentWindowId, derived, selected, dotColors, indexes }) {
+  const d = derived.get(tab.id);
   return {
     classes: [
       "row",
@@ -108,14 +134,14 @@ export function rowViewModel(tab, { index, cursor, now, currentWindowId, rules, 
     checked: selected.has(tab.id),
     favicon: isSupportedUrl(tab.url)
       ? { pageUrl: tab.url }
-      : { letter: (hostnameOf(tab.url)[0] ?? "•").toUpperCase() },
+      : { letter: (d.host[0] ?? "•").toUpperCase() },
     title: (tab.discarded ? "⏸ " : "") + (tab.title || tab.url || "(untitled)"),
-    host: hostnameOf(tab.url) || tab.url || "",
+    host: d.host || tab.url || "",
     age: !tab.active && tab.lastAccessed ? formatAge(now - tab.lastAccessed) : null,
-    badges: badges(tab, rules),
+    badges: badges(tab, d.protected),
     canSnooze: !tab.discarded && isSupportedUrl(tab.url),
-    protected: isProtected(tab.url, rules),
-    protectLabel: isProtected(tab.url, rules) ? "Unprotect site" : "Protect site",
+    protected: d.protected,
+    protectLabel: d.protected ? "Unprotect site" : "Protect site",
     dot:
       dotColors.size > 0
         ? {
