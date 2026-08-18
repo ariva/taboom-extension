@@ -1,5 +1,32 @@
 # CHANGES
 
+## v0.2.8 — 2026-08-18
+
+### Fixes
+- Reset scroll pos on dropdown change (58bbff3)
+- Keep pre-search scroll positions intact (1c2c3bc)
+- Scroll position leaking across filters (f786541)
+- Protect and unprotect used the same missleading shield icon. It should have unique icons. (da82622)
+- Refresh options page on rules change (96a149a)
+
+### Performance
+- Options page re-rendering (d65d782)
+- Service worker - tabHistory improvements. (55e99b0)
+- Misc render trims (9a17833)
+- Faster panel open. Promote SIDEBAR_KEYBOARD_NAVIGATION to stable. (e58b9f8)
+- Double render after filter/scope/sort clicks (4ab9702)
+- Skip layout/paint of offscreen rows (585c809)
+- Batch list rendering into a DocumentFragment (a85b1f1)
+- Replace per-row DOM construction with template cloneNode (ea3c3ca)
+- Replace per-row listeners with one delegated click handler (e571c0f)
+- Cache per-tab (89161ee)
+- Added possibility to do perf analysis while in dev mode locally - disabled by default (be7e33d)
+
+### Other
+- Add typecheck tooling and annotations (0b58375)
+- Keyboard navigation is experimental feature (df1f61b)
+- Added experimental features support. (e75e678)
+
 ## v0.2.7 — 2026-08-16
 
 ### New Features
