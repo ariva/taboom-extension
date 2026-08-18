@@ -83,3 +83,30 @@ test("UI - Options - External rule change re-renders the protection list", async
   await tick();
   assert.match(document.querySelector("#rules li").textContent, /elsewhere\.example\.com/);
 });
+
+test("UI - Options - History-nav toggle persists ui.historyNav", async () => {
+  const box = document.getElementById("historyNav");
+  assert.equal(box.checked, true, "defaults on");
+  box.checked = false;
+  box.dispatchEvent(new window.Event("change", { bubbles: true }));
+  await tick();
+  assert.ok(calls.some((c) => c.startsWith("storage.set") && c.includes('"historyNav":false')));
+});
+
+test("UI - Options - Experimental toggle visible (ALLOW_EXPERIMENTAL) and persists ui.showExperimental", async () => {
+  await tick();
+  assert.equal(document.getElementById("showExperimental-label").hidden, false, "visible when allowed");
+  const box = document.getElementById("showExperimental");
+  assert.equal(box.checked, false, "defaults off");
+  box.checked = true;
+  box.dispatchEvent(new window.Event("change", { bubbles: true }));
+  await tick();
+  assert.ok(calls.some((c) => c.startsWith("storage.set") && c.includes('"showExperimental":true')));
+});
+
+test("UI - Options - History-nav checkbox visibility follows OPTIONS_NAVIGATION_STACK", async () => {
+  const { readFileSync } = await import("node:fs");
+  const features = JSON.parse(readFileSync(new URL("../features.json", import.meta.url), "utf8"));
+  const flagOn = features.OPTIONS_NAVIGATION_STACK?.enabled === true;
+  assert.equal(document.getElementById("historyNav-label").hidden, !flagOn);
+});

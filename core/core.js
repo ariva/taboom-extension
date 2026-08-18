@@ -19,6 +19,8 @@ export const DEFAULTS = {
     fontSize: 1, // rem, relative to browser default
     density: "comfortable", // or "compact"
     theme: "auto", // "auto" | "light" | "dark"
+    historyNav: true, // prev/next tab-history UI in sidebar + context menu
+    showExperimental: false, // opt into experimental features (needs ALLOW_EXPERIMENTAL flag)
   },
 };
 
@@ -124,4 +126,40 @@ export function makeRule(pattern) {
     pattern: trimmed,
     createdAt: Date.now(),
   };
+}
+
+// ---------- tab activation history (browser-style back/forward across tabs) ----------
+
+// Activating a tab while the cursor is in the past truncates the forward part,
+// exactly like browser navigation history.
+export function pushHistory({ stack, cursor }, tabId, max = 50) {
+  if (stack[cursor] === tabId) return { stack, cursor };
+  // set semantics: a re-activated tab moves to the top instead of duplicating
+  const kept = stack.slice(0, cursor + 1).filter((id) => id !== tabId);
+  const next = [...kept, tabId].slice(-max);
+  return { stack: next, cursor: next.length - 1 };
+}
+
+export function filterHistory({ stack, cursor }, keep) {
+  const removedUpToCursor = stack.slice(0, cursor + 1).filter((id) => !keep(id)).length;
+  const next = stack.filter(keep);
+  return { stack: next, cursor: Math.min(next.length - 1, cursor - removedUpToCursor) };
+}
+
+export const removeFromHistory = (hist, tabId) => filterHistory(hist, (id) => id !== tabId);
+
+// ---------- feature flags (features.json at extension root) ----------
+
+export const featureEnabled = (features, key) => features[key]?.enabled ?? false;
+
+// User opted into experimental features (and the build allows it via
+// ALLOW_EXPERIMENTAL): flip enabled:false → true on features marked experimental.
+export function applyExperimental(features, showExperimental) {
+  if (!showExperimental || !featureEnabled(features, "ALLOW_EXPERIMENTAL")) return features;
+  return Object.fromEntries(
+    Object.entries(features).map(([key, value]) => [
+      key,
+      value?.experimental && !value.enabled ? { ...value, enabled: true } : value,
+    ]),
+  );
 }

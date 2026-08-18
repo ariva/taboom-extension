@@ -210,3 +210,30 @@ test("Core - UI defaults", async () => {
   assert.equal(DEFAULTS.ui.theme, "auto");
   assert.equal(DEFAULTS.ui.sort, "window", "group-by-window on first launch");
 });
+
+// ---------- tab activation history ----------
+const { pushHistory, removeFromHistory } = await import("../core/core.js");
+
+test("Core - PushHistory appends, dedupes current, truncates forward, caps size", () => {
+  let h = { stack: [], cursor: -1 };
+  h = pushHistory(h, 1);
+  h = pushHistory(h, 2);
+  h = pushHistory(h, 2); // re-activating current tab: no-op
+  assert.deepEqual(h, { stack: [1, 2], cursor: 1 });
+
+  // stepped back to 1, then picked 3 manually → forward (2) gone
+  h = pushHistory({ stack: [1, 2], cursor: 0 }, 3);
+  assert.deepEqual(h, { stack: [1, 3], cursor: 1 });
+
+  h = pushHistory({ stack: [1, 2, 3], cursor: 2 }, 4, 3);
+  assert.deepEqual(h, { stack: [2, 3, 4], cursor: 2 }, "capped to max");
+
+  h = pushHistory({ stack: [1, 2, 3], cursor: 2 }, 1);
+  assert.deepEqual(h, { stack: [2, 3, 1], cursor: 2 }, "set semantics: re-activation moves to top");
+});
+
+test("Core - RemoveFromHistory drops a closed tab and keeps the cursor sane", () => {
+  assert.deepEqual(removeFromHistory({ stack: [1, 2, 3], cursor: 2 }, 2), { stack: [1, 3], cursor: 1 });
+  assert.deepEqual(removeFromHistory({ stack: [1, 2, 3], cursor: 1 }, 3), { stack: [1, 2], cursor: 1 });
+  assert.deepEqual(removeFromHistory({ stack: [1], cursor: 0 }, 1), { stack: [], cursor: -1 });
+});

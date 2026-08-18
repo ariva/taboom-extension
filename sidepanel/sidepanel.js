@@ -1,7 +1,7 @@
 // Imperative shell: DOM + chrome.* effects only. All list/view logic lives in
 // model.js as pure functions; this file feeds them state and applies the results.
-import { hostnameOf, resolveColorScheme } from "../core/core.js";
-import { loadState, saveState } from "../core/storage.js";
+import { applyExperimental, featureEnabled, hostnameOf, resolveColorScheme } from "../core/core.js";
+import { loadFeatures, loadState, saveState } from "../core/storage.js";
 import {
   bulkSummary,
   countsByFilter,
@@ -12,6 +12,8 @@ import {
   selectVisible,
   windowMaps,
 } from "./model.js";
+
+const FEATURES = await loadFeatures();
 
 const searchInput = document.getElementById("search");
 const filterBar = document.getElementById("filters");
@@ -66,6 +68,11 @@ async function refresh(animate = false) {
   document.documentElement.style.colorScheme = resolveColorScheme(state.ui.theme);
   state.currentWindowId = win.id;
   state.allTabs = tabs;
+  const features = applyExperimental(FEATURES, state.ui.showExperimental ?? false);
+  const historyNav = featureEnabled(features, "NAVIGATION_STACK") && (state.ui.historyNav ?? true);
+  document.getElementById("hist-back").hidden = !historyNav;
+  document.getElementById("hist-forward").hidden = !historyNav;
+  document.getElementById("hist-list-btn").hidden = !featureEnabled(features, "NAVIGATION_DROPDOWN");
   render(animate);
 }
 
@@ -242,15 +249,7 @@ function renderRow(tab, vm) {
   const favicon = document.createElement("span");
   favicon.className = "favicon";
   if (vm.favicon.pageUrl) {
-    // Chrome's local favicon cache — no network request to the site
-    const url = new URL(chrome.runtime.getURL("/_favicon/"));
-    url.searchParams.set("pageUrl", vm.favicon.pageUrl);
-    url.searchParams.set("size", "16");
-    const img = document.createElement("img");
-    img.src = url.toString();
-    img.width = img.height = 16;
-    img.addEventListener("error", () => img.remove());
-    favicon.append(img);
+    favicon.append(faviconImg(vm.favicon.pageUrl));
   } else {
     favicon.textContent = vm.favicon.letter;
   }
@@ -338,6 +337,18 @@ function renderBulkBar() {
 }
 
 // ---------- actions ----------
+
+// Chrome's local favicon cache — no network request to the site
+function faviconImg(pageUrl) {
+  const url = new URL(chrome.runtime.getURL("/_favicon/"));
+  url.searchParams.set("pageUrl", pageUrl);
+  url.searchParams.set("size", "16");
+  const img = document.createElement("img");
+  img.src = url.toString();
+  img.width = img.height = 16;
+  img.addEventListener("error", () => img.remove());
+  return img;
+}
 
 async function activate(tab) {
   await chrome.windows.update(tab.windowId, { focused: true });
@@ -532,3 +543,111 @@ async function syncUpdateBanner() {
 }
 syncUpdateBanner();
 chrome.storage.onChanged.addListener(syncUpdateBanner);
+
+// ---------- tab history nav (back / forward across tabs) ----------
+
+const histBack = document.getElementById("hist-back");
+const histForward = document.getElementById("hist-forward");
+const histPop = document.getElementById("history-pop");
+
+histBack.addEventListener("click", () => chrome.runtime.sendMessage({ type: "history-back" }));
+histForward.addEventListener("click", () => chrome.runtime.sendMessage({ type: "history-forward" }));
+
+async function getTabHistory() {
+  const { tabHistory } = await chrome.storage.local.get("tabHistory");
+  return tabHistory ?? { stack: [], cursor: -1 };
+}
+
+async function syncHistoryButtons() {
+  const { stack, cursor } = await getTabHistory();
+  histBack.disabled = cursor <= 0;
+  histForward.disabled = cursor >= stack.length - 1;
+}
+
+// populate on open (popovertarget handles show/hide natively)
+document.getElementById("hist-list-btn").addEventListener("click", fillHistoryPopover);
+
+async function fillHistoryPopover() {
+  // anchor just below the nav buttons, left-aligned (CSS anchor positioning needs Chrome 125+)
+  const anchor = histForward.parentElement.getBoundingClientRect();
+  histPop.style.top = `${anchor.bottom + 4}px`;
+  histPop.style.left = `${Math.max(4, anchor.left)}px`;
+  const { stack, cursor } = await getTabHistory();
+  const allTabs = await chrome.tabs.query({});
+  const byId = new Map(allTabs.map((t) => [t.id, t]));
+  const { dotColors } = windowMaps(allTabs, state.currentWindowId);
+  histPop.textContent = "";
+
+  const head = document.createElement("div");
+  head.className = "hist-head";
+  const heading = document.createElement("span");
+  heading.className = "muted";
+  heading.textContent = "Navigation stack";
+  const close = document.createElement("button");
+  close.className = "icon-btn";
+  close.title = close.ariaLabel = "Close";
+  close.innerHTML = ICONS.close;
+  close.addEventListener("click", () => histPop.hidePopover?.());
+  head.append(heading, close);
+  histPop.append(head);
+  if (stack.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "muted";
+    empty.textContent = "No tab history yet.";
+    histPop.append(empty);
+    return;
+  }
+  // newest on top; numbering counts from the oldest, so #1 sits at the bottom
+  for (let index = stack.length - 1; index >= 0; index--) {
+    const tab = byId.get(stack[index]);
+    const row = document.createElement("button");
+    row.type = "button";
+    row.className = index === cursor ? "hist-row current" : "hist-row";
+
+    const num = document.createElement("span");
+    num.className = "hist-num muted";
+    num.textContent = index + 1;
+
+    const icon = document.createElement("span");
+    icon.className = "favicon";
+    if (tab?.url) icon.append(faviconImg(tab.url));
+
+    const title = document.createElement("span");
+    title.className = "hist-title";
+    title.textContent = tab ? tab.title || tab.url : "(closed tab)";
+
+    row.append(num, icon, title);
+    if (dotColors.size > 0 && tab) {
+      const dot = document.createElement("span");
+      dot.className = "win-dot";
+      const color = dotColors.get(tab.windowId);
+      if (color) dot.style.background = color;
+      else dot.classList.add("current");
+      row.insertBefore(dot, icon);
+    }
+    row.addEventListener("click", () => {
+      chrome.runtime.sendMessage({ type: "history-jump", index });
+      histPop.hidePopover?.();
+    });
+    histPop.append(row);
+  }
+}
+
+// browser back-button behavior: right-click an arrow opens the history list.
+// Open on pointerup, not on contextmenu: the gesture's own pointer events
+// otherwise light-dismiss the popover the instant it shows.
+for (const arrow of [histBack, histForward]) {
+  arrow.addEventListener("contextmenu", (event) => event.preventDefault());
+  arrow.addEventListener("pointerup", async (event) => {
+    if (event.button !== 2) return;
+    await fillHistoryPopover();
+    try {
+      histPop.showPopover?.();
+    } catch {} // already open
+  });
+}
+
+syncHistoryButtons();
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === "local" && changes.tabHistory) syncHistoryButtons();
+});

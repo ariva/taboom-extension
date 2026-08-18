@@ -1,5 +1,17 @@
 import { DEFAULTS } from "./core.js";
 
+// features.json at extension root is the single source of truth — flip flags
+// there while developing, then reload. Pass a features object to skip the fetch.
+export async function loadFeatures(testFeatures) {
+  if (testFeatures) return testFeatures;
+  try {
+    const response = await fetch(chrome.runtime.getURL("features.json"));
+    return await response.json();
+  } catch {
+    return {}; // fail-closed: unknown flags read as disabled
+  }
+}
+
 // Single flat read of chrome.storage.local with defaults merged in.
 // Add migrateState() dispatch here when schemaVersion 2 exists.
 export async function loadState() {

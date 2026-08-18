@@ -1,6 +1,14 @@
 // Imperative shell: DOM + chrome.* effects only; view logic lives in model.js.
-import { DEFAULTS, makeRule, resolveColorScheme } from "../core/core.js";
-import { loadState, saveState } from "../core/storage.js";
+import {
+  applyExperimental,
+  DEFAULTS,
+  featureEnabled,
+  makeRule,
+  resolveColorScheme,
+} from "../core/core.js";
+import { loadFeatures, loadState, saveState } from "../core/storage.js";
+
+const FEATURES = await loadFeatures();
 import {
   aboutText,
   clampFontSize,
@@ -56,6 +64,16 @@ async function render() {
   document.getElementById("fontSize").value = state.ui.fontSize ?? 1;
   document.getElementById("density").value = state.ui.density ?? "comfortable";
   document.getElementById("theme").value = state.ui.theme ?? "auto";
+  document.getElementById("historyNav").checked = state.ui.historyNav ?? true;
+  document.getElementById("showExperimental").checked = state.ui.showExperimental ?? false;
+
+  const features = applyExperimental(FEATURES, state.ui.showExperimental ?? false);
+  document.getElementById("historyNav-label").hidden =
+    !featureEnabled(features, "OPTIONS_NAVIGATION_STACK");
+  const allowExperimental = featureEnabled(features, "ALLOW_EXPERIMENTAL");
+  document.getElementById("showExperimental-label").hidden = !allowExperimental;
+  document.getElementById("experimental-warning").hidden =
+    !(allowExperimental && (state.ui.showExperimental ?? false));
   applyTheme(state.ui.theme);
 
   document.getElementById("about").textContent = aboutText(chrome.runtime.getManifest().version);
@@ -106,6 +124,21 @@ document.getElementById("density").addEventListener("change", async () => {
   await saveState({ ui: { ...state.ui, density } });
   flashSaved();
 });
+
+document.getElementById("historyNav").addEventListener("change", async () => {
+  const historyNav = document.getElementById("historyNav").checked;
+  const state = await loadState();
+  await saveState({ ui: { ...state.ui, historyNav } });
+  flashSaved();
+});
+
+document.getElementById("showExperimental").addEventListener("change", async () => {
+  const showExperimental = document.getElementById("showExperimental").checked;
+  const state = await loadState();
+  await saveState({ ui: { ...state.ui, showExperimental } });
+  flashSaved();
+});
+
 
 document.getElementById("theme").addEventListener("change", async () => {
   const theme = document.getElementById("theme").value;

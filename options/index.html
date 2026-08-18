@@ -36,6 +36,8 @@
       border-radius: 6px;
     }
     #whats-new summary:hover { background: var(--hover); color: var(--accent); }
+    #experimental-warning { color: var(--danger); font-size: 0.9em; margin: 4px 0 0; }
+
     /* pre defaults (monospace, no wrap) look oversized and overflow the card */
     #whats-new pre {
       font: inherit;
@@ -226,6 +228,9 @@
         <option value="dark">Dark</option>
       </select>
     </label>
+    <label id="historyNav-label" hidden><input type="checkbox" id="historyNav" /> Show tab-history navigation <span class="muted">(prev/next buttons in side panel, History in context menu)</span></label>
+    <label id="showExperimental-label" hidden><input type="checkbox" id="showExperimental" /> Show experimental features</label>
+    <p id="experimental-warning" hidden>⚠ Experimental features enabled — they may change over time and may not be fully polished.</p>
   </section>
 
   <section class="card">

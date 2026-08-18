@@ -15,6 +15,13 @@ function makeEvent() {
 }
 
 // calls: flat log of stubbed chrome calls, e.g. ["tabs.reload 3", "storage.set {...}"]
+// tests fetch the real features.json (single source of truth for flags)
+const featuresJson = readFileSync(new URL("../../features.json", import.meta.url), "utf8");
+globalThis.fetch = async (url) => {
+  if (String(url).endsWith("features.json")) return { json: async () => JSON.parse(featuresJson) };
+  throw new Error(`unmocked fetch ${url}`);
+};
+
 export function makeChrome({ tabs = [], stored = {}, calls = [] }) {
   let nextTabId = 1000;
   return {
@@ -56,6 +63,7 @@ export function makeChrome({ tabs = [], stored = {}, calls = [] }) {
       onRemoved: makeEvent(), onMoved: makeEvent(), onAttached: makeEvent(), onDetached: makeEvent(),
     },
     windows: {
+      WINDOW_ID_NONE: -1,
       getLastFocused: async () => ({ id: 1 }),
       update: async (id) => calls.push(`windows.update ${id}`),
       onFocusChanged: makeEvent(),
@@ -69,6 +77,10 @@ export function makeChrome({ tabs = [], stored = {}, calls = [] }) {
       removeAll: async () => calls.push("contextMenus.removeAll"),
       create: (props) => calls.push(`contextMenus.create ${props.id}`),
       update: (id, props) => calls.push(`contextMenus.update ${id} ${JSON.stringify(props)}`),
+      remove: (id, done) => {
+        calls.push(`contextMenus.remove ${id}`);
+        done?.();
+      },
       onClicked: makeEvent(),
     },
     storage: {
@@ -85,6 +97,16 @@ export function makeChrome({ tabs = [], stored = {}, calls = [] }) {
         },
       },
       onChanged: makeEvent(),
+      session: (() => {
+        const sessionStored = {};
+        return {
+          get: async () => structuredClone(sessionStored),
+          set: async (patch) => {
+            calls.push(`storage.session.set ${JSON.stringify(patch)}`);
+            Object.assign(sessionStored, structuredClone(patch));
+          },
+        };
+      })(),
     },
     runtime: {
       getURL: (path) => `chrome-extension://test${path}`,

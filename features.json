@@ -1,0 +1,6 @@
+{
+  "ALLOW_EXPERIMENTAL": { "enabled": true },
+  "NAVIGATION_STACK": { "enabled": false, "experimental": true },
+  "OPTIONS_NAVIGATION_STACK": { "enabled": false },
+  "NAVIGATION_DROPDOWN": { "enabled": false }
+}
