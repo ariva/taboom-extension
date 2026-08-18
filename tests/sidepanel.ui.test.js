@@ -211,3 +211,35 @@ test("UI - Sidepanel - Own ui-prefs storage echo is ignored; foreign ui change r
 
   document.querySelector('#filters button[data-filter="all"]').click();
 });
+
+// in-search scroll positions live in their own per-filter map: switching
+// filters mid-search remembers positions within the results, while the
+// pre-search positions survive untouched and come back once the search clears
+test("UI - Sidepanel - Mid-search filter positions are separate from pre-search ones", () => {
+  const list = document.getElementById("tab-list");
+  const filter = (name) => document.querySelector(`#filters button[data-filter="${name}"]`).click();
+  const search = document.getElementById("search");
+  const type = (value) => {
+    search.value = value;
+    search.dispatchEvent(new window.Event("input", { bubbles: true }));
+  };
+
+  filter("awake");
+  list.scrollTop = 77;
+  filter("all"); // saves awake→77
+  list.scrollTop = 150;
+
+  type("e"); // entering search saves all→150, results start at top
+  assert.equal(list.scrollTop, 0, "search starts at top");
+  list.scrollTop = 40; // scroll within search results
+  filter("awake"); // in-search: all→40 saved; awake not visited in this search yet
+  assert.equal(list.scrollTop, 0, "first mid-search visit of a filter starts at top");
+  list.scrollTop = 15;
+  filter("all"); // in-search: awake→15 saved
+  assert.equal(list.scrollTop, 40, "in-search position remembered per filter");
+
+  type(""); // clearing restores the PRE-search position of the current filter
+  assert.equal(list.scrollTop, 150, "pre-search position survives mid-search filter clicks");
+  filter("awake");
+  assert.equal(list.scrollTop, 77, "other filter's pre-search position intact too");
+});

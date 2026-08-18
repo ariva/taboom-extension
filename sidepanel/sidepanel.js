@@ -480,13 +480,20 @@ async function protectSelected() {
 
 // ---------- events ----------
 
-// scroll position is remembered per filter; searching starts at the top and
-// clearing the search restores the current filter's position
+// Scroll positions are remembered per filter — in two separate worlds, so they
+// can't clobber each other: scrollByFilter holds normal-browsing positions
+// (restored when the search is cleared), searchScrollByFilter holds positions
+// within the current search results (restored when switching filters mid-search,
+// discarded when the search ends).
 const scrollByFilter = new Map();
+const searchScrollByFilter = new Map();
 
 function setQuery(value) {
   if (value && !state.query) {
     scrollByFilter.set(state.filter, listEl.scrollTop); // entering search
+  }
+  if (!value) {
+    searchScrollByFilter.clear(); // search over — in-results positions are stale
   }
   state.query = value;
   state.cursor = value ? 0 : -1;
@@ -503,23 +510,28 @@ filterBar.addEventListener("click", (event) => {
     /** @type {HTMLElement} */ (event.target).closest("button[data-filter]")
   );
   if (!button) return;
-  scrollByFilter.set(state.filter, listEl.scrollTop);
+  // per-filter scroll memory applies while searching too, but in-search
+  // positions live in their own map so pre-search spots survive the search
+  const scrollMap = state.query ? searchScrollByFilter : scrollByFilter;
+  scrollMap.set(state.filter, listEl.scrollTop);
   state.filter = button.dataset.filter;
-  state.pendingScroll = scrollByFilter.get(state.filter) ?? 0;
+  state.pendingScroll = scrollMap.get(state.filter) ?? 0;
   persistUiPrefs();
-  render();
+  // mid-search the old/new filtered sets barely overlap — a view transition
+  // cross-fades two unrelated lists (reads as ghosting), so skip animation
+  render(!state.query);
 });
 
 scopeSelect.addEventListener("change", () => {
   state.scope = scopeSelect.value;
   persistUiPrefs();
-  render();
+  render(!state.query);
 });
 
 sortSelect.addEventListener("change", () => {
   state.sort = sortSelect.value;
   persistUiPrefs();
-  render();
+  render(!state.query);
 });
 
 // JSON of the ui object this panel just persisted — its storage echo is skipped
