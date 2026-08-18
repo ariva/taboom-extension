@@ -7,6 +7,7 @@ import {
   recordMetric,
   resolveColorScheme,
 } from "../core/core.js";
+import { getElementById } from "../core/dom.js";
 import { loadFeatures, loadState, saveState } from "../core/storage.js";
 import {
   bulkSummary,
@@ -55,15 +56,15 @@ async function flushPerfMetrics() {
   });
 }
 
-const searchInput = document.getElementById("search");
-const filterBar = document.getElementById("filters");
-const scopeSelect = document.getElementById("scope");
-const sortSelect = document.getElementById("sort");
-const listEl = document.getElementById("tab-list");
-const bulkBar = document.getElementById("bulk-bar");
-const bulkCount = document.getElementById("bulk-count");
-const selectAllBox = document.getElementById("select-all");
-const collapseAllBtn = document.getElementById("collapse-all");
+const searchInput = getElementById("search");
+const filterBar = getElementById("filters");
+const scopeSelect = getElementById("scope");
+const sortSelect = getElementById("sort");
+const listEl = getElementById("tab-list");
+const bulkBar = getElementById("bulk-bar");
+const bulkCount = getElementById("bulk-count");
+const selectAllBox = getElementById("select-all");
+const collapseAllBtn = getElementById("collapse-all");
 
 const FOLD_ICONS = {
   fold: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 3l4 4 4-4M4 9l4 4 4-4"/></svg>',
@@ -115,9 +116,9 @@ async function refresh(animate = false) {
     state.cursor = -1;
   }
   const historyNav = featureEnabled(features, "NAVIGATION_STACK") && (state.ui.historyNav ?? true);
-  document.getElementById("hist-back").hidden = !historyNav;
-  document.getElementById("hist-forward").hidden = !historyNav;
-  document.getElementById("hist-list-btn").hidden = !featureEnabled(features, "NAVIGATION_DROPDOWN");
+  getElementById("hist-back").hidden = !historyNav;
+  getElementById("hist-forward").hidden = !historyNav;
+  getElementById("hist-list-btn").hidden = !featureEnabled(features, "NAVIGATION_DROPDOWN");
   render(animate);
 }
 
@@ -416,7 +417,7 @@ async function activate(tab) {
 
 let toastTimer;
 function toast(message) {
-  const el = document.getElementById("toast");
+  const el = getElementById("toast");
   el.textContent = message;
   el.hidden = false;
   clearTimeout(toastTimer);
@@ -491,7 +492,9 @@ searchInput.addEventListener("input", () => {
 });
 
 filterBar.addEventListener("click", (event) => {
-  const button = event.target.closest("button[data-filter]");
+  const button = /** @type {HTMLElement | null} */ (
+    /** @type {HTMLElement} */ (event.target).closest("button[data-filter]")
+  );
   if (!button) return;
   scrollByFilter.set(state.filter, listEl.scrollTop);
   state.filter = button.dataset.filter;
@@ -528,15 +531,15 @@ selectAllBox.addEventListener("change", () => {
   render(false);
 });
 
-document.getElementById("settings-btn").addEventListener("click", () => {
+getElementById("settings-btn").addEventListener("click", () => {
   chrome.runtime.openOptionsPage();
 });
 
-document.getElementById("bulk-snooze").addEventListener("click", () => snooze([...state.selected]));
-document.getElementById("bulk-wake").addEventListener("click", () => wake([...state.selected]));
-document.getElementById("bulk-protect").addEventListener("click", protectSelected);
-document.getElementById("bulk-close").addEventListener("click", () => closeTabs([...state.selected]));
-document.getElementById("bulk-clear").addEventListener("click", () => {
+getElementById("bulk-snooze").addEventListener("click", () => snooze([...state.selected]));
+getElementById("bulk-wake").addEventListener("click", () => wake([...state.selected]));
+getElementById("bulk-protect").addEventListener("click", protectSelected);
+getElementById("bulk-close").addEventListener("click", () => closeTabs([...state.selected]));
+getElementById("bulk-clear").addEventListener("click", () => {
   state.selected.clear();
   render();
 });
@@ -629,7 +632,7 @@ loadState().then((persisted) => {
 // ---------- update notice ----------
 
 // reload() applies the deferred update (an open panel blocks auto-install)
-const updateBanner = document.getElementById("update-banner");
+const updateBanner = getElementById("update-banner");
 updateBanner.addEventListener("click", () => chrome.runtime.reload());
 async function syncUpdateBanner() {
   const { updateAvailable } = await chrome.storage.local.get("updateAvailable");
@@ -641,15 +644,18 @@ chrome.storage.onChanged.addListener(syncUpdateBanner);
 
 // ---------- tab history nav (back / forward across tabs) ----------
 
-const histBack = document.getElementById("hist-back");
-const histForward = document.getElementById("hist-forward");
-const histPop = document.getElementById("history-pop");
+const histBack = getElementById("hist-back");
+const histForward = getElementById("hist-forward");
+const histPop = getElementById("history-pop");
 
 histBack.addEventListener("click", () => chrome.runtime.sendMessage({ type: "history-back" }));
 histForward.addEventListener("click", () => chrome.runtime.sendMessage({ type: "history-forward" }));
 
+/** @returns {Promise<{stack: number[], cursor: number}>} */
 async function getTabHistory() {
-  const { tabHistory } = await chrome.storage.local.get("tabHistory");
+  const { tabHistory } = /** @type {{tabHistory?: {stack: number[], cursor: number}}} */ (
+    await chrome.storage.local.get("tabHistory")
+  );
   return tabHistory ?? { stack: [], cursor: -1 };
 }
 
@@ -660,7 +666,7 @@ async function syncHistoryButtons() {
 }
 
 // populate on open (popovertarget handles show/hide natively)
-document.getElementById("hist-list-btn").addEventListener("click", fillHistoryPopover);
+getElementById("hist-list-btn").addEventListener("click", fillHistoryPopover);
 
 async function fillHistoryPopover() {
   // anchor just below the nav buttons, left-aligned (CSS anchor positioning needs Chrome 125+)
@@ -701,7 +707,7 @@ async function fillHistoryPopover() {
 
     const num = document.createElement("span");
     num.className = "hist-num muted";
-    num.textContent = index + 1;
+    num.textContent = String(index + 1);
 
     const icon = document.createElement("span");
     icon.className = "favicon";

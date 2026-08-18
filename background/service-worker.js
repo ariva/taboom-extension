@@ -208,8 +208,11 @@ chrome.tabs.onActivated.addListener(async ({ tabId }) => {
 // ---------- tab history (back/forward across tabs) ----------
 
 // storage.local: history survives worker sleeps, extension reloads, and browser restarts
+/** @returns {Promise<{stack: number[], cursor: number}>} */
 async function loadHistory() {
-  const { tabHistory } = await chrome.storage.local.get("tabHistory");
+  const { tabHistory } = /** @type {{tabHistory?: {stack: number[], cursor: number}}} */ (
+    await chrome.storage.local.get("tabHistory")
+  );
   return tabHistory ?? { stack: [], cursor: -1 };
 }
 
@@ -295,6 +298,7 @@ chrome.commands.onCommand.addListener(async (command) => {
 
 // per-tab items only appear on pages we can snooze/protect; global items show everywhere
 const PAGE_PATTERNS = ["http://*/*", "https://*/*", "file://*/*"];
+/** @type {chrome.contextMenus.CreateProperties[]} */
 const MENU_ITEMS = [
   { id: "show-manager", title: "Show Taboom Manager" },
   { id: "sep-1", type: "separator" },
@@ -319,7 +323,7 @@ const removeMenu = (id) =>
   new Promise((resolve) =>
     chrome.contextMenus.remove(id, () => {
       void chrome.runtime.lastError; // "not found" on first build — expected
-      resolve();
+      resolve(undefined);
     }),
   );
 

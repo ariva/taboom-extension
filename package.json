@@ -3,8 +3,10 @@
   "private": true,
   "version": "0.2.8",
   "type": "module",
-  "description": "Node tooling metadata only (ES modules for node --test). Chrome ignores this file.",
+  "description": "Node tooling metadata only (ES modules for node --test; tsc type check). Chrome ignores this file.",
   "devDependencies": {
-    "happy-dom": "^20.11.2"
+    "@types/chrome": "^0.2.6",
+    "happy-dom": "^20.11.2",
+    "typescript": "^7.0.2"
   }
 }

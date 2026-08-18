@@ -52,12 +52,12 @@ Chrome may refuse the suggested key if another extension already claims it — a
 Prerequisites:
 
 - [`just`](https://github.com/casey/just) — command runner driving lint/test/build (see its [installation guide](https://github.com/casey/just#installation)).
-- Node.js + `npm install` — installs the test-only dev dependencies (`happy-dom`); `just build` runs the test suite before packing.
+- Node.js + `npm install` — installs the dev-only dependencies (`happy-dom` for UI tests, `typescript` + `@types/chrome` for the type check); `just build` runs lint, type check, and the test suite before packing.
 - [`fd`](https://github.com/sharkdp/fd) — used by the lint step to enumerate JS files.
 
 ```bash
 npm install
-just build    # lint + test + dist/tabs-manager.zip
+just build    # lint + typecheck + test + dist/tabs-manager.zip
 ```
 
 The zip is only needed for distribution (e.g. Chrome Web Store upload). Local development always uses Load unpacked.

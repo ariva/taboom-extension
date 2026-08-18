@@ -6,6 +6,7 @@ import {
   makeRule,
   resolveColorScheme,
 } from "../core/core.js";
+import { getElementById } from "../core/dom.js";
 import { loadFeatures, loadState, saveState } from "../core/storage.js";
 
 const FEATURES = await loadFeatures();
@@ -30,12 +31,12 @@ const SETTING_IDS = [
 async function render() {
   const state = await loadState();
   for (const id of SETTING_IDS) {
-    const input = document.getElementById(id);
-    if (input.type === "checkbox") input.checked = state.settings[id];
-    else input.value = state.settings[id];
+    const input = getElementById(id);
+    if (input.type === "checkbox") input.checked = Boolean(state.settings[id]);
+    else input.value = String(state.settings[id]);
   }
 
-  const list = document.getElementById("rules");
+  const list = getElementById("rules");
   list.textContent = "";
   if (state.protectionRules.length === 0) {
     const li = document.createElement("li");
@@ -62,30 +63,30 @@ async function render() {
     list.append(li);
   }
 
-  document.getElementById("fontSize").value = state.ui.fontSize ?? 1;
-  document.getElementById("density").value = state.ui.density ?? "comfortable";
-  document.getElementById("theme").value = state.ui.theme ?? "auto";
-  document.getElementById("historyNav").checked = state.ui.historyNav ?? true;
-  document.getElementById("showExperimental").checked = state.ui.showExperimental ?? false;
+  getElementById("fontSize").value = String(state.ui.fontSize ?? 1);
+  getElementById("density").value = state.ui.density ?? "comfortable";
+  getElementById("theme").value = state.ui.theme ?? "auto";
+  getElementById("historyNav").checked = state.ui.historyNav ?? true;
+  getElementById("showExperimental").checked = state.ui.showExperimental ?? false;
 
   const features = applyExperimental(FEATURES, state.ui.showExperimental ?? false);
-  document.getElementById("historyNav-label").hidden =
+  getElementById("historyNav-label").hidden =
     !featureEnabled(features, "OPTIONS_NAVIGATION_STACK");
   const allowExperimental = featureEnabled(features, "ALLOW_EXPERIMENTAL");
-  document.getElementById("showExperimental-label").hidden = !allowExperimental;
-  document.getElementById("experimental-warning").hidden =
+  getElementById("showExperimental-label").hidden = !allowExperimental;
+  getElementById("experimental-warning").hidden =
     !(allowExperimental && (state.ui.showExperimental ?? false));
-  document.getElementById("perf-section").hidden =
+  getElementById("perf-section").hidden =
     !featureEnabled(features, "SHOW_PERFORMANCE_INFO");
   applyTheme(state.ui.theme);
 
-  document.getElementById("about").textContent = aboutText(chrome.runtime.getManifest().version);
+  getElementById("about").textContent = aboutText(chrome.runtime.getManifest().version);
 }
 
 async function saveSettings() {
   const settings = {};
   for (const id of SETTING_IDS) {
-    const input = document.getElementById(id);
+    const input = getElementById(id);
     settings[id] =
       input.type === "checkbox"
         ? input.checked
@@ -102,57 +103,57 @@ function applyTheme(theme) {
 
 let savedTimer;
 function flashSaved() {
-  const el = document.getElementById("saved");
+  const el = getElementById("saved");
   el.hidden = false;
   clearTimeout(savedTimer);
   savedTimer = setTimeout(() => (el.hidden = true), 1200);
 }
 
 for (const id of SETTING_IDS) {
-  document.getElementById(id).addEventListener("change", saveSettings);
+  getElementById(id).addEventListener("change", saveSettings);
 }
 
-document.getElementById("fontSize").addEventListener("change", async () => {
-  const input = document.getElementById("fontSize");
+getElementById("fontSize").addEventListener("change", async () => {
+  const input = getElementById("fontSize");
   const fontSize = clampFontSize(input.value);
-  input.value = fontSize;
+  input.value = String(fontSize);
   const state = await loadState();
   await saveState({ ui: { ...state.ui, fontSize } });
   flashSaved();
 });
 
-document.getElementById("density").addEventListener("change", async () => {
-  const density = document.getElementById("density").value;
+getElementById("density").addEventListener("change", async () => {
+  const density = getElementById("density").value;
   const state = await loadState();
   await saveState({ ui: { ...state.ui, density } });
   flashSaved();
 });
 
-document.getElementById("historyNav").addEventListener("change", async () => {
-  const historyNav = document.getElementById("historyNav").checked;
+getElementById("historyNav").addEventListener("change", async () => {
+  const historyNav = getElementById("historyNav").checked;
   const state = await loadState();
   await saveState({ ui: { ...state.ui, historyNav } });
   flashSaved();
 });
 
-document.getElementById("showExperimental").addEventListener("change", async () => {
-  const showExperimental = document.getElementById("showExperimental").checked;
+getElementById("showExperimental").addEventListener("change", async () => {
+  const showExperimental = getElementById("showExperimental").checked;
   const state = await loadState();
   await saveState({ ui: { ...state.ui, showExperimental } });
   flashSaved();
 });
 
 
-document.getElementById("theme").addEventListener("change", async () => {
-  const theme = document.getElementById("theme").value;
+getElementById("theme").addEventListener("change", async () => {
+  const theme = getElementById("theme").value;
   applyTheme(theme);
   const state = await loadState();
   await saveState({ ui: { ...state.ui, theme } });
   flashSaved();
 });
 
-document.getElementById("add-rule").addEventListener("click", async () => {
-  const input = document.getElementById("new-rule");
+getElementById("add-rule").addEventListener("click", async () => {
+  const input = getElementById("new-rule");
   const rule = makeRule(input.value);
   if (!rule) return;
   const state = await loadState();
@@ -165,8 +166,10 @@ document.getElementById("add-rule").addEventListener("click", async () => {
 });
 
 // chrome:// URLs can't be plain hrefs — open via tabs API
-document.getElementById("links").addEventListener("click", (event) => {
-  const link = event.target.closest("a[data-url]");
+getElementById("links").addEventListener("click", (event) => {
+  const link = /** @type {HTMLElement | null} */ (
+    /** @type {HTMLElement} */ (event.target).closest("a[data-url]")
+  );
   if (!link) return;
   event.preventDefault();
   chrome.tabs.create({ url: link.dataset.url });
@@ -175,11 +178,10 @@ document.getElementById("links").addEventListener("click", (event) => {
 const PERF_SNAPSHOTS_MAX = 20;
 
 // each Show click snapshots the current metrics, so the list shows evolution over time
-document.getElementById("perf-show").addEventListener("click", async () => {
-  const { perfMetrics = {}, perfSnapshots = [] } = await chrome.storage.local.get([
-    "perfMetrics",
-    "perfSnapshots",
-  ]);
+getElementById("perf-show").addEventListener("click", async () => {
+  const { perfMetrics = {}, perfSnapshots = [] } = /** @type {Record<string, any>} */ (
+    await chrome.storage.local.get(["perfMetrics", "perfSnapshots"])
+  );
   let snapshots = perfSnapshots;
   if (Object.keys(perfMetrics).length > 0) {
     snapshots = [...perfSnapshots, { at: Date.now(), metrics: perfMetrics }].slice(
@@ -187,23 +189,23 @@ document.getElementById("perf-show").addEventListener("click", async () => {
     );
     await chrome.storage.local.set({ perfSnapshots: snapshots });
   }
-  document.getElementById("perf-out").textContent =
+  getElementById("perf-out").textContent =
     snapshotBlocks(snapshots).join("\n\n") || "No metrics recorded yet.";
 });
 
 // running counters restart; stored snapshot history stays for comparison
-document.getElementById("perf-reset-snapshot").addEventListener("click", async () => {
+getElementById("perf-reset-snapshot").addEventListener("click", async () => {
   await chrome.storage.local.remove("perfMetrics");
   flashSaved();
 });
 
-document.getElementById("perf-reset").addEventListener("click", async () => {
+getElementById("perf-reset").addEventListener("click", async () => {
   await chrome.storage.local.remove(["perfMetrics", "perfSnapshots"]);
-  document.getElementById("perf-out").textContent = "";
+  getElementById("perf-out").textContent = "";
   flashSaved();
 });
 
-document.getElementById("danger").addEventListener("click", async () => {
+getElementById("danger").addEventListener("click", async () => {
   if (!confirm("Delete all Taboom settings and protection rules?")) return;
   await chrome.storage.local.clear();
   await saveState(structuredClone(DEFAULTS));
@@ -221,7 +223,7 @@ fetch(chrome.runtime.getURL("CHANGES.md"))
   .then((markdown) => {
     const sections = releaseSections(markdown);
     if (sections.length === 0) return;
-    const box = document.getElementById("whats-new");
+    const box = getElementById("whats-new");
     for (const [index, section] of sections.entries()) {
       const details = document.createElement("details");
       details.open = index === 0;

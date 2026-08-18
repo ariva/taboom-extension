@@ -122,7 +122,7 @@ export function makeRule(pattern) {
   if (!trimmed) return null;
   return {
     id: crypto.randomUUID(),
-    type: trimmed.startsWith("*.") ? "domain" : "host",
+    type: /** @type {"host" | "domain"} */ (trimmed.startsWith("*.") ? "domain" : "host"),
     pattern: trimmed,
     createdAt: Date.now(),
   };

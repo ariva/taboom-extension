@@ -5,13 +5,17 @@ set shell := ["bash", "-uc"]
 
 default: check
 
-# lint + test
-check: lint test
+# lint + typecheck + test
+check: lint typecheck test
 
 # syntax-check every JS file (node parses ES modules via package.json type:module)
 lint:
     fd -e js -E node_modules . | xargs -I{} node --check {}
     node -e "JSON.parse(require('fs').readFileSync('manifest.json','utf8'))" && echo "manifest.json OK"
+
+# JSDoc type check via tsc — no emit, files ship as written (jsconfig.json)
+typecheck:
+    npx tsc -p jsconfig.json
 
 # unit tests for pure core logic
 test:

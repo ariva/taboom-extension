@@ -1,11 +1,11 @@
 # Testing Taboom - Tabs Manager
 
-Tests run under Node's built-in test runner (`node --test`) — no test framework needed. The UI tests, however, need a DOM implementation (Node has none): they render the real extension pages in [happy-dom](https://github.com/capricorn86/happy-dom) — the one dev dependency `npm install` brings in — with a stubbed `chrome.*` API, so nothing needs a running Chrome.
+Tests run under Node's built-in test runner (`node --test`) — no test framework needed. The UI tests, however, need a DOM implementation (Node has none): they render the real extension pages in [happy-dom](https://github.com/capricorn86/happy-dom) — a dev dependency `npm install` brings in — with a stubbed `chrome.*` API, so nothing needs a running Chrome.
 
 ## Setup
 
 1. Install [Node.js](https://nodejs.org/) 20 or newer (built-in test runner).
-2. Install dev dependencies (only `happy-dom`, used by UI tests):
+2. Install dev dependencies (`happy-dom` for UI tests; `typescript` + `@types/chrome` for `just typecheck`):
 
    ```bash
    npm install
@@ -17,9 +17,10 @@ Tests run under Node's built-in test runner (`node --test`) — no test framewor
 ## Running
 
 ```bash
-just test     # full test suite
-just lint     # syntax-check every JS file + validate manifest.json
-just check    # lint + test (also what `just build` runs before packing)
+just test      # full test suite
+just lint      # syntax-check every JS file + validate manifest.json
+just typecheck # JSDoc type check via tsc (jsconfig.json) — no emit, no build step
+just check     # lint + typecheck + test (also what `just build` runs before packing)
 ```
 
 Single file / filtered run:
