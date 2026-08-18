@@ -45,6 +45,27 @@
 
   <main id="tab-list" role="listbox" aria-label="Open tabs"></main>
 
+  <!-- Row skeleton, cloned per tab (parsing SVG via innerHTML per row is slow).
+       Both protect variants ship here; renderRow removes the one not needed.
+       Unicode glyphs (⏸ 🛡 ✕) would render at wildly different sizes/baselines per platform. -->
+  <template id="row-template">
+    <div class="row" role="option">
+      <input type="checkbox" aria-label="Select tab" />
+      <span class="win-dot"></span>
+      <span class="favicon"></span>
+      <div class="main">
+        <div class="title"></div>
+        <div class="meta"><span class="host"></span></div>
+      </div>
+      <div class="actions">
+        <button data-action="snooze" title="Snooze" aria-label="Snooze"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 3v10M10 3v10"/></svg></button>
+        <button data-action="toggle-protect" data-icon="protect"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M8 1.8 13.2 3.7V8c0 3.2-2.3 5.1-5.2 6.2C5.1 13.1 2.8 11.2 2.8 8V3.7Z"/></svg></button>
+        <button data-action="toggle-protect" data-icon="unprotect"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M8 1.8 13.2 3.7V8c0 3.2-2.3 5.1-5.2 6.2C5.1 13.1 2.8 11.2 2.8 8V3.7Z"/><path stroke-linecap="round" d="M3 2.5l10 11"/></svg></button>
+        <button data-action="close" title="Close" aria-label="Close"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>
+      </div>
+    </div>
+  </template>
+
   <div id="toast" role="status" hidden></div>
 
   <footer id="bulk-bar">

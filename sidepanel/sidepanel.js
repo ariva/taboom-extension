@@ -292,37 +292,42 @@ function renderRow(tab, vm) {
   return perfMeasure("sidepanel.renderRow", () => renderRowImpl(tab, vm));
 }
 
+// cloneNode of the #row-template skeleton beats ~10 createElement calls plus
+// per-button innerHTML SVG parsing on every row of every render
+const ROW_TEMPLATE = /** @type {HTMLTemplateElement} */ (
+  /** @type {unknown} */ (getElementById("row-template"))
+);
+
 function renderRowImpl(tab, vm) {
-  const row = document.createElement("div");
+  const row = /** @type {HTMLElement} */ (ROW_TEMPLATE.content.firstElementChild.cloneNode(true));
   row.className = vm.classes.join(" ");
-  row.setAttribute("role", "option");
   row.style.viewTransitionName = vm.viewTransitionName;
   row.dataset.tabId = String(tab.id);
 
-  const checkbox = document.createElement("input");
-  checkbox.type = "checkbox";
-  checkbox.checked = vm.checked;
-  checkbox.ariaLabel = "Select tab";
+  /** @type {HTMLInputElement} */ (row.querySelector("input")).checked = vm.checked;
 
-  const favicon = document.createElement("span");
-  favicon.className = "favicon";
+  const dot = /** @type {HTMLElement} */ (row.querySelector(".win-dot"));
+  if (vm.dot) {
+    if (vm.dot.color) {
+      dot.style.background = vm.dot.color;
+    } else {
+      dot.classList.add("current");
+    }
+    dot.title = vm.dot.title;
+  } else {
+    dot.remove();
+  }
+
+  const favicon = row.querySelector(".favicon");
   if (vm.favicon.pageUrl) {
     favicon.append(faviconImg(vm.favicon.pageUrl));
   } else {
     favicon.textContent = vm.favicon.letter;
   }
 
-  const main = document.createElement("div");
-  main.className = "main";
-  const title = document.createElement("div");
-  title.className = "title";
-  title.textContent = vm.title;
-  const meta = document.createElement("div");
-  meta.className = "meta";
-  const host = document.createElement("span");
-  host.className = "host";
-  host.textContent = vm.host;
-  meta.append(host);
+  row.querySelector(".title").textContent = vm.title;
+  row.querySelector(".host").textContent = vm.host;
+  const meta = row.querySelector(".meta");
   if (vm.age) {
     const age = document.createElement("span");
     age.textContent = vm.age;
@@ -334,28 +339,14 @@ function renderRowImpl(tab, vm) {
     badge.textContent = label;
     meta.append(badge);
   }
-  main.append(title, meta);
 
-  const actions = document.createElement("div");
-  actions.className = "actions";
-  if (vm.canSnooze) {
-    actions.append(actionButton("snooze", "Snooze", "snooze"));
+  if (!vm.canSnooze) {
+    row.querySelector('[data-action="snooze"]').remove();
   }
-  actions.append(
-    actionButton(vm.protected ? "unprotect" : "protect", vm.protectLabel, "toggle-protect"),
-    actionButton("close", "Close", "close"),
-  );
-
-  if (vm.dot) {
-    const dot = document.createElement("span");
-    dot.className = "win-dot";
-    if (vm.dot.color) dot.style.background = vm.dot.color;
-    else dot.classList.add("current");
-    dot.title = vm.dot.title;
-    row.append(checkbox, dot, favicon, main, actions);
-  } else {
-    row.append(checkbox, favicon, main, actions);
-  }
+  // template ships both protect variants; drop the one this row doesn't need
+  row.querySelector(vm.protected ? '[data-icon="protect"]' : '[data-icon="unprotect"]').remove();
+  const protect = /** @type {HTMLElement} */ (row.querySelector('[data-action="toggle-protect"]'));
+  protect.title = protect.ariaLabel = vm.protectLabel;
   return row;
 }
 
@@ -391,23 +382,10 @@ listEl.addEventListener("click", (event) => {
   if (tab) activate(tab);
 });
 
-// inline SVGs: unicode glyphs (⏸ 🛡 ✕) render at wildly different sizes/baselines per platform
+// row action icons live in #row-template now; this one is for the history popover
 const ICONS = {
-  snooze: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 3v10M10 3v10"/></svg>',
-  protect: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M8 1.8 13.2 3.7V8c0 3.2-2.3 5.1-5.2 6.2C5.1 13.1 2.8 11.2 2.8 8V3.7Z"/></svg>',
-  unprotect: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M8 1.8 13.2 3.7V8c0 3.2-2.3 5.1-5.2 6.2C5.1 13.1 2.8 11.2 2.8 8V3.7Z"/><path stroke-linecap="round" d="M3 2.5l10 11"/></svg>',
   close: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg>',
 };
-
-// action is dispatched by the delegated click listener on #tab-list
-function actionButton(icon, label, action) {
-  const button = document.createElement("button");
-  button.innerHTML = ICONS[icon];
-  button.title = label;
-  button.ariaLabel = label;
-  button.dataset.action = action;
-  return button;
-}
 
 function renderBulkBar() {
   const summary = bulkSummary(state.visible, state.selected);

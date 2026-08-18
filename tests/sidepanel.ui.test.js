@@ -156,3 +156,37 @@ test("UI - Sidepanel - Scroll position is per filter; search starts at top and r
   search.dispatchEvent(new window.Event("input", { bubbles: true }));
   assert.equal(list.scrollTop, 60, "clearing search restores filter position");
 });
+
+// covers the delegated #tab-list click dispatch + template variant pruning
+test("UI - Sidepanel - Row action buttons dispatch per-tab actions without activating", async () => {
+  document.querySelector('#filters button[data-filter="all"]').click(); // previous test leaves "awake"
+  const row = (id) => document.querySelector(`.row[data-tab-id="${id}"]`);
+
+  // template prunes per row: no snooze on discarded, one protect variant kept
+  assert.equal(row(2).querySelector('[data-action="snooze"]'), null, "no snooze button on discarded tab");
+  assert.ok(row(1).querySelector('[data-icon="protect"]'), "unprotected tab keeps protect icon");
+  assert.equal(row(1).querySelector('[data-icon="unprotect"]'), null);
+  assert.ok(row(3).querySelector('[data-icon="unprotect"]'), "protected tab keeps unprotect icon");
+  assert.equal(row(3).querySelector('[data-action="toggle-protect"]').title, "Unprotect site");
+  assert.equal(row(1).querySelector('[data-action="toggle-protect"]').title, "Protect site");
+
+  calls.length = 0;
+  row(1).querySelector('input[type="checkbox"]').click();
+  await tick();
+  assert.match(document.getElementById("bulk-count").textContent, /1 selected/, "checkbox selects only its tab");
+
+  row(1).querySelector('[data-action="snooze"]').click();
+  await tick();
+  assert.ok(calls.includes("sendMessage snooze-tab"), "snooze message sent");
+
+  row(1).querySelector('[data-action="toggle-protect"]').click();
+  await tick();
+  assert.ok(calls.includes("sendMessage toggle-site-protection"), "protect message sent");
+
+  row(1).querySelector('[data-action="close"]').click();
+  await tick();
+  assert.ok(calls.some((c) => c.startsWith("tabs.remove 1")), "close removes the tab");
+
+  // none of the above may fall through to row activation
+  assert.ok(!calls.some((c) => c.startsWith("windows.update")), "button clicks never activate the row");
+});
