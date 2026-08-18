@@ -15,6 +15,7 @@ import {
   clampedNumber,
   hasRule,
   releaseSections,
+  snapshotBlocks,
 } from "./model.js";
 
 const SETTING_IDS = [
@@ -74,6 +75,8 @@ async function render() {
   document.getElementById("showExperimental-label").hidden = !allowExperimental;
   document.getElementById("experimental-warning").hidden =
     !(allowExperimental && (state.ui.showExperimental ?? false));
+  document.getElementById("perf-section").hidden =
+    !featureEnabled(features, "SHOW_PERFORMANCE_INFO");
   applyTheme(state.ui.theme);
 
   document.getElementById("about").textContent = aboutText(chrome.runtime.getManifest().version);
@@ -167,6 +170,31 @@ document.getElementById("links").addEventListener("click", (event) => {
   if (!link) return;
   event.preventDefault();
   chrome.tabs.create({ url: link.dataset.url });
+});
+
+const PERF_SNAPSHOTS_MAX = 20;
+
+// each Show click snapshots the current metrics, so the list shows evolution over time
+document.getElementById("perf-show").addEventListener("click", async () => {
+  const { perfMetrics = {}, perfSnapshots = [] } = await chrome.storage.local.get([
+    "perfMetrics",
+    "perfSnapshots",
+  ]);
+  let snapshots = perfSnapshots;
+  if (Object.keys(perfMetrics).length > 0) {
+    snapshots = [...perfSnapshots, { at: Date.now(), metrics: perfMetrics }].slice(
+      -PERF_SNAPSHOTS_MAX,
+    );
+    await chrome.storage.local.set({ perfSnapshots: snapshots });
+  }
+  document.getElementById("perf-out").textContent =
+    snapshotBlocks(snapshots).join("\n\n") || "No metrics recorded yet.";
+});
+
+document.getElementById("perf-reset").addEventListener("click", async () => {
+  await chrome.storage.local.remove(["perfMetrics", "perfSnapshots"]);
+  document.getElementById("perf-out").textContent = "";
+  flashSaved();
 });
 
 document.getElementById("danger").addEventListener("click", async () => {

@@ -163,3 +163,21 @@ export function applyExperimental(features, showExperimental) {
     ]),
   );
 }
+
+// ---------- performance metrics ----------
+
+// metrics: { [key]: { count, avg, min, max, last } } — plain JSON, storage-safe
+export function recordMetric(metrics, key, ms) {
+  const prev = metrics[key] ?? { count: 0, avg: 0, min: ms, max: ms };
+  const count = prev.count + 1;
+  return {
+    ...metrics,
+    [key]: {
+      count,
+      avg: prev.avg + (ms - prev.avg) / count, // running mean, no history kept
+      min: Math.min(prev.min, ms),
+      max: Math.max(prev.max, ms),
+      last: ms,
+    },
+  };
+}

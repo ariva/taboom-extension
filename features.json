@@ -2,5 +2,7 @@
   "ALLOW_EXPERIMENTAL": { "enabled": true },
   "NAVIGATION_STACK": { "enabled": false, "experimental": true },
   "OPTIONS_NAVIGATION_STACK": { "enabled": false },
-  "NAVIGATION_DROPDOWN": { "enabled": false }
+  "NAVIGATION_DROPDOWN": { "enabled": false },
+  "PERFORMANCE": { "enabled": false },
+  "SHOW_PERFORMANCE_INFO": { "enabled": false }
 }

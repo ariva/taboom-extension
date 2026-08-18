@@ -110,3 +110,27 @@ test("UI - Options - History-nav checkbox visibility follows OPTIONS_NAVIGATION_
   const flagOn = features.OPTIONS_NAVIGATION_STACK?.enabled === true;
   assert.equal(document.getElementById("historyNav-label").hidden, !flagOn);
 });
+
+test("UI - Options - Performance section visibility follows SHOW_PERFORMANCE_INFO", async () => {
+  const { readFileSync } = await import("node:fs");
+  const features = JSON.parse(readFileSync(new URL("../features.json", import.meta.url), "utf8"));
+  const flagOn = features.SHOW_PERFORMANCE_INFO?.enabled === true;
+  assert.equal(document.getElementById("perf-section").hidden, !flagOn);
+});
+
+test("UI - Options - Show performance stores a timestamped snapshot; reset clears both keys", async () => {
+  stored.perfMetrics = { "sidepanel.render": { count: 2, avg: 4, min: 3, max: 5, last: 5 } };
+  document.getElementById("perf-show").click();
+  await tick();
+  await tick();
+  assert.equal(stored.perfSnapshots.length, 1, "snapshot stored");
+  assert.ok(stored.perfSnapshots[0].at > 0, "timestamped");
+  assert.match(document.getElementById("perf-out").textContent, /sidepanel\.render: count 2/);
+
+  document.getElementById("perf-reset").click();
+  await tick();
+  await tick();
+  assert.equal(stored.perfMetrics, undefined, "metrics cleared");
+  assert.equal(stored.perfSnapshots, undefined, "snapshots cleared");
+  assert.equal(document.getElementById("perf-out").textContent, "");
+});

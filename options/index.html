@@ -39,6 +39,7 @@
     #experimental-warning { color: var(--danger); font-size: 0.9em; margin: 4px 0 0; }
 
     /* pre defaults (monospace, no wrap) look oversized and overflow the card */
+    #perf-out,
     #whats-new pre {
       font: inherit;
       white-space: pre-wrap;
@@ -249,6 +250,13 @@
     <h2>Data</h2>
     <p class="muted">Removes all settings and protection rules. Cannot be undone.</p>
     <button id="danger">Delete all Extension data</button>
+  </section>
+
+  <section class="card" id="perf-section" hidden>
+    <h2>Performance</h2>
+    <button id="perf-show">Show performance metrics</button>
+    <button id="perf-reset">Reset performance metrics</button>
+    <pre class="muted" id="perf-out"></pre>
   </section>
 
   <section class="card">

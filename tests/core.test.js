@@ -237,3 +237,14 @@ test("Core - RemoveFromHistory drops a closed tab and keeps the cursor sane", ()
   assert.deepEqual(removeFromHistory({ stack: [1, 2, 3], cursor: 1 }, 3), { stack: [1, 2], cursor: 1 });
   assert.deepEqual(removeFromHistory({ stack: [1], cursor: 0 }, 1), { stack: [], cursor: -1 });
 });
+
+test("Core - RecordMetric keeps count/avg/min/max/last as a running summary", async () => {
+  const { recordMetric } = await import("../core/core.js");
+  let m = recordMetric({}, "render", 10);
+  m = recordMetric(m, "render", 20);
+  m = recordMetric(m, "render", 6);
+  assert.deepEqual(m.render, { count: 3, avg: 12, min: 6, max: 20, last: 6 });
+  m = recordMetric(m, "other", 5);
+  assert.equal(m.other.count, 1);
+  assert.equal(m.render.count, 3, "keys independent");
+});

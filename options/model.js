@@ -20,6 +20,27 @@ export function aboutText(version) {
   return `Taboom ${version}`;
 }
 
+// snapshots [{at, metrics}] → text blocks, newest first, timestamp header per block
+export function snapshotBlocks(snapshots) {
+  return [...snapshots]
+    .reverse()
+    .map((snapshot) =>
+      [
+        new Date(snapshot.at).toLocaleString(),
+        ...perfLines(snapshot.metrics).map((line) => `  ${line}`),
+      ].join("\n"),
+    );
+}
+
+// perf metrics ({key: {count, avg, min, max, last}}) → readable lines
+export function perfLines(metrics) {
+  return Object.entries(metrics).map(
+    ([key, m]) =>
+      `${key}: count ${m.count} · avg ${m.avg.toFixed(1)}ms · ` +
+      `min ${m.min.toFixed(1)} · max ${m.max.toFixed(1)} · last ${m.last.toFixed(1)}`,
+  );
+}
+
 // How many release sections the options "What's new" box shows.
 export const SHOW_MAX_CHANGES = 25;
 

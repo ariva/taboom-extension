@@ -1,6 +1,12 @@
 // Imperative shell: DOM + chrome.* effects only. All list/view logic lives in
 // model.js as pure functions; this file feeds them state and applies the results.
-import { applyExperimental, featureEnabled, hostnameOf, resolveColorScheme } from "../core/core.js";
+import {
+  applyExperimental,
+  featureEnabled,
+  hostnameOf,
+  recordMetric,
+  resolveColorScheme,
+} from "../core/core.js";
 import { loadFeatures, loadState, saveState } from "../core/storage.js";
 import {
   bulkSummary,
@@ -14,6 +20,31 @@ import {
 } from "./model.js";
 
 const FEATURES = await loadFeatures();
+
+// ---------- performance metrics (PERFORMANCE flag) ----------
+
+const perfBuffer = [];
+
+function perfMeasure(key, fn) {
+  if (!featureEnabled(FEATURES, "PERFORMANCE")) return fn();
+  const start = performance.now();
+  const result = fn();
+  perfBuffer.push([key, performance.now() - start]);
+  return result;
+}
+
+// buffered: a write per render would re-trigger our own storage listener each time
+// (ponytail: the 10s flush still echoes one extra render per interval — fine at this rate)
+async function flushPerfMetrics() {
+  if (perfBuffer.length === 0) return;
+  const samples = perfBuffer.splice(0);
+  const { perfMetrics = {} } = await chrome.storage.local.get("perfMetrics");
+  await chrome.storage.local.set({
+    perfMetrics: samples.reduce((m, [key, ms]) => recordMetric(m, key, ms), perfMetrics),
+  });
+}
+setInterval(flushPerfMetrics, 10_000).unref?.(); // unref: don't hold the node test process open
+globalThis.addEventListener?.("pagehide", flushPerfMetrics);
 
 const searchInput = document.getElementById("search");
 const filterBar = document.getElementById("filters");
@@ -104,6 +135,10 @@ function render(animate = true) {
 }
 
 function renderNow() {
+  perfMeasure("sidepanel.render", renderNowImpl);
+}
+
+function renderNowImpl() {
   const byFilter = countsByFilter(state.allTabs, state.rules);
   for (const button of filterBar.querySelectorAll("button")) {
     const name = button.dataset.filter;
@@ -231,6 +266,10 @@ function renderGroupHeader(windowId, isCollapsed, indexes, collapsible) {
 
 // translate a row view-model into DOM; wires event handlers to actions
 function renderRow(tab, vm) {
+  return perfMeasure("sidepanel.renderRow", () => renderRowImpl(tab, vm));
+}
+
+function renderRowImpl(tab, vm) {
   const row = document.createElement("div");
   row.className = vm.classes.join(" ");
   row.setAttribute("role", "option");

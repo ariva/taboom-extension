@@ -190,3 +190,23 @@ test("Model - ResolveColorScheme: explicit themes pass, anything else follows sy
   assert.equal(resolveColorScheme("auto"), "");
   assert.equal(resolveColorScheme(undefined), "");
 });
+
+test("Model - Options - PerfLines formats metrics readably", async () => {
+  const { perfLines } = await import("../options/model.js");
+  const lines = perfLines({ "sidepanel.render": { count: 3, avg: 12.34, min: 6, max: 20.5, last: 6 } });
+  assert.equal(lines.length, 1);
+  assert.match(lines[0], /^sidepanel\.render: count 3 · avg 12\.3ms · min 6\.0 · max 20\.5 · last 6\.0$/);
+  assert.deepEqual(perfLines({}), []);
+});
+
+test("Model - Options - SnapshotBlocks: newest first, timestamp header, indented metrics", async () => {
+  const { snapshotBlocks } = await import("../options/model.js");
+  const metrics = { render: { count: 1, avg: 5, min: 5, max: 5, last: 5 } };
+  const blocks = snapshotBlocks([
+    { at: 1700000000000, metrics },
+    { at: 1700000100000, metrics },
+  ]);
+  assert.equal(blocks.length, 2);
+  assert.equal(blocks[0], `${new Date(1700000100000).toLocaleString()}\n  render: count 1 · avg 5.0ms · min 5.0 · max 5.0 · last 5.0`, "newest first");
+  assert.deepEqual(snapshotBlocks([]), []);
+});
