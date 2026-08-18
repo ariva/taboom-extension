@@ -21,6 +21,8 @@ import {
   windowMaps,
 } from "./model.js";
 
+// state read races the features fetch instead of queuing behind the top-level await
+const initialStatePromise = loadState();
 const FEATURES = await loadFeatures();
 
 // ---------- performance metrics (PERFORMANCE flag) ----------
@@ -99,9 +101,9 @@ const state = {
 // animate only for user-initiated refreshes; background event echoes
 // (tab/storage/focus changes — incl. renders triggered in OTHER open panels)
 // re-render without a view transition
-async function refresh(animate = false) {
+async function refresh(animate = false, preloaded = null) {
   const [persisted, tabs, win] = await Promise.all([
-    loadState(),
+    preloaded ?? loadState(), // startup passes its already-read state — no second read
     chrome.tabs.query({}),
     chrome.windows.getLastFocused(),
   ]);
@@ -654,14 +656,13 @@ chrome.storage.onChanged.addListener((changes) => {
 
 // ---------- init ----------
 
-loadState().then((persisted) => {
+initialStatePromise.then((persisted) => {
   state.filter = persisted.ui.defaultFilter;
   state.scope = persisted.ui.scope;
   state.sort = persisted.ui.sort;
   scopeSelect.value = state.scope;
   sortSelect.value = state.sort;
-  refresh();
-  searchInput.focus();
+  refresh(false, persisted); // search input focuses itself via the autofocus attribute
 });
 
 // ---------- update notice ----------

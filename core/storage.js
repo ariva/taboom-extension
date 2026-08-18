@@ -14,11 +14,14 @@ export async function loadFeatures(testFeatures) {
 
 /** @typedef {{ id: string, type: "host" | "domain", pattern: string, createdAt: number }} Rule */
 
-// Single flat read of chrome.storage.local with defaults merged in.
+// One targeted read of the state keys with defaults merged in — not get(null),
+// which would also deserialize perfMetrics/perfSnapshots/tabHistory every call.
 // Add migrateState() dispatch here when schemaVersion 2 exists.
 /** @returns {Promise<{schemaVersion: number, settings: typeof DEFAULTS.settings, protectionRules: Rule[], ui: typeof DEFAULTS.ui}>} */
 export async function loadState() {
-  const raw = /** @type {Record<string, any>} */ (await chrome.storage.local.get(null));
+  const raw = /** @type {Record<string, any>} */ (
+    await chrome.storage.local.get(["settings", "protectionRules", "ui"])
+  );
   return {
     schemaVersion: 1,
     settings: { ...DEFAULTS.settings, ...(raw.settings ?? {}) },
