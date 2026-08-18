@@ -297,16 +297,12 @@ function renderRowImpl(tab, vm) {
   row.className = vm.classes.join(" ");
   row.setAttribute("role", "option");
   row.style.viewTransitionName = vm.viewTransitionName;
+  row.dataset.tabId = String(tab.id);
 
   const checkbox = document.createElement("input");
   checkbox.type = "checkbox";
   checkbox.checked = vm.checked;
   checkbox.ariaLabel = "Select tab";
-  checkbox.addEventListener("click", (event) => {
-    event.stopPropagation();
-    checkbox.checked ? state.selected.add(tab.id) : state.selected.delete(tab.id);
-    renderBulkBar();
-  });
 
   const favicon = document.createElement("span");
   favicon.className = "favicon";
@@ -343,13 +339,11 @@ function renderRowImpl(tab, vm) {
   const actions = document.createElement("div");
   actions.className = "actions";
   if (vm.canSnooze) {
-    actions.append(actionButton("snooze", "Snooze", () => snooze([tab.id])));
+    actions.append(actionButton("snooze", "Snooze", "snooze"));
   }
   actions.append(
-    actionButton(vm.protected ? "unprotect" : "protect", vm.protectLabel, () =>
-      chrome.runtime.sendMessage({ type: "toggle-site-protection", tabId: tab.id }),
-    ),
-    actionButton("close", "Close", () => closeTabs([tab.id])),
+    actionButton(vm.protected ? "unprotect" : "protect", vm.protectLabel, "toggle-protect"),
+    actionButton("close", "Close", "close"),
   );
 
   if (vm.dot) {
@@ -362,9 +356,40 @@ function renderRowImpl(tab, vm) {
   } else {
     row.append(checkbox, favicon, main, actions);
   }
-  row.addEventListener("click", () => activate(tab));
   return row;
 }
+
+// One delegated click listener instead of ~6 listeners per row — with big
+// lists that's thousands of listener allocations saved on every render.
+listEl.addEventListener("click", (event) => {
+  const target = /** @type {HTMLElement} */ (event.target);
+  const row = /** @type {HTMLElement | null} */ (target.closest(".row"));
+  if (!row) return; // group headers keep their own handlers
+  const tabId = Number(row.dataset.tabId);
+  if (target.matches('input[type="checkbox"]')) {
+    if (/** @type {HTMLInputElement} */ (target).checked) {
+      state.selected.add(tabId);
+    } else {
+      state.selected.delete(tabId);
+    }
+    renderBulkBar();
+    return;
+  }
+  const button = /** @type {HTMLElement | null} */ (target.closest("[data-action]"));
+  switch (button?.dataset.action) {
+    case "snooze":
+      snooze([tabId]);
+      return;
+    case "toggle-protect":
+      chrome.runtime.sendMessage({ type: "toggle-site-protection", tabId });
+      return;
+    case "close":
+      closeTabs([tabId]);
+      return;
+  }
+  const tab = state.allTabs.find((t) => t.id === tabId);
+  if (tab) activate(tab);
+});
 
 // inline SVGs: unicode glyphs (⏸ 🛡 ✕) render at wildly different sizes/baselines per platform
 const ICONS = {
@@ -374,15 +399,13 @@ const ICONS = {
   close: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg>',
 };
 
-function actionButton(icon, label, onClick) {
+// action is dispatched by the delegated click listener on #tab-list
+function actionButton(icon, label, action) {
   const button = document.createElement("button");
   button.innerHTML = ICONS[icon];
   button.title = label;
   button.ariaLabel = label;
-  button.addEventListener("click", (event) => {
-    event.stopPropagation();
-    onClick();
-  });
+  button.dataset.action = action;
   return button;
 }
 
