@@ -88,6 +88,7 @@ const state = {
   // after activating, the tab jumps in the list (top in recent/window sorts) —
   // follow it on the next event-driven re-render so it doesn't vanish off-screen
   followCurrent: false,
+  pendingScroll: null, // scrollTop to apply after the next render (filter/search switches)
 };
 
 // ---------- data ----------
@@ -202,6 +203,11 @@ function renderNowImpl() {
     state.visible.forEach((tab, index) => listEl.append(renderRow(tab, rowVm(tab, index))));
   }
   renderCollapseAllButton(foldableGroups, anythingToFold);
+
+  if (state.pendingScroll != null) {
+    listEl.scrollTop = state.pendingScroll;
+    state.pendingScroll = null;
+  }
 
   if (state.followCurrent) {
     state.followCurrent = false;
@@ -466,16 +472,30 @@ async function protectSelected() {
 
 // ---------- events ----------
 
-searchInput.addEventListener("input", () => {
-  state.query = searchInput.value;
-  state.cursor = state.query ? 0 : -1;
+// scroll position is remembered per filter; searching starts at the top and
+// clearing the search restores the current filter's position
+const scrollByFilter = new Map();
+
+function setQuery(value) {
+  if (value && !state.query) {
+    scrollByFilter.set(state.filter, listEl.scrollTop); // entering search
+  }
+  state.query = value;
+  state.cursor = value ? 0 : -1;
+  state.pendingScroll = value ? 0 : (scrollByFilter.get(state.filter) ?? 0);
   render(false);
+}
+
+searchInput.addEventListener("input", () => {
+  setQuery(searchInput.value);
 });
 
 filterBar.addEventListener("click", (event) => {
   const button = event.target.closest("button[data-filter]");
   if (!button) return;
+  scrollByFilter.set(state.filter, listEl.scrollTop);
   state.filter = button.dataset.filter;
+  state.pendingScroll = scrollByFilter.get(state.filter) ?? 0;
   persistUiPrefs();
   render();
 });
@@ -529,8 +549,7 @@ document.addEventListener("keydown", (event) => {
   }
   if (event.key === "Escape") {
     searchInput.value = "";
-    state.query = "";
-    render(false);
+    setQuery("");
     searchInput.focus();
     return;
   }

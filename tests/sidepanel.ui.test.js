@@ -133,3 +133,26 @@ test("UI - Sidepanel - [hidden] beats author display rules (computed style)", ()
   assert.equal(window.getComputedStyle(bar).display, "none");
   bar.hidden = false;
 });
+
+test("UI - Sidepanel - Scroll position is per filter; search starts at top and restores", async () => {
+  const list = document.getElementById("tab-list");
+  const filter = (name) => document.querySelector(`#filters button[data-filter="${name}"]`).click();
+
+  filter("all");
+  list.scrollTop = 120;
+  filter("awake");
+  assert.equal(list.scrollTop, 0, "fresh filter starts at top");
+  list.scrollTop = 60;
+  filter("all");
+  assert.equal(list.scrollTop, 120, "all-filter position restored");
+  filter("awake");
+  assert.equal(list.scrollTop, 60, "awake-filter position restored");
+
+  const search = document.getElementById("search");
+  search.value = "zzz";
+  search.dispatchEvent(new window.Event("input", { bubbles: true }));
+  assert.equal(list.scrollTop, 0, "search resets to top");
+  search.value = "";
+  search.dispatchEvent(new window.Event("input", { bubbles: true }));
+  assert.equal(list.scrollTop, 60, "clearing search restores filter position");
+});
