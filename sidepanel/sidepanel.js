@@ -33,8 +33,10 @@ const FEATURES = await loadFeatures();
 const perfBuffer = [];
 let perfFlushQueued = false;
 
+const PERF_ON = featureEnabled(FEATURES, "PERFORMANCE"); // flags are static per load
+
 function perfMeasure(key, fn) {
-  if (!featureEnabled(FEATURES, "PERFORMANCE")) {
+  if (!PERF_ON) {
     return fn();
   }
   const start = performance.now();
@@ -82,6 +84,7 @@ const state = {
   sort: "recent",
   ui: {},
   rules: [],
+  features: FEATURES, // experimental-resolved copy, refreshed in refresh()
   allTabs: [],
   derived: new Map(), // per-tab {host, haystack, protected} — rebuilt each refresh
   visible: [], // rows the user can interact with (excludes collapsed groups)
@@ -115,15 +118,17 @@ async function refresh(animate = false, preloaded = null) {
   state.currentWindowId = win.id;
   state.allTabs = tabs;
   state.derived = deriveTabs(tabs, state.rules);
-  const features = applyExperimental(FEATURES, state.ui.showExperimental ?? false);
+  // resolved once per refresh; the keydown handler reads this instead of
+  // re-running applyExperimental (a fresh object) on every keypress
+  state.features = applyExperimental(FEATURES, state.ui.showExperimental ?? false);
   // flag turned off mid-navigation: drop the cursor so no stale outline lingers
-  if (!featureEnabled(features, "SIDEBAR_KEYBOARD_NAVIGATION")) {
+  if (!featureEnabled(state.features, "SIDEBAR_KEYBOARD_NAVIGATION")) {
     state.cursor = -1;
   }
-  const historyNav = featureEnabled(features, "NAVIGATION_STACK") && (state.ui.historyNav ?? true);
+  const historyNav = featureEnabled(state.features, "NAVIGATION_STACK") && (state.ui.historyNav ?? true);
   getElementById("hist-back").hidden = !historyNav;
   getElementById("hist-forward").hidden = !historyNav;
-  getElementById("hist-list-btn").hidden = !featureEnabled(features, "NAVIGATION_DROPDOWN");
+  getElementById("hist-list-btn").hidden = !featureEnabled(state.features, "NAVIGATION_DROPDOWN");
   render(animate);
 }
 
@@ -199,10 +204,21 @@ function renderNowImpl() {
     const collapsible = groups.length > 1; // lone window: nothing to fold away
     anythingToFold = collapsible;
     if (collapsible && !state.query) foldableGroups = groups;
+    // per-window totals in one pass (visible count = the group's own length)
+    const totals = new Map();
+    for (const tab of state.allTabs) {
+      totals.set(tab.windowId, (totals.get(tab.windowId) ?? 0) + 1);
+    }
     let index = 0;
     for (const [windowId, groupTabs] of groups) {
       const isCollapsed = collapsible && collapsed.has(windowId);
-      frag.append(renderGroupHeader(windowId, isCollapsed, maps.indexes, collapsible));
+      frag.append(renderGroupHeader(windowId, {
+        isCollapsed,
+        indexes: maps.indexes,
+        collapsible,
+        count: groupTabs.length,
+        total: totals.get(windowId) ?? 0,
+      }));
       if (isCollapsed) continue;
       for (const tab of groupTabs) frag.append(renderRow(tab, rowVm(tab, index++)));
     }
@@ -255,12 +271,12 @@ collapseAllBtn.addEventListener("click", () => {
 });
 
 // clickable group header: toggles collapse of that window's rows
-function renderGroupHeader(windowId, isCollapsed, indexes, collapsible) {
+function renderGroupHeader(windowId, { isCollapsed, indexes, collapsible, count, total }) {
   const header = document.createElement("div");
   header.className = "group-header";
   header.textContent = groupHeader(windowId, {
-    visible: state.fullVisible,
-    tabs: state.allTabs,
+    count,
+    total,
     currentWindowId: state.currentWindowId,
     indexes,
     collapsed: isCollapsed,
@@ -293,6 +309,9 @@ function renderGroupHeader(windowId, isCollapsed, indexes, collapsible) {
 
 // translate a row view-model into DOM; wires event handlers to actions
 function renderRow(tab, vm) {
+  if (!PERF_ON) {
+    return renderRowImpl(tab, vm); // skip the per-row closure allocation
+  }
   return perfMeasure("sidepanel.renderRow", () => renderRowImpl(tab, vm));
 }
 
@@ -583,10 +602,7 @@ document.addEventListener("keydown", (event) => {
     searchInput.focus();
     return;
   }
-  const keyboardNav = featureEnabled(
-    applyExperimental(FEATURES, state.ui.showExperimental ?? false),
-    "SIDEBAR_KEYBOARD_NAVIGATION",
-  );
+  const keyboardNav = featureEnabled(state.features, "SIDEBAR_KEYBOARD_NAVIGATION");
   if (event.key === "ArrowDown" || event.key === "ArrowUp") {
     if (!keyboardNav) return;
     event.preventDefault();

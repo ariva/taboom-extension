@@ -100,9 +100,9 @@ export function emptyMessage(query, filter) {
   return "No open tabs.";
 }
 
-export function groupHeader(windowId, { visible, tabs, currentWindowId, indexes, collapsed = false, collapsible = true }) {
-  const count = visible.filter((tab) => tab.windowId === windowId).length;
-  const total = tabs.filter((tab) => tab.windowId === windowId).length;
+// count/total are precomputed by the caller — filtering the full tab list per
+// group here made group-by-window renders O(tabs × windows)
+export function groupHeader(windowId, { count, total, currentWindowId, indexes, collapsed = false, collapsible = true }) {
   const label = windowId === currentWindowId ? "Window Current" : "Window";
   const arrow = collapsible ? `${collapsed ? "▸" : "▾"} ` : "";
   return `${arrow}${label} #${indexes.get(windowId)} - ${count}/${total}`;
