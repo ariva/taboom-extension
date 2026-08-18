@@ -166,12 +166,13 @@ function renderNowImpl() {
 
   listEl.classList.toggle("compact", state.ui.density === "compact");
   state.cursor = Math.min(state.cursor, state.visible.length - 1);
-  listEl.textContent = "";
+  // build everything into a fragment: one live-DOM mutation instead of N appends
+  const frag = document.createDocumentFragment();
   if (state.fullVisible.length === 0) {
     const empty = document.createElement("div");
     empty.className = "empty";
     empty.textContent = emptyMessage(state.query, state.filter);
-    listEl.append(empty);
+    frag.append(empty);
   }
 
   const maps = windowMaps(state.allTabs, state.currentWindowId);
@@ -199,13 +200,14 @@ function renderNowImpl() {
     let index = 0;
     for (const [windowId, groupTabs] of groups) {
       const isCollapsed = collapsible && collapsed.has(windowId);
-      listEl.append(renderGroupHeader(windowId, isCollapsed, maps.indexes, collapsible));
+      frag.append(renderGroupHeader(windowId, isCollapsed, maps.indexes, collapsible));
       if (isCollapsed) continue;
-      for (const tab of groupTabs) listEl.append(renderRow(tab, rowVm(tab, index++)));
+      for (const tab of groupTabs) frag.append(renderRow(tab, rowVm(tab, index++)));
     }
   } else {
-    state.visible.forEach((tab, index) => listEl.append(renderRow(tab, rowVm(tab, index))));
+    state.visible.forEach((tab, index) => frag.append(renderRow(tab, rowVm(tab, index))));
   }
+  listEl.replaceChildren(frag);
   renderCollapseAllButton(foldableGroups, anythingToFold);
 
   if (state.pendingScroll != null) {
