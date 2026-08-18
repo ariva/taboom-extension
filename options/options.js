@@ -113,44 +113,32 @@ for (const id of SETTING_IDS) {
   getElementById(id).addEventListener("change", saveSettings);
 }
 
-getElementById("fontSize").addEventListener("change", async () => {
-  const input = getElementById("fontSize");
-  const fontSize = clampFontSize(input.value);
-  input.value = String(fontSize);
+// Single merge point for ui writes: re-reads right before writing so a
+// concurrent writer (the side panel persisting filter/scope/sort) is far less
+// likely to be clobbered by a whole-object overwrite from a stale read.
+async function saveUiPatch(patch) {
   const state = await loadState();
-  await saveState({ ui: { ...state.ui, fontSize } });
+  await saveState({ ui: { ...state.ui, ...patch } });
   flashSaved();
-});
+}
 
-getElementById("density").addEventListener("change", async () => {
-  const density = getElementById("density").value;
-  const state = await loadState();
-  await saveState({ ui: { ...state.ui, density } });
-  flashSaved();
-});
-
-getElementById("historyNav").addEventListener("change", async () => {
-  const historyNav = getElementById("historyNav").checked;
-  const state = await loadState();
-  await saveState({ ui: { ...state.ui, historyNav } });
-  flashSaved();
-});
-
-getElementById("showExperimental").addEventListener("change", async () => {
-  const showExperimental = getElementById("showExperimental").checked;
-  const state = await loadState();
-  await saveState({ ui: { ...state.ui, showExperimental } });
-  flashSaved();
-});
-
-
-getElementById("theme").addEventListener("change", async () => {
-  const theme = getElementById("theme").value;
-  applyTheme(theme);
-  const state = await loadState();
-  await saveState({ ui: { ...state.ui, theme } });
-  flashSaved();
-});
+// element id doubles as the ui key; parse cleans the raw value, apply gives
+// immediate feedback before the write round-trips
+const UI_FIELDS = [
+  { id: "fontSize", prop: "value", parse: clampFontSize, apply: (v, input) => { input.value = String(v); } },
+  { id: "density", prop: "value" },
+  { id: "theme", prop: "value", apply: (v) => applyTheme(v) },
+  { id: "historyNav", prop: "checked" },
+  { id: "showExperimental", prop: "checked" },
+];
+for (const { id, prop, parse, apply } of UI_FIELDS) {
+  getElementById(id).addEventListener("change", async () => {
+    const input = getElementById(id);
+    const value = parse ? parse(input[prop]) : input[prop];
+    apply?.(value, input);
+    await saveUiPatch({ [id]: value });
+  });
+}
 
 getElementById("add-rule").addEventListener("click", async () => {
   const input = getElementById("new-rule");
@@ -214,8 +202,14 @@ getElementById("danger").addEventListener("click", async () => {
 
 render();
 
-// rules/settings can change from the side panel or context menu while this page is open
-chrome.storage.onChanged.addListener(() => render());
+// rules/settings can change from the side panel or context menu while this page
+// is open — but only re-render for keys this page shows (tabHistory changes on
+// every tab switch and perfMetrics on every measured render; neither is shown)
+chrome.storage.onChanged.addListener((changes) => {
+  if (changes.settings || changes.protectionRules || changes.ui) {
+    render();
+  }
+});
 
 // What's new: bundled CHANGES.md — one collapsible per release, newest open
 fetch(chrome.runtime.getURL("CHANGES.md"))
