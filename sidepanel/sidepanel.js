@@ -226,6 +226,7 @@ function renderNowImpl() {
     state.visible.forEach((tab, index) => frag.append(renderRow(tab, rowVm(tab, index))));
   }
   listEl.replaceChildren(frag);
+  syncRowHeight();
   renderCollapseAllButton(foldableGroups, anythingToFold);
 
   if (state.pendingScroll != null) {
@@ -244,6 +245,30 @@ function renderNowImpl() {
     }
   }
   renderBulkBar();
+}
+
+// Feed the real row height back into the content-visibility placeholder
+// (--row-h). Offscreen rows use the placeholder for layout, so any gap between
+// it and the true height (fonts per OS, fontSize/density settings) makes a
+// restored scrollTop land rows off the saved position. Runs BEFORE the
+// pendingScroll restore so the restore maps through corrected heights.
+let lastRowHeight = 0;
+function syncRowHeight() {
+  const row = /** @type {HTMLElement | null} */ (listEl.querySelector(".row"));
+  if (!row) return;
+  row.style.contentVisibility = "visible"; // may be offscreen: force real layout to measure
+  const cs = window.getComputedStyle(row);
+  // fractional measure (clientHeight rounds to int; a sub-px error still adds
+  // up to half a row over a long list)
+  const height =
+    row.getBoundingClientRect().height -
+    parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) -
+    parseFloat(cs.borderTopWidth) - parseFloat(cs.borderBottomWidth);
+  row.style.contentVisibility = "";
+  if (height > 0 && height !== lastRowHeight) {
+    lastRowHeight = height;
+    listEl.style.setProperty("--row-h", `${height}px`);
+  }
 }
 
 // toolbar fold/unfold-all toggle; visible in Group by window with 2+ window
