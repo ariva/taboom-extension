@@ -190,3 +190,24 @@ test("UI - Sidepanel - Row action buttons dispatch per-tab actions without activ
   // none of the above may fall through to row activation
   assert.ok(!calls.some((c) => c.startsWith("windows.update")), "button clicks never activate the row");
 });
+
+test("UI - Sidepanel - Own ui-prefs storage echo is ignored; foreign ui change re-renders", async () => {
+  calls.length = 0;
+  document.querySelector('#filters button[data-filter="awake"]').click();
+  const firstRow = document.querySelector(".row");
+  assert.ok(firstRow, "filter click rendered");
+
+  // deliver the storage echo of exactly what the click persisted
+  const lastSet = calls.filter((c) => c.startsWith("storage.set")).at(-1);
+  const { ui } = JSON.parse(lastSet.slice("storage.set ".length));
+  await chrome.storage.onChanged.fire({ ui: { newValue: ui } });
+  await new Promise((resolve) => setTimeout(resolve, 200)); // past the 150ms debounce
+  assert.equal(document.querySelector(".row"), firstRow, "own echo: no second render");
+
+  // a change written elsewhere (e.g. options page) must still re-render
+  await chrome.storage.onChanged.fire({ ui: { newValue: { ...ui, density: "comfortable" } } });
+  await new Promise((resolve) => setTimeout(resolve, 200));
+  assert.notEqual(document.querySelector(".row"), firstRow, "foreign ui change re-renders");
+
+  document.querySelector('#filters button[data-filter="all"]').click();
+});

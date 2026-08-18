@@ -522,10 +522,16 @@ sortSelect.addEventListener("change", () => {
   render();
 });
 
+// JSON of the ui object this panel just persisted — its storage echo is skipped
+// (the click handler already rendered that state; without this every filter/
+// scope/sort click renders twice and re-queries all tabs 150ms later)
+let lastOwnUiWrite = null;
+
 function persistUiPrefs() {
-  saveState({
-    ui: { ...state.ui, defaultFilter: state.filter, scope: state.scope, sort: state.sort },
-  });
+  const ui = { ...state.ui, defaultFilter: state.filter, scope: state.scope, sort: state.sort };
+  state.ui = ui;
+  lastOwnUiWrite = JSON.stringify(ui);
+  saveState({ ui });
 }
 
 // Select/unselect everything currently visible (i.e. matching search + filter).
@@ -620,7 +626,17 @@ chrome.tabs.onUpdated.addListener((_tabId, changeInfo) => {
 // let those echo back into renders (history buttons have their own listener)
 chrome.storage.onChanged.addListener((changes) => {
   const ignored = ["perfMetrics", "perfSnapshots", "tabHistory"];
-  if (Object.keys(changes).every((key) => ignored.includes(key))) return;
+  const relevant = Object.keys(changes).filter((key) => !ignored.includes(key));
+  if (relevant.length === 0) return;
+  // this panel's own ui-prefs write echoing back — already rendered that state
+  if (
+    relevant.length === 1 &&
+    relevant[0] === "ui" &&
+    JSON.stringify(changes.ui.newValue) === lastOwnUiWrite
+  ) {
+    lastOwnUiWrite = null;
+    return;
+  }
   scheduleRefresh();
 });
 
