@@ -219,3 +219,4 @@ test("Service Worker - History submenu click jumps to that entry", async () => {
   await tick();
   assert.ok(calls.some((c) => c.startsWith("tabs.update 3") && c.includes('"active":true')), "stack[0]=3 activated");
 });
+

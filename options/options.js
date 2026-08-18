@@ -191,6 +191,12 @@ document.getElementById("perf-show").addEventListener("click", async () => {
     snapshotBlocks(snapshots).join("\n\n") || "No metrics recorded yet.";
 });
 
+// running counters restart; stored snapshot history stays for comparison
+document.getElementById("perf-reset-snapshot").addEventListener("click", async () => {
+  await chrome.storage.local.remove("perfMetrics");
+  flashSaved();
+});
+
 document.getElementById("perf-reset").addEventListener("click", async () => {
   await chrome.storage.local.remove(["perfMetrics", "perfSnapshots"]);
   document.getElementById("perf-out").textContent = "";

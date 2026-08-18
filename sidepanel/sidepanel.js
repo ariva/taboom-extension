@@ -23,28 +23,37 @@ const FEATURES = await loadFeatures();
 
 // ---------- performance metrics (PERFORMANCE flag) ----------
 
+// Samples collect during a render burst, then one storage write on the next
+// task — storage.local.perfMetrics is always current (the render-triggering
+// storage listener ignores perf keys, so this can't echo into more renders).
 const perfBuffer = [];
+let perfFlushQueued = false;
 
 function perfMeasure(key, fn) {
-  if (!featureEnabled(FEATURES, "PERFORMANCE")) return fn();
+  if (!featureEnabled(FEATURES, "PERFORMANCE")) {
+    return fn();
+  }
   const start = performance.now();
   const result = fn();
   perfBuffer.push([key, performance.now() - start]);
+  if (!perfFlushQueued) {
+    perfFlushQueued = true;
+    setTimeout(flushPerfMetrics, 0);
+  }
   return result;
 }
 
-// buffered: a write per render would re-trigger our own storage listener each time
-// (ponytail: the 10s flush still echoes one extra render per interval — fine at this rate)
 async function flushPerfMetrics() {
-  if (perfBuffer.length === 0) return;
+  perfFlushQueued = false;
+  if (perfBuffer.length === 0) {
+    return;
+  }
   const samples = perfBuffer.splice(0);
   const { perfMetrics = {} } = await chrome.storage.local.get("perfMetrics");
   await chrome.storage.local.set({
     perfMetrics: samples.reduce((m, [key, ms]) => recordMetric(m, key, ms), perfMetrics),
   });
 }
-setInterval(flushPerfMetrics, 10_000).unref?.(); // unref: don't hold the node test process open
-globalThis.addEventListener?.("pagehide", flushPerfMetrics);
 
 const searchInput = document.getElementById("search");
 const filterBar = document.getElementById("filters");
@@ -100,6 +109,10 @@ async function refresh(animate = false) {
   state.currentWindowId = win.id;
   state.allTabs = tabs;
   const features = applyExperimental(FEATURES, state.ui.showExperimental ?? false);
+  // flag turned off mid-navigation: drop the cursor so no stale outline lingers
+  if (!featureEnabled(features, "SIDEBAR_KEYBOARD_NAVIGATION")) {
+    state.cursor = -1;
+  }
   const historyNav = featureEnabled(features, "NAVIGATION_STACK") && (state.ui.historyNav ?? true);
   document.getElementById("hist-back").hidden = !historyNav;
   document.getElementById("hist-forward").hidden = !historyNav;
@@ -521,18 +534,29 @@ document.addEventListener("keydown", (event) => {
     searchInput.focus();
     return;
   }
+  const keyboardNav = featureEnabled(
+    applyExperimental(FEATURES, state.ui.showExperimental ?? false),
+    "SIDEBAR_KEYBOARD_NAVIGATION",
+  );
   if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+    if (!keyboardNav) return;
     event.preventDefault();
     if (state.visible.length === 0) return;
-    state.cursor = event.key === "ArrowDown"
+    const next = event.key === "ArrowDown"
       ? Math.min(state.cursor + 1, state.visible.length - 1)
       : Math.max(state.cursor - 1, 0);
-    render(false);
-    listEl.querySelector(".cursor")?.scrollIntoView({ block: "nearest" });
+    // move the cursor class directly — a full render per keypress is ~90ms on big lists
+    const rows = listEl.querySelectorAll(".row");
+    rows[state.cursor]?.classList.remove("cursor");
+    state.cursor = next;
+    rows[next]?.classList.add("cursor");
+    rows[next]?.scrollIntoView({ block: "nearest" });
     return;
   }
-  if (event.key === "Enter" && state.cursor >= 0 && state.visible[state.cursor]) {
+  if (event.key === "Enter" && keyboardNav && state.cursor >= 0 && state.visible[state.cursor]) {
     activate(state.visible[state.cursor]);
+    // activated tab jumps to the top of the list — put the cursor back on it
+    state.cursor = 0;
   }
 });
 
@@ -546,17 +570,30 @@ function scheduleRefresh() {
 
 for (const event of [
   chrome.tabs.onCreated,
-  chrome.tabs.onUpdated,
   chrome.tabs.onActivated,
   chrome.tabs.onRemoved,
   chrome.tabs.onMoved,
   chrome.tabs.onAttached,
   chrome.tabs.onDetached,
   chrome.windows.onFocusChanged,
-  chrome.storage.onChanged,
 ]) {
   event.addListener(scheduleRefresh);
 }
+
+// onUpdated fires for every tab's loading progress — with hundreds of tabs that's
+// a constant stream; only changes the list actually shows should trigger a render
+const RENDERED_TAB_PROPS = ["title", "url", "favIconUrl", "discarded", "audible", "pinned"];
+chrome.tabs.onUpdated.addListener((_tabId, changeInfo) => {
+  if (RENDERED_TAB_PROPS.some((prop) => prop in changeInfo)) scheduleRefresh();
+});
+
+// our own perf flush + history bookkeeping write storage constantly — don't
+// let those echo back into renders (history buttons have their own listener)
+chrome.storage.onChanged.addListener((changes) => {
+  const ignored = ["perfMetrics", "perfSnapshots", "tabHistory"];
+  if (Object.keys(changes).every((key) => ignored.includes(key))) return;
+  scheduleRefresh();
+});
 
 // ---------- init ----------
 

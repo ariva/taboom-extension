@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { makeChrome, loadPage, tick } from "./helpers/ui.js";
+
+const FEATURES = JSON.parse(readFileSync(new URL("../features.json", import.meta.url), "utf8"));
+const KEY_NAV_ON = FEATURES.SIDEBAR_KEYBOARD_NAVIGATION?.enabled === true;
+const keyNavSkip = { skip: !KEY_NAV_ON && "SIDEBAR_KEYBOARD_NAVIGATION disabled in features.json" };
 
 const NOW = Date.now();
 const tabs = [
@@ -28,7 +33,12 @@ test("UI - Sidepanel Keyboard - Slash focuses search", () => {
   assert.equal(document.activeElement, document.getElementById("search"));
 });
 
-test("UI - Sidepanel Keyboard - Arrow keys move the cursor and clamp at both ends", () => {
+test("UI - Sidepanel Keyboard - Arrows do nothing while flag off", { skip: KEY_NAV_ON }, () => {
+  key("ArrowDown");
+  assert.equal(document.querySelector(".row.cursor"), null, "no cursor appears");
+});
+
+test("UI - Sidepanel Keyboard - Arrow keys move the cursor and clamp at both ends", keyNavSkip, () => {
   assert.equal(document.querySelector(".row.cursor"), null, "no cursor initially");
   key("ArrowDown");
   assert.equal(cursorTitle(), "Alpha");
@@ -43,7 +53,7 @@ test("UI - Sidepanel Keyboard - Arrow keys move the cursor and clamp at both end
   assert.equal(cursorTitle(), "Alpha", "clamped at first row");
 });
 
-test("UI - Sidepanel Keyboard - Enter activates the cursor tab", async () => {
+test("UI - Sidepanel Keyboard - Enter activates the cursor tab", keyNavSkip, async () => {
   key("ArrowDown"); // Alpha → Beta
   assert.equal(cursorTitle(), "Beta");
   calls.length = 0;

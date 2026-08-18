@@ -134,7 +134,8 @@ main.compact .row .meta { display: none; }
     inset -4px 0 3px -1px var(--lip),
     var(--shadow-1);
 }
-.row.cursor { outline: 2px solid var(--accent); outline-offset: -2px; }
+/* keyboard cursor: amber, so it can't be confused with the accent-blue active-tab border */
+.row.cursor { outline: 2px solid var(--warn-fg); outline-offset: -2px; }
 
 /* per-window color dot, present only when tabs span multiple windows */
 .row .win-dot {

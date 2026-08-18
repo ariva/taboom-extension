@@ -127,10 +127,15 @@ test("UI - Options - Show performance stores a timestamped snapshot; reset clear
   assert.ok(stored.perfSnapshots[0].at > 0, "timestamped");
   assert.match(document.getElementById("perf-out").textContent, /sidepanel\.render: count 2/);
 
+  document.getElementById("perf-reset-snapshot").click();
+  await tick();
+  await tick();
+  assert.equal(stored.perfMetrics, undefined, "running metrics cleared");
+  assert.equal(stored.perfSnapshots.length, 1, "snapshot history survives");
+
   document.getElementById("perf-reset").click();
   await tick();
   await tick();
-  assert.equal(stored.perfMetrics, undefined, "metrics cleared");
-  assert.equal(stored.perfSnapshots, undefined, "snapshots cleared");
+  assert.equal(stored.perfSnapshots, undefined, "reset all clears history too");
   assert.equal(document.getElementById("perf-out").textContent, "");
 });
