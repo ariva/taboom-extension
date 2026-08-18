@@ -243,3 +243,32 @@ test("UI - Sidepanel - Mid-search filter positions are separate from pre-search 
   filter("awake");
   assert.equal(list.scrollTop, 77, "other filter's pre-search position intact too");
 });
+
+test("UI - Sidepanel - Scope and sort changes reset scroll and forget saved positions", () => {
+  const list = document.getElementById("tab-list");
+  const filter = (name) => document.querySelector(`#filters button[data-filter="${name}"]`).click();
+  const select = (id, value) => {
+    const el = document.getElementById(id);
+    el.value = value;
+    el.dispatchEvent(new window.Event("change", { bubbles: true }));
+  };
+
+  filter("all");
+  list.scrollTop = 130;
+  select("scope", "current-window");
+  assert.equal(list.scrollTop, 0, "scope switch starts at top");
+
+  list.scrollTop = 90;
+  filter("awake"); // saves all→90 in the new scope
+  filter("all");
+  assert.equal(list.scrollTop, 90, "positions saved after the switch still work");
+
+  select("sort", "title");
+  assert.equal(list.scrollTop, 0, "sort switch also resets");
+  filter("awake");
+  assert.equal(list.scrollTop, 0, "old positions forgotten after sort change");
+
+  select("sort", "recent");
+  select("scope", "all-windows");
+  assert.equal(list.scrollTop, 0, "switching back also resets");
+});

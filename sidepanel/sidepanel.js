@@ -543,14 +543,24 @@ filterBar.addEventListener("click", (event) => {
   render(!state.query);
 });
 
+// scope/sort change = a different list — start at top, and saved per-filter
+// positions from the old view are meaningless now
+function resetScrollPositions() {
+  scrollByFilter.clear();
+  searchScrollByFilter.clear();
+  state.pendingScroll = 0;
+}
+
 scopeSelect.addEventListener("change", () => {
   state.scope = scopeSelect.value;
+  resetScrollPositions();
   persistUiPrefs();
   render(!state.query);
 });
 
 sortSelect.addEventListener("change", () => {
   state.sort = sortSelect.value;
+  resetScrollPositions();
   persistUiPrefs();
   render(!state.query);
 });
