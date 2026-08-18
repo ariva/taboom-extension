@@ -15,6 +15,26 @@ import { loadFeatures, loadState, saveState } from "../core/storage.js";
 
 const ALARM_NAME = "auto-snooze";
 
+// features.json can't change without an extension reload — fetch it once per
+// worker life instead of on every context-menu rebuild
+let featuresPromise;
+const getFeatures = () => (featuresPromise ??= loadFeatures());
+
+// Resolved NAVIGATION_STACK gate, cached — the whole history machinery
+// (a storage write per tab switch + menu rebuild chain) is skipped when off.
+// ui.showExperimental affects the resolution, so ui changes invalidate it.
+let navStackPromise = null;
+function navStackEnabled() {
+  navStackPromise ??= (async () => {
+    const [{ ui }, features] = await Promise.all([loadState(), getFeatures()]);
+    return featureEnabled(
+      applyExperimental(features, ui.showExperimental ?? false),
+      "NAVIGATION_STACK",
+    );
+  })();
+  return navStackPromise;
+}
+
 // ---------- lifecycle ----------
 
 chrome.runtime.onInstalled.addListener(init);
@@ -57,30 +77,28 @@ async function autoSnoozePass() {
   const state = await loadState();
   if (!state.settings.autoSnoozeEnabled) return;
   const tabs = await chrome.tabs.query({});
-  for (const tabId of selectAutoSnoozeTargets(tabs, state.settings, state.protectionRules)) {
-    try {
-      await chrome.tabs.discard(tabId);
-    } catch (error) {
-      console.debug("discard failed", tabId, error);
-    }
-  }
+  await Promise.allSettled(
+    selectAutoSnoozeTargets(tabs, state.settings, state.protectionRules).map((tabId) =>
+      chrome.tabs.discard(tabId).catch((error) => console.debug("discard failed", tabId, error)),
+    ),
+  );
 }
 
 // ---------- protection ----------
 
 async function applyAutoDiscardable(rules) {
   const tabs = await chrome.tabs.query({});
-  for (const tab of tabs) {
-    if (!tab.id || !isSupportedUrl(tab.url)) continue;
-    const wanted = !isProtected(tab.url, rules);
-    if (tab.autoDiscardable !== wanted) {
-      try {
-        await chrome.tabs.update(tab.id, { autoDiscardable: wanted });
-      } catch (error) {
-        console.debug("autoDiscardable update failed", tab.id, error);
-      }
-    }
-  }
+  await Promise.allSettled(
+    tabs
+      .filter((tab) => tab.id && isSupportedUrl(tab.url))
+      .map((tab) => {
+        const wanted = !isProtected(tab.url, rules);
+        if (tab.autoDiscardable === wanted) return null;
+        return chrome.tabs
+          .update(tab.id, { autoDiscardable: wanted })
+          .catch((error) => console.debug("autoDiscardable update failed", tab.id, error));
+      }),
+  );
 }
 
 async function toggleSiteProtection(tab) {
@@ -177,8 +195,16 @@ async function handleMessage(message) {
 
 chrome.storage.onChanged.addListener(async (changes, area) => {
   if (area !== "local") return;
+  if (changes.ui) {
+    navStackPromise = null; // showExperimental may have flipped the resolved flag
+  }
   if (changes.settings) {
-    await ensureAlarm(changes.settings.newValue);
+    // recreate only when the interval actually changed — any settings save hits this
+    const oldInterval = /** @type {any} */ (changes.settings.oldValue)?.checkIntervalMinutes;
+    const newInterval = /** @type {any} */ (changes.settings.newValue)?.checkIntervalMinutes;
+    if (oldInterval !== newInterval) {
+      await ensureAlarm(changes.settings.newValue);
+    }
   }
   if (changes.protectionRules) {
     await applyAutoDiscardable(changes.protectionRules.newValue ?? []);
@@ -225,6 +251,7 @@ function isOwnJump(tabId) {
 }
 
 async function recordActivation(tabId) {
+  if (!(await navStackEnabled())) return; // feature off: zero writes per tab switch
   if (isOwnJump(tabId)) return;
   const hist = await loadHistory();
   await chrome.storage.local.set({ tabHistory: pushHistory(hist, tabId) });
@@ -241,6 +268,7 @@ chrome.windows.onFocusChanged.addListener(async (windowId) => {
 });
 
 chrome.tabs.onRemoved.addListener(async (tabId) => {
+  if (!(await navStackEnabled())) return; // nothing recorded, nothing to prune
   const hist = await loadHistory();
   await chrome.storage.local.set({ tabHistory: removeFromHistory(hist, tabId) });
 });
@@ -330,15 +358,12 @@ const removeMenu = (id) =>
 // "Navigation stack" submenu after a separator: newest first, radio dot marks current.
 // Hidden entirely (incl. separator) when ui.historyNav is off.
 async function rebuildHistoryMenu() {
-  const [{ ui }, { stack, cursor }, rawFeatures] = await Promise.all([
-    loadState(),
-    loadHistory(),
-    loadFeatures(),
-  ]);
+  const [{ ui }, rawFeatures] = await Promise.all([loadState(), getFeatures()]);
   const features = applyExperimental(rawFeatures, ui.showExperimental ?? false);
   await removeMenu("history");
   await removeMenu("sep-2");
   if (!featureEnabled(features, "NAVIGATION_STACK") || ui.historyNav === false) return;
+  const { stack, cursor } = await loadHistory(); // only read when the menu will exist
   chrome.contextMenus.create({ id: "sep-2", type: "separator", parentId: "root", contexts: ["page"] });
   chrome.contextMenus.create({
     id: "history",

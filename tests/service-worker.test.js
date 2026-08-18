@@ -157,7 +157,10 @@ test("Service Worker - Navigation to a protected url flips autoDiscardable off",
   assert.ok(calls.some((c) => c.startsWith("tabs.update 1") && c.includes('"autoDiscardable":false')));
 });
 
-test("Service Worker - Tab history: back jumps without pushing, manual pick truncates forward", async () => {
+test(
+  "Service Worker - Tab history: back jumps without pushing, manual pick truncates forward",
+  { skip: !NAV_STACK_ON && "NAVIGATION_STACK disabled in features.json" },
+  async () => {
   // stack so far from earlier tests: [3, 2] (protect-title test activations)
   await chrome.tabs.onActivated.fire({ tabId: 1 });
   await chrome.tabs.onActivated.fire({ tabId: 4 });
@@ -173,16 +176,36 @@ test("Service Worker - Tab history: back jumps without pushing, manual pick trun
   await tick();
   const { tabHistory } = await chrome.storage.local.get();
   assert.deepEqual(tabHistory, { stack: [3, 1, 2], cursor: 2 }, "forward entry 4 truncated, 2 moved to top");
-});
+  },
+);
 
-test("Service Worker - Window focus switch records the newly-current tab in history", async () => {
-  await chrome.windows.onFocusChanged.fire(chrome.windows.WINDOW_ID_NONE); // devtools etc — ignored
-  await chrome.windows.onFocusChanged.fire(2); // window 2's active tab: 1000 (created by snooze test)
-  await tick();
-  const { tabHistory } = await chrome.storage.local.get();
-  assert.equal(tabHistory.stack.at(-1), 1000, "focused window's active tab pushed");
-  assert.equal(tabHistory.cursor, tabHistory.stack.length - 1);
-});
+test(
+  "Service Worker - Window focus switch records the newly-current tab in history",
+  { skip: !NAV_STACK_ON && "NAVIGATION_STACK disabled in features.json" },
+  async () => {
+    await chrome.windows.onFocusChanged.fire(chrome.windows.WINDOW_ID_NONE); // devtools etc — ignored
+    await chrome.windows.onFocusChanged.fire(2); // window 2's active tab: 1000 (created by snooze test)
+    await tick();
+    const { tabHistory } = await chrome.storage.local.get();
+    assert.equal(tabHistory.stack.at(-1), 1000, "focused window's active tab pushed");
+    assert.equal(tabHistory.cursor, tabHistory.stack.length - 1);
+  },
+);
+
+test(
+  "Service Worker - NAVIGATION_STACK off: tab switches write no history at all",
+  { skip: NAV_STACK_ON && "NAVIGATION_STACK enabled in features.json" },
+  async () => {
+    calls.length = 0;
+    await chrome.tabs.onActivated.fire({ tabId: 1 });
+    await chrome.windows.onFocusChanged.fire(2);
+    await tick();
+    assert.ok(
+      !calls.some((c) => c.startsWith("storage.set") && c.includes("tabHistory")),
+      "no tabHistory writes while the feature is off",
+    );
+  },
+);
 
 test(
   "Service Worker - History submenu rebuilt on init: newest first, radio marks current",
@@ -213,10 +236,14 @@ test(
   },
 );
 
-test("Service Worker - History submenu click jumps to that entry", async () => {
-  calls.length = 0;
-  await chrome.contextMenus.onClicked.fire({ menuItemId: "hist-0" }, { id: 1, windowId: 1 });
-  await tick();
-  assert.ok(calls.some((c) => c.startsWith("tabs.update 3") && c.includes('"active":true')), "stack[0]=3 activated");
-});
+test(
+  "Service Worker - History submenu click jumps to that entry",
+  { skip: !NAV_STACK_ON && "NAVIGATION_STACK disabled in features.json" },
+  async () => {
+    calls.length = 0;
+    await chrome.contextMenus.onClicked.fire({ menuItemId: "hist-0" }, { id: 1, windowId: 1 });
+    await tick();
+    assert.ok(calls.some((c) => c.startsWith("tabs.update 3") && c.includes('"active":true')), "stack[0]=3 activated");
+  },
+);
 
