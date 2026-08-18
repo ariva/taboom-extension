@@ -410,6 +410,7 @@ function faviconImg(pageUrl) {
   url.searchParams.set("size", "16");
   const img = document.createElement("img");
   img.src = url.toString();
+  img.loading = "lazy"; // don't fetch favicons for offscreen rows up front
   img.width = img.height = 16;
   img.addEventListener("error", () => img.remove());
   return img;

@@ -88,12 +88,17 @@ main {
   border-radius: var(--radius-m);
   cursor: pointer;
   transition: background var(--transition), box-shadow var(--transition);
+  /* native virtualization: browser skips layout/paint/style for offscreen rows,
+     so a 1000-tab list costs ~a-viewport of layout. `auto` height is the estimate
+     until first render, then the browser remembers the real size. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 44px;
 }
 
 .row:hover, .row.cursor { background: var(--hover); box-shadow: var(--shadow-1); }
 
 /* compact density: tighter rows, no meta line */
-main.compact .row { padding: 3px 8px; }
+main.compact .row { padding: 3px 8px; contain-intrinsic-size: auto 26px; }
 main.compact .row .meta { display: none; }
 
 /* snoozed = dimmed; hover restores full strength so actions stay readable */
