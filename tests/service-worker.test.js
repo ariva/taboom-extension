@@ -247,3 +247,20 @@ test(
   },
 );
 
+// not flag-dependent: pruning must work even with NAVIGATION_STACK off, so a
+// stack recorded while the feature was on can't keep dead tab ids.
+// Runs last — it overwrites tabHistory the flag-on submenu tests rely on.
+test("Service Worker - Closing a tab sweeps every closed id from the history stack", async () => {
+  // 777 = residue from a lost-update race (activation write landed after a prune)
+  await chrome.storage.local.set({ tabHistory: { stack: [1, 777, 2, 3], cursor: 3 } });
+  await chrome.tabs.onRemoved.fire(2);
+  await tick();
+  const { tabHistory } = await chrome.storage.local.get();
+  assert.deepEqual(tabHistory, { stack: [1, 3], cursor: 1 }, "closed id AND stale ids swept");
+
+  calls.length = 0;
+  await chrome.tabs.onRemoved.fire(888); // nothing in the stack is closed
+  await tick();
+  assert.ok(!calls.some((c) => c.startsWith("storage.set")), "no write when nothing to prune");
+});
+

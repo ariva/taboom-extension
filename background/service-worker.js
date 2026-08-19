@@ -268,9 +268,19 @@ chrome.windows.onFocusChanged.addListener(async (windowId) => {
 });
 
 chrome.tabs.onRemoved.addListener(async (tabId) => {
-  if (!(await navStackEnabled())) return; // nothing recorded, nothing to prune
+  // NOT gated on the nav-stack flag: a stack recorded while the feature was on
+  // must not keep dead tab ids after it's toggled off.
   const hist = await loadHistory();
-  await chrome.storage.local.set({ tabHistory: removeFromHistory(hist, tabId) });
+  if (hist.stack.length === 0) return; // default installs: read only, no write
+  // Sweep ALL closed ids, not just this one: closing the active tab fires
+  // onActivated for its neighbor, and that recordActivation's read-modify-write
+  // can land after our prune and resurrect the closed id (lost update). A full
+  // sweep against the open tabs makes the next close heal any such residue.
+  const open = new Set((await chrome.tabs.query({})).map((tab) => tab.id));
+  open.delete(tabId); // this close may still be listed by the query
+  const next = filterHistory(hist, (id) => open.has(id));
+  if (next.stack.length === hist.stack.length) return; // nothing dead: no write
+  await chrome.storage.local.set({ tabHistory: next });
 });
 
 async function historyJump(cursor) {
