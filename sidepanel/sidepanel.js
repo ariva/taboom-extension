@@ -258,7 +258,9 @@ function renderNowImpl() {
 let lastRowHeight = 0;
 function syncRowHeight() {
   const row = /** @type {HTMLElement | null} */ (listEl.querySelector(".row"));
-  if (!row) return;
+  if (!row) {
+    return;
+  }
   row.style.contentVisibility = "visible"; // may be offscreen: force real layout to measure
   const cs = window.getComputedStyle(row);
   // fractional measure (clientHeight rounds to int; a sub-px error still adds
@@ -406,7 +408,9 @@ function renderRowImpl(tab, vm) {
 listEl.addEventListener("click", (event) => {
   const target = /** @type {HTMLElement} */ (event.target);
   const row = /** @type {HTMLElement | null} */ (target.closest(".row"));
-  if (!row) return; // group headers keep their own handlers
+  if (!row) {
+    return; // group headers keep their own handlers
+  }
   const tabId = Number(row.dataset.tabId);
   if (target.matches('input[type="checkbox"]')) {
     if (/** @type {HTMLInputElement} */ (target).checked) {
@@ -430,7 +434,9 @@ listEl.addEventListener("click", (event) => {
       return;
   }
   const tab = state.allTabs.find((t) => t.id === tabId);
-  if (tab) activate(tab);
+  if (tab) {
+    activate(tab);
+  }
 });
 
 // row action icons live in #row-template now; this one is for the history popover
@@ -650,7 +656,9 @@ document.addEventListener("keydown", (event) => {
     try {
       popoverOpen = histPop.matches(":popover-open");
     } catch {} // happy-dom: selector unsupported
-    if (popoverOpen) return;
+    if (popoverOpen) {
+      return;
+    }
     searchInput.value = "";
     setQuery("");
     searchInput.focus();
@@ -711,7 +719,9 @@ chrome.tabs.onUpdated.addListener((_tabId, changeInfo) => {
 chrome.storage.onChanged.addListener((changes) => {
   const ignored = ["perfMetrics", "perfSnapshots", "tabHistory"];
   const relevant = Object.keys(changes).filter((key) => !ignored.includes(key));
-  if (relevant.length === 0) return;
+  if (relevant.length === 0) {
+    return;
+  }
   // this panel's own ui-prefs write echoing back — already rendered that state
   if (
     relevant.length === 1 &&
@@ -766,11 +776,15 @@ histPop.addEventListener("toggle", (event) => {
 });
 
 histBack.addEventListener("click", () => {
-  if (consumeLongPress()) return; // the hold opened the popover; don't also navigate
+  if (consumeLongPress()) {
+    return; // the hold opened the popover; don't also navigate
+  }
   chrome.runtime.sendMessage({ type: "history-back" });
 });
 histForward.addEventListener("click", () => {
-  if (consumeLongPress()) return;
+  if (consumeLongPress()) {
+    return;
+  }
   chrome.runtime.sendMessage({ type: "history-forward" });
 });
 
@@ -882,7 +896,9 @@ async function openHistoryPopover() {
 for (const arrow of [histBack, histForward]) {
   arrow.addEventListener("contextmenu", (event) => event.preventDefault());
   arrow.addEventListener("pointerdown", (event) => {
-    if (event.button !== 0) return;
+    if (event.button !== 0) {
+      return;
+    }
     longPressArmed = false;
     clearTimeout(longPressTimer);
     longPressTimer = setTimeout(() => (longPressArmed = true), LONG_PRESS_MS);
@@ -900,5 +916,17 @@ for (const arrow of [histBack, histForward]) {
 
 syncHistoryButtons();
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === "local" && changes.tabHistory) syncHistoryButtons();
+  if (area !== "local" || !changes.tabHistory) {
+    return;
+  }
+  syncHistoryButtons();
+  // popover open (in THIS panel — every window's panel gets this event, so all
+  // open popups converge on the same trail): live-refresh its rows
+  let open = false;
+  try {
+    open = histPop.matches(":popover-open");
+  } catch {} // happy-dom: selector unsupported
+  if (open) {
+    fillHistoryPopover();
+  }
 });

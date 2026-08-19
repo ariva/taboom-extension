@@ -91,7 +91,9 @@ async function applyAutoDiscardable(rules) {
       .filter((tab) => tab.id && isSupportedUrl(tab.url))
       .map((tab) => {
         const wanted = !isProtected(tab.url, rules);
-        if (tab.autoDiscardable === wanted) return null;
+        if (tab.autoDiscardable === wanted) {
+          return null;
+        }
         return chrome.tabs
           .update(tab.id, { autoDiscardable: wanted })
           .catch((error) => console.debug("autoDiscardable update failed", tab.id, error));
@@ -267,7 +269,9 @@ function isOwnJump(tabId) {
 }
 
 async function recordActivation(tabId) {
-  if (!(await navStackEnabled())) return; // feature off: zero writes per tab switch
+  if (!(await navStackEnabled())) {
+    return; // feature off: zero writes per tab switch
+  }
   if (isOwnJump(tabId)) return;
   await withHistory((hist) => pushHistory(hist, tabId));
 }
@@ -286,7 +290,9 @@ chrome.tabs.onRemoved.addListener((tabId) =>
   // NOT gated on the nav-stack flag: a stack recorded while the feature was on
   // must not keep dead tab ids after it's toggled off. Sweeps ALL closed ids.
   withHistory(async (hist) => {
-    if (hist.stack.length === 0) return null; // default installs: no write
+    if (hist.stack.length === 0) {
+      return null; // default installs: no write
+    }
     const open = new Set((await chrome.tabs.query({})).map((tab) => tab.id));
     open.delete(tabId); // this close may still be listed by the query
     const next = filterHistory(hist, (id) => open.has(id));
@@ -299,14 +305,18 @@ chrome.tabs.onRemoved.addListener((tabId) =>
 // while the tab is still open. Swap the id in place, cursor untouched.
 chrome.tabs.onReplaced.addListener((addedTabId, removedTabId) =>
   withHistory((hist) => {
-    if (!hist.stack.includes(removedTabId)) return null;
+    if (!hist.stack.includes(removedTabId)) {
+      return null;
+    }
     return { ...hist, stack: hist.stack.map((id) => (id === removedTabId ? addedTabId : id)) };
   }),
 );
 
 async function historyJump(cursor) {
   await withHistory(async (hist) => {
-    if (cursor < 0 || cursor >= hist.stack.length) return null;
+    if (cursor < 0 || cursor >= hist.stack.length) {
+      return null;
+    }
     const tabId = hist.stack[cursor];
     try {
       const tab = await chrome.tabs.get(tabId);

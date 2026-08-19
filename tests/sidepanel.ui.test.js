@@ -337,6 +337,23 @@ test("UI - Sidepanel - Long-press on a history arrow opens the popover instead o
   assert.ok(calls.includes("sendMessage history-back"), "plain click still goes back");
 });
 
+test("UI - Sidepanel - Open history popover live-refreshes when the trail changes", async () => {
+  const pop = document.getElementById("history-pop");
+  await chrome.storage.local.set({ tabHistory: { stack: [1, 2], cursor: 1 } });
+  pop.matches = () => true; // simulate :popover-open (no popover engine in happy-dom)
+  await chrome.storage.onChanged.fire({ tabHistory: {} }, "local");
+  await tick();
+  assert.equal(pop.querySelectorAll(".hist-row").length, 2, "rows refilled from the new trail");
+  assert.match(pop.querySelector(".hist-row.current").textContent, /Some Video|2/, "cursor row marked");
+
+  pop.matches = () => false; // closed popover: no refill
+  pop.textContent = "";
+  await chrome.storage.onChanged.fire({ tabHistory: {} }, "local");
+  await tick();
+  assert.equal(pop.querySelectorAll(".hist-row").length, 0, "closed popover left alone");
+  delete pop.matches;
+});
+
 test("UI - Sidepanel - Escape with open history popover leaves the search alone", () => {
   const search = document.getElementById("search");
   search.value = "abc";
