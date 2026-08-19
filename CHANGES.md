@@ -1,5 +1,22 @@
 # CHANGES
 
+## v0.2.9 — 2026-08-19
+
+### New Features
+- Live-sync open history popups across windows (a57aba2)
+- Promote prev/next navigation buttons to stable. (079649c)
+- Hold(or right click) prev/next to see navigation history pop-up (5c9a445)
+- Experimental button to show/hide history popup (086aa21)
+- Experimental feature - make auto-jump to All filter if current search has no results (012760b)
+- Search-aware filter counts (7f055c4)
+
+### Fixes
+- Snoozed tabs showing as "(closed tab)" in history — discard replaces the tab id (d698ac8)
+- Wrong tab in history after closing the current one, rework pushHistory to move the cursor onto in-stack tabs (66d2a41)
+- Esc closes navigation stack popover (ab583db)
+- Closed tabs lingering in navigation stack (32bf3d0)
+- Exact scroll restores with content-visibility (97e316f)
+
 ## v0.2.8 — 2026-08-18
 
 ### Fixes
