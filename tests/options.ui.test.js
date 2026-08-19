@@ -139,3 +139,29 @@ test("UI - Options - Show performance stores a timestamped snapshot; reset clear
   assert.equal(stored.perfSnapshots, undefined, "reset all clears history too");
   assert.equal(document.getElementById("perf-out").textContent, "");
 });
+
+test("UI - Options - Restore defaults resets settings/ui but keeps protected sites", async () => {
+  stored.settings = { autoSnoozeEnabled: false, inactivityMinutes: 45 };
+  stored.ui = { fontSize: 1.2, theme: "light" };
+  stored.protectionRules = [{ id: "r1", type: "domain", pattern: "*.github.com" }];
+  document.getElementById("restore-defaults").click();
+  await tick();
+  await tick();
+  assert.equal(stored.settings.autoSnoozeEnabled, true, "settings back to defaults");
+  assert.equal(stored.settings.inactivityMinutes, 60);
+  assert.equal(stored.ui.theme, "auto", "ui back to defaults");
+  assert.deepEqual(
+    stored.protectionRules,
+    [{ id: "r1", type: "domain", pattern: "*.github.com" }],
+    "protected sites untouched",
+  );
+});
+
+test("UI - Options - Clear protected sites empties rules but keeps settings", async () => {
+  stored.settings.inactivityMinutes = 45;
+  document.getElementById("clear-protected").click();
+  await tick();
+  await tick();
+  assert.deepEqual(stored.protectionRules, [], "all rules removed");
+  assert.equal(stored.settings.inactivityMinutes, 45, "settings untouched");
+});

@@ -161,7 +161,7 @@
     .muted { color: var(--muted); font-size: 13px; }
 
     .card.danger-zone { border: 1px solid color-mix(in srgb, var(--danger) 40%, transparent); }
-    #danger {
+    #danger, #restore-defaults, #clear-protected {
       color: var(--danger);
       border: 1px solid currentColor;
       border-radius: var(--radius-s);
@@ -169,7 +169,10 @@
       padding: 4px 12px;
       transition: background var(--transition);
     }
-    #danger:hover { background: color-mix(in srgb, var(--danger) 10%, transparent); }
+    #danger:hover, #restore-defaults:hover, #clear-protected:hover {
+      background: color-mix(in srgb, var(--danger) 10%, transparent);
+    }
+    .danger-zone p + button + p { margin-top: 14px; }
 
     #saved {
       position: fixed;
@@ -248,6 +251,10 @@
 
   <section class="card danger-zone">
     <h2>Data</h2>
+    <p class="muted">Restores all settings and appearance to their defaults. Protected sites stay unchanged.</p>
+    <button id="restore-defaults">Restore default settings</button>
+    <p class="muted">Removes every protected site. Settings stay unchanged.</p>
+    <button id="clear-protected">Clear protected sites</button>
     <p class="muted">Removes all settings and protection rules. Cannot be undone.</p>
     <button id="danger">Delete all Extension data</button>
   </section>
