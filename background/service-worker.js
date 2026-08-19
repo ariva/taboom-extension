@@ -294,6 +294,16 @@ chrome.tabs.onRemoved.addListener((tabId) =>
   }),
 );
 
+// Discarding (snoozing!) or prerender-committing a tab REPLACES its id with no
+// onRemoved for the old one — the trail entry would turn into "(closed tab)"
+// while the tab is still open. Swap the id in place, cursor untouched.
+chrome.tabs.onReplaced.addListener((addedTabId, removedTabId) =>
+  withHistory((hist) => {
+    if (!hist.stack.includes(removedTabId)) return null;
+    return { ...hist, stack: hist.stack.map((id) => (id === removedTabId ? addedTabId : id)) };
+  }),
+);
+
 async function historyJump(cursor) {
   await withHistory(async (hist) => {
     if (cursor < 0 || cursor >= hist.stack.length) return null;

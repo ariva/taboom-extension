@@ -272,6 +272,21 @@ test(
   },
 );
 
+// Discarding (snooze) swaps a tab's id via onReplaced with NO onRemoved — the
+// trail must follow the new id or the entry reads "(closed tab)" while open.
+test("Service Worker - Tab id replacement (snooze/prerender) is followed in the history stack", async () => {
+  await chrome.storage.local.set({ tabHistory: { stack: [3, 2, 1], cursor: 2 } });
+  await chrome.tabs.onReplaced.fire(2222, 2);
+  await tick();
+  const { tabHistory } = await chrome.storage.local.get();
+  assert.deepEqual(tabHistory, { stack: [3, 2222, 1], cursor: 2 }, "id swapped in place");
+
+  calls.length = 0;
+  await chrome.tabs.onReplaced.fire(4444, 999); // old id not in the stack
+  await tick();
+  assert.ok(!calls.some((c) => c.startsWith("storage.set")), "no write when id absent");
+});
+
 // not flag-dependent: pruning must work even with NAVIGATION_STACK off, so a
 // stack recorded while the feature was on can't keep dead tab ids.
 // Runs last — it overwrites tabHistory the flag-on submenu tests rely on.

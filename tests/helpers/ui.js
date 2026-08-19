@@ -61,6 +61,7 @@ export function makeChrome({ tabs = [], stored = {}, calls = [] }) {
       },
       onCreated: makeEvent(), onUpdated: makeEvent(), onActivated: makeEvent(),
       onRemoved: makeEvent(), onMoved: makeEvent(), onAttached: makeEvent(), onDetached: makeEvent(),
+      onReplaced: makeEvent(),
     },
     windows: {
       WINDOW_ID_NONE: -1,
