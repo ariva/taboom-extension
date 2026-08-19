@@ -18,8 +18,8 @@ export function deriveTabs(tabs, rules) {
   );
 }
 
-// filter + sort the full tab list down to what the panel shows
-export function selectVisible(tabs, { query, scope, filter, sort, currentWindowId, derived, now }) {
+// tabs matching the active search and window scope — the pool `filter` narrows
+export function searchCandidates(tabs, { query, scope, currentWindowId, derived }) {
   const tokens = query.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
   let result = tabs.filter((tab) =>
     tokens.every((token) => derived.get(tab.id).haystack.includes(token)),
@@ -27,6 +27,13 @@ export function selectVisible(tabs, { query, scope, filter, sort, currentWindowI
   if (scope === "current-window") {
     result = result.filter((tab) => tab.windowId === currentWindowId);
   }
+  return result;
+}
+
+// filter + sort the full tab list down to what the panel shows
+export function selectVisible(tabs, view) {
+  const { filter, sort, currentWindowId, derived, now } = view;
+  let result = searchCandidates(tabs, view);
   switch (filter) {
     case "awake": result = result.filter((tab) => !tab.discarded); break;
     case "snoozed": result = result.filter((tab) => tab.discarded); break;

@@ -54,18 +54,35 @@ test("UI - Sidepanel - UI prefs applied: dark theme + compact density", () => {
 });
 
 test("UI - Sidepanel - Search narrows list; no match shows empty state; Escape clears", () => {
+  const counts = () => [...document.querySelectorAll("#filters .count")].map((el) => el.textContent);
   const search = document.getElementById("search");
   search.value = "inbox";
   search.dispatchEvent(new window.Event("input", { bubbles: true }));
   assert.equal(document.querySelectorAll(".row").length, 1);
+  // active search: chips count the FOUND items (Inbox: awake + protected)
+  assert.deepEqual(counts(), ["1", "1", "0", "1"], "counts follow search matches");
 
   search.value = "zzz-nothing";
   search.dispatchEvent(new window.Event("input", { bubbles: true }));
   assert.equal(document.querySelectorAll(".row").length, 0);
   assert.match(document.querySelector(".empty").textContent, /No tabs match/);
+  assert.deepEqual(counts(), ["0", "0", "0", "0"], "no matches: all chips zero");
 
   document.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
   assert.equal(document.querySelectorAll(".row").length, 3);
+  assert.deepEqual(counts(), ["3", "2", "1", "1"], "clearing search restores full counts");
+
+  // current filter has no matches but others do — auto-select All so results show
+  document.querySelector('#filters button[data-filter="snoozed"]').click();
+  search.value = "inbox"; // Inbox is awake: 0 snoozed matches
+  search.dispatchEvent(new window.Event("input", { bubbles: true }));
+  assert.equal(document.querySelectorAll(".row").length, 1, "match visible after auto-jump");
+  assert.equal(
+    document.querySelector('#filters button[data-filter="all"]').getAttribute("aria-pressed"),
+    "true",
+    "All filter auto-selected",
+  );
+  document.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
 });
 
 test("UI - Sidepanel - Snoozed filter shows only discarded tabs", () => {

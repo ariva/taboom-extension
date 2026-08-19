@@ -14,6 +14,7 @@ import {
   countsByFilter,
   deriveTabs,
   emptyMessage,
+  searchCandidates,
   groupByWindow,
   groupHeader,
   rowViewModel,
@@ -164,10 +165,12 @@ function renderNow() {
 }
 
 function renderNowImpl() {
-  const byFilter = countsByFilter(state.allTabs, state.derived);
+  // active search: chips count found items (what clicking each filter would show)
+  const counted = state.query ? searchCandidates(state.allTabs, state) : state.allTabs;
+  const byFilter = countsByFilter(counted, state.derived);
   for (const button of filterBar.querySelectorAll("button")) {
     const name = button.dataset.filter;
-    button.querySelector(".count").textContent = byFilter[name];
+    button.querySelector(".count").textContent = String(byFilter[name]);
     button.setAttribute("aria-pressed", String(name === state.filter));
   }
 
@@ -542,6 +545,15 @@ function setQuery(value) {
     searchScrollByFilter.clear(); // search over — in-results positions are stale
   }
   state.query = value;
+  // search narrowed the current filter to nothing while matches exist elsewhere:
+  // auto-select All so the results aren't hidden behind the filter (not
+  // persisted — the user didn't choose it)
+  if (value && state.filter !== "all") {
+    const found = countsByFilter(searchCandidates(state.allTabs, state), state.derived);
+    if (found[state.filter] === 0 && found.all > 0) {
+      state.filter = "all";
+    }
+  }
   state.cursor = value ? 0 : -1;
   state.pendingScroll = value ? 0 : (scrollByFilter.get(state.filter) ?? 0);
   render(false);
