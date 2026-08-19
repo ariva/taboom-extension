@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Taboom - Tabs Manager by ariva-tools",
   "description": "Taboom - Privacy-first smart Tabs Manager to search, snooze, and protect Chrome tabs. Saves memory, runs fully locally.",
-  "version": "0.2.9",
+  "version": "0.2.10",
   "minimum_chrome_version": "121",
 
   "permissions": ["tabs", "storage", "alarms", "contextMenus", "sidePanel", "favicon"],
