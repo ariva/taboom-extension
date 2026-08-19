@@ -765,8 +765,14 @@ histPop.addEventListener("toggle", (event) => {
     : "Show Navigation History";
 });
 
-histBack.addEventListener("click", () => chrome.runtime.sendMessage({ type: "history-back" }));
-histForward.addEventListener("click", () => chrome.runtime.sendMessage({ type: "history-forward" }));
+histBack.addEventListener("click", () => {
+  if (consumeLongPress()) return; // the hold opened the popover; don't also navigate
+  chrome.runtime.sendMessage({ type: "history-back" });
+});
+histForward.addEventListener("click", () => {
+  if (consumeLongPress()) return;
+  chrome.runtime.sendMessage({ type: "history-forward" });
+});
 
 /** @returns {Promise<{stack: number[], cursor: number}>} */
 async function getTabHistory() {
@@ -851,17 +857,44 @@ async function fillHistoryPopover() {
   }
 }
 
-// browser back-button behavior: right-click an arrow opens the history list.
-// Open on pointerup, not on contextmenu: the gesture's own pointer events
-// otherwise light-dismiss the popover the instant it shows.
+// Browser back-button behavior: right-click OR long-press an arrow opens the
+// history list. Both open on pointerup, never mid-gesture: the gesture's own
+// remaining pointer events otherwise light-dismiss the popover the instant it
+// shows. The hold timer only ARMS the long-press; release opens.
+const LONG_PRESS_MS = 500;
+let longPressTimer;
+let longPressArmed = false;
+
+// click fires right after the opening pointerup — swallow exactly one
+function consumeLongPress() {
+  const armed = longPressArmed;
+  longPressArmed = false;
+  return armed;
+}
+
+async function openHistoryPopover() {
+  await fillHistoryPopover();
+  try {
+    histPop.showPopover?.();
+  } catch {} // already open
+}
+
 for (const arrow of [histBack, histForward]) {
   arrow.addEventListener("contextmenu", (event) => event.preventDefault());
+  arrow.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0) return;
+    longPressArmed = false;
+    clearTimeout(longPressTimer);
+    longPressTimer = setTimeout(() => (longPressArmed = true), LONG_PRESS_MS);
+  });
+  for (const type of ["pointerleave", "pointercancel"]) {
+    arrow.addEventListener(type, () => clearTimeout(longPressTimer));
+  }
   arrow.addEventListener("pointerup", async (event) => {
-    if (event.button !== 2) return;
-    await fillHistoryPopover();
-    try {
-      histPop.showPopover?.();
-    } catch {} // already open
+    clearTimeout(longPressTimer);
+    if (event.button === 2 || (event.button === 0 && longPressArmed)) {
+      await openHistoryPopover();
+    }
   });
 }
 

@@ -309,6 +309,34 @@ test("UI - Sidepanel - History dropdown caret flips with the popover toggle even
   assert.equal(btn.title, "Show Navigation History");
 });
 
+test("UI - Sidepanel - Long-press on a history arrow opens the popover instead of navigating", async () => {
+  const back = document.getElementById("hist-back");
+  const pop = document.getElementById("history-pop");
+  back.disabled = false; // gesture wiring under test, not the disabled logic
+  const pointer = (type, button = 0) => {
+    const event = new window.Event(type, { bubbles: true });
+    event.button = button;
+    back.dispatchEvent(event);
+  };
+
+  // hold past the threshold → release opens the popover, click is swallowed
+  calls.length = 0;
+  pointer("pointerdown");
+  await new Promise((resolve) => setTimeout(resolve, 550));
+  pointer("pointerup");
+  await tick();
+  assert.ok(pop.querySelector(".hist-head"), "popover filled on long-press release");
+  back.click();
+  assert.ok(!calls.includes("sendMessage history-back"), "hold's click does not navigate");
+
+  // quick click (no hold) still navigates
+  pointer("pointerdown");
+  pointer("pointerup");
+  back.click();
+  await tick();
+  assert.ok(calls.includes("sendMessage history-back"), "plain click still goes back");
+});
+
 test("UI - Sidepanel - Escape with open history popover leaves the search alone", () => {
   const search = document.getElementById("search");
   search.value = "abc";
