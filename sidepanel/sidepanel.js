@@ -644,6 +644,13 @@ document.addEventListener("keydown", (event) => {
     return;
   }
   if (event.key === "Escape") {
+    // open history popover: the browser closes it on this same Esc (native
+    // light dismiss) — don't also clear the search underneath
+    let popoverOpen = false;
+    try {
+      popoverOpen = histPop.matches(":popover-open");
+    } catch {} // happy-dom: selector unsupported
+    if (popoverOpen) return;
     searchInput.value = "";
     setQuery("");
     searchInput.focus();

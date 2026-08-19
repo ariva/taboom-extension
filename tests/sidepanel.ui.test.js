@@ -291,6 +291,20 @@ test("UI - Sidepanel - Mid-search filter positions are separate from pre-search 
   assert.equal(list.scrollTop, 77, "other filter's pre-search position intact too");
 });
 
+test("UI - Sidepanel - Escape with open history popover leaves the search alone", () => {
+  const search = document.getElementById("search");
+  search.value = "abc";
+  search.dispatchEvent(new window.Event("input", { bubbles: true }));
+  const pop = document.getElementById("history-pop");
+  pop.matches = () => true; // happy-dom has no :popover-open — simulate "open"
+  document.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  assert.equal(search.value, "abc", "search untouched while popover open (Esc closes popover natively)");
+  pop.matches = () => false;
+  document.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  assert.equal(search.value, "", "next Escape clears the search as usual");
+  delete pop.matches;
+});
+
 test("UI - Sidepanel - Scope and sort changes reset scroll and forget saved positions", () => {
   const list = document.getElementById("tab-list");
   const filter = (name) => document.querySelector(`#filters button[data-filter="${name}"]`).click();
