@@ -214,22 +214,28 @@ test("Core - UI defaults", async () => {
 // ---------- tab activation history ----------
 const { pushHistory, removeFromHistory } = await import("../core/core.js");
 
-test("Core - PushHistory appends, dedupes current, truncates forward, caps size", () => {
+test("Core - PushHistory appends new tabs, moves cursor to known tabs, caps size", () => {
   let h = { stack: [], cursor: -1 };
   h = pushHistory(h, 1);
   h = pushHistory(h, 2);
   h = pushHistory(h, 2); // re-activating current tab: no-op
   assert.deepEqual(h, { stack: [1, 2], cursor: 1 });
 
-  // stepped back to 1, then picked 3 manually → forward (2) gone
-  h = pushHistory({ stack: [1, 2], cursor: 0 }, 3);
-  assert.deepEqual(h, { stack: [1, 3], cursor: 1 });
+  // stepped back to tab2 of [1,2,3,4], manually picked tab3 (ahead in the
+  // trail) → cursor moves onto it, trail untouched
+  h = pushHistory({ stack: [1, 2, 3, 4], cursor: 1 }, 3);
+  assert.deepEqual(h, { stack: [1, 2, 3, 4], cursor: 2 }, "known tab ahead: cursor moves");
+
+  // picking a tab BEHIND the cursor also just moves the cursor
+  h = pushHistory({ stack: [1, 2, 3, 4], cursor: 2 }, 1);
+  assert.deepEqual(h, { stack: [1, 2, 3, 4], cursor: 0 }, "known tab behind: cursor moves");
+
+  // a tab NOT in the stack truncates the forward part and appends
+  h = pushHistory({ stack: [1, 2, 3, 4], cursor: 1 }, 5);
+  assert.deepEqual(h, { stack: [1, 2, 5], cursor: 2 }, "new tab: forward truncated");
 
   h = pushHistory({ stack: [1, 2, 3], cursor: 2 }, 4, 3);
   assert.deepEqual(h, { stack: [2, 3, 4], cursor: 2 }, "capped to max");
-
-  h = pushHistory({ stack: [1, 2, 3], cursor: 2 }, 1);
-  assert.deepEqual(h, { stack: [2, 3, 1], cursor: 2 }, "set semantics: re-activation moves to top");
 });
 
 test("Core - RemoveFromHistory drops a closed tab and keeps the cursor sane", () => {

@@ -50,9 +50,7 @@ async function init() {
   await chrome.storage.local.remove("updateAvailable"); // running the new version now
   // history persists across extension reloads — just prune tabs that vanished meanwhile
   const openIds = new Set((await chrome.tabs.query({})).map((tab) => tab.id));
-  await chrome.storage.local.set({
-    tabHistory: filterHistory(await loadHistory(), (id) => openIds.has(id)),
-  });
+  await withHistory((hist) => filterHistory(hist, (id) => openIds.has(id)));
 }
 
 // An open side panel keeps the extension non-idle, deferring auto-update forever;
@@ -242,6 +240,24 @@ async function loadHistory() {
   return tabHistory ?? { stack: [], cursor: -1 };
 }
 
+// Every tabHistory mutation runs through one chain. Closing the active tab
+// fires onActivated (neighbor) and onRemoved (closed tab) essentially at once;
+// unserialized, their read-modify-writes interleave and the last writer
+// resurrects the closed id or loses the cursor move.
+let historyChain = Promise.resolve();
+function withHistory(mutate) {
+  const run = historyChain.then(async () => {
+    const hist = await loadHistory();
+    const next = await mutate(hist);
+    // pushHistory's no-op returns the same stack ref + cursor — skip the write
+    if (next && !(next.stack === hist.stack && next.cursor === hist.cursor)) {
+      await chrome.storage.local.set({ tabHistory: next });
+    }
+  });
+  historyChain = run.catch(() => {}); // one failure must not jam the queue
+  return run;
+}
+
 let expectedActivation = null; // our own jump's tabId — don't re-push it
 
 function isOwnJump(tabId) {
@@ -253,8 +269,7 @@ function isOwnJump(tabId) {
 async function recordActivation(tabId) {
   if (!(await navStackEnabled())) return; // feature off: zero writes per tab switch
   if (isOwnJump(tabId)) return;
-  const hist = await loadHistory();
-  await chrome.storage.local.set({ tabHistory: pushHistory(hist, tabId) });
+  await withHistory((hist) => pushHistory(hist, tabId));
 }
 
 chrome.tabs.onActivated.addListener(({ tabId }) => recordActivation(tabId));
@@ -267,37 +282,34 @@ chrome.windows.onFocusChanged.addListener(async (windowId) => {
   if (tab?.id) await recordActivation(tab.id);
 });
 
-chrome.tabs.onRemoved.addListener(async (tabId) => {
+chrome.tabs.onRemoved.addListener((tabId) =>
   // NOT gated on the nav-stack flag: a stack recorded while the feature was on
-  // must not keep dead tab ids after it's toggled off.
-  const hist = await loadHistory();
-  if (hist.stack.length === 0) return; // default installs: read only, no write
-  // Sweep ALL closed ids, not just this one: closing the active tab fires
-  // onActivated for its neighbor, and that recordActivation's read-modify-write
-  // can land after our prune and resurrect the closed id (lost update). A full
-  // sweep against the open tabs makes the next close heal any such residue.
-  const open = new Set((await chrome.tabs.query({})).map((tab) => tab.id));
-  open.delete(tabId); // this close may still be listed by the query
-  const next = filterHistory(hist, (id) => open.has(id));
-  if (next.stack.length === hist.stack.length) return; // nothing dead: no write
-  await chrome.storage.local.set({ tabHistory: next });
-});
+  // must not keep dead tab ids after it's toggled off. Sweeps ALL closed ids.
+  withHistory(async (hist) => {
+    if (hist.stack.length === 0) return null; // default installs: no write
+    const open = new Set((await chrome.tabs.query({})).map((tab) => tab.id));
+    open.delete(tabId); // this close may still be listed by the query
+    const next = filterHistory(hist, (id) => open.has(id));
+    return next.stack.length === hist.stack.length ? null : next;
+  }),
+);
 
 async function historyJump(cursor) {
-  const hist = await loadHistory();
-  if (cursor < 0 || cursor >= hist.stack.length) return;
-  const tabId = hist.stack[cursor];
-  try {
-    const tab = await chrome.tabs.get(tabId);
-    expectedActivation = tabId;
-    await chrome.storage.local.set({ tabHistory: { ...hist, cursor } });
-    await chrome.windows.update(tab.windowId, { focused: true });
-    await chrome.tabs.update(tabId, { active: true });
-  } catch {
-    // tab already gone (e.g. closed while worker slept) — drop it, stay put
-    expectedActivation = null;
-    await chrome.storage.local.set({ tabHistory: removeFromHistory(hist, tabId) });
-  }
+  await withHistory(async (hist) => {
+    if (cursor < 0 || cursor >= hist.stack.length) return null;
+    const tabId = hist.stack[cursor];
+    try {
+      const tab = await chrome.tabs.get(tabId);
+      expectedActivation = tabId;
+      await chrome.windows.update(tab.windowId, { focused: true });
+      await chrome.tabs.update(tabId, { active: true });
+      return { ...hist, cursor };
+    } catch {
+      // tab already gone (e.g. closed while worker slept) — drop it, stay put
+      expectedActivation = null;
+      return removeFromHistory(hist, tabId);
+    }
+  });
 }
 
 // Re-evaluate protection flag when a tab navigates to a different URL.

@@ -130,13 +130,15 @@ export function makeRule(pattern) {
 
 // ---------- tab activation history (browser-style back/forward across tabs) ----------
 
-// Activating a tab while the cursor is in the past truncates the forward part,
-// exactly like browser navigation history.
+// Activating a tab that is already anywhere in the stack just moves the cursor
+// to it — manually re-picking a tab from the trail must not rewrite the trail.
+// Only a tab NOT in the stack truncates the forward part and appends, exactly
+// like picking a new destination in browser navigation history.
 export function pushHistory({ stack, cursor }, tabId, max = 50) {
   if (stack[cursor] === tabId) return { stack, cursor };
-  // set semantics: a re-activated tab moves to the top instead of duplicating
-  const kept = stack.slice(0, cursor + 1).filter((id) => id !== tabId);
-  const next = [...kept, tabId].slice(-max);
+  const existing = stack.indexOf(tabId);
+  if (existing !== -1) return { stack, cursor: existing };
+  const next = [...stack.slice(0, cursor + 1), tabId].slice(-max);
   return { stack: next, cursor: next.length - 1 };
 }
 

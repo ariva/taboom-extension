@@ -172,10 +172,14 @@ test(
   assert.ok(calls.some((c) => c.startsWith("tabs.update 1") && c.includes('"active":true')), "back activates previous tab");
 
   await chrome.tabs.onActivated.fire({ tabId: 1 }); // Chrome reporting our own jump
-  await chrome.tabs.onActivated.fire({ tabId: 2 }); // user picks a different tab from the past
+  await chrome.tabs.onActivated.fire({ tabId: 2 }); // user picks a tab that's in the trail
   await tick();
   const { tabHistory } = await chrome.storage.local.get();
-  assert.deepEqual(tabHistory, { stack: [3, 1, 2], cursor: 2 }, "forward entry 4 truncated, 2 moved to top");
+  assert.deepEqual(
+    tabHistory,
+    { stack: [3, 2, 1, 4], cursor: 1 },
+    "known tab: cursor moves onto it, trail untouched",
+  );
   },
 );
 
@@ -211,15 +215,17 @@ test(
   "Service Worker - History submenu rebuilt on init: newest first, radio marks current",
   { skip: !NAV_STACK_ON && "NAVIGATION_STACK disabled in features.json" },
   async () => {
-    // history at this point: [3, 1, 2] cursor 2, plus 1000 pushed by the focus test
+    // history at this point: [3, 2, 1000] — the focus test's new tab 1000
+    // truncated the forward part (cursor was on 2 after the manual pick)
     calls.length = 0;
     await chrome.runtime.onInstalled.fire();
     await tick();
     assert.ok(calls.includes("contextMenus.remove history"));
     assert.ok(calls.includes("contextMenus.create history"));
-    for (const index of [0, 1, 2, 3]) {
+    for (const index of [0, 1, 2]) {
       assert.ok(calls.includes(`contextMenus.create hist-${index}`), `hist-${index}`);
     }
+    assert.ok(!calls.includes("contextMenus.create hist-3"), "only 3 entries remain");
   },
 );
 
@@ -244,6 +250,25 @@ test(
     await chrome.contextMenus.onClicked.fire({ menuItemId: "hist-0" }, { id: 1, windowId: 1 });
     await tick();
     assert.ok(calls.some((c) => c.startsWith("tabs.update 3") && c.includes('"active":true')), "stack[0]=3 activated");
+  },
+);
+
+test(
+  "Service Worker - Closing the active tab: concurrent activation + removal stay consistent",
+  { skip: !NAV_STACK_ON && "NAVIGATION_STACK disabled in features.json" },
+  async () => {
+    // tab 4 (current) closes; Chrome auto-activates neighbor 1000 — both events
+    // land at once and must serialize instead of last-writer-wins
+    await chrome.storage.local.set({ tabHistory: { stack: [3, 2, 1000, 4], cursor: 3 } });
+    await Promise.all([
+      chrome.tabs.onActivated.fire({ tabId: 1000 }),
+      chrome.tabs.onRemoved.fire(4),
+    ]);
+    await tick();
+    await tick();
+    const { tabHistory } = await chrome.storage.local.get();
+    assert.ok(!tabHistory.stack.includes(4), "closed id not resurrected by the activation write");
+    assert.equal(tabHistory.stack[tabHistory.cursor], 1000, "cursor on the auto-activated tab");
   },
 );
 
