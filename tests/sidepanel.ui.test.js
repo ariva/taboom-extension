@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { makeChrome, loadPage, tick } from "./helpers/ui.js";
+
+const FEATURES = JSON.parse(readFileSync(new URL("../features.json", import.meta.url), "utf8"));
+const AUTO_ALL_ON = FEATURES.SEARCH_AUTO_SELECT_ALL?.enabled === true;
 
 const NOW = Date.now();
 const tabs = [
@@ -71,19 +75,45 @@ test("UI - Sidepanel - Search narrows list; no match shows empty state; Escape c
   document.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
   assert.equal(document.querySelectorAll(".row").length, 3);
   assert.deepEqual(counts(), ["3", "2", "1", "1"], "clearing search restores full counts");
-
-  // current filter has no matches but others do — auto-select All so results show
-  document.querySelector('#filters button[data-filter="snoozed"]').click();
-  search.value = "inbox"; // Inbox is awake: 0 snoozed matches
-  search.dispatchEvent(new window.Event("input", { bubbles: true }));
-  assert.equal(document.querySelectorAll(".row").length, 1, "match visible after auto-jump");
-  assert.equal(
-    document.querySelector('#filters button[data-filter="all"]').getAttribute("aria-pressed"),
-    "true",
-    "All filter auto-selected",
-  );
-  document.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
 });
+
+test(
+  "UI - Sidepanel - Empty current filter during search auto-selects All",
+  { skip: !AUTO_ALL_ON && "SEARCH_AUTO_SELECT_ALL disabled in features.json" },
+  () => {
+    const search = document.getElementById("search");
+    document.querySelector('#filters button[data-filter="snoozed"]').click();
+    search.value = "inbox"; // Inbox is awake: 0 snoozed matches
+    search.dispatchEvent(new window.Event("input", { bubbles: true }));
+    assert.equal(document.querySelectorAll(".row").length, 1, "match visible after auto-jump");
+    assert.equal(
+      document.querySelector('#filters button[data-filter="all"]').getAttribute("aria-pressed"),
+      "true",
+      "All filter auto-selected",
+    );
+    document.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    document.querySelector('#filters button[data-filter="all"]').click();
+  },
+);
+
+test(
+  "UI - Sidepanel - SEARCH_AUTO_SELECT_ALL off: empty filter stays put during search",
+  { skip: AUTO_ALL_ON && "SEARCH_AUTO_SELECT_ALL enabled in features.json" },
+  () => {
+    const search = document.getElementById("search");
+    document.querySelector('#filters button[data-filter="snoozed"]').click();
+    search.value = "inbox"; // Inbox is awake: 0 snoozed matches
+    search.dispatchEvent(new window.Event("input", { bubbles: true }));
+    assert.equal(document.querySelectorAll(".row").length, 0, "no rows: filter kept");
+    assert.equal(
+      document.querySelector('#filters button[data-filter="snoozed"]').getAttribute("aria-pressed"),
+      "true",
+      "snoozed filter still selected",
+    );
+    document.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    document.querySelector('#filters button[data-filter="all"]').click();
+  },
+);
 
 test("UI - Sidepanel - Snoozed filter shows only discarded tabs", () => {
   document.querySelector('#filters button[data-filter="snoozed"]').click();
