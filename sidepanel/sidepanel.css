@@ -325,6 +325,11 @@ footer button:disabled:hover { background: none; }
   cursor: pointer;
 }
 
+/* history dropdown button: caret-down-over-list normally, caret-up while open */
+#hist-list-btn .caret-open { display: none; }
+#hist-list-btn.open .caret-closed { display: none; }
+#hist-list-btn.open .caret-open { display: block; }
+
 /* tab history nav: arrows + popover list right of search */
 .search-row { display: flex; gap: 4px; align-items: center; }
 .search-row #search { flex: 1; min-width: 0; }

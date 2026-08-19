@@ -752,7 +752,18 @@ chrome.storage.onChanged.addListener(syncUpdateBanner);
 
 const histBack = getElementById("hist-back");
 const histForward = getElementById("hist-forward");
+const histListBtn = getElementById("hist-list-btn");
 const histPop = getElementById("history-pop");
+
+// caret flips while the popover is open; the toggle event fires on every close
+// path (button click, light dismiss, Esc), so the icon can't get stuck
+histPop.addEventListener("toggle", (event) => {
+  const open = /** @type {{newState?: string}} */ (event).newState === "open";
+  histListBtn.classList.toggle("open", open);
+  histListBtn.title = histListBtn.ariaLabel = open
+    ? "Hide Navigation History"
+    : "Show Navigation History";
+});
 
 histBack.addEventListener("click", () => chrome.runtime.sendMessage({ type: "history-back" }));
 histForward.addEventListener("click", () => chrome.runtime.sendMessage({ type: "history-forward" }));
@@ -772,7 +783,7 @@ async function syncHistoryButtons() {
 }
 
 // populate on open (popovertarget handles show/hide natively)
-getElementById("hist-list-btn").addEventListener("click", fillHistoryPopover);
+histListBtn.addEventListener("click", fillHistoryPopover);
 
 async function fillHistoryPopover() {
   // anchor just below the nav buttons, left-aligned (CSS anchor positioning needs Chrome 125+)
@@ -789,7 +800,7 @@ async function fillHistoryPopover() {
   head.className = "hist-head";
   const heading = document.createElement("span");
   heading.className = "muted";
-  heading.textContent = "Navigation stack";
+  heading.textContent = "Navigation History";
   const close = document.createElement("button");
   close.className = "icon-btn";
   close.title = close.ariaLabel = "Close";

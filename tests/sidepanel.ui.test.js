@@ -291,6 +291,24 @@ test("UI - Sidepanel - Mid-search filter positions are separate from pre-search 
   assert.equal(list.scrollTop, 77, "other filter's pre-search position intact too");
 });
 
+test("UI - Sidepanel - History dropdown caret flips with the popover toggle event", () => {
+  const btn = document.getElementById("hist-list-btn");
+  const pop = document.getElementById("history-pop");
+  assert.ok(btn.querySelector(".caret-closed") && btn.querySelector(".caret-open"), "both variants present");
+
+  const toggle = (newState) => {
+    const event = new window.Event("toggle");
+    event.newState = newState;
+    pop.dispatchEvent(event);
+  };
+  toggle("open");
+  assert.ok(btn.classList.contains("open"), "open state flips caret up");
+  assert.equal(btn.title, "Hide Navigation History");
+  toggle("closed");
+  assert.ok(!btn.classList.contains("open"), "closed state flips caret back down");
+  assert.equal(btn.title, "Show Navigation History");
+});
+
 test("UI - Sidepanel - Escape with open history popover leaves the search alone", () => {
   const search = document.getElementById("search");
   search.value = "abc";

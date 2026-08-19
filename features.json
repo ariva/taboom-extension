@@ -4,7 +4,7 @@
   "SIDEBAR_KEYBOARD_NAVIGATION": { "enabled": true },
   "SEARCH_AUTO_SELECT_ALL": { "enabled": false, "experimental": true },
   "OPTIONS_NAVIGATION_STACK": { "enabled": false },
-  "NAVIGATION_DROPDOWN": { "enabled": false },
+  "NAVIGATION_DROPDOWN": { "enabled": false, "experimental": true },
   "PERFORMANCE": { "enabled": false },
   "SHOW_PERFORMANCE_INFO": { "enabled": false }
 }
