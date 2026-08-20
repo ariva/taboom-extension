@@ -9,7 +9,7 @@
   "WINDOW_GROUP_SELECT": { "enabled": true },
   "GROUP_BY_TITLE": { "enabled": true },
   "GROUP_BY_DOMAIN": { "enabled": true },
-  "SEARCH_AUTO_SELECT_ALL": { "enabled": false, "experimental": true },
+  "SEARCH_AUTO_SELECT_ALL": { "enabled": true },
   "PERFORMANCE": { "enabled": false },
   "SHOW_PERFORMANCE_INFO": { "enabled": false }
 }

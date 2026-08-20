@@ -22,6 +22,7 @@ export const DEFAULTS = {
     density: "comfortable", // or "compact"
     theme: "auto", // "auto" | "light" | "dark"
     historyNav: "traditional", // "disabled" | "traditional" | "compact" (legacy: true/false)
+    searchEmptyFilter: "keep", // "keep" | "all" — when search matches are hidden by the current filter
     showExperimental: false, // opt into experimental features (needs ALLOW_EXPERIMENTAL flag)
   },
 };

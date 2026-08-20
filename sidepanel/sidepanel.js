@@ -776,7 +776,12 @@ function setQuery(value) {
   // search narrowed the current filter to nothing while matches exist elsewhere:
   // auto-select All so the results aren't hidden behind the filter (not
   // persisted — the user didn't choose it)
-  if (value && state.filter !== "all" && featureEnabled(state.features, "SEARCH_AUTO_SELECT_ALL")) {
+  if (
+    value &&
+    state.filter !== "all" &&
+    featureEnabled(state.features, "SEARCH_AUTO_SELECT_ALL") &&
+    (state.ui.searchEmptyFilter ?? "keep") === "all" // user opted in (options: Customization)
+  ) {
     const found = countsByFilter(searchCandidates(state.allTabs, state), state.derived);
     if (found[state.filter] === 0 && found.all > 0) {
       state.filter = "all";

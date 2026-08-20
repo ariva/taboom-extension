@@ -239,6 +239,12 @@
     <h2>Customization</h2>
     <label id="showExperimental-label" hidden><input type="checkbox" id="showExperimental" /> Show experimental features</label>
     <p id="experimental-warning" hidden>⚠ Experimental features enabled — they may change over time and may not be fully polished.</p>
+    <label id="searchEmptyFilter-label" hidden>When search matches are hidden by the current filter
+      <select id="searchEmptyFilter">
+        <option value="keep">Keep the current filter</option>
+        <option value="all">Switch to the All filter</option>
+      </select>
+    </label>
     <label>Sort memory
       <select id="sortDirMode">
         <option value="default">Default order on every change</option>

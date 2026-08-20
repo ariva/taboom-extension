@@ -76,13 +76,29 @@ test("UI - Sidepanel - Search narrows list; no match shows empty state; Escape c
 });
 
 test(
-  "UI - Sidepanel - Empty current filter during search auto-selects All",
+  "UI - Sidepanel - Hidden-matches behavior: keep filter by default, switch to All when opted in",
   { skip: !AUTO_ALL_ON && "SEARCH_AUTO_SELECT_ALL disabled in features.json" },
-  () => {
+  async () => {
     const search = document.getElementById("search");
+    const type = (value) => {
+      search.value = value;
+      search.dispatchEvent(new window.Event("input", { bubbles: true }));
+    };
+
+    // default (searchEmptyFilter "keep"): flag alone must NOT jump
     document.querySelector('#filters button[data-filter="snoozed"]').click();
-    search.value = "inbox"; // Inbox is awake: 0 snoozed matches
-    search.dispatchEvent(new window.Event("input", { bubbles: true }));
+    type("inbox"); // Inbox is awake: 0 snoozed matches
+    assert.equal(document.querySelectorAll(".row").length, 0, "default: filter kept");
+    document.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+
+    // opt in via the Customization setting
+    const { ui } = await chrome.storage.local.get("ui");
+    await chrome.storage.local.set({ ui: { ...ui, searchEmptyFilter: "all" } });
+    await chrome.storage.onChanged.fire({ ui: { newValue: {} } }, "local");
+    await new Promise((resolve) => setTimeout(resolve, 200)); // refresh debounce
+
+    document.querySelector('#filters button[data-filter="snoozed"]').click();
+    type("inbox");
     assert.equal(document.querySelectorAll(".row").length, 1, "match visible after auto-jump");
     assert.equal(
       document.querySelector('#filters button[data-filter="all"]').getAttribute("aria-pressed"),
@@ -91,6 +107,10 @@ test(
     );
     document.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
     document.querySelector('#filters button[data-filter="all"]').click();
+
+    await chrome.storage.local.set({ ui: { ...ui, searchEmptyFilter: "keep" } });
+    await chrome.storage.onChanged.fire({ ui: { newValue: {} } }, "local");
+    await new Promise((resolve) => setTimeout(resolve, 200));
   },
 );
 

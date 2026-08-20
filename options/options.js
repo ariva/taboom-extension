@@ -69,6 +69,7 @@ async function render() {
   getElementById("fontSize").value = String(state.ui.fontSize ?? 1);
   getElementById("density").value = state.ui.density ?? "comfortable";
   getElementById("sortDirMode").value = state.ui.sortDirMode ?? "default";
+  getElementById("searchEmptyFilter").value = state.ui.searchEmptyFilter ?? "keep";
   getElementById("theme").value = state.ui.theme ?? "auto";
   getElementById("showExperimental").checked = state.ui.showExperimental ?? false;
 
@@ -90,6 +91,8 @@ async function render() {
       document.querySelector(`#historyNav option[value="${value}"]`)
     ).hidden = !featureEnabled(features, flag);
   }
+  getElementById("searchEmptyFilter-label").hidden =
+    !featureEnabled(features, "SEARCH_AUTO_SELECT_ALL");
   const allowExperimental = featureEnabled(features, "ALLOW_EXPERIMENTAL");
   getElementById("showExperimental-label").hidden = !allowExperimental;
   getElementById("experimental-warning").hidden =
@@ -146,6 +149,7 @@ const UI_FIELDS = [
   { id: "fontSize", prop: "value", parse: clampFontSize, apply: (v, input) => { input.value = String(v); } },
   { id: "density", prop: "value" },
   { id: "sortDirMode", prop: "value" },
+  { id: "searchEmptyFilter", prop: "value" },
   { id: "theme", prop: "value", apply: (v) => applyTheme(v) },
   { id: "historyNav", prop: "value" },
   { id: "showExperimental", prop: "checked" },

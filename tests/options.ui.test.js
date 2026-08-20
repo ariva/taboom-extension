@@ -221,3 +221,18 @@ test("UI - Options - What's new paginates: initial count, then a page per click 
   assert.equal(visibleCount(), total, "everything visible at the end");
   assert.equal(clicks, Math.ceil((total - SHOW_INITIAL_CHANGES) / SHOW_MORE_PAGE), "page count");
 });
+
+test("UI - Options - Hidden-matches dropdown visible only with SEARCH_AUTO_SELECT_ALL", async () => {
+  const { applyExperimental, featureEnabled } = await import("../core/core.js");
+  const effective = applyExperimental(RAW_FEATURES, stored.ui?.showExperimental ?? false);
+  assert.equal(
+    document.getElementById("searchEmptyFilter-label").hidden,
+    !featureEnabled(effective, "SEARCH_AUTO_SELECT_ALL"),
+    "label visibility follows the resolved flag",
+  );
+  assert.equal(
+    document.getElementById("searchEmptyFilter").value,
+    stored.ui?.searchEmptyFilter ?? "keep",
+    "defaults to keeping the filter",
+  );
+});
