@@ -1,5 +1,10 @@
 # CHANGES
 
+## v0.2.11 — 2026-08-20
+
+### New Features
+- Per-version update-banner dismissal functionality (edc1d07)
+
 ## v0.2.10 — 2026-08-20
 
 ### New Features
