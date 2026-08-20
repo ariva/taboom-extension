@@ -1,5 +1,6 @@
 import {
   applyExperimental,
+  dedupeHistory,
   featureEnabled,
   filterHistory,
   hostnameOf,
@@ -7,8 +8,10 @@ import {
   isSupportedUrl,
   makeRule,
   matchesRule,
-  pushHistory,
+  pushHistoryCompact,
+  pushHistoryTraditional,
   removeFromHistory,
+  resolveNavMode,
   selectAutoSnoozeTargets,
 } from "../core/core.js";
 import { loadFeatures, loadState, saveState } from "../core/storage.js";
@@ -20,19 +23,17 @@ const ALARM_NAME = "auto-snooze";
 let featuresPromise;
 const getFeatures = () => (featuresPromise ??= loadFeatures());
 
-// Resolved NAVIGATION_STACK gate, cached — the whole history machinery
-// (a storage write per tab switch + menu rebuild chain) is skipped when off.
-// ui.showExperimental affects the resolution, so ui changes invalidate it.
-let navStackPromise = null;
-function navStackEnabled() {
-  navStackPromise ??= (async () => {
+// Resolved navigation mode ("off" | "compact" | "traditional"), cached — the
+// whole history machinery (a storage write per tab switch + menu rebuild
+// chain) is skipped when "off". ui changes invalidate it (mode dropdown and
+// showExperimental both affect the resolution).
+let navModePromise = null;
+function navMode() {
+  navModePromise ??= (async () => {
     const [{ ui }, features] = await Promise.all([loadState(), getFeatures()]);
-    return featureEnabled(
-      applyExperimental(features, ui.showExperimental ?? false),
-      "NAVIGATION_STACK",
-    );
+    return resolveNavMode(applyExperimental(features, ui.showExperimental ?? false), ui);
   })();
-  return navStackPromise;
+  return navModePromise;
 }
 
 // ---------- lifecycle ----------
@@ -196,7 +197,14 @@ async function handleMessage(message) {
 chrome.storage.onChanged.addListener(async (changes, area) => {
   if (area !== "local") return;
   if (changes.ui) {
-    navStackPromise = null; // showExperimental may have flipped the resolved flag
+    navModePromise = null; // mode dropdown / showExperimental may have changed it
+    // switching to compact: dedupe once (newest occurrence wins) so compact's
+    // move-cursor-to-first-occurrence never lands on a stale duplicate
+    if ((await navMode()) === "compact") {
+      await withHistory((hist) =>
+        new Set(hist.stack).size === hist.stack.length ? null : dedupeHistory(hist),
+      );
+    }
   }
   if (changes.settings) {
     // recreate only when the interval actually changed — any settings save hits this
@@ -269,11 +277,13 @@ function isOwnJump(tabId) {
 }
 
 async function recordActivation(tabId) {
-  if (!(await navStackEnabled())) {
+  const mode = await navMode();
+  if (mode === "off") {
     return; // feature off: zero writes per tab switch
   }
   if (isOwnJump(tabId)) return;
-  await withHistory((hist) => pushHistory(hist, tabId));
+  const push = mode === "compact" ? pushHistoryCompact : pushHistoryTraditional;
+  await withHistory((hist) => push(hist, tabId));
 }
 
 chrome.tabs.onActivated.addListener(({ tabId }) => recordActivation(tabId));
@@ -404,7 +414,7 @@ async function rebuildHistoryMenu() {
   const features = applyExperimental(rawFeatures, ui.showExperimental ?? false);
   await removeMenu("history");
   await removeMenu("sep-2");
-  if (!featureEnabled(features, "NAVIGATION_STACK") || ui.historyNav === false) return;
+  if (resolveNavMode(features, ui) === "off") return;
   const { stack, cursor } = await loadHistory(); // only read when the menu will exist
   chrome.contextMenus.create({ id: "sep-2", type: "separator", parentId: "root", contexts: ["page"] });
   chrome.contextMenus.create({

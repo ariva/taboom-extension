@@ -3,11 +3,19 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { makeChrome, tick } from "./helpers/ui.js";
+import { makeChrome, tick, TEST_FEATURES } from "./helpers/ui.js";
 
-// flag-dependent tests skip when features.json disables their feature
-const FEATURES = JSON.parse(readFileSync(new URL("../features.json", import.meta.url), "utf8"));
-const NAV_STACK_ON = FEATURES.NAVIGATION_STACK?.enabled === true;
+// flag-dependent tests skip when the EFFECTIVE flags (experimental resolved
+// under TEST_EXPERIMENTAL=1) disable their feature
+const NAV_STACK_ON = TEST_FEATURES.NAVIGATION_STACK?.enabled === true;
+// Resolved fresh-install mode ("off" | "traditional" | "compact") — several
+// tests replay traces that depend on which push semantics the default mode
+// uses, so they skip unless the flags produce the mode they were written for.
+const { resolveNavMode } = await import("../core/core.js");
+const DEFAULT_MODE = resolveNavMode(TEST_FEATURES, {});
+const NAV_ON = DEFAULT_MODE !== "off";
+const TRADITIONAL_DEFAULT = DEFAULT_MODE === "traditional";
+const COMPACT_AVAILABLE = NAV_STACK_ON && TEST_FEATURES.NAVIGATION_COMPACT_STACK?.enabled === true;
 
 const NOW = Date.now();
 const HOUR = 3_600_000;
@@ -159,7 +167,7 @@ test("Service Worker - Navigation to a protected url flips autoDiscardable off",
 
 test(
   "Service Worker - Tab history: back jumps without pushing, manual pick truncates forward",
-  { skip: !NAV_STACK_ON && "NAVIGATION_STACK disabled in features.json" },
+  { skip: !TRADITIONAL_DEFAULT && "trace assumes traditional as the default mode" },
   async () => {
   // stack so far from earlier tests: [3, 2] (protect-title test activations)
   await chrome.tabs.onActivated.fire({ tabId: 1 });
@@ -177,15 +185,15 @@ test(
   const { tabHistory } = await chrome.storage.local.get();
   assert.deepEqual(
     tabHistory,
-    { stack: [3, 2, 1, 4], cursor: 1 },
-    "known tab: cursor moves onto it, trail untouched",
+    { stack: [3, 2, 1, 2], cursor: 3 },
+    "traditional (default): forward truncated, duplicate appended",
   );
   },
 );
 
 test(
   "Service Worker - Window focus switch records the newly-current tab in history",
-  { skip: !NAV_STACK_ON && "NAVIGATION_STACK disabled in features.json" },
+  { skip: !NAV_ON && "navigation resolves to off in features.json" },
   async () => {
     await chrome.windows.onFocusChanged.fire(chrome.windows.WINDOW_ID_NONE); // devtools etc — ignored
     await chrome.windows.onFocusChanged.fire(2); // window 2's active tab: 1000 (created by snooze test)
@@ -198,7 +206,7 @@ test(
 
 test(
   "Service Worker - NAVIGATION_STACK off: tab switches write no history at all",
-  { skip: NAV_STACK_ON && "NAVIGATION_STACK enabled in features.json" },
+  { skip: NAV_ON && "navigation enabled in features.json" },
   async () => {
     calls.length = 0;
     await chrome.tabs.onActivated.fire({ tabId: 1 });
@@ -213,25 +221,25 @@ test(
 
 test(
   "Service Worker - History submenu rebuilt on init: newest first, radio marks current",
-  { skip: !NAV_STACK_ON && "NAVIGATION_STACK disabled in features.json" },
+  { skip: !TRADITIONAL_DEFAULT && "trace assumes traditional as the default mode" },
   async () => {
-    // history at this point: [3, 2, 1000] — the focus test's new tab 1000
-    // truncated the forward part (cursor was on 2 after the manual pick)
+    // history at this point (traditional): [3, 2, 1, 2, 1000] — duplicates
+    // stay, focus test appended 1000 at the cursor's end
     calls.length = 0;
     await chrome.runtime.onInstalled.fire();
     await tick();
     assert.ok(calls.includes("contextMenus.remove history"));
     assert.ok(calls.includes("contextMenus.create history"));
-    for (const index of [0, 1, 2]) {
+    for (const index of [0, 1, 2, 3, 4]) {
       assert.ok(calls.includes(`contextMenus.create hist-${index}`), `hist-${index}`);
     }
-    assert.ok(!calls.includes("contextMenus.create hist-3"), "only 3 entries remain");
+    assert.ok(!calls.includes("contextMenus.create hist-5"), "exactly 5 entries");
   },
 );
 
 test(
   "Service Worker - NAVIGATION_STACK off: history menu removed and never created",
-  { skip: NAV_STACK_ON && "NAVIGATION_STACK enabled in features.json" },
+  { skip: NAV_ON && "navigation enabled in features.json" },
   async () => {
     calls.length = 0;
     await chrome.runtime.onInstalled.fire();
@@ -244,7 +252,7 @@ test(
 
 test(
   "Service Worker - History submenu click jumps to that entry",
-  { skip: !NAV_STACK_ON && "NAVIGATION_STACK disabled in features.json" },
+  { skip: !TRADITIONAL_DEFAULT && "trace assumes traditional as the default mode" },
   async () => {
     calls.length = 0;
     await chrome.contextMenus.onClicked.fire({ menuItemId: "hist-0" }, { id: 1, windowId: 1 });
@@ -255,7 +263,7 @@ test(
 
 test(
   "Service Worker - Closing the active tab: concurrent activation + removal stay consistent",
-  { skip: !NAV_STACK_ON && "NAVIGATION_STACK disabled in features.json" },
+  { skip: !NAV_ON && "navigation resolves to off in features.json" },
   async () => {
     // tab 4 (current) closes; Chrome auto-activates neighbor 1000 — both events
     // land at once and must serialize instead of last-writer-wins
@@ -269,6 +277,29 @@ test(
     const { tabHistory } = await chrome.storage.local.get();
     assert.ok(!tabHistory.stack.includes(4), "closed id not resurrected by the activation write");
     assert.equal(tabHistory.stack[tabHistory.cursor], 1000, "cursor on the auto-activated tab");
+  },
+);
+
+test(
+  "Service Worker - Switching to compact dedupes the stack; compact re-pick moves the cursor",
+  { skip: !COMPACT_AVAILABLE && "compact mode disabled in features.json" },
+  async () => {
+    await chrome.storage.local.set({ tabHistory: { stack: [1, 2, 1, 3], cursor: 3 } });
+    await chrome.storage.local.set({ ui: { historyNav: "compact" } });
+    await chrome.storage.onChanged.fire({ ui: { newValue: { historyNav: "compact" } } }, "local");
+    await tick();
+    let { tabHistory } = await chrome.storage.local.get();
+    assert.deepEqual(tabHistory, { stack: [2, 1, 3], cursor: 2 }, "deduped, newest occurrence kept");
+
+    await chrome.tabs.onActivated.fire({ tabId: 2 }); // in trail → cursor moves, nothing appended
+    await tick();
+    ({ tabHistory } = await chrome.storage.local.get());
+    assert.deepEqual(tabHistory, { stack: [2, 1, 3], cursor: 0 }, "compact: cursor-move, no dupe");
+
+    // back to default (traditional) for the remaining tests
+    await chrome.storage.local.set({ ui: {} });
+    await chrome.storage.onChanged.fire({ ui: { newValue: {} } }, "local");
+    await tick();
   },
 );
 

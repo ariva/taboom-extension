@@ -17,9 +17,21 @@ lint:
 typecheck:
     npx tsc -p jsconfig.json
 
-# unit tests for pure core logic
-test:
+# three passes: flags as shipped; experimental flags treated as enabled;
+# every flag disabled (helpers/ui.js wires each scenario into the code under test)
+test: test-enabled test-experimental test-disabled
+
+# flags exactly as shipped in features.json
+test-enabled:
     node --test tests/*.test.js
+
+# experimental flags treated as enabled (ui.showExperimental injected)
+test-experimental:
+    TEST_EXPERIMENTAL=1 node --test tests/*.test.js
+
+# every feature flag disabled
+test-disabled:
+    TEST_ALL_DISABLED=1 node --test tests/*.test.js
 
 # pack distributable zip (excludes docs/tests/tooling)
 build: check

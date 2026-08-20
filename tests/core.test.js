@@ -212,30 +212,75 @@ test("Core - UI defaults", async () => {
 });
 
 // ---------- tab activation history ----------
-const { pushHistory, removeFromHistory } = await import("../core/core.js");
+const { pushHistoryCompact, pushHistoryTraditional, dedupeHistory, resolveNavMode, removeFromHistory } =
+  await import("../core/core.js");
 
-test("Core - PushHistory appends new tabs, moves cursor to known tabs, caps size", () => {
+test("Core - PushHistoryCompact appends new tabs, moves cursor to known tabs, caps size", () => {
   let h = { stack: [], cursor: -1 };
-  h = pushHistory(h, 1);
-  h = pushHistory(h, 2);
-  h = pushHistory(h, 2); // re-activating current tab: no-op
+  h = pushHistoryCompact(h, 1);
+  h = pushHistoryCompact(h, 2);
+  h = pushHistoryCompact(h, 2); // re-activating current tab: no-op
   assert.deepEqual(h, { stack: [1, 2], cursor: 1 });
 
   // stepped back to tab2 of [1,2,3,4], manually picked tab3 (ahead in the
   // trail) → cursor moves onto it, trail untouched
-  h = pushHistory({ stack: [1, 2, 3, 4], cursor: 1 }, 3);
+  h = pushHistoryCompact({ stack: [1, 2, 3, 4], cursor: 1 }, 3);
   assert.deepEqual(h, { stack: [1, 2, 3, 4], cursor: 2 }, "known tab ahead: cursor moves");
 
   // picking a tab BEHIND the cursor also just moves the cursor
-  h = pushHistory({ stack: [1, 2, 3, 4], cursor: 2 }, 1);
+  h = pushHistoryCompact({ stack: [1, 2, 3, 4], cursor: 2 }, 1);
   assert.deepEqual(h, { stack: [1, 2, 3, 4], cursor: 0 }, "known tab behind: cursor moves");
 
   // a tab NOT in the stack truncates the forward part and appends
-  h = pushHistory({ stack: [1, 2, 3, 4], cursor: 1 }, 5);
+  h = pushHistoryCompact({ stack: [1, 2, 3, 4], cursor: 1 }, 5);
   assert.deepEqual(h, { stack: [1, 2, 5], cursor: 2 }, "new tab: forward truncated");
 
-  h = pushHistory({ stack: [1, 2, 3], cursor: 2 }, 4, 3);
+  h = pushHistoryCompact({ stack: [1, 2, 3], cursor: 2 }, 4, 3);
   assert.deepEqual(h, { stack: [2, 3, 4], cursor: 2 }, "capped to max");
+});
+
+test("Core - PushHistoryTraditional truncates forward and appends, duplicates allowed", () => {
+  // [1,2*,3,4] + tab1 → [1,2,1*] (duplicate appended, forward gone)
+  let h = pushHistoryTraditional({ stack: [1, 2, 3, 4], cursor: 1 }, 1);
+  assert.deepEqual(h, { stack: [1, 2, 1], cursor: 2 }, "known tab re-appends");
+
+  // [1,2*,3,4] + tab5 → [1,2,5*]
+  h = pushHistoryTraditional({ stack: [1, 2, 3, 4], cursor: 1 }, 5);
+  assert.deepEqual(h, { stack: [1, 2, 5], cursor: 2 }, "new tab appends");
+
+  h = pushHistoryTraditional({ stack: [1, 2], cursor: 1 }, 2);
+  assert.deepEqual(h, { stack: [1, 2], cursor: 1 }, "re-activating current: no-op");
+
+  h = pushHistoryTraditional({ stack: [1, 2, 3], cursor: 2 }, 4, 3);
+  assert.deepEqual(h, { stack: [2, 3, 4], cursor: 2 }, "capped to max (default 100)");
+});
+
+test("Core - DedupeHistory keeps newest occurrence, cursor follows its tab", () => {
+  assert.deepEqual(
+    dedupeHistory({ stack: [1, 2, 1, 3, 2], cursor: 2 }, ),
+    { stack: [1, 3, 2], cursor: 0 },
+    "newest occurrences kept in order; cursor follows tab 1",
+  );
+  assert.deepEqual(dedupeHistory({ stack: [1, 2, 3], cursor: 1 }), { stack: [1, 2, 3], cursor: 1 });
+  assert.deepEqual(dedupeHistory({ stack: [], cursor: -1 }), { stack: [], cursor: -1 });
+});
+
+test("Core - ResolveNavMode: master flag, per-mode flags, legacy booleans, fallback", () => {
+  const flags = (stack, trad, compact) => ({
+    NAVIGATION_STACK: { enabled: stack },
+    NAVIGATION_TRADITIONAL_STACK: { enabled: trad },
+    NAVIGATION_COMPACT_STACK: { enabled: compact },
+  });
+  const all = flags(true, true, true);
+  assert.equal(resolveNavMode(all, {}), "traditional", "default is traditional");
+  assert.equal(resolveNavMode(all, { historyNav: "compact" }), "compact");
+  assert.equal(resolveNavMode(all, { historyNav: "disabled" }), "off");
+  assert.equal(resolveNavMode(all, { historyNav: true }), "traditional", "legacy true");
+  assert.equal(resolveNavMode(all, { historyNav: false }), "off", "legacy false");
+  assert.equal(resolveNavMode(flags(false, true, true), { historyNav: "compact" }), "off", "master off");
+  assert.equal(resolveNavMode(flags(true, false, true), {}), "compact", "traditional flag off: falls back");
+  assert.equal(resolveNavMode(flags(true, true, false), { historyNav: "compact" }), "traditional", "compact flag off: falls back");
+  assert.equal(resolveNavMode(flags(true, false, false), {}), "off", "no mode enabled");
 });
 
 test("Core - RemoveFromHistory drops a closed tab and keeps the cursor sane", () => {

@@ -19,7 +19,7 @@ export const DEFAULTS = {
     fontSize: 1, // rem, relative to browser default
     density: "comfortable", // or "compact"
     theme: "auto", // "auto" | "light" | "dark"
-    historyNav: true, // prev/next tab-history UI in sidebar + context menu
+    historyNav: "traditional", // "disabled" | "traditional" | "compact" (legacy: true/false)
     showExperimental: false, // opt into experimental features (needs ALLOW_EXPERIMENTAL flag)
   },
 };
@@ -130,16 +130,56 @@ export function makeRule(pattern) {
 
 // ---------- tab activation history (browser-style back/forward across tabs) ----------
 
-// Activating a tab that is already anywhere in the stack just moves the cursor
-// to it — manually re-picking a tab from the trail must not rewrite the trail.
-// Only a tab NOT in the stack truncates the forward part and appends, exactly
-// like picking a new destination in browser navigation history.
-export function pushHistory({ stack, cursor }, tabId, max = 50) {
+// COMPACT mode: activating a tab that is already anywhere in the stack just
+// moves the cursor to it — re-picking a tab from the trail must not rewrite it.
+// Only a tab NOT in the stack truncates the forward part and appends.
+export function pushHistoryCompact({ stack, cursor }, tabId, max = 50) {
   if (stack[cursor] === tabId) return { stack, cursor };
   const existing = stack.indexOf(tabId);
   if (existing !== -1) return { stack, cursor: existing };
   const next = [...stack.slice(0, cursor + 1), tabId].slice(-max);
   return { stack: next, cursor: next.length - 1 };
+}
+
+// TRADITIONAL mode: classic browser history — every manual activation
+// truncates the forward part and appends, duplicates allowed.
+// [1,2*,3,4] + tab1 → [1,2,1*]; [1,2*,3,4] + tab5 → [1,2,5*].
+export function pushHistoryTraditional({ stack, cursor }, tabId, max = 100) {
+  if (stack[cursor] === tabId) return { stack, cursor };
+  const next = [...stack.slice(0, cursor + 1), tabId].slice(-max);
+  return { stack: next, cursor: next.length - 1 };
+}
+
+// Switching to compact dedupes a traditional stack once (newest occurrence
+// wins) so compact's move-cursor-to-first-occurrence never lands on a stale dupe.
+export function dedupeHistory({ stack, cursor }) {
+  const seen = new Set();
+  const kept = [];
+  for (let index = stack.length - 1; index >= 0; index--) {
+    if (!seen.has(stack[index])) {
+      seen.add(stack[index]);
+      kept.unshift(stack[index]);
+    }
+  }
+  // cursor follows its tab's surviving occurrence (empty stack → -1)
+  return { stack: kept, cursor: kept.indexOf(stack[cursor]) };
+}
+
+// ui.historyNav ("disabled" | "traditional" | "compact"; legacy true/false) +
+// feature flags → the mode actually in effect. NAVIGATION_STACK is the master
+// kill-switch; a mode whose flag is off falls back to the other enabled mode.
+export function resolveNavMode(features, ui) {
+  if (!featureEnabled(features, "NAVIGATION_STACK")) return "off";
+  const raw = ui.historyNav ?? "traditional";
+  const wanted = raw === true ? "traditional" : raw === false ? "disabled" : raw;
+  if (wanted === "disabled") return "off";
+  const allowed = {
+    traditional: featureEnabled(features, "NAVIGATION_TRADITIONAL_STACK"),
+    compact: featureEnabled(features, "NAVIGATION_COMPACT_STACK"),
+  };
+  if (allowed[wanted]) return wanted;
+  const other = wanted === "traditional" ? "compact" : "traditional";
+  return allowed[other] ? other : "off";
 }
 
 export function filterHistory({ stack, cursor }, keep) {

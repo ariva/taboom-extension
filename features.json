@@ -1,6 +1,8 @@
 {
   "ALLOW_EXPERIMENTAL": { "enabled": true },
   "NAVIGATION_STACK": { "enabled": true },
+  "NAVIGATION_TRADITIONAL_STACK": { "enabled": true },
+  "NAVIGATION_COMPACT_STACK": { "enabled": true },
   "OPTIONS_NAVIGATION_STACK": { "enabled": true },
   "NAVIGATION_DROPDOWN": { "enabled": false, "experimental": true },
   "SIDEBAR_KEYBOARD_NAVIGATION": { "enabled": true },

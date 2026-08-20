@@ -6,6 +6,7 @@ import {
   hostnameOf,
   recordMetric,
   resolveColorScheme,
+  resolveNavMode,
 } from "../core/core.js";
 import { getElementById } from "../core/dom.js";
 import { loadFeatures, loadState, saveState } from "../core/storage.js";
@@ -86,6 +87,7 @@ const state = {
   ui: {},
   rules: [],
   features: FEATURES, // experimental-resolved copy, refreshed in refresh()
+  navMode: "off", // "off" | "compact" | "traditional" — resolved in refresh()
   allTabs: [],
   derived: new Map(), // per-tab {host, haystack, protected} — rebuilt each refresh
   visible: [], // rows the user can interact with (excludes collapsed groups)
@@ -126,9 +128,9 @@ async function refresh(animate = false, preloaded = null) {
   if (!featureEnabled(state.features, "SIDEBAR_KEYBOARD_NAVIGATION")) {
     state.cursor = -1;
   }
-  const historyNav = featureEnabled(state.features, "NAVIGATION_STACK") && (state.ui.historyNav ?? true);
-  getElementById("hist-back").hidden = !historyNav;
-  getElementById("hist-forward").hidden = !historyNav;
+  state.navMode = resolveNavMode(state.features, state.ui);
+  getElementById("hist-back").hidden = state.navMode === "off";
+  getElementById("hist-forward").hidden = state.navMode === "off";
   getElementById("hist-list-btn").hidden = !featureEnabled(state.features, "NAVIGATION_DROPDOWN");
   render(animate);
 }
@@ -765,6 +767,22 @@ const histForward = getElementById("hist-forward");
 const histListBtn = getElementById("hist-list-btn");
 const histPop = getElementById("history-pop");
 
+// navigation mode switched (options page, any window): close an open popup —
+// its rows and header belong to the previous mode. storage.onChanged already
+// broadcasts to every panel, so no extra message plumbing is needed.
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== "local" || !changes.ui) {
+    return;
+  }
+  const oldNav = /** @type {any} */ (changes.ui.oldValue)?.historyNav;
+  const newNav = /** @type {any} */ (changes.ui.newValue)?.historyNav;
+  if (oldNav !== newNav) {
+    try {
+      histPop.hidePopover?.();
+    } catch {} // already hidden
+  }
+});
+
 // caret flips while the popover is open; the toggle event fires on every close
 // path (button click, light dismiss, Esc), so the icon can't get stuck
 histPop.addEventListener("toggle", (event) => {
@@ -820,7 +838,8 @@ async function fillHistoryPopover() {
   head.className = "hist-head";
   const heading = document.createElement("span");
   heading.className = "muted";
-  heading.textContent = "Navigation History";
+  heading.textContent =
+    state.navMode === "compact" ? "Compact Navigation History" : "Navigation History";
   const close = document.createElement("button");
   close.className = "icon-btn";
   close.title = close.ariaLabel = "Close";

@@ -3,6 +3,7 @@
 // (node --test), so one setup per file is safe.
 import { readFileSync } from "node:fs";
 import { Window } from "happy-dom";
+import { applyExperimental } from "../../core/core.js";
 
 // capturing event: tests can fire() to invoke everything the code registered
 function makeEvent() {
@@ -17,12 +18,37 @@ function makeEvent() {
 // calls: flat log of stubbed chrome calls, e.g. ["tabs.reload 3", "storage.set {...}"]
 // tests fetch the real features.json (single source of truth for flags)
 const featuresJson = readFileSync(new URL("../../features.json", import.meta.url), "utf8");
+
+// The suite runs three times (see justfile):
+//  1. flags as shipped;
+//  2. TEST_EXPERIMENTAL=1 — experimental flags count as enabled, so
+//     experimental functionality is tested, not skipped until promotion
+//     (makeChrome injects ui.showExperimental so the code under test resolves
+//     the flags the same way the skip decisions do);
+//  3. TEST_ALL_DISABLED=1 — every flag off, proving disabled-state behavior
+//     (the fetch stub serves the disabled set to the code under test).
+export const TEST_EXPERIMENTAL = process.env.TEST_EXPERIMENTAL === "1";
+export const TEST_ALL_DISABLED = process.env.TEST_ALL_DISABLED === "1";
+export const RAW_FEATURES = (() => {
+  const parsed = JSON.parse(featuresJson);
+  if (TEST_ALL_DISABLED) {
+    for (const value of Object.values(parsed)) {
+      value.enabled = false;
+    }
+  }
+  return parsed;
+})();
+export const TEST_FEATURES = applyExperimental(RAW_FEATURES, TEST_EXPERIMENTAL);
+
 globalThis.fetch = async (url) => {
-  if (String(url).endsWith("features.json")) return { json: async () => JSON.parse(featuresJson) };
+  if (String(url).endsWith("features.json")) return { json: async () => structuredClone(RAW_FEATURES) };
   throw new Error(`unmocked fetch ${url}`);
 };
 
 export function makeChrome({ tabs = [], stored = {}, calls = [] }) {
+  if (TEST_EXPERIMENTAL) {
+    stored.ui = { ...(stored.ui ?? {}), showExperimental: true };
+  }
   let nextTabId = 1000;
   return {
     tabs: {

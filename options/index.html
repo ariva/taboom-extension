@@ -232,7 +232,13 @@
         <option value="dark">Dark</option>
       </select>
     </label>
-    <label id="historyNav-label" hidden><input type="checkbox" id="historyNav" /> Show tab-history navigation <span class="muted">(prev/next buttons in side panel, History in context menu)</span></label>
+    <label id="historyNav-label" hidden>Tab-history navigation
+      <select id="historyNav">
+        <option value="disabled">Disabled</option>
+        <option value="traditional">Traditional Navigation</option>
+        <option value="compact">Compact Navigation</option>
+      </select>
+      <span class="muted">(prev/next buttons in side panel, History in context menu)</span></label>
     <label id="showExperimental-label" hidden><input type="checkbox" id="showExperimental" /> Show experimental features</label>
     <p id="experimental-warning" hidden>⚠ Experimental features enabled — they may change over time and may not be fully polished.</p>
   </section>

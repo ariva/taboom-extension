@@ -5,6 +5,7 @@ import {
   featureEnabled,
   makeRule,
   resolveColorScheme,
+  resolveNavMode,
 } from "../core/core.js";
 import { getElementById } from "../core/dom.js";
 import { loadFeatures, loadState, saveState } from "../core/storage.js";
@@ -66,12 +67,26 @@ async function render() {
   getElementById("fontSize").value = String(state.ui.fontSize ?? 1);
   getElementById("density").value = state.ui.density ?? "comfortable";
   getElementById("theme").value = state.ui.theme ?? "auto";
-  getElementById("historyNav").checked = state.ui.historyNav ?? true;
   getElementById("showExperimental").checked = state.ui.showExperimental ?? false;
 
   const features = applyExperimental(FEATURES, state.ui.showExperimental ?? false);
   getElementById("historyNav-label").hidden =
     !featureEnabled(features, "OPTIONS_NAVIGATION_STACK");
+  // The dropdown shows the EFFECTIVE mode, not the raw stored value: a stored
+  // mode whose flag got disabled falls back (traditional ↔ compact, disabled
+  // when neither is available). The stored preference itself is NOT rewritten,
+  // so re-enabling the flag restores the user's original choice.
+  const mode = resolveNavMode(features, state.ui);
+  getElementById("historyNav").value = mode === "off" ? "disabled" : mode;
+  // modes whose feature flag is off aren't offered
+  for (const [value, flag] of [
+    ["traditional", "NAVIGATION_TRADITIONAL_STACK"],
+    ["compact", "NAVIGATION_COMPACT_STACK"],
+  ]) {
+    /** @type {HTMLElement} */ (
+      document.querySelector(`#historyNav option[value="${value}"]`)
+    ).hidden = !featureEnabled(features, flag);
+  }
   const allowExperimental = featureEnabled(features, "ALLOW_EXPERIMENTAL");
   getElementById("showExperimental-label").hidden = !allowExperimental;
   getElementById("experimental-warning").hidden =
@@ -128,7 +143,7 @@ const UI_FIELDS = [
   { id: "fontSize", prop: "value", parse: clampFontSize, apply: (v, input) => { input.value = String(v); } },
   { id: "density", prop: "value" },
   { id: "theme", prop: "value", apply: (v) => applyTheme(v) },
-  { id: "historyNav", prop: "checked" },
+  { id: "historyNav", prop: "value" },
   { id: "showExperimental", prop: "checked" },
 ];
 for (const { id, prop, parse, apply } of UI_FIELDS) {

@@ -1,10 +1,8 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { makeChrome, loadPage, tick } from "./helpers/ui.js";
+import { makeChrome, loadPage, tick, TEST_FEATURES } from "./helpers/ui.js";
 
-const FEATURES = JSON.parse(readFileSync(new URL("../features.json", import.meta.url), "utf8"));
-const KEY_NAV_ON = FEATURES.SIDEBAR_KEYBOARD_NAVIGATION?.enabled === true;
+const KEY_NAV_ON = TEST_FEATURES.SIDEBAR_KEYBOARD_NAVIGATION?.enabled === true;
 const keyNavSkip = { skip: !KEY_NAV_ON && "SIDEBAR_KEYBOARD_NAVIGATION disabled in features.json" };
 
 const NOW = Date.now();

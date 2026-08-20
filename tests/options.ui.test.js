@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { makeChrome, loadPage, tick } from "./helpers/ui.js";
+import { makeChrome, loadPage, tick, RAW_FEATURES, TEST_EXPERIMENTAL, TEST_FEATURES } from "./helpers/ui.js";
 
 const calls = [];
 const stored = {
@@ -84,20 +84,31 @@ test("UI - Options - External rule change re-renders the protection list", async
   assert.match(document.querySelector("#rules li").textContent, /elsewhere\.example\.com/);
 });
 
-test("UI - Options - History-nav toggle persists ui.historyNav", async () => {
-  const box = document.getElementById("historyNav");
-  assert.equal(box.checked, true, "defaults on");
-  box.checked = false;
-  box.dispatchEvent(new window.Event("change", { bubbles: true }));
+test("UI - Options - History-nav dropdown persists the mode", async () => {
+  const { resolveNavMode, applyExperimental } = await import("../core/core.js");
+  const select = document.getElementById("historyNav");
+  // adaptive: fresh install shows whatever the flags resolve the default to,
+  // with experimental applied exactly the way the app does (stored ui)
+  const effective = applyExperimental(RAW_FEATURES, stored.ui?.showExperimental ?? false);
+  const expected = resolveNavMode(effective, stored.ui);
+  assert.equal(select.value, expected === "off" ? "disabled" : expected, "shows resolved default");
+  select.value = "compact";
+  select.dispatchEvent(new window.Event("change", { bubbles: true }));
   await tick();
-  assert.ok(calls.some((c) => c.startsWith("storage.set") && c.includes('"historyNav":false')));
+  await tick();
+  assert.ok(calls.some((c) => c.startsWith("storage.set") && c.includes('"historyNav":"compact"')));
+  select.value = "traditional";
+  select.dispatchEvent(new window.Event("change", { bubbles: true }));
+  await tick();
+  await tick();
 });
 
 test("UI - Options - Experimental toggle visible (ALLOW_EXPERIMENTAL) and persists ui.showExperimental", async () => {
   await tick();
-  assert.equal(document.getElementById("showExperimental-label").hidden, false, "visible when allowed");
+  const allowOn = TEST_FEATURES.ALLOW_EXPERIMENTAL?.enabled === true;
+  assert.equal(document.getElementById("showExperimental-label").hidden, !allowOn, "visible iff allowed");
   const box = document.getElementById("showExperimental");
-  assert.equal(box.checked, false, "defaults off");
+  assert.equal(box.checked, TEST_EXPERIMENTAL, "reflects the scenario's injected default");
   box.checked = true;
   box.dispatchEvent(new window.Event("change", { bubbles: true }));
   await tick();
@@ -105,16 +116,12 @@ test("UI - Options - Experimental toggle visible (ALLOW_EXPERIMENTAL) and persis
 });
 
 test("UI - Options - History-nav checkbox visibility follows OPTIONS_NAVIGATION_STACK", async () => {
-  const { readFileSync } = await import("node:fs");
-  const features = JSON.parse(readFileSync(new URL("../features.json", import.meta.url), "utf8"));
-  const flagOn = features.OPTIONS_NAVIGATION_STACK?.enabled === true;
+  const flagOn = TEST_FEATURES.OPTIONS_NAVIGATION_STACK?.enabled === true;
   assert.equal(document.getElementById("historyNav-label").hidden, !flagOn);
 });
 
 test("UI - Options - Performance section visibility follows SHOW_PERFORMANCE_INFO", async () => {
-  const { readFileSync } = await import("node:fs");
-  const features = JSON.parse(readFileSync(new URL("../features.json", import.meta.url), "utf8"));
-  const flagOn = features.SHOW_PERFORMANCE_INFO?.enabled === true;
+  const flagOn = TEST_FEATURES.SHOW_PERFORMANCE_INFO?.enabled === true;
   assert.equal(document.getElementById("perf-section").hidden, !flagOn);
 });
 
@@ -164,4 +171,24 @@ test("UI - Options - Clear protected sites empties rules but keeps settings", as
   await tick();
   assert.deepEqual(stored.protectionRules, [], "all rules removed");
   assert.equal(stored.settings.inactivityMinutes, 45, "settings untouched");
+});
+
+test("UI - Options - Dropdown shows the effective mode when the stored one is flag-disabled", async () => {
+  const { resolveNavMode, applyExperimental } = await import("../core/core.js");
+  stored.ui = { ...stored.ui, historyNav: "compact" };
+  await chrome.storage.onChanged.fire({ ui: {} }, "local"); // re-render
+  await tick();
+  await tick();
+  // adaptive: compact flag off → traditional; both off → disabled; resolved
+  // with experimental applied the way the app does (stored ui)
+  const mode = resolveNavMode(
+    applyExperimental(RAW_FEATURES, stored.ui?.showExperimental ?? false),
+    stored.ui,
+  );
+  assert.equal(
+    document.getElementById("historyNav").value,
+    mode === "off" ? "disabled" : mode,
+    "dropdown shows the resolver's effective mode, stored value not rewritten",
+  );
+  assert.equal(stored.ui.historyNav, "compact", "stored preference untouched");
 });

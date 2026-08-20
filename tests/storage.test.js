@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { makeChrome } from "./helpers/ui.js";
+import { makeChrome, TEST_EXPERIMENTAL } from "./helpers/ui.js";
 import { DEFAULTS } from "../core/core.js";
 
 test("Core - Storage - LoadState merges defaults with partial stored state", async () => {
@@ -25,7 +25,8 @@ test("Core - Storage - LoadState on empty storage returns full defaults; saveSta
 
   const state = await loadState();
   assert.deepEqual(state.settings, DEFAULTS.settings);
-  assert.deepEqual(state.ui, DEFAULTS.ui);
+  // scenario 2 injects ui.showExperimental into stored state (helpers/ui.js)
+  assert.deepEqual(state.ui, { ...DEFAULTS.ui, ...(TEST_EXPERIMENTAL ? { showExperimental: true } : {}) });
 
   await saveState({ ui: { ...state.ui, fontSize: 1.3 } });
   assert.equal(stored.ui.fontSize, 1.3);

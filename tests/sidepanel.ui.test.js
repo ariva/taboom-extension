@@ -1,10 +1,8 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { makeChrome, loadPage, tick } from "./helpers/ui.js";
+import { makeChrome, loadPage, tick, TEST_FEATURES } from "./helpers/ui.js";
 
-const FEATURES = JSON.parse(readFileSync(new URL("../features.json", import.meta.url), "utf8"));
-const AUTO_ALL_ON = FEATURES.SEARCH_AUTO_SELECT_ALL?.enabled === true;
+const AUTO_ALL_ON = TEST_FEATURES.SEARCH_AUTO_SELECT_ALL?.enabled === true;
 
 const NOW = Date.now();
 const tabs = [
@@ -352,6 +350,26 @@ test("UI - Sidepanel - Open history popover live-refreshes when the trail change
   await tick();
   assert.equal(pop.querySelectorAll(".hist-row").length, 0, "closed popover left alone");
   delete pop.matches;
+});
+
+test("UI - Sidepanel - Navigation mode switch closes an open history popup", async () => {
+  const pop = document.getElementById("history-pop");
+  const hides = [];
+  pop.hidePopover = () => hides.push(1);
+  await chrome.storage.onChanged.fire(
+    { ui: { oldValue: { historyNav: "traditional" }, newValue: { historyNav: "compact" } } },
+    "local",
+  );
+  await tick();
+  assert.equal(hides.length, 1, "mode change hides the popup");
+
+  await chrome.storage.onChanged.fire(
+    { ui: { oldValue: { historyNav: "compact", theme: "dark" }, newValue: { historyNav: "compact", theme: "light" } } },
+    "local",
+  );
+  await tick();
+  assert.equal(hides.length, 1, "unrelated ui change leaves it open");
+  delete pop.hidePopover;
 });
 
 test("UI - Sidepanel - Escape with open history popover leaves the search alone", () => {
