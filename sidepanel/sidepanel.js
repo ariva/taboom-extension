@@ -947,7 +947,7 @@ chrome.tabs.onUpdated.addListener((_tabId, changeInfo) => {
 // our own perf flush + history bookkeeping write storage constantly — don't
 // let those echo back into renders (history buttons have their own listener)
 chrome.storage.onChanged.addListener((changes) => {
-  const ignored = ["perfMetrics", "perfSnapshots", "tabHistory"];
+  const ignored = ["perfMetrics", "perfSnapshots", "tabHistory", "updateAvailable", "dismissedUpdate"];
   const relevant = Object.keys(changes).filter((key) => !ignored.includes(key));
   if (relevant.length === 0) {
     return;
@@ -982,11 +982,29 @@ initialStatePromise.then((persisted) => {
 
 // reload() applies the deferred update (an open panel blocks auto-install)
 const updateBanner = getElementById("update-banner");
-updateBanner.addEventListener("click", () => chrome.runtime.reload());
-async function syncUpdateBanner() {
+const updateRestart = getElementById("update-restart");
+// reload ONLY from the restart button — a listener on the banner container
+// Deferred out of the click stack: runtime.reload() tears this very document
+// down, and doing that mid-handler is a known crashy path (esp. unpacked).
+updateRestart.addEventListener("click", () => setTimeout(() => chrome.runtime.reload(), 0));
+
+// dismiss = remember THIS version; the nudge returns only for a newer update
+getElementById("update-dismiss").addEventListener("click", async () => {
   const { updateAvailable } = await chrome.storage.local.get("updateAvailable");
-  if (updateAvailable) updateBanner.textContent = `Update ${updateAvailable} ready — restart Taboom`;
-  updateBanner.hidden = !updateAvailable;
+  await chrome.storage.local.set({ dismissedUpdate: updateAvailable });
+  // the storage echo re-runs syncUpdateBanner in every open panel
+});
+
+async function syncUpdateBanner() {
+  const { updateAvailable, dismissedUpdate } = /** @type {Record<string, any>} */ (
+    await chrome.storage.local.get(["updateAvailable", "dismissedUpdate"])
+  );
+  const show = Boolean(updateAvailable) && updateAvailable !== dismissedUpdate;
+  if (show) {
+    updateRestart.textContent = `Update ${updateAvailable} ready — click to update or restart Taboom`;
+    updateRestart.title = "Click to restart Taboom and apply the update";
+  }
+  updateBanner.hidden = !show;
 }
 syncUpdateBanner();
 chrome.storage.onChanged.addListener(syncUpdateBanner);

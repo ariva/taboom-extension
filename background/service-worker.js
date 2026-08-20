@@ -49,7 +49,7 @@ async function init() {
   await applyAutoDiscardable(state.protectionRules);
   await createContextMenus();
   await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
-  await chrome.storage.local.remove("updateAvailable"); // running the new version now
+  await chrome.storage.local.remove(["updateAvailable", "dismissedUpdate"]); // running the new version now
   // history persists across extension reloads — just prune tabs that vanished meanwhile
   const openIds = new Set((await chrome.tabs.query({})).map((tab) => tab.id));
   await withHistory((hist) => filterHistory(hist, (id) => openIds.has(id)));

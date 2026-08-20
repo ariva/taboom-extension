@@ -366,14 +366,24 @@ footer button:disabled:hover { background: none; }
 /* pending-update notice: panel blocks auto-install, click restarts to apply */
 #update-banner {
   margin-top: 6px;
-  padding: 6px 10px;
-  width: 100%;
-  border: none;
+  display: flex;
+  align-items: stretch;
   border-radius: var(--radius-m);
   background: var(--accent);
   color: var(--accent-fg);
-  cursor: pointer;
+  overflow: hidden;
 }
+#update-banner button {
+  border: none;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  padding: 6px 10px;
+}
+#update-restart { flex: 1; text-align: left; }
+#update-dismiss { flex: none; display: inline-flex; align-items: center; }
+#update-dismiss svg { width: 12px; height: 12px; }
+#update-banner button:hover { background: rgb(0 0 0 / 0.15); }
 
 /* history dropdown button: caret-down-over-list normally, caret-up while open */
 #hist-list-btn .caret-open { display: none; }

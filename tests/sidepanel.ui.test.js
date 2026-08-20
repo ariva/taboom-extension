@@ -477,3 +477,52 @@ test("UI - Sidepanel - Scope and sort changes reset scroll and forget saved posi
   select("scope", "all-windows");
   assert.equal(list.scrollTop, 0, "switching back also resets");
 });
+
+test("UI - Sidepanel - Update nudge: dismissible, silent for the same version, back for a newer one", async () => {
+  const banner = document.getElementById("update-banner");
+  await chrome.storage.local.set({ updateAvailable: "9.9.9" });
+  await chrome.storage.onChanged.fire({ updateAvailable: {} }, "local");
+  await tick();
+  assert.equal(banner.hidden, false, "nudge shows");
+  assert.match(
+    document.getElementById("update-restart").textContent,
+    /Update 9\.9\.9 ready — click to update or restart Taboom/,
+    "text tells the user to click",
+  );
+  assert.match(
+    document.getElementById("update-restart").title,
+    /restart Taboom and apply the update/,
+    "restart tooltip explains the click",
+  );
+  assert.match(
+    document.getElementById("update-dismiss").title,
+    /Closes this notice/,
+    "dismiss tooltip explains the close",
+  );
+
+  calls.length = 0;
+  document.getElementById("update-dismiss").click();
+  await tick();
+  assert.ok(!calls.includes("runtime.reload"), "dismiss must not restart the extension");
+  await chrome.storage.onChanged.fire({ dismissedUpdate: {} }, "local"); // storage echo
+  await tick();
+  assert.equal(banner.hidden, true, "dismiss hides the nudge");
+  const { dismissedUpdate } = await chrome.storage.local.get("dismissedUpdate");
+  assert.equal(dismissedUpdate, "9.9.9", "dismissed version remembered");
+
+  await chrome.storage.onChanged.fire({ updateAvailable: {} }, "local"); // same version again
+  await tick();
+  assert.equal(banner.hidden, true, "same version never re-nudges");
+
+  await chrome.storage.local.set({ updateAvailable: "9.9.10" });
+  await chrome.storage.onChanged.fire({ updateAvailable: {} }, "local");
+  await tick();
+  assert.equal(banner.hidden, false, "a newer version nudges again");
+
+  // clicking the banner text is what applies the update
+  calls.length = 0;
+  document.getElementById("update-restart").click();
+  await tick();
+  assert.ok(calls.includes("runtime.reload"), "banner click restarts the extension to apply the update");
+  await chrome.storage.local.remove(["updateAvailable", "dismissedUpdate"]);
+});
