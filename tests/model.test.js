@@ -7,8 +7,9 @@ import {
   countsByFilter,
   deriveTabs,
   emptyMessage,
-  groupByWindow,
   groupHeader,
+  groupTabs,
+  titleGroupLabel,
   rowViewModel,
   selectVisible,
   windowColor,
@@ -87,11 +88,34 @@ test("Model - GroupHeader formats current and other windows, collapse indicator"
   assert.equal(groupHeader(2, { ...ctx, total: 1 }), "Window #2 - 1/1");
 });
 
-test("Model - GroupByWindow keeps order and splits runs", () => {
+test("Model - GroupTabs keeps order and splits runs by any key", () => {
   const tabs = [tab({ id: 1 }), tab({ id: 2 }), tab({ id: 3, windowId: 2 }), tab({ id: 4, windowId: 2 })];
-  const groups = groupByWindow(tabs);
-  assert.deepEqual(groups.map(([id, list]) => [id, list.map((t) => t.id)]), [[1, [1, 2]], [2, [3, 4]]]);
-  assert.deepEqual(groupByWindow([]), []);
+  const byWindow = groupTabs(tabs, (t) => t.windowId);
+  assert.deepEqual(byWindow.map(([id, list]) => [id, list.map((t) => t.id)]), [[1, [1, 2]], [2, [3, 4]]]);
+  assert.deepEqual(groupTabs([], (t) => t.windowId), []);
+
+  const titled = [tab({ id: 1, title: "A" }), tab({ id: 2, title: "A" }), tab({ id: 3, title: "B" })];
+  assert.deepEqual(
+    groupTabs(titled, (t) => t.title ?? "").map(([key, list]) => [key, list.map((t) => t.id)]),
+    [["A", [1, 2]], ["B", [3]]],
+    "same key fn contract works for titles",
+  );
+});
+
+test("Model - Group-title sort: biggest groups first, ties alphabetical, recent-first inside", () => {
+  const tabs = [
+    tab({ id: 1, title: "Beta", lastAccessed: NOW - 2 * HOUR }),
+    tab({ id: 2, title: "Alpha", lastAccessed: NOW - 3 * HOUR }),
+    tab({ id: 3, title: "Beta", lastAccessed: NOW - 1 * HOUR }),
+    tab({ id: 4, title: "Zulu", lastAccessed: NOW - 1 * HOUR }),
+  ];
+  assert.deepEqual(
+    selectVisible(tabs, view(tabs, { sort: "group-title" })).map((t) => t.id),
+    [3, 1, 2, 4],
+    "Beta pair (size 2) first recent-first, then singles Alpha/Zulu alphabetical",
+  );
+  assert.equal(titleGroupLabel("Beta", { count: 2, total: 3 }), "Beta - 2/3");
+  assert.equal(titleGroupLabel("", { count: 1, total: 1 }), "(untitled) - 1/1");
 });
 
 test("Model - EmptyMessage picks the right hint", () => {

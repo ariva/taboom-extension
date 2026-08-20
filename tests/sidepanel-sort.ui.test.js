@@ -3,6 +3,7 @@ import { test } from "node:test";
 import { makeChrome, loadPage, tick, TEST_FEATURES } from "./helpers/ui.js";
 
 const GROUP_SELECT_ON = TEST_FEATURES.WINDOW_GROUP_SELECT?.enabled === true;
+const GROUP_TITLE_ON = TEST_FEATURES.GROUP_BY_TITLE?.enabled === true;
 
 const NOW = Date.now();
 const HOUR = 3_600_000;
@@ -176,3 +177,40 @@ test("UI - Sidepanel Sort - Window headers carry the window color dot", () => {
   assert.ok(dots[0].classList.contains("current"), "current window uses the accent dot");
   assert.ok(dots[1].style.background, "other window gets its palette color");
 });
+
+test(
+  "UI - Sidepanel Sort - Group by title: alphabetical groups, collapse + fold-all work",
+  { skip: !GROUP_TITLE_ON && "GROUP_BY_TITLE disabled in features.json" },
+  () => {
+  setSort("group-title");
+  const headers = [...document.querySelectorAll(".group-header .group-label")].map((el) => el.textContent);
+  assert.deepEqual(
+    headers,
+    ["Alpha - 1/1", "Bravo - 1/1", "Charlie - 1/1", "Delta - 1/1"],
+    "one group per title, alphabetical, visible/total counts",
+  );
+  assert.equal(document.getElementById("collapse-all").hidden, false, "fold-all available");
+  assert.equal(document.querySelectorAll(".group-header .win-dot").length, 0, "no window dots in title grouping");
+
+  document.querySelectorAll(".group-header")[0].click(); // collapse "Alpha"
+  assert.equal(document.querySelectorAll(".row").length, 3, "collapsed group's row hidden");
+  assert.match(document.querySelectorAll(".group-header .fold-arrow")[0].textContent, /▸/);
+  document.querySelectorAll(".group-header")[0].click(); // expand again
+  assert.equal(document.querySelectorAll(".row").length, 4);
+  setSort("window");
+  },
+);
+
+test(
+  "UI - Sidepanel Sort - GROUP_BY_TITLE off: option hidden, stored pref falls back to window",
+  { skip: GROUP_TITLE_ON && "GROUP_BY_TITLE enabled in features.json" },
+  async () => {
+    const option = document.querySelector('#sort option[value="group-title"]');
+    assert.equal(option.hidden, true, "dropdown option hidden");
+    setSort("group-title"); // simulates a stored preference from when the flag was on
+    await tick();
+    const headers = [...document.querySelectorAll(".group-header .group-label")].map((el) => el.textContent);
+    assert.ok(headers.every((h) => h.startsWith("Window")), "falls back to window grouping");
+    setSort("window");
+  },
+);

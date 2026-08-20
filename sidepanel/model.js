@@ -45,6 +45,25 @@ export function selectVisible(tabs, view) {
     case "oldest": result.sort((a, b) => last(a) - last(b)); break;
     case "title": result.sort((a, b) => (a.title ?? "").localeCompare(b.title ?? "")); break;
     case "domain": result.sort((a, b) => derived.get(a.id).host.localeCompare(derived.get(b.id).host)); break;
+    // same-title tabs grouped together (duplicates side by side): biggest
+    // groups first, equal sizes alphabetical, recent-first within a group
+    case "group-title": {
+      const sizes = new Map();
+      for (const tab of result) {
+        const key = tab.title ?? "";
+        sizes.set(key, (sizes.get(key) ?? 0) + 1);
+      }
+      result.sort((a, b) => {
+        const titleA = a.title ?? "";
+        const titleB = b.title ?? "";
+        return (
+          sizes.get(titleB) - sizes.get(titleA) ||
+          titleA.localeCompare(titleB) ||
+          last(b) - last(a)
+        );
+      });
+      break;
+    }
     // current window first, then other windows by id; recent-first within each
     case "window": {
       const rank = (tab) => (tab.windowId === currentWindowId ? 0 : tab.windowId);
@@ -115,15 +134,21 @@ export function groupHeader(windowId, { count, total, currentWindowId, indexes }
   return `${label} #${indexes.get(windowId)} - ${count}/${total}`;
 }
 
-// consecutive same-window runs → ordered [windowId, tabs[]] pairs
-export function groupByWindow(tabs) {
+// Generic grouping: consecutive same-key runs → ordered [key, tabs[]] pairs.
+// The list must already be sorted by the key (the group-* sorts guarantee it).
+export function groupTabs(tabs, key) {
   const groups = [];
   for (const tab of tabs) {
     const last = groups[groups.length - 1];
-    if (last && last[0] === tab.windowId) last[1].push(tab);
-    else groups.push([tab.windowId, [tab]]);
+    if (last && last[0] === key(tab)) last[1].push(tab);
+    else groups.push([key(tab), [tab]]);
   }
   return groups;
+}
+
+// header label for title groups; window groups use groupHeader() above
+export function titleGroupLabel(title, { count, total }) {
+  return `${title || "(untitled)"} - ${count}/${total}`;
 }
 
 // everything renderRow needs to build the DOM, as plain data

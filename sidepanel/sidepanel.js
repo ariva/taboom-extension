@@ -16,8 +16,9 @@ import {
   deriveTabs,
   emptyMessage,
   searchCandidates,
-  groupByWindow,
   groupHeader,
+  groupTabs,
+  titleGroupLabel,
   rowViewModel,
   selectVisible,
   windowMaps,
@@ -92,7 +93,7 @@ const state = {
   derived: new Map(), // per-tab {host, haystack, protected} — rebuilt each refresh
   visible: [], // rows the user can interact with (excludes collapsed groups)
   fullVisible: [], // before collapsing — header counts + empty-state check
-  collapsedWindows: new Set(), // windowIds collapsed in group-by-window view (session only)
+  collapsedGroups: new Set(), // group keys collapsed in a grouped sort (session only)
   selected: new Set(),
   cursor: -1,
   currentWindowId: null,
@@ -129,6 +130,11 @@ async function refresh(animate = false, preloaded = null) {
     state.cursor = -1;
   }
   state.navMode = resolveNavMode(state.features, state.ui);
+  // Group by title is flag-gated: hide the option when off, and show the
+  // effective sort if a stored group-title preference can't apply
+  /** @type {HTMLElement} */ (sortSelect.querySelector('option[value="group-title"]')).hidden =
+    !featureEnabled(state.features, "GROUP_BY_TITLE");
+  sortSelect.value = effectiveSort();
   getElementById("hist-back").hidden = state.navMode === "off";
   getElementById("hist-forward").hidden = state.navMode === "off";
   getElementById("hist-list-btn").hidden = !featureEnabled(state.features, "NAVIGATION_DROPDOWN");
@@ -145,15 +151,49 @@ const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
 // (1000-tab users) skip animation entirely — snappy beats pretty there.
 const VT_MAX_ROWS = 100;
 
+// Grouping registry: a grouped sort = a key function + a header-label builder.
+// Add future groupings (domain, ...) here — collapse, fold-all, and the
+// group-select checkbox come for free.
+const GROUPINGS = {
+  window: {
+    noun: "window",
+    key: (tab) => tab.windowId,
+    label: (windowId, count, total, maps) =>
+      groupHeader(windowId, {
+        count,
+        total,
+        currentWindowId: state.currentWindowId,
+        indexes: maps.indexes,
+      }),
+  },
+  "group-title": {
+    key: (tab) => tab.title ?? "",
+    label: (title, count, total) => titleGroupLabel(title, { count, total }),
+    noun: "group",
+  },
+};
+
+// GROUP_BY_TITLE off but persisted/selected: fall back to the window grouping
+// for display — the stored preference is not rewritten
+function effectiveSort() {
+  if (state.sort === "group-title" && !featureEnabled(state.features, "GROUP_BY_TITLE")) {
+    return "window";
+  }
+  return state.sort;
+}
+
 // an active search auto-expands: matches must never hide under a collapsed group
 function effectiveCollapsed() {
-  return state.sort === "window" && !state.query ? state.collapsedWindows : new Set();
+  return GROUPINGS[effectiveSort()] && !state.query ? state.collapsedGroups : new Set();
 }
 
 function render(animate = true) {
-  state.fullVisible = selectVisible(state.allTabs, { ...state, now: Date.now() });
+  state.fullVisible = selectVisible(state.allTabs, { ...state, sort: effectiveSort(), now: Date.now() });
   const collapsed = effectiveCollapsed();
-  state.visible = state.fullVisible.filter((tab) => !collapsed.has(tab.windowId));
+  const grouping = GROUPINGS[effectiveSort()];
+  state.visible = grouping
+    ? state.fullVisible.filter((tab) => !collapsed.has(grouping.key(tab)))
+    : state.fullVisible;
   const heavy = Math.max(state.visible.length, listEl.childElementCount) > VT_MAX_ROWS;
   if (animate && !heavy && document.startViewTransition && !reducedMotion.matches) {
     document.startViewTransition(renderNow);
@@ -203,31 +243,37 @@ function renderNowImpl() {
 
   let foldableGroups = [];
   let anythingToFold = false;
-  if (state.sort === "window") {
+  const sort = effectiveSort();
+  const grouping = GROUPINGS[sort];
+  if (grouping) {
     const collapsed = effectiveCollapsed();
-    const groups = groupByWindow(state.fullVisible);
-    const collapsible = groups.length > 1; // lone window: nothing to fold away
+    const groups = groupTabs(state.fullVisible, grouping.key);
+    const collapsible = groups.length > 1; // lone group: nothing to fold away
     anythingToFold = collapsible;
     if (collapsible && !state.query) foldableGroups = groups;
-    // per-window totals in one pass (visible count = the group's own length)
+    // per-group totals in one pass (visible count = the group's own length)
     const totals = new Map();
     for (const tab of state.allTabs) {
-      totals.set(tab.windowId, (totals.get(tab.windowId) ?? 0) + 1);
+      const key = grouping.key(tab);
+      totals.set(key, (totals.get(key) ?? 0) + 1);
     }
     let index = 0;
-    for (const [windowId, groupTabs] of groups) {
-      const isCollapsed = collapsible && collapsed.has(windowId);
-      frag.append(renderGroupHeader(windowId, {
+    for (const [groupKey, members] of groups) {
+      const isCollapsed = collapsible && collapsed.has(groupKey);
+      frag.append(renderGroupHeader(groupKey, {
         isCollapsed,
-        indexes: maps.indexes,
         collapsible,
-        count: groupTabs.length,
-        total: totals.get(windowId) ?? 0,
-        tabs: groupTabs,
-        dotColors: maps.dotColors,
+        labelText: grouping.label(groupKey, members.length, totals.get(groupKey) ?? 0, maps),
+        // window color dot only makes sense for the window grouping
+        dotColor:
+          sort === "window" && maps.dotColors.size > 0
+            ? (maps.dotColors.get(groupKey) ?? null)
+            : null,
+        tabs: members,
+        noun: grouping.noun,
       }));
       if (isCollapsed) continue;
-      for (const tab of groupTabs) frag.append(renderRow(tab, rowVm(tab, index++)));
+      for (const tab of members) frag.append(renderRow(tab, rowVm(tab, index++)));
     }
   } else {
     state.visible.forEach((tab, index) => frag.append(renderRow(tab, rowVm(tab, index))));
@@ -283,11 +329,11 @@ function syncRowHeight() {
 // toolbar fold/unfold-all toggle; visible in Group by window with 2+ window
 // groups (hidden for a lone window), disabled while a search is active
 function renderCollapseAllButton(groups, anythingToFold) {
-  collapseAllBtn.hidden = state.sort !== "window" || !anythingToFold;
+  collapseAllBtn.hidden = !GROUPINGS[effectiveSort()] || !anythingToFold;
   if (collapseAllBtn.hidden) return;
   collapseAllBtn.disabled = groups.length === 0;
   const allCollapsed =
-    groups.length > 0 && groups.every(([windowId]) => state.collapsedWindows.has(windowId));
+    groups.length > 0 && groups.every(([windowId]) => state.collapsedGroups.has(windowId));
   collapseAllBtn.innerHTML = allCollapsed ? FOLD_ICONS.unfold : FOLD_ICONS.fold;
   collapseAllBtn.title = collapseAllBtn.ariaLabel = allCollapsed ? "Expand all" : "Collapse all";
   collapseAllBtn.dataset.groups = JSON.stringify(groups.map(([windowId]) => windowId));
@@ -295,21 +341,21 @@ function renderCollapseAllButton(groups, anythingToFold) {
 
 collapseAllBtn.addEventListener("click", () => {
   const windowIds = JSON.parse(collapseAllBtn.dataset.groups ?? "[]");
-  const allCollapsed = windowIds.every((id) => state.collapsedWindows.has(id));
+  const allCollapsed = windowIds.every((id) => state.collapsedGroups.has(id));
   if (allCollapsed) {
-    state.collapsedWindows.clear();
+    state.collapsedGroups.clear();
   } else {
-    for (const id of windowIds) state.collapsedWindows.add(id);
+    for (const id of windowIds) state.collapsedGroups.add(id);
   }
   render();
 });
 
-// clickable group header: toggles collapse of that window's rows
-function renderGroupHeader(windowId, { isCollapsed, indexes, collapsible, count, total, tabs, dotColors }) {
+// clickable group header (any grouping): toggles collapse of the group's rows
+function renderGroupHeader(groupKey, { isCollapsed, collapsible, labelText, dotColor, tabs, noun }) {
   const header = document.createElement("div");
   header.className = "group-header";
-  // WINDOW_GROUP_SELECT: checkbox left of the window label selects/unselects
-  // every tab of this window that the current filter/search shows
+  // WINDOW_GROUP_SELECT: checkbox left of the label selects/unselects every
+  // tab of this group that the current filter/search shows
   if (featureEnabled(state.features, "WINDOW_GROUP_SELECT")) {
     const box = document.createElement("input");
     box.type = "checkbox";
@@ -317,7 +363,7 @@ function renderGroupHeader(windowId, { isCollapsed, indexes, collapsible, count,
     const selectedCount = tabs.filter((tab) => state.selected.has(tab.id)).length;
     box.checked = tabs.length > 0 && selectedCount === tabs.length;
     box.indeterminate = selectedCount > 0 && selectedCount < tabs.length;
-    box.title = box.ariaLabel = box.checked ? "Unselect window tabs" : "Select window tabs";
+    box.title = box.ariaLabel = `${box.checked ? "Unselect" : "Select"} ${noun} tabs`;
     box.addEventListener("click", (event) => {
       event.stopPropagation(); // header click collapses the group
       if (box.checked) {
@@ -333,13 +379,13 @@ function renderGroupHeader(windowId, { isCollapsed, indexes, collapsible, count,
     });
     header.append(box);
   }
-  // same per-window color dot the rows carry (accent for the current window)
-  if (dotColors.size > 0) {
+  // window grouping: same per-window color dot the rows carry
+  // (dotColor null = no dot; "" = current window accent)
+  if (dotColor !== null) {
     const dot = document.createElement("span");
     dot.className = "win-dot";
-    const color = dotColors.get(windowId);
-    if (color) {
-      dot.style.background = color;
+    if (dotColor) {
+      dot.style.background = dotColor;
     } else {
       dot.classList.add("current");
     }
@@ -347,12 +393,7 @@ function renderGroupHeader(windowId, { isCollapsed, indexes, collapsible, count,
   }
   const label = document.createElement("span");
   label.className = "group-label";
-  label.textContent = groupHeader(windowId, {
-    count,
-    total,
-    currentWindowId: state.currentWindowId,
-    indexes,
-  });
+  label.textContent = labelText;
   header.append(label);
   if (!collapsible) {
     header.classList.add("static");
@@ -369,9 +410,9 @@ function renderGroupHeader(windowId, { isCollapsed, indexes, collapsible, count,
   header.title = isCollapsed ? "Expand" : "Collapse";
   const toggle = () => {
     if (state.query) return; // search shows everything; collapse resumes after
-    state.collapsedWindows.has(windowId)
-      ? state.collapsedWindows.delete(windowId)
-      : state.collapsedWindows.add(windowId);
+    state.collapsedGroups.has(groupKey)
+      ? state.collapsedGroups.delete(groupKey)
+      : state.collapsedGroups.add(groupKey);
     render();
   };
   header.addEventListener("click", toggle);
@@ -654,6 +695,7 @@ scopeSelect.addEventListener("change", () => {
 
 sortSelect.addEventListener("change", () => {
   state.sort = sortSelect.value;
+  state.collapsedGroups.clear(); // keys from another grouping are meaningless
   resetScrollPositions();
   persistUiPrefs();
   render(!state.query);
