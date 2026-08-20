@@ -352,6 +352,23 @@ test("UI - Sidepanel - Open history popover live-refreshes when the trail change
   delete pop.matches;
 });
 
+test("UI - Sidepanel - Focus transitions close the popup and announce themselves", async () => {
+  const pop = document.getElementById("history-pop");
+  const hides = [];
+  pop.hidePopover = () => hides.push(1);
+  calls.length = 0;
+  window.dispatchEvent(new window.Event("blur"));
+  await tick();
+  assert.equal(hides.length, 1, "popup closed on focus loss");
+  assert.ok(calls.includes("sendMessage sidebar-no-focus"), "focus loss announced");
+
+  window.dispatchEvent(new window.Event("focus"));
+  await tick();
+  assert.ok(calls.includes("sendMessage sidebar-focused"), "focus gain announced");
+  assert.equal(hides.length, 1, "gaining focus closes nothing");
+  delete pop.hidePopover;
+});
+
 test("UI - Sidepanel - Navigation mode switch closes an open history popup", async () => {
   const pop = document.getElementById("history-pop");
   const hides = [];

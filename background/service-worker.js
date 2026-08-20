@@ -187,6 +187,9 @@ async function handleMessage(message) {
       return loadHistory().then((h) => historyJump(h.cursor + 1));
     case "history-jump":
       return historyJump(message.index);
+    case "sidebar-focused":
+    case "sidebar-no-focus":
+      return; // acknowledged; no behavior yet — hook points for future focus-aware features
     default:
       throw new Error(`unknown message ${message.type}`);
   }

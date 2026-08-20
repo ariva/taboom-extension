@@ -767,6 +767,19 @@ const histForward = getElementById("hist-forward");
 const histListBtn = getElementById("hist-list-btn");
 const histPop = getElementById("history-pop");
 
+// Focus tracking: losing focus (user clicked into the page or another window)
+// closes any open popup; both transitions are announced — no consumer yet,
+// hook points for future focus-aware behavior.
+window.addEventListener("focus", () => {
+  chrome.runtime.sendMessage({ type: "sidebar-focused" }).catch(() => {}); // SW may be asleep
+});
+window.addEventListener("blur", () => {
+  try {
+    histPop.hidePopover?.();
+  } catch {} // already hidden
+  chrome.runtime.sendMessage({ type: "sidebar-no-focus" }).catch(() => {});
+});
+
 // navigation mode switched (options page, any window): close an open popup —
 // its rows and header belong to the previous mode. storage.onChanged already
 // broadcasts to every panel, so no extra message plumbing is needed.
