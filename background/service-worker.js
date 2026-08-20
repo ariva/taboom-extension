@@ -11,6 +11,7 @@ import {
   pushHistoryCompact,
   pushHistoryTraditional,
   removeFromHistory,
+  removeHistoryAt,
   resolveNavMode,
   selectAutoSnoozeTargets,
 } from "../core/core.js";
@@ -187,6 +188,8 @@ async function handleMessage(message) {
       return loadHistory().then((h) => historyJump(h.cursor + 1));
     case "history-jump":
       return historyJump(message.index);
+    case "history-remove":
+      return withHistory((hist) => removeHistoryAt(hist, message.index));
     case "sidebar-focused":
     case "sidebar-no-focus":
       return; // acknowledged; no behavior yet — hook points for future focus-aware features

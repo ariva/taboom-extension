@@ -212,7 +212,7 @@ test("Core - UI defaults", async () => {
 });
 
 // ---------- tab activation history ----------
-const { pushHistoryCompact, pushHistoryTraditional, dedupeHistory, resolveNavMode, removeFromHistory } =
+const { pushHistoryCompact, pushHistoryTraditional, dedupeHistory, resolveNavMode, removeFromHistory, removeHistoryAt } =
   await import("../core/core.js");
 
 test("Core - PushHistoryCompact appends new tabs, moves cursor to known tabs, caps size", () => {
@@ -281,6 +281,14 @@ test("Core - ResolveNavMode: master flag, per-mode flags, legacy booleans, fallb
   assert.equal(resolveNavMode(flags(true, false, true), {}), "compact", "traditional flag off: falls back");
   assert.equal(resolveNavMode(flags(true, true, false), { historyNav: "compact" }), "traditional", "compact flag off: falls back");
   assert.equal(resolveNavMode(flags(true, false, false), {}), "off", "no mode enabled");
+});
+
+test("Core - RemoveHistoryAt removes one entry by index, cursor follows", () => {
+  assert.deepEqual(removeHistoryAt({ stack: [1, 2, 1], cursor: 2 }, 0), { stack: [2, 1], cursor: 1 }, "duplicate: only the indexed one goes");
+  assert.deepEqual(removeHistoryAt({ stack: [1, 2, 3], cursor: 1 }, 1), { stack: [1, 3], cursor: 0 }, "removing the cursor entry steps back");
+  assert.deepEqual(removeHistoryAt({ stack: [1, 2, 3], cursor: 0 }, 2), { stack: [1, 2], cursor: 0 }, "forward removal leaves cursor");
+  assert.deepEqual(removeHistoryAt({ stack: [1], cursor: 0 }, 0), { stack: [], cursor: -1 }, "last entry: empty stack");
+  assert.deepEqual(removeHistoryAt({ stack: [1, 2], cursor: 1 }, 9), { stack: [1, 2], cursor: 1 }, "out of range: unchanged");
 });
 
 test("Core - RemoveFromHistory drops a closed tab and keeps the cursor sane", () => {

@@ -418,6 +418,23 @@ test("UI - Sidepanel - Right-click on an arrow with open popup closes it", async
   delete pop.hidePopover;
 });
 
+test("UI - Sidepanel - History entry X sends history-remove with the entry's index", async () => {
+  const pop = document.getElementById("history-pop");
+  await chrome.storage.local.set({ tabHistory: { stack: [1, 2], cursor: 1 } });
+  pop.matches = () => true; // "open" so the storage echo fills the rows
+  await chrome.storage.onChanged.fire({ tabHistory: {} }, "local");
+  await tick();
+  const items = pop.querySelectorAll(".hist-item");
+  assert.equal(items.length, 2, "one item per entry, each with its X");
+
+  calls.length = 0;
+  items[0].querySelector(".hist-x").click(); // newest-first: top item is stack index 1
+  await tick();
+  assert.ok(calls.includes("sendMessage history-remove"), "remove message sent");
+  pop.matches = () => false;
+  delete pop.matches;
+});
+
 test("UI - Sidepanel - Escape with open history popover leaves the search alone", () => {
   const search = document.getElementById("search");
   search.value = "abc";

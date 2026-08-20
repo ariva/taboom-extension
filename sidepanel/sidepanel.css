@@ -360,6 +360,13 @@ footer button:disabled:hover { background: none; }
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* row + its X share a line; X only shows while the entry is hovered/focused */
+#history-pop .hist-item { display: flex; align-items: center; gap: 2px; }
+#history-pop .hist-item .hist-row { flex: 1; min-width: 0; }
+#history-pop .hist-x { visibility: hidden; flex: none; }
+#history-pop .hist-item:hover .hist-x,
+#history-pop .hist-item:focus-within .hist-x { visibility: visible; }
+
 /* --hover is near-invisible on card-bg (popover ground) — use the stronger badge tone */
 #history-pop .hist-row:hover { background: var(--badge-bg); }
 #history-pop .hist-row.current { font-weight: 700; color: var(--accent); }
@@ -368,4 +375,22 @@ footer button:disabled:hover { background: none; }
 #history-pop .hist-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #history-pop .win-dot { width: 6px; height: 6px; border-radius: 50%; flex: none; }
 #history-pop .win-dot.current { background: var(--accent); }
-#history-pop .hist-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 0 4px 8px; }
+#history-pop .hist-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 0 6px 8px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 6px;
+}
+#history-pop .hist-close {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-s);
+  background: none;
+  padding: 2px 10px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background var(--transition);
+}
+#history-pop .hist-close:hover { background: var(--badge-bg); }

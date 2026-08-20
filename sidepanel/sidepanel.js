@@ -857,10 +857,12 @@ async function fillHistoryPopover() {
   heading.className = "muted";
   heading.textContent =
     state.navMode === "compact" ? "Compact Navigation History" : "Navigation History";
+  // text label, not an X: the per-entry X buttons mean "remove entry" — the
+  // popup's own dismiss must not look like one of them
   const close = document.createElement("button");
-  close.className = "icon-btn";
-  close.title = close.ariaLabel = "Close";
-  close.innerHTML = ICONS.close;
+  close.type = "button";
+  close.className = "hist-close";
+  close.textContent = "Close";
   close.addEventListener("click", () => histPop.hidePopover?.());
   head.append(heading, close);
   histPop.append(head);
@@ -903,7 +905,23 @@ async function fillHistoryPopover() {
       chrome.runtime.sendMessage({ type: "history-jump", index });
       histPop.hidePopover?.();
     });
-    histPop.append(row);
+
+    // per-entry remove; the tabHistory storage echo live-refreshes the open
+    // popup, so indexes stay correct after each removal. Sibling of the row
+    // button — buttons can't nest.
+    const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.className = "icon-btn hist-x";
+    removeBtn.title = removeBtn.ariaLabel = "Remove from history";
+    removeBtn.innerHTML = ICONS.close;
+    removeBtn.addEventListener("click", () => {
+      chrome.runtime.sendMessage({ type: "history-remove", index }).catch(() => {});
+    });
+
+    const item = document.createElement("div");
+    item.className = "hist-item";
+    item.append(row, removeBtn);
+    histPop.append(item);
   }
 }
 

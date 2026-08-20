@@ -190,6 +190,17 @@ export function filterHistory({ stack, cursor }, keep) {
 
 export const removeFromHistory = (hist, tabId) => filterHistory(hist, (id) => id !== tabId);
 
+// Remove ONE entry by position (traditional stacks can hold the same tab id
+// more than once, so removal from the popup must be by index, not id).
+// Removing the cursor entry moves the cursor to the previous one.
+export function removeHistoryAt({ stack, cursor }, index) {
+  if (index < 0 || index >= stack.length) {
+    return { stack, cursor };
+  }
+  const next = stack.filter((_, position) => position !== index);
+  return { stack: next, cursor: Math.min(next.length - 1, index <= cursor ? cursor - 1 : cursor) };
+}
+
 // ---------- feature flags (features.json at extension root) ----------
 
 export const featureEnabled = (features, key) => features[key]?.enabled ?? false;

@@ -335,3 +335,11 @@ test("Service Worker - Closing a tab sweeps every closed id from the history sta
   assert.ok(!calls.some((c) => c.startsWith("storage.set")), "no write when nothing to prune");
 });
 
+
+test("Service Worker - history-remove message drops one entry by index", async () => {
+  await chrome.storage.local.set({ tabHistory: { stack: [3, 2, 3], cursor: 2 } });
+  await send({ type: "history-remove", index: 0 });
+  await tick();
+  const { tabHistory } = await chrome.storage.local.get();
+  assert.deepEqual(tabHistory, { stack: [2, 3], cursor: 1 }, "indexed entry gone, duplicate kept");
+});
