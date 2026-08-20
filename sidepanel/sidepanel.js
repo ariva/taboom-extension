@@ -223,6 +223,8 @@ function renderNowImpl() {
         collapsible,
         count: groupTabs.length,
         total: totals.get(windowId) ?? 0,
+        tabs: groupTabs,
+        dotColors: maps.dotColors,
       }));
       if (isCollapsed) continue;
       for (const tab of groupTabs) frag.append(renderRow(tab, rowVm(tab, index++)));
@@ -303,21 +305,65 @@ collapseAllBtn.addEventListener("click", () => {
 });
 
 // clickable group header: toggles collapse of that window's rows
-function renderGroupHeader(windowId, { isCollapsed, indexes, collapsible, count, total }) {
+function renderGroupHeader(windowId, { isCollapsed, indexes, collapsible, count, total, tabs, dotColors }) {
   const header = document.createElement("div");
   header.className = "group-header";
-  header.textContent = groupHeader(windowId, {
+  // WINDOW_GROUP_SELECT: checkbox left of the window label selects/unselects
+  // every tab of this window that the current filter/search shows
+  if (featureEnabled(state.features, "WINDOW_GROUP_SELECT")) {
+    const box = document.createElement("input");
+    box.type = "checkbox";
+    box.className = "group-select";
+    const selectedCount = tabs.filter((tab) => state.selected.has(tab.id)).length;
+    box.checked = tabs.length > 0 && selectedCount === tabs.length;
+    box.indeterminate = selectedCount > 0 && selectedCount < tabs.length;
+    box.title = box.ariaLabel = box.checked ? "Unselect window tabs" : "Select window tabs";
+    box.addEventListener("click", (event) => {
+      event.stopPropagation(); // header click collapses the group
+      if (box.checked) {
+        for (const tab of tabs) {
+          state.selected.add(tab.id);
+        }
+      } else {
+        for (const tab of tabs) {
+          state.selected.delete(tab.id);
+        }
+      }
+      render(false); // row checkboxes + bulk bar follow
+    });
+    header.append(box);
+  }
+  // same per-window color dot the rows carry (accent for the current window)
+  if (dotColors.size > 0) {
+    const dot = document.createElement("span");
+    dot.className = "win-dot";
+    const color = dotColors.get(windowId);
+    if (color) {
+      dot.style.background = color;
+    } else {
+      dot.classList.add("current");
+    }
+    header.append(dot);
+  }
+  const label = document.createElement("span");
+  label.className = "group-label";
+  label.textContent = groupHeader(windowId, {
     count,
     total,
     currentWindowId: state.currentWindowId,
     indexes,
-    collapsed: isCollapsed,
-    collapsible,
   });
+  header.append(label);
   if (!collapsible) {
     header.classList.add("static");
     return header;
   }
+  // collapse chevron right-aligned (accordion layout) — far from the
+  // group-select checkbox on the left so the two targets can't be confused
+  const arrow = document.createElement("span");
+  arrow.className = "fold-arrow";
+  arrow.textContent = isCollapsed ? "▸" : "▾";
+  header.append(arrow);
   header.setAttribute("role", "button");
   header.tabIndex = 0;
   header.title = isCollapsed ? "Expand" : "Collapse";
@@ -330,6 +376,9 @@ function renderGroupHeader(windowId, { isCollapsed, indexes, collapsible, count,
   };
   header.addEventListener("click", toggle);
   header.addEventListener("keydown", (event) => {
+    if (event.target !== header) {
+      return; // space on the focused group-select checkbox must not collapse
+    }
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
       event.stopPropagation();

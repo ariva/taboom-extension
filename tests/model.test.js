@@ -82,10 +82,9 @@ test("Model - GroupHeader formats current and other windows, collapse indicator"
   const tabs = [tab({ id: 1 }), tab({ id: 2 }), tab({ id: 3, windowId: 2 })];
   const { indexes } = windowMaps(tabs, 1);
   const ctx = { count: 1, total: 2, currentWindowId: 1, indexes };
-  assert.equal(groupHeader(1, ctx), "▾ Window Current #1 - 1/2");
-  assert.equal(groupHeader(2, { ...ctx, total: 1 }), "▾ Window #2 - 1/1");
-  assert.equal(groupHeader(2, { ...ctx, total: 1, collapsed: true }), "▸ Window #2 - 1/1");
-  assert.equal(groupHeader(1, { ...ctx, collapsible: false }), "Window Current #1 - 1/2", "no arrow when not collapsible");
+  // arrow is rendered by the view (right-aligned span), not part of the text
+  assert.equal(groupHeader(1, ctx), "Window Current #1 - 1/2");
+  assert.equal(groupHeader(2, { ...ctx, total: 1 }), "Window #2 - 1/1");
 });
 
 test("Model - GroupByWindow keeps order and splits runs", () => {

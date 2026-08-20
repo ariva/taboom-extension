@@ -67,7 +67,7 @@ test("UI - Sidepanel Keyboard - Single visible window: header not collapsible", 
   sel.dispatchEvent(new window.Event("change", { bubbles: true }));
   const header = document.querySelector(".group-header");
   assert.ok(header.classList.contains("static"));
-  assert.ok(!header.textContent.startsWith("▾"), "no collapse arrow");
+  assert.ok(!header.textContent.includes("▾"), "no collapse arrow");
   assert.equal(header.getAttribute("role"), null, "not a button");
   assert.equal(document.getElementById("collapse-all").hidden, true, "fold-all hidden for lone window");
   header.click();

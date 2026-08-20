@@ -6,6 +6,7 @@
   "OPTIONS_NAVIGATION_STACK": { "enabled": true },
   "NAVIGATION_DROPDOWN": { "enabled": false, "experimental": true },
   "SIDEBAR_KEYBOARD_NAVIGATION": { "enabled": true },
+  "WINDOW_GROUP_SELECT": { "enabled": true },
   "SEARCH_AUTO_SELECT_ALL": { "enabled": false, "experimental": true },
   "PERFORMANCE": { "enabled": false },
   "SHOW_PERFORMANCE_INFO": { "enabled": false }

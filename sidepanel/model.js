@@ -108,11 +108,11 @@ export function emptyMessage(query, filter) {
 }
 
 // count/total are precomputed by the caller — filtering the full tab list per
-// group here made group-by-window renders O(tabs × windows)
-export function groupHeader(windowId, { count, total, currentWindowId, indexes, collapsed = false, collapsible = true }) {
+// group here made group-by-window renders O(tabs × windows).
+// Collapse arrow is NOT part of the text: the view renders it right-aligned.
+export function groupHeader(windowId, { count, total, currentWindowId, indexes }) {
   const label = windowId === currentWindowId ? "Window Current" : "Window";
-  const arrow = collapsible ? `${collapsed ? "▸" : "▾"} ` : "";
-  return `${arrow}${label} #${indexes.get(windowId)} - ${count}/${total}`;
+  return `${label} #${indexes.get(windowId)} - ${count}/${total}`;
 }
 
 // consecutive same-window runs → ordered [windowId, tabs[]] pairs

@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { makeChrome, loadPage, tick } from "./helpers/ui.js";
+import { makeChrome, loadPage, tick, TEST_FEATURES } from "./helpers/ui.js";
+
+const GROUP_SELECT_ON = TEST_FEATURES.WINDOW_GROUP_SELECT?.enabled === true;
 
 const NOW = Date.now();
 const HOUR = 3_600_000;
@@ -54,7 +56,7 @@ test("UI - Sidepanel Sort - Group by window: current window first, headers with 
   setSort("window");
   assert.deepEqual(titles(), ["Bravo", "Alpha", "Charlie", "Delta"], "current window recent-first, then window 2");
   const headers = [...document.querySelectorAll(".group-header")].map((el) => el.textContent);
-  assert.deepEqual(headers, ["▾ Window Current #1 - 3/3", "▾ Window #2 - 1/1"]);
+  assert.deepEqual(headers, ["Window Current #1 - 3/3▾", "Window #2 - 1/1▾"], "arrow right-aligned (last in text)");
 
   // filtered list → visible / total diverge
   const search = document.getElementById("search");
@@ -77,7 +79,7 @@ test("UI - Sidepanel Sort - Collapse hides a group's rows; search auto-expands",
 
   headerFor("Window Current #1").click();
   assert.equal(document.querySelectorAll(".row").length, 1, "only window 2's row left");
-  assert.match(headerFor("Window Current #1").textContent, /^▸/, "collapsed indicator");
+  assert.match(headerFor("Window Current #1").textContent, /▸$/, "collapsed indicator at the right");
   assert.equal(document.querySelectorAll(".group-header").length, 2, "header stays visible");
 
   // search finds a tab inside the collapsed group → group auto-expands
@@ -86,7 +88,7 @@ test("UI - Sidepanel Sort - Collapse hides a group's rows; search auto-expands",
   search.dispatchEvent(new window.Event("input", { bubbles: true }));
   assert.equal(document.querySelectorAll(".row").length, 1);
   assert.match(document.querySelector(".row .title").textContent, /Charlie/);
-  assert.ok(!headerFor("Window Current #1").textContent.startsWith("▸"), "not marked collapsed during search");
+  assert.ok(!headerFor("Window Current #1").textContent.includes("▸"), "not marked collapsed during search");
   assert.ok(headerFor("Window Current #1").classList.contains("static"), "single visible group → no collapse UI");
 
   // clearing the search restores the collapsed state
@@ -126,4 +128,51 @@ test("UI - Sidepanel Sort - Collapse-all button folds and unfolds every group", 
   assert.equal(btn.title, "Collapse all");
   setSort("recent");
   assert.equal(btn.hidden, true);
+});
+
+test(
+  "UI - Sidepanel Sort - Window header checkbox selects that window's visible tabs",
+  { skip: !GROUP_SELECT_ON && "WINDOW_GROUP_SELECT disabled in features.json" },
+  () => {
+    setSort("window");
+    const boxes = document.querySelectorAll(".group-header .group-select");
+    assert.equal(boxes.length, 2, "one checkbox per window header");
+    const rowBox = document.querySelector('.row input[type="checkbox"]');
+    assert.equal(window.getComputedStyle(boxes[0]).width, "14px", "explicit size, not platform default");
+    assert.equal(
+      window.getComputedStyle(boxes[0]).width,
+      window.getComputedStyle(rowBox).width,
+      "same size as row checkboxes",
+    );
+
+    assert.equal(boxes[0].title, "Select window tabs", "tooltip before select");
+    boxes[0].click(); // window 1: tabs 1,2,3
+    assert.match(document.getElementById("bulk-count").textContent, /3 selected/);
+    const rowBoxes = [...document.querySelectorAll('.row input[type="checkbox"]')];
+    assert.equal(rowBoxes.filter((box) => box.checked).length, 3, "rows follow the group box");
+
+    const freshBoxes = document.querySelectorAll(".group-header .group-select");
+    assert.equal(freshBoxes[0].checked, true, "group box checked after select");
+    assert.equal(freshBoxes[0].title, "Unselect window tabs", "tooltip flips when checked");
+    freshBoxes[0].click(); // unselect the window again
+    assert.match(document.getElementById("bulk-count").textContent, /0 selected/);
+  },
+);
+
+test(
+  "UI - Sidepanel Sort - WINDOW_GROUP_SELECT off: headers carry no checkbox",
+  { skip: GROUP_SELECT_ON && "WINDOW_GROUP_SELECT enabled in features.json" },
+  () => {
+    setSort("window");
+    assert.equal(document.querySelector(".group-header .group-select"), null);
+  },
+);
+
+test("UI - Sidepanel Sort - Window headers carry the window color dot", () => {
+  setSort("window");
+  const dots = document.querySelectorAll(".group-header .win-dot");
+  assert.equal(dots.length, 2, "one dot per window header");
+  assert.equal(window.getComputedStyle(dots[0]).width, "6px", "dot actually has a size outside rows");
+  assert.ok(dots[0].classList.contains("current"), "current window uses the accent dot");
+  assert.ok(dots[1].style.background, "other window gets its palette color");
 });

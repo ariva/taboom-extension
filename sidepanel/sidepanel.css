@@ -143,18 +143,19 @@ main.compact .row .meta { display: none; }
 /* keyboard cursor: amber, so it can't be confused with the accent-blue active-tab border */
 .row.cursor { outline: 2px solid var(--warn-fg); outline-offset: -2px; }
 
-/* per-window color dot, present only when tabs span multiple windows */
-.row .win-dot {
+/* per-window color dot (rows, group headers, history popup) — present only
+   when tabs span multiple windows */
+.win-dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
   flex: none;
-  /* top-aligned like the checkbox, nudged to the checkbox's vertical middle
-     (native checkbox ≈ 13px + 3px default margin → center ~9.5px) */
-  margin-top: 6px;
 }
+.win-dot.current { background: var(--accent); }
 
-.row .win-dot.current { background: var(--accent); }
+/* rows top-align content: nudge the dot to the checkbox's vertical middle
+   (native checkbox ≈ 13px + 3px default margin → center ~9.5px) */
+.row .win-dot { margin-top: 6px; }
 
 .row .favicon {
   width: 16px;
@@ -300,6 +301,26 @@ footer button:disabled:hover { background: none; }
   user-select: none;
 }
 
+.group-header { display: flex; align-items: center; gap: 6px; }
+/* breathing room between window groups — where one window ends and the next starts */
+.group-header:not(:first-child) { margin-top: 14px; }
+/* explicit identical size: native checkbox rendering varies per platform and
+   font context — row and window checkboxes must look the same */
+.row input[type="checkbox"],
+.group-header .group-select { width: 14px; height: 14px; }
+.group-header .group-select { margin: 0; flex: none; }
+.group-header .group-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  /* same emphasis as the active tab row: bold + accent */
+  font-weight: 600;
+  color: var(--accent);
+}
+.group-header .fold-arrow { flex: none; margin-left: auto; }
+
 .group-header:hover { color: light-dark(#333, #ddd); }
 .group-header.static { cursor: default; }
 .group-header.static:hover { color: var(--muted); }
@@ -373,8 +394,6 @@ footer button:disabled:hover { background: none; }
 #history-pop .hist-row { display: flex; align-items: center; gap: 6px; }
 #history-pop .hist-num { min-width: 1.4em; text-align: right; font-variant-numeric: tabular-nums; }
 #history-pop .hist-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-#history-pop .win-dot { width: 6px; height: 6px; border-radius: 50%; flex: none; }
-#history-pop .win-dot.current { background: var(--accent); }
 #history-pop .hist-head {
   display: flex;
   align-items: center;
