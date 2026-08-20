@@ -50,26 +50,15 @@ export function selectVisible(tabs, view) {
     case "oldest": result.sort((a, b) => last(a) - last(b)); break;
     case "title": result.sort((a, b) => s * (a.title ?? "").localeCompare(b.title ?? "")); break;
     case "domain": result.sort((a, b) => s * derived.get(a.id).host.localeCompare(derived.get(b.id).host)); break;
-    // same-title tabs grouped: "none" = groups alphabetical; "desc"/"asc" =
-    // by visible group size (ties alphabetical); recent-first within a group
-    case "group-title": {
-      const sizes = new Map();
-      for (const tab of result) {
-        const key = tab.title ?? "";
-        sizes.set(key, (sizes.get(key) ?? 0) + 1);
-      }
-      const bySize = sortDir === "desc" ? -1 : sortDir === "asc" ? 1 : 0;
-      result.sort((a, b) => {
-        const titleA = a.title ?? "";
-        const titleB = b.title ?? "";
-        return (
-          bySize * (sizes.get(titleA) - sizes.get(titleB)) ||
-          titleA.localeCompare(titleB) ||
-          last(b) - last(a)
-        );
-      });
+    // key-grouped sorts (title/domain): "none" = groups alphabetical;
+    // "desc"/"asc" = by visible group size (ties alphabetical);
+    // recent-first within a group
+    case "group-title":
+      sortGroupedByKey(result, (tab) => tab.title ?? "", sortDir, last);
       break;
-    }
+    case "group-domain":
+      sortGroupedByKey(result, (tab) => derived.get(tab.id).host, sortDir, last);
+      break;
     // "none" = current window first then windows by id (natural 1..x);
     // "desc"/"asc" = windows by visible tab count (natural order as tiebreak);
     // within a window always recent-first
@@ -90,6 +79,22 @@ export function selectVisible(tabs, view) {
     }
   }
   return result;
+}
+
+// shared ordering for key-grouped sorts — see the group-* cases above
+function sortGroupedByKey(result, keyOf, sortDir, last) {
+  const sizes = new Map();
+  for (const tab of result) {
+    const key = keyOf(tab);
+    sizes.set(key, (sizes.get(key) ?? 0) + 1);
+  }
+  const bySize = sortDir === "desc" ? -1 : sortDir === "asc" ? 1 : 0;
+  result.sort(
+    (a, b) =>
+      bySize * (sizes.get(keyOf(a)) - sizes.get(keyOf(b))) ||
+      keyOf(a).localeCompare(keyOf(b)) ||
+      last(b) - last(a),
+  );
 }
 
 export function countsByFilter(tabs, derived) {
@@ -153,6 +158,10 @@ export function windowGroupName(windowId, { currentWindowId, indexes }) {
 
 export function titleGroupName(title) {
   return title || "(untitled)";
+}
+
+export function domainGroupName(host) {
+  return host || "(no domain)";
 }
 
 // Generic grouping: consecutive same-key runs → ordered [key, tabs[]] pairs.

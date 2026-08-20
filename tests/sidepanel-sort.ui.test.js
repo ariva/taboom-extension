@@ -335,3 +335,38 @@ test("UI - Sidepanel Sort - Sort memory: remember mode restores each sort's last
   assert.equal(dirBtn.dataset.dir, "asc", "default mode: canonical on every change");
   setSort("window");
 });
+
+const GROUP_DOMAIN_ON = TEST_FEATURES.GROUP_BY_DOMAIN?.enabled === true;
+
+test(
+  "UI - Sidepanel Sort - Group by domain: host groups with counts",
+  { skip: !GROUP_DOMAIN_ON && "GROUP_BY_DOMAIN disabled in features.json" },
+  () => {
+    setSort("group-domain");
+    const headers = [...document.querySelectorAll(".group-header .group-label")].map((el) => el.textContent);
+    assert.deepEqual(
+      headers,
+      ["alpha.dev", "bb.aa", "mid.io", "zeta.org"],
+      "one group per host (all size 1 → ties alphabetical under desc default)",
+    );
+    assert.ok(
+      [...document.querySelectorAll(".group-header .group-count")].every((el) => el.textContent === "1/1"),
+      "counts rendered per group",
+    );
+    setSort("window");
+  },
+);
+
+test(
+  "UI - Sidepanel Sort - GROUP_BY_DOMAIN off: option hidden, stored pref falls back to window",
+  { skip: GROUP_DOMAIN_ON && "GROUP_BY_DOMAIN enabled in features.json" },
+  async () => {
+    const option = document.querySelector('#sort option[value="group-domain"]');
+    assert.equal(option.hidden, true, "dropdown option hidden");
+    setSort("group-domain");
+    await tick();
+    const headers = [...document.querySelectorAll(".group-header .group-label")].map((el) => el.textContent);
+    assert.ok(headers.every((h) => h.startsWith("Window")), "falls back to window grouping");
+    setSort("window");
+  },
+);

@@ -139,6 +139,24 @@ test("Model - GroupTabs keeps order and splits runs by any key", () => {
   );
 });
 
+test("Model - Group-domain sort clusters by host with the shared size ordering", () => {
+  const tabs = [
+    tab({ id: 1, url: "https://b.com/x", lastAccessed: NOW - 2 * HOUR }),
+    tab({ id: 2, url: "https://a.com/y", lastAccessed: NOW - 3 * HOUR }),
+    tab({ id: 3, url: "https://b.com/z", lastAccessed: NOW - 1 * HOUR }),
+  ];
+  assert.deepEqual(
+    selectVisible(tabs, view(tabs, { sort: "group-domain", sortDir: "desc" })).map((t) => t.id),
+    [3, 1, 2],
+    "b.com pair first (recent-first within), then a.com",
+  );
+  assert.deepEqual(
+    selectVisible(tabs, view(tabs, { sort: "group-domain" })).map((t) => t.id),
+    [2, 3, 1],
+    "no direction: hosts alphabetical",
+  );
+});
+
 test("Model - Group-title sort: natural = alphabetical, desc = biggest groups first", () => {
   const tabs = [
     tab({ id: 1, title: "Beta", lastAccessed: NOW - 2 * HOUR }),

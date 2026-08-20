@@ -159,7 +159,7 @@
     }
     .row button:hover { background: var(--hover); }
     .row input { flex: 1; }
-    .muted { color: var(--muted); font-size: 13px; }
+    .muted { color: var(--muted); font-size: 11px; }
 
     .card.danger-zone { border: 1px solid color-mix(in srgb, var(--danger) 40%, transparent); }
     #danger, #restore-defaults, #clear-protected {
@@ -233,6 +233,12 @@
         <option value="dark">Dark</option>
       </select>
     </label>
+  </section>
+
+  <section class="card">
+    <h2>Customization</h2>
+    <label id="showExperimental-label" hidden><input type="checkbox" id="showExperimental" /> Show experimental features</label>
+    <p id="experimental-warning" hidden>⚠ Experimental features enabled — they may change over time and may not be fully polished.</p>
     <label>Sort memory
       <select id="sortDirMode">
         <option value="default">Default order on every change</option>
@@ -246,8 +252,6 @@
         <option value="compact">Compact Navigation</option>
       </select>
       <span class="muted">(prev/next buttons in side panel, History in context menu)</span></label>
-    <label id="showExperimental-label" hidden><input type="checkbox" id="showExperimental" /> Show experimental features</label>
-    <p id="experimental-warning" hidden>⚠ Experimental features enabled — they may change over time and may not be fully polished.</p>
   </section>
 
   <section class="card">

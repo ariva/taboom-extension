@@ -16,6 +16,7 @@ import {
   deriveTabs,
   emptyMessage,
   searchCandidates,
+  domainGroupName,
   groupTabs,
   titleGroupName,
   windowGroupName,
@@ -135,10 +136,12 @@ async function refresh(animate = false, preloaded = null) {
     state.cursor = -1;
   }
   state.navMode = resolveNavMode(state.features, state.ui);
-  // Group by title is flag-gated: hide the option when off, and show the
-  // effective sort if a stored group-title preference can't apply
-  /** @type {HTMLElement} */ (sortSelect.querySelector('option[value="group-title"]')).hidden =
-    !featureEnabled(state.features, "GROUP_BY_TITLE");
+  // flag-gated sorts: hide options whose flag is off, and show the effective
+  // sort if a stored preference can't apply
+  for (const [value, flag] of Object.entries(FLAG_GATED_SORTS)) {
+    /** @type {HTMLElement} */ (sortSelect.querySelector(`option[value="${value}"]`)).hidden =
+      !featureEnabled(state.features, flag);
+  }
   sortSelect.value = effectiveSort();
   getElementById("hist-back").hidden = state.navMode === "off";
   getElementById("hist-forward").hidden = state.navMode === "off";
@@ -171,6 +174,18 @@ const GROUPINGS = {
     name: (title) => titleGroupName(title),
     noun: "group",
   },
+  "group-domain": {
+    key: (tab) => state.derived.get(tab.id)?.host ?? "",
+    name: (host) => domainGroupName(host),
+    noun: "group",
+  },
+};
+
+// sorts that only exist while their feature flag is on (option hidden + a
+// stored preference falls back to the window grouping)
+const FLAG_GATED_SORTS = {
+  "group-title": "GROUP_BY_TITLE",
+  "group-domain": "GROUP_BY_DOMAIN",
 };
 
 // Direction metadata per sort. Paired sorts (recent/oldest) swap the dropdown
@@ -184,6 +199,7 @@ const SORT_DIRECTIONS = {
   domain: { states: ["asc", "desc"] },
   window: { states: ["none", "desc", "asc"] },
   "group-title": { states: ["desc", "asc", "none"] }, // biggest groups first by default
+  "group-domain": { states: ["desc", "asc", "none"] },
 };
 
 function canonicalDir(sort) {
@@ -231,10 +247,11 @@ sortDirBtn.addEventListener("click", () => {
   render(!state.query);
 });
 
-// GROUP_BY_TITLE off but persisted/selected: fall back to the window grouping
-// for display — the stored preference is not rewritten
+// flag-gated sort selected while its flag is off: fall back to the window
+// grouping for display — the stored preference is not rewritten
 function effectiveSort() {
-  if (state.sort === "group-title" && !featureEnabled(state.features, "GROUP_BY_TITLE")) {
+  const flag = FLAG_GATED_SORTS[state.sort];
+  if (flag && !featureEnabled(state.features, flag)) {
     return "window";
   }
   return state.sort;

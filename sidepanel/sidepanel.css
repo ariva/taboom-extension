@@ -302,8 +302,13 @@ footer button:disabled:hover { background: none; }
 }
 
 .group-header { display: flex; align-items: center; gap: 6px; }
-/* breathing room between window groups — where one window ends and the next starts */
-.group-header:not(:first-child) { margin-top: 14px; }
+
+/* group section item's divider */
+.group-header:not(:first-child) {
+  margin-top: 7px;
+  border-top: 1px solid var(--border);
+  padding-top: 7px;
+}
 /* explicit identical size: native checkbox rendering varies per platform and
    font context — row and window checkboxes must look the same */
 .row input[type="checkbox"],
