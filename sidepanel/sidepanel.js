@@ -94,6 +94,10 @@ const state = {
   visible: [], // rows the user can interact with (excludes collapsed groups)
   fullVisible: [], // before collapsing — header counts + empty-state check
   collapsedGroups: new Set(), // group keys collapsed in a grouped sort (session only)
+  // collapse state WITHIN a search: each search starts fully expanded (matches
+  // must be visible), but groups can then be folded without touching the
+  // pre-search collapse state — same split as searchScrollByFilter
+  searchCollapsedGroups: new Set(),
   selected: new Set(),
   cursor: -1,
   currentWindowId: null,
@@ -182,9 +186,13 @@ function effectiveSort() {
   return state.sort;
 }
 
-// an active search auto-expands: matches must never hide under a collapsed group
+// the collapse set in effect: searches get their own (fresh per search)
+function activeCollapsedSet() {
+  return state.query ? state.searchCollapsedGroups : state.collapsedGroups;
+}
+
 function effectiveCollapsed() {
-  return GROUPINGS[effectiveSort()] && !state.query ? state.collapsedGroups : new Set();
+  return GROUPINGS[effectiveSort()] ? activeCollapsedSet() : new Set();
 }
 
 function render(animate = true) {
@@ -250,7 +258,7 @@ function renderNowImpl() {
     const groups = groupTabs(state.fullVisible, grouping.key);
     const collapsible = groups.length > 1; // lone group: nothing to fold away
     anythingToFold = collapsible;
-    if (collapsible && !state.query) foldableGroups = groups;
+    if (collapsible) foldableGroups = groups;
     // per-group totals in one pass (visible count = the group's own length)
     const totals = new Map();
     for (const tab of state.allTabs) {
@@ -271,6 +279,8 @@ function renderNowImpl() {
             : null,
         tabs: members,
         noun: grouping.noun,
+        count: members.length,
+        total: totals.get(groupKey) ?? 0,
       }));
       if (isCollapsed) continue;
       for (const tab of members) frag.append(renderRow(tab, rowVm(tab, index++)));
@@ -333,7 +343,7 @@ function renderCollapseAllButton(groups, anythingToFold) {
   if (collapseAllBtn.hidden) return;
   collapseAllBtn.disabled = groups.length === 0;
   const allCollapsed =
-    groups.length > 0 && groups.every(([windowId]) => state.collapsedGroups.has(windowId));
+    groups.length > 0 && groups.every(([windowId]) => activeCollapsedSet().has(windowId));
   collapseAllBtn.innerHTML = allCollapsed ? FOLD_ICONS.unfold : FOLD_ICONS.fold;
   collapseAllBtn.title = collapseAllBtn.ariaLabel = allCollapsed ? "Expand all" : "Collapse all";
   collapseAllBtn.dataset.groups = JSON.stringify(groups.map(([windowId]) => windowId));
@@ -341,26 +351,27 @@ function renderCollapseAllButton(groups, anythingToFold) {
 
 collapseAllBtn.addEventListener("click", () => {
   const windowIds = JSON.parse(collapseAllBtn.dataset.groups ?? "[]");
-  const allCollapsed = windowIds.every((id) => state.collapsedGroups.has(id));
+  const set = activeCollapsedSet();
+  const allCollapsed = windowIds.every((id) => set.has(id));
   if (allCollapsed) {
-    state.collapsedGroups.clear();
+    set.clear();
   } else {
-    for (const id of windowIds) state.collapsedGroups.add(id);
+    for (const id of windowIds) set.add(id);
   }
   render();
 });
 
 // clickable group header (any grouping): toggles collapse of the group's rows
-function renderGroupHeader(groupKey, { isCollapsed, collapsible, labelText, dotColor, tabs, noun }) {
+function renderGroupHeader(groupKey, { isCollapsed, collapsible, labelText, dotColor, tabs, noun, count, total }) {
   const header = document.createElement("div");
   header.className = "group-header";
   // WINDOW_GROUP_SELECT: checkbox left of the label selects/unselects every
   // tab of this group that the current filter/search shows
+  const selectedCount = tabs.filter((tab) => state.selected.has(tab.id)).length;
   if (featureEnabled(state.features, "WINDOW_GROUP_SELECT")) {
     const box = document.createElement("input");
     box.type = "checkbox";
     box.className = "group-select";
-    const selectedCount = tabs.filter((tab) => state.selected.has(tab.id)).length;
     box.checked = tabs.length > 0 && selectedCount === tabs.length;
     box.indeterminate = selectedCount > 0 && selectedCount < tabs.length;
     box.title = box.ariaLabel = `${box.checked ? "Unselect" : "Select"} ${noun} tabs`;
@@ -395,8 +406,16 @@ function renderGroupHeader(groupKey, { isCollapsed, collapsible, labelText, dotC
   label.className = "group-label";
   label.textContent = labelText;
   header.append(label);
+  // hover: generic group info (name + how many tabs) plus the click action.
+  // Custom tip (not title=): native tooltips render under the cursor and the
+  // pointer hides the first line — ours sits to the right of the pointer.
+  const info =
+    `${labelText.split(" - ")[0]}\n` +
+    `${selectedCount}/${count} selected tabs\n` +
+    `${count}/${total} visible tabs`;
   if (!collapsible) {
     header.classList.add("static");
+    header.dataset.tip = info;
     return header;
   }
   // collapse chevron right-aligned (accordion layout) — far from the
@@ -407,12 +426,12 @@ function renderGroupHeader(groupKey, { isCollapsed, collapsible, labelText, dotC
   header.append(arrow);
   header.setAttribute("role", "button");
   header.tabIndex = 0;
-  header.title = isCollapsed ? "Expand" : "Collapse";
+  header.dataset.tip = `${info}\nClick to ${isCollapsed ? "expand" : "collapse"}`;
   const toggle = () => {
-    if (state.query) return; // search shows everything; collapse resumes after
-    state.collapsedGroups.has(groupKey)
-      ? state.collapsedGroups.delete(groupKey)
-      : state.collapsedGroups.add(groupKey);
+    // searches start expanded but fold freely into their own set; the
+    // pre-search collapse state is untouched and resumes after
+    const set = activeCollapsedSet();
+    set.has(groupKey) ? set.delete(groupKey) : set.add(groupKey);
     render();
   };
   header.addEventListener("click", toggle);
@@ -495,9 +514,42 @@ function renderRowImpl(tab, vm) {
   return row;
 }
 
+// Custom hover tip for group headers, offset right+below the pointer so the
+// cursor never covers the text (native title tooltips can't be positioned).
+const hoverTip = document.createElement("div");
+hoverTip.id = "hover-tip";
+hoverTip.hidden = true;
+document.body.append(hoverTip);
+
+function moveHoverTip(event) {
+  hoverTip.style.left = `${Math.min(event.clientX + 14, window.innerWidth - hoverTip.offsetWidth - 4)}px`;
+  hoverTip.style.top = `${Math.min(event.clientY + 18, window.innerHeight - hoverTip.offsetHeight - 4)}px`;
+}
+
+listEl.addEventListener("mouseover", (event) => {
+  const header = /** @type {HTMLElement | null} */ (
+    /** @type {HTMLElement} */ (event.target).closest(".group-header")
+  );
+  if (!header || !header.dataset.tip) {
+    hoverTip.hidden = true;
+    return;
+  }
+  hoverTip.textContent = header.dataset.tip;
+  hoverTip.hidden = false;
+  moveHoverTip(event);
+});
+listEl.addEventListener("mousemove", (event) => {
+  if (!hoverTip.hidden) {
+    moveHoverTip(event);
+  }
+});
+listEl.addEventListener("mouseleave", () => (hoverTip.hidden = true));
+listEl.addEventListener("scroll", () => (hoverTip.hidden = true), { passive: true });
+
 // One delegated click listener instead of ~6 listeners per row — with big
 // lists that's thousands of listener allocations saved on every render.
 listEl.addEventListener("click", (event) => {
+  hoverTip.hidden = true; // toggling changes the tip text; rehover shows fresh
   const target = /** @type {HTMLElement} */ (event.target);
   const row = /** @type {HTMLElement | null} */ (target.closest(".row"));
   if (!row) {
@@ -510,7 +562,7 @@ listEl.addEventListener("click", (event) => {
     } else {
       state.selected.delete(tabId);
     }
-    renderBulkBar();
+    render(false); // group checkboxes + header tips reflect selection too
     return;
   }
   const button = /** @type {HTMLElement | null} */ (target.closest("[data-action]"));
@@ -638,9 +690,11 @@ const searchScrollByFilter = new Map();
 function setQuery(value) {
   if (value && !state.query) {
     scrollByFilter.set(state.filter, listEl.scrollTop); // entering search
+    state.searchCollapsedGroups.clear(); // every search starts fully expanded
   }
   if (!value) {
     searchScrollByFilter.clear(); // search over — in-results positions are stale
+    state.searchCollapsedGroups.clear();
   }
   state.query = value;
   // search narrowed the current filter to nothing while matches exist elsewhere:
@@ -696,6 +750,7 @@ scopeSelect.addEventListener("change", () => {
 sortSelect.addEventListener("change", () => {
   state.sort = sortSelect.value;
   state.collapsedGroups.clear(); // keys from another grouping are meaningless
+  state.searchCollapsedGroups.clear();
   resetScrollPositions();
   persistUiPrefs();
   render(!state.query);

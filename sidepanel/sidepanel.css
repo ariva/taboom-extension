@@ -325,6 +325,21 @@ footer button:disabled:hover { background: none; }
 .group-header.static { cursor: default; }
 .group-header.static:hover { color: var(--muted); }
 
+/* custom group-header tip, positioned right of the pointer by JS */
+#hover-tip {
+  position: fixed;
+  z-index: 20;
+  max-width: 60vw;
+  padding: 6px 9px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  box-shadow: var(--shadow-2);
+  font-size: 0.85rem;
+  white-space: pre-line;
+  pointer-events: none;
+}
+
 .empty {
   padding: 24px;
   text-align: center;

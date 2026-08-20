@@ -30,6 +30,18 @@ test("UI - Sidepanel Sort - Default is Group by window on first launch", () => {
   assert.equal(document.getElementById("sort").value, "window");
   assert.equal(document.querySelectorAll(".group-header").length, 2, "grouped view by default");
   assert.equal(document.getElementById("collapse-all").hidden, false, "fold-all visible");
+  const header = document.querySelector(".group-header");
+  assert.match(
+    header.dataset.tip,
+    /Window Current #1\n0\/3 selected tabs\n3\/3 visible tabs\nClick to collapse/,
+    "tip carries group, selection, visibility info + action",
+  );
+  header.dispatchEvent(new window.Event("mouseover", { bubbles: true }));
+  const tip = document.getElementById("hover-tip");
+  assert.equal(tip.hidden, false, "custom tip shows on hover");
+  assert.match(tip.textContent, /0\/3 selected tabs/);
+  document.getElementById("tab-list").dispatchEvent(new window.Event("mouseleave"));
+  assert.equal(tip.hidden, true, "tip hides when leaving the list");
 });
 
 test("UI - Sidepanel Sort - Recent: most recently used first", () => {
@@ -214,3 +226,29 @@ test(
     setSort("window");
   },
 );
+
+test("UI - Sidepanel Sort - Groups collapse during search without touching pre-search state", () => {
+  setSort("window");
+  const search = document.getElementById("search");
+  const type = (value) => {
+    search.value = value;
+    search.dispatchEvent(new window.Event("input", { bubbles: true }));
+  };
+  const headerFor = (needle) =>
+    [...document.querySelectorAll(".group-header")].find((el) => el.textContent.includes(needle));
+
+  headerFor("Window Current #1").click(); // collapse window 1 BEFORE searching
+  assert.equal(document.querySelectorAll(".row").length, 1, "window 1 folded pre-search");
+
+  type("a"); // matches tabs in both windows; search starts fully expanded
+  assert.equal(document.querySelectorAll(".row").length, 4, "search auto-expands");
+
+  headerFor("Window #2").click(); // fold a group WITHIN the search
+  assert.equal(document.querySelectorAll(".row").length, 3, "group folds mid-search");
+  assert.match(headerFor("Window #2").textContent, /▸/, "collapsed indicator shows");
+
+  type(""); // search over: pre-search collapse state resumes
+  assert.equal(document.querySelectorAll(".row").length, 1, "window 1 still folded, window 2 open");
+  assert.ok(!headerFor("Window #2").textContent.includes("▸"), "search-time fold did not leak");
+  headerFor("Window Current #1").click(); // restore expanded state for other tests
+});
