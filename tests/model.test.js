@@ -7,9 +7,9 @@ import {
   countsByFilter,
   deriveTabs,
   emptyMessage,
-  groupHeader,
   groupTabs,
-  titleGroupLabel,
+  titleGroupName,
+  windowGroupName,
   rowViewModel,
   selectVisible,
   windowColor,
@@ -50,6 +50,43 @@ test("Model - SelectVisible combines search, scope, filter, and sort", () => {
   );
 });
 
+test("Model - SortDir: flat sorts flip, grouped sorts order groups by visible size", () => {
+  const tabs = [
+    tab({ id: 1, title: "Alpha", lastAccessed: NOW - 1 * HOUR }),
+    tab({ id: 2, title: "Beta", lastAccessed: NOW - 2 * HOUR }),
+    tab({ id: 3, title: "Gamma", windowId: 2, lastAccessed: NOW - 3 * HOUR }),
+  ];
+  assert.deepEqual(
+    selectVisible(tabs, view(tabs, { sort: "title", sortDir: "desc" })).map((t) => t.id),
+    [3, 2, 1],
+    "title Z..A",
+  );
+  // window 1 has 2 visible tabs, window 2 has 1
+  assert.deepEqual(
+    selectVisible(tabs, view(tabs, { sort: "window", sortDir: "desc" })).map((t) => t.id),
+    [1, 2, 3],
+    "most tabs first (window 1), recent-first within",
+  );
+  assert.deepEqual(
+    selectVisible(tabs, view(tabs, { sort: "window", sortDir: "asc" })).map((t) => t.id),
+    [3, 1, 2],
+    "fewest tabs first (window 2)",
+  );
+  assert.deepEqual(
+    selectVisible(tabs, view(tabs, { sort: "window" })).map((t) => t.id),
+    [1, 2, 3],
+    "no sortDir: natural order (current window first)",
+  );
+  const dupes = [
+    tab({ id: 1, title: "Beta" }), tab({ id: 2, title: "Beta" }), tab({ id: 3, title: "Alpha" }),
+  ];
+  assert.deepEqual(
+    selectVisible(dupes, view(dupes, { sort: "group-title", sortDir: "asc" })).map((t) => t.title),
+    ["Alpha", "Beta", "Beta"],
+    "group-title asc: smallest groups first",
+  );
+});
+
 test("Model - DeriveTabs precomputes host, lowercase haystack, protected flag", () => {
   const rules = [{ id: "r", type: "host", pattern: "example.com" }];
   const derived = deriveTabs([tab({ title: "Example PAGE" }), tab({ id: 2, url: "https://other.io/" })], rules);
@@ -79,13 +116,13 @@ test("Model - WindowColor: palette first, unique golden-angle hues beyond", () =
   assert.equal(fifty.size, 50, "no repeats");
 });
 
-test("Model - GroupHeader formats current and other windows, collapse indicator", () => {
+test("Model - Group names: window label and title fallback (counts/arrow live in the view)", () => {
   const tabs = [tab({ id: 1 }), tab({ id: 2 }), tab({ id: 3, windowId: 2 })];
   const { indexes } = windowMaps(tabs, 1);
-  const ctx = { count: 1, total: 2, currentWindowId: 1, indexes };
-  // arrow is rendered by the view (right-aligned span), not part of the text
-  assert.equal(groupHeader(1, ctx), "Window Current #1 - 1/2");
-  assert.equal(groupHeader(2, { ...ctx, total: 1 }), "Window #2 - 1/1");
+  assert.equal(windowGroupName(1, { currentWindowId: 1, indexes }), "Window Current #1");
+  assert.equal(windowGroupName(2, { currentWindowId: 1, indexes }), "Window #2");
+  assert.equal(titleGroupName("Some tab"), "Some tab");
+  assert.equal(titleGroupName(""), "(untitled)");
 });
 
 test("Model - GroupTabs keeps order and splits runs by any key", () => {
@@ -102,7 +139,7 @@ test("Model - GroupTabs keeps order and splits runs by any key", () => {
   );
 });
 
-test("Model - Group-title sort: biggest groups first, ties alphabetical, recent-first inside", () => {
+test("Model - Group-title sort: natural = alphabetical, desc = biggest groups first", () => {
   const tabs = [
     tab({ id: 1, title: "Beta", lastAccessed: NOW - 2 * HOUR }),
     tab({ id: 2, title: "Alpha", lastAccessed: NOW - 3 * HOUR }),
@@ -111,11 +148,15 @@ test("Model - Group-title sort: biggest groups first, ties alphabetical, recent-
   ];
   assert.deepEqual(
     selectVisible(tabs, view(tabs, { sort: "group-title" })).map((t) => t.id),
-    [3, 1, 2, 4],
-    "Beta pair (size 2) first recent-first, then singles Alpha/Zulu alphabetical",
+    [2, 3, 1, 4],
+    "natural: groups alphabetical, recent-first within Beta",
   );
-  assert.equal(titleGroupLabel("Beta", { count: 2, total: 3 }), "Beta - 2/3");
-  assert.equal(titleGroupLabel("", { count: 1, total: 1 }), "(untitled) - 1/1");
+  assert.deepEqual(
+    selectVisible(tabs, view(tabs, { sort: "group-title", sortDir: "desc" })).map((t) => t.id),
+    [3, 1, 2, 4],
+    "desc: Beta pair (size 2) first, then singles alphabetical",
+  );
+
 });
 
 test("Model - EmptyMessage picks the right hint", () => {

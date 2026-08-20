@@ -30,9 +30,14 @@ export function searchCandidates(tabs, { query, scope, currentWindowId, derived 
   return result;
 }
 
-// filter + sort the full tab list down to what the panel shows
+// filter + sort the full tab list down to what the panel shows.
+// sortDir: flat sorts take "asc"|"desc"; grouped sorts take "none" (natural
+// order) | "desc" (most visible tabs first) | "asc" (fewest first). Group
+// direction reorders GROUPS only — within-group order is always recency.
+// recent/oldest carry their direction in their identity and ignore sortDir.
 export function selectVisible(tabs, view) {
-  const { filter, sort, currentWindowId, derived, now } = view;
+  const { filter, sort, currentWindowId, derived, now, sortDir } = view;
+  const s = sortDir === "desc" ? -1 : 1;
   let result = searchCandidates(tabs, view);
   switch (filter) {
     case "awake": result = result.filter((tab) => !tab.discarded); break;
@@ -43,31 +48,44 @@ export function selectVisible(tabs, view) {
   switch (sort) {
     case "recent": result.sort((a, b) => last(b) - last(a)); break;
     case "oldest": result.sort((a, b) => last(a) - last(b)); break;
-    case "title": result.sort((a, b) => (a.title ?? "").localeCompare(b.title ?? "")); break;
-    case "domain": result.sort((a, b) => derived.get(a.id).host.localeCompare(derived.get(b.id).host)); break;
-    // same-title tabs grouped together (duplicates side by side): biggest
-    // groups first, equal sizes alphabetical, recent-first within a group
+    case "title": result.sort((a, b) => s * (a.title ?? "").localeCompare(b.title ?? "")); break;
+    case "domain": result.sort((a, b) => s * derived.get(a.id).host.localeCompare(derived.get(b.id).host)); break;
+    // same-title tabs grouped: "none" = groups alphabetical; "desc"/"asc" =
+    // by visible group size (ties alphabetical); recent-first within a group
     case "group-title": {
       const sizes = new Map();
       for (const tab of result) {
         const key = tab.title ?? "";
         sizes.set(key, (sizes.get(key) ?? 0) + 1);
       }
+      const bySize = sortDir === "desc" ? -1 : sortDir === "asc" ? 1 : 0;
       result.sort((a, b) => {
         const titleA = a.title ?? "";
         const titleB = b.title ?? "";
         return (
-          sizes.get(titleB) - sizes.get(titleA) ||
+          bySize * (sizes.get(titleA) - sizes.get(titleB)) ||
           titleA.localeCompare(titleB) ||
           last(b) - last(a)
         );
       });
       break;
     }
-    // current window first, then other windows by id; recent-first within each
+    // "none" = current window first then windows by id (natural 1..x);
+    // "desc"/"asc" = windows by visible tab count (natural order as tiebreak);
+    // within a window always recent-first
     case "window": {
       const rank = (tab) => (tab.windowId === currentWindowId ? 0 : tab.windowId);
-      result.sort((a, b) => rank(a) - rank(b) || last(b) - last(a));
+      const sizes = new Map();
+      for (const tab of result) {
+        sizes.set(tab.windowId, (sizes.get(tab.windowId) ?? 0) + 1);
+      }
+      const bySize = sortDir === "desc" ? -1 : sortDir === "asc" ? 1 : 0;
+      result.sort(
+        (a, b) =>
+          bySize * (sizes.get(a.windowId) - sizes.get(b.windowId)) ||
+          rank(a) - rank(b) ||
+          last(b) - last(a),
+      );
       break;
     }
   }
@@ -126,12 +144,15 @@ export function emptyMessage(query, filter) {
   return "No open tabs.";
 }
 
-// count/total are precomputed by the caller — filtering the full tab list per
-// group here made group-by-window renders O(tabs × windows).
-// Collapse arrow is NOT part of the text: the view renders it right-aligned.
-export function groupHeader(windowId, { count, total, currentWindowId, indexes }) {
+// Group NAME only — the view renders counts and the collapse arrow as their
+// own right-side spans so a long name can ellipsize without eating them.
+export function windowGroupName(windowId, { currentWindowId, indexes }) {
   const label = windowId === currentWindowId ? "Window Current" : "Window";
-  return `${label} #${indexes.get(windowId)} - ${count}/${total}`;
+  return `${label} #${indexes.get(windowId)}`;
+}
+
+export function titleGroupName(title) {
+  return title || "(untitled)";
 }
 
 // Generic grouping: consecutive same-key runs → ordered [key, tabs[]] pairs.
@@ -144,11 +165,6 @@ export function groupTabs(tabs, key) {
     else groups.push([key(tab), [tab]]);
   }
   return groups;
-}
-
-// header label for title groups; window groups use groupHeader() above
-export function titleGroupLabel(title, { count, total }) {
-  return `${title || "(untitled)"} - ${count}/${total}`;
 }
 
 // everything renderRow needs to build the DOM, as plain data

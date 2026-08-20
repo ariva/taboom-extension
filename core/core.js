@@ -16,6 +16,8 @@ export const DEFAULTS = {
     defaultFilter: "all",
     scope: "all-windows",
     sort: "window",
+    sortDirMode: "default", // "default" = canonical on every sort change; "remember" = per-sort memory
+    sortDirections: {}, // last-used direction per sort value (used when sortDirMode = remember)
     fontSize: 1, // rem, relative to browser default
     density: "comfortable", // or "compact"
     theme: "auto", // "auto" | "light" | "dark"

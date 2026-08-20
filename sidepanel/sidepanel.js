@@ -16,9 +16,9 @@ import {
   deriveTabs,
   emptyMessage,
   searchCandidates,
-  groupHeader,
   groupTabs,
-  titleGroupLabel,
+  titleGroupName,
+  windowGroupName,
   rowViewModel,
   selectVisible,
   windowMaps,
@@ -85,6 +85,7 @@ const state = {
   filter: "all",
   scope: "all-windows",
   sort: "recent",
+  sortDir: "desc", // current sort's direction state (see SORT_DIRECTIONS)
   ui: {},
   rules: [],
   features: FEATURES, // experimental-resolved copy, refreshed in refresh()
@@ -162,20 +163,73 @@ const GROUPINGS = {
   window: {
     noun: "window",
     key: (tab) => tab.windowId,
-    label: (windowId, count, total, maps) =>
-      groupHeader(windowId, {
-        count,
-        total,
-        currentWindowId: state.currentWindowId,
-        indexes: maps.indexes,
-      }),
+    name: (windowId, maps) =>
+      windowGroupName(windowId, { currentWindowId: state.currentWindowId, indexes: maps.indexes }),
   },
   "group-title": {
     key: (tab) => tab.title ?? "",
-    label: (title, count, total) => titleGroupLabel(title, { count, total }),
+    name: (title) => titleGroupName(title),
     noun: "group",
   },
 };
+
+// Direction metadata per sort. Paired sorts (recent/oldest) swap the dropdown
+// option itself. Flat sorts cycle asc⇄desc. Grouped sorts are TRI-state:
+// "none" (natural order) → "desc" (most visible tabs first) → "asc" (fewest) →
+// back to "none". states[0] is the canonical/first-time state.
+const SORT_DIRECTIONS = {
+  recent: { states: ["desc"], inverse: "oldest" },
+  oldest: { states: ["asc"], inverse: "recent" },
+  title: { states: ["asc", "desc"] },
+  domain: { states: ["asc", "desc"] },
+  window: { states: ["none", "desc", "asc"] },
+  "group-title": { states: ["desc", "asc", "none"] }, // biggest groups first by default
+};
+
+function canonicalDir(sort) {
+  return (SORT_DIRECTIONS[sort] ?? { states: ["asc"] }).states[0];
+}
+
+// initial direction when a sort becomes active: canonical, unless the user
+// opted into per-sort memory ("Sort memory: Remember previous" in options)
+function initialDirFor(sort) {
+  if ((state.ui.sortDirMode ?? "default") === "remember") {
+    return state.ui.sortDirections?.[sort] ?? canonicalDir(sort);
+  }
+  return canonicalDir(sort);
+}
+
+const sortDirBtn = getElementById("sort-dir");
+
+const DIR_TITLES = {
+  none: "Default Sorting — click to sort by tab count, most first",
+  desc: "Descending / most tabs first — click for ascending / fewest first",
+  asc: "Ascending / fewest tabs first — click for next order",
+};
+
+function syncSortDirButton() {
+  const meta = SORT_DIRECTIONS[effectiveSort()] ?? { states: ["asc"] };
+  const dir = meta.inverse ? meta.states[0] : state.sortDir;
+  sortDirBtn.dataset.dir = dir;
+  sortDirBtn.title = sortDirBtn.ariaLabel = DIR_TITLES[dir];
+}
+
+sortDirBtn.addEventListener("click", () => {
+  const meta = SORT_DIRECTIONS[effectiveSort()];
+  if (meta?.inverse) {
+    // smart pair swap: e.g. Recently used ⇄ Least recently used
+    state.sort = meta.inverse;
+    sortSelect.value = meta.inverse;
+    state.sortDir = canonicalDir(state.sort);
+  } else {
+    const states = meta?.states ?? ["asc", "desc"];
+    state.sortDir = states[(states.indexOf(state.sortDir) + 1) % states.length];
+  }
+  resetScrollPositions(); // new order = saved positions meaningless; start at top
+  persistUiPrefs();
+  syncSortDirButton();
+  render(!state.query);
+});
 
 // GROUP_BY_TITLE off but persisted/selected: fall back to the window grouping
 // for display — the stored preference is not rewritten
@@ -271,7 +325,7 @@ function renderNowImpl() {
       frag.append(renderGroupHeader(groupKey, {
         isCollapsed,
         collapsible,
-        labelText: grouping.label(groupKey, members.length, totals.get(groupKey) ?? 0, maps),
+        name: grouping.name(groupKey, maps),
         // window color dot only makes sense for the window grouping
         dotColor:
           sort === "window" && maps.dotColors.size > 0
@@ -362,7 +416,7 @@ collapseAllBtn.addEventListener("click", () => {
 });
 
 // clickable group header (any grouping): toggles collapse of the group's rows
-function renderGroupHeader(groupKey, { isCollapsed, collapsible, labelText, dotColor, tabs, noun, count, total }) {
+function renderGroupHeader(groupKey, { isCollapsed, collapsible, name, dotColor, tabs, noun, count, total }) {
   const header = document.createElement("div");
   header.className = "group-header";
   // WINDOW_GROUP_SELECT: checkbox left of the label selects/unselects every
@@ -404,13 +458,18 @@ function renderGroupHeader(groupKey, { isCollapsed, collapsible, labelText, dotC
   }
   const label = document.createElement("span");
   label.className = "group-label";
-  label.textContent = labelText;
-  header.append(label);
+  label.textContent = name;
+  // counts in their own non-shrinking span: a long name ellipsizes without
+  // ever swallowing the visible/total numbers
+  const counts = document.createElement("span");
+  counts.className = "group-count";
+  counts.textContent = `${count}/${total}`;
+  header.append(label, counts);
   // hover: generic group info (name + how many tabs) plus the click action.
   // Custom tip (not title=): native tooltips render under the cursor and the
   // pointer hides the first line — ours sits to the right of the pointer.
   const info =
-    `${labelText.split(" - ")[0]}\n` +
+    `${name}\n` +
     `${selectedCount}/${count} selected tabs\n` +
     `${count}/${total} visible tabs`;
   if (!collapsible) {
@@ -749,10 +808,12 @@ scopeSelect.addEventListener("change", () => {
 
 sortSelect.addEventListener("change", () => {
   state.sort = sortSelect.value;
+  state.sortDir = initialDirFor(state.sort);
   state.collapsedGroups.clear(); // keys from another grouping are meaningless
   state.searchCollapsedGroups.clear();
   resetScrollPositions();
   persistUiPrefs();
+  syncSortDirButton();
   render(!state.query);
 });
 
@@ -762,7 +823,15 @@ sortSelect.addEventListener("change", () => {
 let lastOwnUiWrite = null;
 
 function persistUiPrefs() {
-  const ui = { ...state.ui, defaultFilter: state.filter, scope: state.scope, sort: state.sort };
+  const ui = {
+    ...state.ui,
+    defaultFilter: state.filter,
+    scope: state.scope,
+    sort: state.sort,
+    // every sort remembers its last direction (only applied when the user's
+    // Sort memory option is "remember")
+    sortDirections: { ...(state.ui.sortDirections ?? {}), [state.sort]: state.sortDir },
+  };
   state.ui = ui;
   lastOwnUiWrite = JSON.stringify(ui);
   saveState({ ui });
@@ -884,8 +953,11 @@ initialStatePromise.then((persisted) => {
   state.filter = persisted.ui.defaultFilter;
   state.scope = persisted.ui.scope;
   state.sort = persisted.ui.sort;
+  state.ui = persisted.ui; // initialDirFor reads sortDirMode/sortDirections
+  state.sortDir = initialDirFor(state.sort);
   scopeSelect.value = state.scope;
   sortSelect.value = state.sort;
+  syncSortDirButton();
   refresh(false, persisted); // search input focuses itself via the autofocus attribute
 });
 

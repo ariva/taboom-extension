@@ -14,7 +14,9 @@ const tabs = [
   { id: 4, windowId: 2, active: false, discarded: false, url: "https://bb.aa/q", title: "Delta", lastAccessed: NOW - 4 * HOUR },
 ];
 
-loadPage("../../sidepanel/index.html", makeChrome({ tabs, calls: [], stored: {} }));
+const stored = {};
+const chrome = makeChrome({ tabs, calls: [], stored });
+loadPage("../../sidepanel/index.html", chrome);
 await import("../sidepanel/sidepanel.js");
 await tick();
 await tick();
@@ -69,7 +71,12 @@ test("UI - Sidepanel Sort - Group by window: current window first, headers with 
   setSort("window");
   assert.deepEqual(titles(), ["Bravo", "Alpha", "Charlie", "Delta"], "current window recent-first, then window 2");
   const headers = [...document.querySelectorAll(".group-header")].map((el) => el.textContent);
-  assert.deepEqual(headers, ["Window Current #1 - 3/3▾", "Window #2 - 1/1▾"], "arrow right-aligned (last in text)");
+  assert.deepEqual(headers, ["Window Current #13/3▾", "Window #21/1▾"], "name + counts + arrow spans");
+  assert.deepEqual(
+    [...document.querySelectorAll(".group-header .group-count")].map((el) => el.textContent),
+    ["3/3", "1/1"],
+    "counts in their own non-truncating span",
+  );
 
   // filtered list → visible / total diverge
   const search = document.getElementById("search");
@@ -77,7 +84,8 @@ test("UI - Sidepanel Sort - Group by window: current window first, headers with 
   search.dispatchEvent(new window.Event("input", { bubbles: true }));
   assert.deepEqual(
     [...document.querySelectorAll(".group-header")].map((el) => el.textContent),
-    ["Window Current #1 - 1/3"],
+    ["Window Current #11/3"],
+    "single matching group: static header, no fold arrow",
   );
   search.value = "";
   search.dispatchEvent(new window.Event("input", { bubbles: true }));
@@ -195,11 +203,20 @@ test(
   { skip: !GROUP_TITLE_ON && "GROUP_BY_TITLE disabled in features.json" },
   () => {
   setSort("group-title");
+  assert.equal(
+    document.getElementById("sort-dir").dataset.dir,
+    "desc",
+    "group-title defaults to descending (biggest groups first)",
+  );
   const headers = [...document.querySelectorAll(".group-header .group-label")].map((el) => el.textContent);
   assert.deepEqual(
     headers,
-    ["Alpha - 1/1", "Bravo - 1/1", "Charlie - 1/1", "Delta - 1/1"],
-    "one group per title, alphabetical, visible/total counts",
+    ["Alpha", "Bravo", "Charlie", "Delta"],
+    "one group per title, alphabetical (all size 1 → ties alphabetical under desc)",
+  );
+  assert.ok(
+    [...document.querySelectorAll(".group-header .group-count")].every((el) => el.textContent === "1/1"),
+    "counts rendered separately",
   );
   assert.equal(document.getElementById("collapse-all").hidden, false, "fold-all available");
   assert.equal(document.querySelectorAll(".group-header .win-dot").length, 0, "no window dots in title grouping");
@@ -251,4 +268,70 @@ test("UI - Sidepanel Sort - Groups collapse during search without touching pre-s
   assert.equal(document.querySelectorAll(".row").length, 1, "window 1 still folded, window 2 open");
   assert.ok(!headerFor("Window #2").textContent.includes("▸"), "search-time fold did not leak");
   headerFor("Window Current #1").click(); // restore expanded state for other tests
+});
+
+test("UI - Sidepanel Sort - Direction: pair swap, flat flip, grouped tri-state cycle", async () => {
+  const dirBtn = document.getElementById("sort-dir");
+  const sortSel = document.getElementById("sort");
+
+  setSort("recent");
+  assert.equal(dirBtn.dataset.dir, "desc", "recent shows the desc glyph");
+  document.getElementById("tab-list").scrollTop = 90;
+  dirBtn.click();
+  await tick();
+  assert.equal(sortSel.value, "oldest", "smart swap to the paired option");
+  assert.equal(dirBtn.dataset.dir, "asc");
+  assert.deepEqual(titles(), ["Delta", "Charlie", "Alpha", "Bravo"], "list actually reversed");
+  assert.equal(document.getElementById("tab-list").scrollTop, 0, "direction change scrolls to top");
+
+  setSort("title");
+  assert.equal(dirBtn.dataset.dir, "asc", "title starts ascending");
+  dirBtn.click();
+  await tick();
+  assert.equal(sortSel.value, "title", "no paired option: dropdown unchanged");
+  assert.deepEqual(titles(), ["Delta", "Charlie", "Bravo", "Alpha"], "title Z..A");
+  assert.equal(dirBtn.dataset.dir, "desc");
+
+  // grouped tri-state: none → desc (most tabs) → asc (fewest) → none
+  setSort("window"); // window 1: 3 tabs, window 2: 1 tab
+  assert.equal(dirBtn.dataset.dir, "none", "grouped sorts start in natural order");
+  const firstHeader = () => document.querySelector(".group-header .group-label").textContent;
+  assert.match(firstHeader(), /Window Current #1/, "natural: current window first");
+  dirBtn.click();
+  await tick();
+  assert.equal(dirBtn.dataset.dir, "desc");
+  assert.match(firstHeader(), /Window Current #1/, "most tabs first: window 1 (3 tabs)");
+  dirBtn.click();
+  await tick();
+  assert.equal(dirBtn.dataset.dir, "asc");
+  assert.match(firstHeader(), /Window #2/, "fewest tabs first: window 2 (1 tab)");
+  dirBtn.click();
+  await tick();
+  assert.equal(dirBtn.dataset.dir, "none", "cycle wraps back to natural");
+});
+
+test("UI - Sidepanel Sort - Sort memory: remember mode restores each sort's last direction", async () => {
+  const dirBtn = document.getElementById("sort-dir");
+  // clean slate: earlier tests' clicks persisted per-sort directions already
+  stored.ui = { ...(stored.ui ?? {}), sortDirMode: "remember", sortDirections: {} };
+  await chrome.storage.onChanged.fire({ ui: {} }, "local"); // refresh picks up the mode
+  await new Promise((resolve) => setTimeout(resolve, 200)); // debounce
+
+  setSort("title");
+  dirBtn.click(); // title → desc, persisted per-sort
+  await tick();
+  assert.equal(dirBtn.dataset.dir, "desc");
+  setSort("window");
+  assert.equal(dirBtn.dataset.dir, "none", "window never used: canonical");
+  setSort("title");
+  assert.equal(dirBtn.dataset.dir, "desc", "title direction remembered");
+  assert.deepEqual(titles(), ["Delta", "Charlie", "Bravo", "Alpha"], "restored order applied");
+
+  stored.ui = { ...stored.ui, sortDirMode: "default" };
+  await chrome.storage.onChanged.fire({ ui: {} }, "local");
+  await new Promise((resolve) => setTimeout(resolve, 200));
+  setSort("window");
+  setSort("title");
+  assert.equal(dirBtn.dataset.dir, "asc", "default mode: canonical on every change");
+  setSort("window");
 });
