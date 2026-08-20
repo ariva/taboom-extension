@@ -389,6 +389,35 @@ test("UI - Sidepanel - Navigation mode switch closes an open history popup", asy
   delete pop.hidePopover;
 });
 
+test("UI - Sidepanel - Right-click on an arrow with open popup closes it", async () => {
+  const back = document.getElementById("hist-back");
+  const pop = document.getElementById("history-pop");
+  back.disabled = false;
+  const hides = [];
+  pop.matches = () => true; // popup open at gesture start
+  pop.hidePopover = () => hides.push(1);
+  pop.textContent = "sentinel";
+  const pointer = (type, button) => {
+    const event = new window.Event(type, { bubbles: true });
+    event.button = button;
+    back.dispatchEvent(event);
+  };
+  pointer("pointerdown", 2);
+  pop.matches = () => false; // light dismiss closed it mid-gesture
+  pointer("pointerup", 2);
+  await tick();
+  assert.equal(hides.length, 1, "gesture closes, not reopens");
+  assert.equal(pop.textContent, "sentinel", "popup not refilled");
+
+  // popup closed at gesture start: right-click opens as before
+  pointer("pointerdown", 2);
+  pointer("pointerup", 2);
+  await tick();
+  assert.ok(pop.querySelector(".hist-head"), "opens when it was closed");
+  delete pop.matches;
+  delete pop.hidePopover;
+});
+
 test("UI - Sidepanel - Escape with open history popover leaves the search alone", () => {
   const search = document.getElementById("search");
   search.value = "abc";

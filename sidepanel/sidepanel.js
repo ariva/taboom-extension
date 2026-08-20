@@ -654,11 +654,7 @@ document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
     // open history popover: the browser closes it on this same Esc (native
     // light dismiss) — don't also clear the search underneath
-    let popoverOpen = false;
-    try {
-      popoverOpen = histPop.matches(":popover-open");
-    } catch {} // happy-dom: selector unsupported
-    if (popoverOpen) {
+    if (isPopoverOpen()) {
       return;
     }
     searchInput.value = "";
@@ -766,6 +762,14 @@ const histBack = getElementById("hist-back");
 const histForward = getElementById("hist-forward");
 const histListBtn = getElementById("hist-list-btn");
 const histPop = getElementById("history-pop");
+
+function isPopoverOpen() {
+  try {
+    return histPop.matches(":popover-open");
+  } catch {
+    return false; // happy-dom: selector unsupported
+  }
+}
 
 // Focus tracking: losing focus (user clicked into the page or another window)
 // closes any open popup; both transitions are announced — no consumer yet,
@@ -910,6 +914,10 @@ async function fillHistoryPopover() {
 const LONG_PRESS_MS = 500;
 let longPressTimer;
 let longPressArmed = false;
+// openness at gesture START: native light dismiss may close the popup on the
+// pointerdown itself, so by pointerup it always reads closed — without this
+// snapshot a right-click on an arrow would close-then-instantly-reopen
+let popoverWasOpen = false;
 
 // click fires right after the opening pointerup — swallow exactly one
 function consumeLongPress() {
@@ -928,6 +936,7 @@ async function openHistoryPopover() {
 for (const arrow of [histBack, histForward]) {
   arrow.addEventListener("contextmenu", (event) => event.preventDefault());
   arrow.addEventListener("pointerdown", (event) => {
+    popoverWasOpen = isPopoverOpen(); // any button — before light dismiss races us
     if (event.button !== 0) {
       return;
     }
@@ -940,9 +949,17 @@ for (const arrow of [histBack, histForward]) {
   }
   arrow.addEventListener("pointerup", async (event) => {
     clearTimeout(longPressTimer);
-    if (event.button === 2 || (event.button === 0 && longPressArmed)) {
-      await openHistoryPopover();
+    if (event.button !== 2 && !(event.button === 0 && longPressArmed)) {
+      return;
     }
+    // toggle: popup was open when the gesture started → this gesture closes it
+    if (popoverWasOpen) {
+      try {
+        histPop.hidePopover?.();
+      } catch {} // light dismiss already closed it
+      return;
+    }
+    await openHistoryPopover();
   });
 }
 
@@ -954,11 +971,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
   syncHistoryButtons();
   // popover open (in THIS panel — every window's panel gets this event, so all
   // open popups converge on the same trail): live-refresh its rows
-  let open = false;
-  try {
-    open = histPop.matches(":popover-open");
-  } catch {} // happy-dom: selector unsupported
-  if (open) {
+  if (isPopoverOpen()) {
     fillHistoryPopover();
   }
 });
