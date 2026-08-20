@@ -41,11 +41,14 @@ export function perfLines(metrics) {
   );
 }
 
-// How many release sections the options "What's new" box shows.
-export const SHOW_MAX_CHANGES = 25;
+// "What's new" shows this many releases up front; a Show-more button then
+// reveals SHOW_MORE_PAGE per click until everything is visible.
+export const SHOW_INITIAL_CHANGES = 5;
+export const SHOW_MORE_PAGE = 10;
 
-// Newest `count` release sections of CHANGES.md as [{ title, body }], newest first.
-export function releaseSections(markdown, count = SHOW_MAX_CHANGES) {
+// Newest `count` release sections of CHANGES.md as [{ title, body }], newest
+// first — all of them by default.
+export function releaseSections(markdown, count = Infinity) {
   return markdown
     .split(/^## /m)
     .slice(1, count + 1)

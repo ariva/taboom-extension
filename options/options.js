@@ -17,6 +17,8 @@ import {
   clampedNumber,
   hasRule,
   releaseSections,
+  SHOW_INITIAL_CHANGES,
+  SHOW_MORE_PAGE,
   snapshotBlocks,
 } from "./model.js";
 
@@ -256,6 +258,9 @@ fetch(chrome.runtime.getURL("CHANGES.md"))
     for (const [index, section] of sections.entries()) {
       const details = document.createElement("details");
       details.open = index === 0;
+      if (index >= SHOW_INITIAL_CHANGES) {
+        details.hidden = true; // revealed by the Show-all button
+      }
       const summary = document.createElement("summary");
       summary.textContent = index === 0 ? `What's new — ${section.title}` : section.title;
       const pre = document.createElement("pre");
@@ -263,6 +268,27 @@ fetch(chrome.runtime.getURL("CHANGES.md"))
       pre.textContent = section.body;
       details.append(summary, pre);
       box.append(details);
+    }
+    if (sections.length > SHOW_INITIAL_CHANGES) {
+      // paginated reveal: each click shows the next SHOW_MORE_PAGE releases;
+      // the button disappears once the last one is visible
+      const showMore = document.createElement("button");
+      const hiddenNow = () => [...box.querySelectorAll("details[hidden]")];
+      const updateLabel = () => {
+        showMore.textContent = `Show ${Math.min(SHOW_MORE_PAGE, hiddenNow().length)} more`;
+      };
+      showMore.addEventListener("click", () => {
+        for (const hiddenSection of hiddenNow().slice(0, SHOW_MORE_PAGE)) {
+          /** @type {HTMLElement} */ (hiddenSection).hidden = false;
+        }
+        if (hiddenNow().length === 0) {
+          showMore.remove();
+        } else {
+          updateLabel();
+        }
+      });
+      updateLabel();
+      box.append(showMore);
     }
     box.hidden = false;
   })

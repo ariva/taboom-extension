@@ -192,3 +192,32 @@ test("UI - Options - Dropdown shows the effective mode when the stored one is fl
   );
   assert.equal(stored.ui.historyNav, "compact", "stored preference untouched");
 });
+
+test("UI - Options - What's new paginates: initial count, then a page per click until done", async () => {
+  const { SHOW_INITIAL_CHANGES, SHOW_MORE_PAGE } = await import("../options/model.js");
+  const { readFileSync } = await import("node:fs");
+  const md = readFileSync(new URL("../CHANGES.md", import.meta.url), "utf8");
+  const total = md.split(/^## /m).length - 1;
+  const box = document.getElementById("whats-new");
+  const details = box.querySelectorAll("details");
+  assert.equal(details.length, total, "every release section rendered");
+  const visibleCount = () => [...box.querySelectorAll("details")].filter((d) => !d.hidden).length;
+  assert.equal(visibleCount(), Math.min(SHOW_INITIAL_CHANGES, total), "initial count visible up front");
+
+  if (total <= SHOW_INITIAL_CHANGES) {
+    assert.equal(box.querySelector("button"), null, "no button at the initial count or fewer releases");
+    return;
+  }
+  let clicks = 0;
+  let button;
+  while ((button = box.querySelector("button"))) {
+    const hidden = total - visibleCount();
+    assert.equal(button.textContent, `Show ${Math.min(SHOW_MORE_PAGE, hidden)} more`, "label = next page size");
+    button.click();
+    clicks++;
+    assert.equal(visibleCount(), Math.min(total, total - hidden + Math.min(SHOW_MORE_PAGE, hidden)), "one page revealed");
+    assert.ok(clicks <= total, "terminates");
+  }
+  assert.equal(visibleCount(), total, "everything visible at the end");
+  assert.equal(clicks, Math.ceil((total - SHOW_INITIAL_CHANGES) / SHOW_MORE_PAGE), "page count");
+});

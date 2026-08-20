@@ -40,8 +40,11 @@ export const RAW_FEATURES = (() => {
 })();
 export const TEST_FEATURES = applyExperimental(RAW_FEATURES, TEST_EXPERIMENTAL);
 
+const changesMd = readFileSync(new URL("../../CHANGES.md", import.meta.url), "utf8");
+
 globalThis.fetch = async (url) => {
   if (String(url).endsWith("features.json")) return { json: async () => structuredClone(RAW_FEATURES) };
+  if (String(url).endsWith("CHANGES.md")) return { text: async () => changesMd };
   throw new Error(`unmocked fetch ${url}`);
 };
 
