@@ -1,5 +1,10 @@
 # CHANGES
 
+## v0.2.12 — 2026-08-20
+
+### New Features
+- Hidden-matches search behavior as an opt-in Customization dropdown and the feature is stabile. (9b2a3e5)
+
 ## v0.2.11 — 2026-08-20
 
 ### New Features
