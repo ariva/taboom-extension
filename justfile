@@ -33,12 +33,9 @@ test-experimental:
 test-disabled:
     TEST_ALL_DISABLED=1 node --test tests/*.test.js
 
-# pack distributable zip (excludes docs/tests/tooling)
-build: check
-    mkdir -p dist
-    rm -f dist/taboom-tabs-manager.zip
-    zip -r dist/taboom-tabs-manager.zip manifest.json CHANGES.md features.json background core sidepanel options icons styles images/moon.svg
-    @echo "dist/taboom-tabs-manager.zip ready"
+# release-gate (code checks, versions match, > previous tag, notes + valid hashes) then pack
+build:
+    ./scripts/build.sh
 
 clean:
     rm -rf dist

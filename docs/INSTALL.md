@@ -54,11 +54,15 @@ Prerequisites:
 - [`just`](https://github.com/casey/just) — command runner driving lint/test/build (see its [installation guide](https://github.com/casey/just#installation)).
 - Node.js + `npm install` — installs the dev-only dependencies (`happy-dom` for UI tests, `typescript` + `@types/chrome` for the type check); `just build` runs lint, type check, and the test suite before packing.
 - [`fd`](https://github.com/sharkdp/fd) — used by the lint step to enumerate JS files.
+- [`jq`](https://jqlang.github.io/jq/) — `scripts/build.sh` reads versions from `manifest.json`/`package.json` with it.
+- `zip` + `git` — `scripts/build.sh` packs the archive and verifies CHANGES.md commit hashes against history.
 
 ```bash
 npm install
-just build    # lint + typecheck + test + dist/tabs-manager.zip
+just build    # lint + typecheck + test + release gate + dist/taboom-tabs-manager.zip
 ```
+
+`just build` refuses to pack unless `package.json` and `manifest.json` versions match, the version is newer than the latest `release-v*` tag, CHANGES.md has an entry for it, and every commit hash in CHANGES.md exists in git history (`scripts/validate_hashes.sh`).
 
 The zip is only needed for distribution (e.g. Chrome Web Store upload). Local development always uses Load unpacked.
 
