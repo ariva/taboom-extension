@@ -1,5 +1,22 @@
 # CHANGES
 
+## v0.2.10 — 2026-08-20
+
+### New Features
+- Group by domain, plus options Customization section (fddeb4d)
+- Added sort-direction button (754ad4f)
+- Search-scoped group folding plus a hover tooltip (d65fbb8)
+- Experimental feature - group tabs by title — biggest groups first. (216a8df)
+- Per-window select checkbox in group headers plus header polish — dot indicator, accordion chevron, spacing. (0686858)
+- Control individual items in navigation history - have ability to remove from the list (38ce277)
+- Pagination of the what's-new items. (d392d3e)
+- Close sidebar popups on focus loss (c2abbb1)
+- Traditional/compact navigation stacks behind per-mode flags, options dropdown (990c6e6)
+- Add restore default settings and clear protected sites actions in options (937c47a)
+
+### Fixes
+- Right-click on nav arrows toggles the history popup (7bbac90)
+
 ## v0.2.9 — 2026-08-19
 
 ### New Features
