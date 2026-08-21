@@ -370,3 +370,24 @@ test(
     setSort("window");
   },
 );
+
+test("UI - Sidepanel Sort - Group by window is the last dropdown option", () => {
+  const options = [...document.querySelectorAll("#sort option")];
+  assert.equal(options[options.length - 1].value, "window");
+});
+
+test("UI - Sidepanel Sort - sort-dir hides with a lone group, like fold-all", () => {
+  setSort("window");
+  const dirBtn = document.getElementById("sort-dir");
+  const scope = document.getElementById("scope");
+  assert.equal(dirBtn.hidden, false, "multiple window groups: visible");
+  scope.value = "current-window";
+  scope.dispatchEvent(new window.Event("change", { bubbles: true }));
+  assert.equal(dirBtn.hidden, true, "lone group: direction hidden");
+  assert.equal(document.getElementById("collapse-all").hidden, true, "same rule as fold-all");
+  setSort("recent");
+  assert.equal(dirBtn.hidden, false, "non-grouped sort: always visible");
+  scope.value = "all-windows";
+  scope.dispatchEvent(new window.Event("change", { bubbles: true }));
+  setSort("window");
+});

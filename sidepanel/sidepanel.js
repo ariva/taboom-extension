@@ -223,7 +223,12 @@ const DIR_TITLES = {
   asc: "Ascending / fewest tabs first — click for next order",
 };
 
-function syncSortDirButton() {
+// same shape as renderCollapseAllButton: one function owns the whole button,
+// called only from render(). Hidden when a grouped sort has a lone group —
+// same rule as the fold-all toggle.
+function renderSortDirButton(grouping, anythingToFold) {
+  sortDirBtn.hidden = Boolean(grouping) && !anythingToFold;
+  if (sortDirBtn.hidden) { return; }
   const meta = SORT_DIRECTIONS[effectiveSort()] ?? { states: ["asc"] };
   const dir = meta.inverse ? meta.states[0] : state.sortDir;
   sortDirBtn.dataset.dir = dir;
@@ -243,7 +248,6 @@ sortDirBtn.addEventListener("click", () => {
   }
   resetScrollPositions(); // new order = saved positions meaningless; start at top
   persistUiPrefs();
-  syncSortDirButton();
   render(!state.query);
 });
 
@@ -362,6 +366,7 @@ function renderNowImpl() {
   listEl.replaceChildren(frag);
   syncRowHeight();
   renderCollapseAllButton(foldableGroups, anythingToFold);
+  renderSortDirButton(grouping, anythingToFold);
 
   if (state.pendingScroll != null) {
     listEl.scrollTop = state.pendingScroll;
@@ -835,7 +840,6 @@ sortSelect.addEventListener("change", () => {
   state.searchCollapsedGroups.clear();
   resetScrollPositions();
   persistUiPrefs();
-  syncSortDirButton();
   render(!state.query);
 });
 
@@ -979,7 +983,6 @@ initialStatePromise.then((persisted) => {
   state.sortDir = initialDirFor(state.sort);
   scopeSelect.value = state.scope;
   sortSelect.value = state.sort;
-  syncSortDirButton();
   refresh(false, persisted); // search input focuses itself via the autofocus attribute
 });
 
