@@ -203,6 +203,10 @@ test("UI - Options - What's new paginates: initial count, then a page per click 
   assert.equal(details.length, total, "every release section rendered");
   const visibleCount = () => [...box.querySelectorAll("details")].filter((d) => !d.hidden).length;
   assert.equal(visibleCount(), Math.min(SHOW_INITIAL_CHANGES, total), "initial count visible up front");
+  assert.ok(
+    [...details].every((d, index) => d.open === (index < SHOW_INITIAL_CHANGES)),
+    "initial page expanded, later releases folded",
+  );
 
   if (total <= SHOW_INITIAL_CHANGES) {
     assert.equal(box.querySelector("button"), null, "no button at the initial count or fewer releases");

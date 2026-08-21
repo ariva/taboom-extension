@@ -263,7 +263,7 @@ fetch(chrome.runtime.getURL("CHANGES.md"))
     const box = getElementById("whats-new");
     for (const [index, section] of sections.entries()) {
       const details = document.createElement("details");
-      details.open = index === 0;
+      details.open = index < SHOW_INITIAL_CHANGES; // initial page expanded, rest fold
       if (index >= SHOW_INITIAL_CHANGES) {
         details.hidden = true; // revealed by the Show-all button
       }
