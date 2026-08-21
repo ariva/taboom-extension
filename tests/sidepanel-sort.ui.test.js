@@ -137,16 +137,16 @@ test("UI - Sidepanel Sort - Collapse-all button folds and unfolds every group", 
 
   setSort("window");
   assert.equal(btn.hidden, false, "visible with 2+ groups");
-  assert.equal(btn.title, "Collapse all");
+  assert.equal(btn.title, "Click to Collapse");
 
   btn.click();
   assert.equal(document.querySelectorAll(".row").length, 0, "all groups folded");
   assert.equal(document.querySelectorAll(".group-header").length, 2, "headers remain");
-  assert.equal(btn.title, "Expand all");
+  assert.equal(btn.title, "Click to Expand");
 
   btn.click();
   assert.equal(document.querySelectorAll(".row").length, 4, "all groups unfolded");
-  assert.equal(btn.title, "Collapse all");
+  assert.equal(btn.title, "Click to Collapse");
   setSort("recent");
   assert.equal(btn.hidden, true);
 });

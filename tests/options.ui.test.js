@@ -193,28 +193,32 @@ test("UI - Options - Dropdown shows the effective mode when the stored one is fl
   assert.equal(stored.ui.historyNav, "compact", "stored preference untouched");
 });
 
+const CHANGES_COLLAPSABLE = TEST_FEATURES.OPTION_COLLAPSABLE_CHANGE_LOG_ITEMS?.enabled === true;
+
 test("UI - Options - What's new paginates: initial count, then a page per click until done", async () => {
   const { SHOW_INITIAL_CHANGES, SHOW_MORE_PAGE } = await import("../options/model.js");
   const { readFileSync } = await import("node:fs");
   const md = readFileSync(new URL("../CHANGES.md", import.meta.url), "utf8");
   const total = md.split(/^## /m).length - 1;
   const box = document.getElementById("whats-new");
-  const details = box.querySelectorAll("details");
-  assert.equal(details.length, total, "every release section rendered");
-  const visibleCount = () => [...box.querySelectorAll("details")].filter((d) => !d.hidden).length;
+  const entries = box.querySelectorAll(".changes-entry");
+  assert.equal(entries.length, total, "every release section rendered");
+  const visibleCount = () => [...box.querySelectorAll(".changes-entry")].filter((d) => !d.hidden).length;
   assert.equal(visibleCount(), Math.min(SHOW_INITIAL_CHANGES, total), "initial count visible up front");
-  assert.ok(
-    [...details].every((d, index) => d.open === (index < SHOW_INITIAL_CHANGES)),
-    "initial page expanded, later releases folded",
-  );
+  if (CHANGES_COLLAPSABLE) {
+    assert.ok(
+      [...entries].every((d, index) => d.open === (index < SHOW_INITIAL_CHANGES)),
+      "initial page expanded, later releases folded",
+    );
+  }
 
   if (total <= SHOW_INITIAL_CHANGES) {
-    assert.equal(box.querySelector("button"), null, "no button at the initial count or fewer releases");
+    assert.equal(box.querySelector("#changes-more"), null, "no Show-more at the initial count or fewer releases");
     return;
   }
   let clicks = 0;
   let button;
-  while ((button = box.querySelector("button"))) {
+  while ((button = box.querySelector("#changes-more"))) {
     const hidden = total - visibleCount();
     assert.equal(button.textContent, `Show ${Math.min(SHOW_MORE_PAGE, hidden)} more`, "label = next page size");
     button.click();
@@ -225,6 +229,41 @@ test("UI - Options - What's new paginates: initial count, then a page per click 
   assert.equal(visibleCount(), total, "everything visible at the end");
   assert.equal(clicks, Math.ceil((total - SHOW_INITIAL_CHANGES) / SHOW_MORE_PAGE), "page count");
 });
+
+test(
+  "UI - Options - What's new fold-all toggle collapses and expands every release",
+  { skip: !CHANGES_COLLAPSABLE && "OPTION_COLLAPSABLE_CHANGE_LOG_ITEMS disabled in features.json" },
+  () => {
+    const box = document.getElementById("whats-new");
+    const toggle = document.getElementById("changes-toggle");
+    const allDetails = [...box.querySelectorAll("details")];
+    assert.equal(toggle.title, "Click to Collapse", "some entries open at start");
+    assert.ok(toggle.querySelector("svg"), "icon button, not text");
+    toggle.click();
+    assert.ok(allDetails.every((d) => !d.open), "everything folded");
+    assert.equal(toggle.title, "Click to Expand");
+    toggle.click();
+    assert.ok(allDetails.every((d) => d.open), "everything expanded, hidden ones included");
+    assert.equal(toggle.title, "Click to Collapse");
+  },
+);
+
+test(
+  "UI - Options - What's new flag off: entries always expanded, no fold UI",
+  { skip: CHANGES_COLLAPSABLE && "OPTION_COLLAPSABLE_CHANGE_LOG_ITEMS enabled in features.json" },
+  () => {
+    const box = document.getElementById("whats-new");
+    assert.equal(document.getElementById("changes-toggle"), null, "no fold-all toggle");
+    assert.equal(box.querySelector("details"), null, "no collapsibles at all");
+    assert.equal(box.querySelector("summary"), null, "no chevron carriers");
+    const entries = [...box.querySelectorAll(".changes-entry")];
+    assert.ok(entries.length > 0, "entries rendered as plain blocks");
+    assert.ok(
+      entries.every((e) => e.querySelector(".changes-title") && e.querySelector("pre")),
+      "every entry shows title + body unconditionally",
+    );
+  },
+);
 
 test("UI - Options - Hidden-matches dropdown visible only with SEARCH_AUTO_SELECT_ALL", async () => {
   const { applyExperimental, featureEnabled } = await import("../core/core.js");
