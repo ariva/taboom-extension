@@ -44,7 +44,7 @@ export function perfLines(metrics) {
 // "What's new" shows this many releases up front; a Show-more button then
 // reveals SHOW_MORE_PAGE per click until everything is visible.
 export const SHOW_INITIAL_CHANGES = 5;
-export const SHOW_MORE_PAGE = 10;
+export const SHOW_MORE_PAGE = 5;
 
 // Newest `count` release sections of CHANGES.md as [{ title, body }], newest
 // first — all of them by default.

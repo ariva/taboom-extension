@@ -27,7 +27,9 @@
       pointer-events: none;
     }
 
-    #whats-new details + details { margin-top: 0.75rem; }
+    #whats-new .changes-entry + .changes-entry { margin-top: 0.75rem; }
+    /* non-collapsable entry heading (OPTION_COLLAPSABLE_CHANGE_LOG_ITEMS off) */
+    #whats-new .changes-title { margin: 0; padding: 0.25rem 0; }
     #whats-new > button { margin-top: 1rem; display: block; }
     #whats-new summary {
       cursor: pointer;
@@ -35,8 +37,30 @@
       padding: 0.25rem 0.4rem;
       margin: -0.25rem -0.4rem;
       border-radius: 6px;
+      display: flex;
+      align-items: center;
+      list-style: none; /* native left marker off — chevron sits right, like the sidepanel */
     }
+    #whats-new summary::-webkit-details-marker { display: none; }
+    /* chevron in a 16px column at the box's right edge — same column the
+       fold-all icon above sits in, so all collapse indicators line up */
+    #whats-new summary::after { content: "▸"; margin-left: auto; width: 16px; text-align: center; }
+    #whats-new details[open] > summary::after { content: "▾"; }
     #whats-new summary:hover { background: var(--hover); color: var(--accent); }
+    /* fold-all icon toggle on its own row above the entries, right-aligned */
+    #whats-new #changes-toggle {
+      /* -4px cancels the horizontal padding: the 16px svg ends flush at the
+         box edge, aligned with the summaries' chevron column */
+      margin: 0 -4px 0.5rem auto;
+      padding: 2px 4px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: inherit;
+      border-radius: 4px;
+    }
+    #changes-toggle svg { width: 16px; height: 16px; display: block; }
+    #changes-toggle:hover { background: var(--hover); color: var(--accent); }
     #experimental-warning { color: var(--danger); font-size: 0.9em; margin: 4px 0 0; }
 
     /* pre defaults (monospace, no wrap) look oversized and overflow the card */

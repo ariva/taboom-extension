@@ -8,7 +8,7 @@ import {
   resolveColorScheme,
   resolveNavMode,
 } from "../core/core.js";
-import { getElementById } from "../core/dom.js";
+import { getElementById, FOLD_ICONS } from "../core/dom.js";
 import { loadFeatures, loadState, saveState } from "../core/storage.js";
 import {
   bulkSummary,
@@ -75,10 +75,6 @@ const bulkCount = getElementById("bulk-count");
 const selectAllBox = getElementById("select-all");
 const collapseAllBtn = getElementById("collapse-all");
 
-const FOLD_ICONS = {
-  fold: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 3l4 4 4-4M4 9l4 4 4-4"/></svg>',
-  unfold: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7l4-4 4 4M4 13l4-4 4 4"/></svg>',
-};
 
 // the single mutable state of the panel — handlers write here, render reads
 const state = {
@@ -421,7 +417,7 @@ function renderCollapseAllButton(groups, anythingToFold) {
   const allCollapsed =
     groups.length > 0 && groups.every(([windowId]) => activeCollapsedSet().has(windowId));
   collapseAllBtn.innerHTML = allCollapsed ? FOLD_ICONS.unfold : FOLD_ICONS.fold;
-  collapseAllBtn.title = collapseAllBtn.ariaLabel = allCollapsed ? "Expand all" : "Collapse all";
+  collapseAllBtn.title = collapseAllBtn.ariaLabel = allCollapsed ? "Click to Expand" : "Click to Collapse";
   collapseAllBtn.dataset.groups = JSON.stringify(groups.map(([windowId]) => windowId));
 }
 

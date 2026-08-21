@@ -1,5 +1,7 @@
 {
   "ALLOW_EXPERIMENTAL": { "enabled": true },
+  "PERFORMANCE": { "enabled": false },
+  "SHOW_PERFORMANCE_INFO": { "enabled": false },
   "NAVIGATION_STACK": { "enabled": true },
   "NAVIGATION_TRADITIONAL_STACK": { "enabled": true },
   "NAVIGATION_COMPACT_STACK": { "enabled": true },
@@ -10,6 +12,5 @@
   "GROUP_BY_TITLE": { "enabled": true },
   "GROUP_BY_DOMAIN": { "enabled": true },
   "SEARCH_AUTO_SELECT_ALL": { "enabled": true },
-  "PERFORMANCE": { "enabled": false },
-  "SHOW_PERFORMANCE_INFO": { "enabled": false }
+  "OPTION_COLLAPSABLE_CHANGE_LOG_ITEMS": { "enabled": false }
 }
