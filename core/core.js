@@ -23,6 +23,7 @@ export const DEFAULTS = {
     theme: "auto", // "auto" | "light" | "dark"
     historyNav: "traditional", // "disabled" | "traditional" | "compact" (legacy: true/false)
     searchEmptyFilter: "keep", // "keep" | "all" — when search matches are hidden by the current filter
+    hideUpdateBanner: false, // suppress the new-version banner in the side panel
     showExperimental: false, // opt into experimental features (needs ALLOW_EXPERIMENTAL flag)
   },
 };

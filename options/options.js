@@ -72,6 +72,7 @@ async function render() {
   getElementById("searchEmptyFilter").value = state.ui.searchEmptyFilter ?? "keep";
   getElementById("theme").value = state.ui.theme ?? "auto";
   getElementById("showExperimental").checked = state.ui.showExperimental ?? false;
+  getElementById("hideUpdateBanner").checked = state.ui.hideUpdateBanner ?? false;
 
   const features = applyExperimental(FEATURES, state.ui.showExperimental ?? false);
   getElementById("historyNav-label").hidden =
@@ -153,6 +154,7 @@ const UI_FIELDS = [
   { id: "theme", prop: "value", apply: (v) => applyTheme(v) },
   { id: "historyNav", prop: "value" },
   { id: "showExperimental", prop: "checked" },
+  { id: "hideUpdateBanner", prop: "checked" },
 ];
 for (const { id, prop, parse, apply } of UI_FIELDS) {
   getElementById(id).addEventListener("change", async () => {

@@ -546,3 +546,19 @@ test("UI - Sidepanel - Update nudge: dismissible, silent for the same version, b
   assert.ok(calls.includes("runtime.reload"), "banner click restarts the extension to apply the update");
   await chrome.storage.local.remove(["updateAvailable", "dismissedUpdate"]);
 });
+
+test("UI - Sidepanel - Update nudge: ui.hideUpdateBanner suppresses it entirely", async () => {
+  const banner = document.getElementById("update-banner");
+  const { ui } = await chrome.storage.local.get("ui");
+  await chrome.storage.local.set({ updateAvailable: "9.9.11", ui: { ...ui, hideUpdateBanner: true } });
+  await chrome.storage.onChanged.fire({ updateAvailable: {}, ui: {} }, "local");
+  await tick();
+  assert.equal(banner.hidden, true, "option keeps the nudge hidden");
+  await chrome.storage.local.set({ ui: { ...ui, hideUpdateBanner: false } });
+  await chrome.storage.onChanged.fire({ ui: {} }, "local");
+  await tick();
+  assert.equal(banner.hidden, false, "clearing the option shows it again");
+  await chrome.storage.local.remove(["updateAvailable", "dismissedUpdate"]);
+  await chrome.storage.onChanged.fire({ updateAvailable: {} }, "local");
+  await tick();
+});

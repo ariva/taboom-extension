@@ -279,3 +279,15 @@ test("UI - Options - Hidden-matches dropdown visible only with SEARCH_AUTO_SELEC
     "defaults to keeping the filter",
   );
 });
+
+test("UI - Options - Hide update banner checkbox persists ui.hideUpdateBanner", async () => {
+  const box = document.getElementById("hideUpdateBanner");
+  assert.equal(box.checked, false, "default: banner not hidden");
+  box.checked = true;
+  box.dispatchEvent(new window.Event("change", { bubbles: true }));
+  await tick();
+  assert.ok(
+    calls.some((c) => c.startsWith("storage.set") && c.includes('"hideUpdateBanner":true')),
+    "preference persisted",
+  );
+});

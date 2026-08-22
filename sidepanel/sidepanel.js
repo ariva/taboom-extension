@@ -1000,10 +1000,13 @@ getElementById("update-dismiss").addEventListener("click", async () => {
 });
 
 async function syncUpdateBanner() {
-  const { updateAvailable, dismissedUpdate } = /** @type {Record<string, any>} */ (
-    await chrome.storage.local.get(["updateAvailable", "dismissedUpdate"])
+  const { updateAvailable, dismissedUpdate, ui } = /** @type {Record<string, any>} */ (
+    await chrome.storage.local.get(["updateAvailable", "dismissedUpdate", "ui"])
   );
-  const show = Boolean(updateAvailable) && updateAvailable !== dismissedUpdate;
+  const show =
+    Boolean(updateAvailable) &&
+    updateAvailable !== dismissedUpdate &&
+    !(ui?.hideUpdateBanner ?? false);
   if (show) {
     updateRestart.textContent = `Update ${updateAvailable} ready — click to update or restart Taboom`;
     updateRestart.title = "Click to restart Taboom and apply the update";
