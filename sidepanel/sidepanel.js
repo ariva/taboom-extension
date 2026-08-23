@@ -15,6 +15,8 @@ import {
   countsByFilter,
   deriveTabs,
   emptyMessage,
+  fuzzyActive,
+  highlightRanges,
   searchCandidates,
   domainGroupName,
   groupTabs,
@@ -142,6 +144,15 @@ async function refresh(animate = false, preloaded = null) {
   getElementById("hist-back").hidden = state.navMode === "off";
   getElementById("hist-forward").hidden = state.navMode === "off";
   getElementById("hist-list-btn").hidden = !featureEnabled(state.features, "NAVIGATION_DROPDOWN");
+  // offered only when experimental features are on AND FUZZY_SEARCH is enabled
+  // BECAUSE of that opt-in (raw flag off, resolved flag on) — drives the same
+  // ui.experimental_fuzzySearch pref as the options page
+  getElementById("fuzzy-label").hidden = !(
+    (state.ui.showExperimental ?? false) &&
+    !featureEnabled(FEATURES, "FUZZY_SEARCH") &&
+    featureEnabled(state.features, "FUZZY_SEARCH")
+  );
+  getElementById("fuzzy-toggle").checked = state.ui.experimental_fuzzySearch ?? true;
   render(animate);
 }
 
@@ -308,6 +319,8 @@ function renderNowImpl() {
 
   const maps = windowMaps(state.allTabs, state.currentWindowId);
   const now = Date.now();
+  // tokenized once per render — rows highlight their matches while searching
+  const queryTokens = state.query.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
   const rowVm = (tab, index) =>
     rowViewModel(tab, {
       index,
@@ -318,6 +331,8 @@ function renderNowImpl() {
       selected: state.selected,
       dotColors: maps.dotColors,
       indexes: maps.indexes,
+      queryTokens,
+      fuzzy: fuzzyActive(state),
     });
 
   let foldableGroups = [];
@@ -539,11 +554,37 @@ const ROW_TEMPLATE = /** @type {HTMLTemplateElement} */ (
   /** @type {unknown} */ (getElementById("row-template"))
 );
 
+// text with the model's highlight ranges wrapped in <mark> (plain textContent
+// when there is nothing to mark — the common non-search path stays cheap)
+function setTextWithMarks(el, text, ranges) {
+  if (!ranges || ranges.length === 0) {
+    el.textContent = text;
+    return;
+  }
+  el.textContent = "";
+  let pos = 0;
+  for (const [start, end] of ranges) {
+    if (start > pos) {
+      el.append(text.slice(pos, start));
+    }
+    const mark = document.createElement("mark");
+    mark.textContent = text.slice(start, end);
+    el.append(mark);
+    pos = end;
+  }
+  if (pos < text.length) {
+    el.append(text.slice(pos));
+  }
+}
+
 function renderRowImpl(tab, vm) {
   const row = /** @type {HTMLElement} */ (ROW_TEMPLATE.content.firstElementChild.cloneNode(true));
   row.className = vm.classes.join(" ");
   row.style.viewTransitionName = vm.viewTransitionName;
   row.dataset.tabId = String(tab.id);
+  if (tab.url) {
+    row.dataset.tip = tab.url; // full URL in the hover tip (titles ellipsize)
+  }
 
   /** @type {HTMLInputElement} */ (row.querySelector("input")).checked = vm.checked;
 
@@ -566,8 +607,8 @@ function renderRowImpl(tab, vm) {
     favicon.textContent = vm.favicon.letter;
   }
 
-  row.querySelector(".title").textContent = vm.title;
-  row.querySelector(".host").textContent = vm.host;
+  setTextWithMarks(/** @type {HTMLElement} */ (row.querySelector(".title")), vm.title, vm.titleRanges);
+  setTextWithMarks(/** @type {HTMLElement} */ (row.querySelector(".host")), vm.host, vm.hostRanges);
   const meta = row.querySelector(".meta");
   if (vm.age) {
     const age = document.createElement("span");
@@ -604,14 +645,23 @@ function moveHoverTip(event) {
 }
 
 listEl.addEventListener("mouseover", (event) => {
-  const header = /** @type {HTMLElement | null} */ (
-    /** @type {HTMLElement} */ (event.target).closest(".group-header")
-  );
-  if (!header || !header.dataset.tip) {
+  const target = /** @type {HTMLElement} */ (event.target);
+  // buttons/checkboxes carry their own native tooltips — don't stack ours on top
+  const carrier = target.closest("button, input")
+    ? null
+    : /** @type {HTMLElement | null} */ (target.closest(".group-header, .row"));
+  if (!carrier || !carrier.dataset.tip) {
     hoverTip.hidden = true;
     return;
   }
-  hoverTip.textContent = header.dataset.tip;
+  const tip = carrier.dataset.tip;
+  // row tip = the URL — while searching, mark the matched tokens in it too
+  if (carrier.classList.contains("row") && state.query.trim()) {
+    const tokens = state.query.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
+    setTextWithMarks(hoverTip, tip, highlightRanges(tip, tokens, fuzzyActive(state)));
+  } else {
+    hoverTip.textContent = tip;
+  }
   hoverTip.hidden = false;
   moveHoverTip(event);
 });
@@ -858,6 +908,14 @@ function persistUiPrefs() {
   lastOwnUiWrite = JSON.stringify(ui);
   saveState({ ui });
 }
+
+// fuzzy checkbox next to search = the same ui.experimental_fuzzySearch pref
+// the options page exposes; re-render re-ranks the active search immediately
+getElementById("fuzzy-toggle").addEventListener("change", () => {
+  state.ui = { ...state.ui, experimental_fuzzySearch: getElementById("fuzzy-toggle").checked };
+  persistUiPrefs();
+  render(false);
+});
 
 // Select/unselect everything currently visible (i.e. matching search + filter).
 selectAllBox.addEventListener("change", () => {

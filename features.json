@@ -12,5 +12,6 @@
   "GROUP_BY_TITLE": { "enabled": true },
   "GROUP_BY_DOMAIN": { "enabled": true },
   "SEARCH_AUTO_SELECT_ALL": { "enabled": true },
-  "OPTION_COLLAPSABLE_CHANGE_LOG_ITEMS": { "enabled": false }
+  "OPTION_COLLAPSABLE_CHANGE_LOG_ITEMS": { "enabled": false },
+  "FUZZY_SEARCH": { "enabled": false, "experimental": true }
 }

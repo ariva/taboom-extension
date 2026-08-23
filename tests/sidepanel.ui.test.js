@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { makeChrome, loadPage, tick, TEST_FEATURES } from "./helpers/ui.js";
+import { makeChrome, loadPage, tick, RAW_FEATURES, TEST_EXPERIMENTAL, TEST_FEATURES } from "./helpers/ui.js";
 
 const AUTO_ALL_ON = TEST_FEATURES.SEARCH_AUTO_SELECT_ALL?.enabled === true;
 
@@ -560,5 +560,75 @@ test("UI - Sidepanel - Update nudge: ui.hideUpdateBanner suppresses it entirely"
   assert.equal(banner.hidden, false, "clearing the option shows it again");
   await chrome.storage.local.remove(["updateAvailable", "dismissedUpdate"]);
   await chrome.storage.onChanged.fire({ updateAvailable: {} }, "local");
+  await tick();
+});
+
+test("UI - Sidepanel - Search highlights the found tokens in the list", async () => {
+  const search = document.getElementById("search");
+  search.value = "pull";
+  search.dispatchEvent(new window.Event("input", { bubbles: true }));
+  await tick();
+  const marks = [...document.querySelectorAll(".row .title mark")].map((m) => m.textContent);
+  assert.deepEqual(marks, ["Pull"], "matched token wrapped in <mark>, original casing kept");
+  search.value = "";
+  search.dispatchEvent(new window.Event("input", { bubbles: true }));
+  await tick();
+  assert.equal(document.querySelector(".row mark"), null, "no marks without a search");
+});
+
+test("UI - Sidepanel - Row hover shows the full URL in the custom tip", async () => {
+  const row = document.querySelector(".row");
+  assert.ok(row.dataset.tip.startsWith("https://"), "row carries its url as tip");
+  row.dispatchEvent(new window.Event("mouseover", { bubbles: true }));
+  const tip = document.getElementById("hover-tip");
+  assert.equal(tip.hidden, false, "tip visible on row hover");
+  assert.equal(tip.textContent, row.dataset.tip, "tip text = tab url");
+  document.getElementById("tab-list").dispatchEvent(new window.Event("mouseleave"));
+  assert.equal(tip.hidden, true);
+});
+
+test("UI - Sidepanel - Hover tip highlights the searched tokens inside the URL", async () => {
+  const search = document.getElementById("search");
+  search.value = "github";
+  search.dispatchEvent(new window.Event("input", { bubbles: true }));
+  await tick();
+  const row = document.querySelector(".row");
+  row.dispatchEvent(new window.Event("mouseover", { bubbles: true }));
+  const tip = document.getElementById("hover-tip");
+  assert.equal(tip.hidden, false);
+  const marks = [...tip.querySelectorAll("mark")].map((m) => m.textContent);
+  assert.deepEqual(marks, ["github"], "matched token marked inside the tip URL");
+  assert.equal(tip.textContent, row.dataset.tip, "full url still shown");
+  search.value = "";
+  search.dispatchEvent(new window.Event("input", { bubbles: true }));
+  await tick();
+  // rows were rebuilt by the render — hover the fresh one, not the detached ref
+  document.querySelector(".row").dispatchEvent(new window.Event("mouseover", { bubbles: true }));
+  assert.equal(tip.querySelectorAll("mark").length, 0, "no marks without a search");
+});
+
+test("UI - Sidepanel - Fuzzy checkbox by the search box drives experimental_fuzzySearch", async () => {
+  const label = document.getElementById("fuzzy-label");
+  // visible only when the experimental opt-in itself flipped the flag on
+  const offered =
+    TEST_EXPERIMENTAL &&
+    RAW_FEATURES.FUZZY_SEARCH?.enabled !== true &&
+    TEST_FEATURES.FUZZY_SEARCH?.enabled === true;
+  assert.equal(label.hidden, !offered, "visible only via the experimental opt-in");
+  if (!offered) {
+    return;
+  }
+  const box = document.getElementById("fuzzy-toggle");
+  assert.equal(box.checked, true, "defaults on");
+  calls.length = 0;
+  box.checked = false;
+  box.dispatchEvent(new window.Event("change", { bubbles: true }));
+  await tick();
+  assert.ok(
+    calls.some((c) => c.startsWith("storage.set") && c.includes('"experimental_fuzzySearch":false')),
+    "pref persisted from the sidepanel",
+  );
+  box.checked = true;
+  box.dispatchEvent(new window.Event("change", { bubbles: true }));
   await tick();
 });

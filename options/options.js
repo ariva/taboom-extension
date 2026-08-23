@@ -73,15 +73,16 @@ async function render() {
   getElementById("theme").value = state.ui.theme ?? "auto";
   getElementById("showExperimental").checked = state.ui.showExperimental ?? false;
   getElementById("hideUpdateBanner").checked = state.ui.hideUpdateBanner ?? false;
+  getElementById("experimental_fuzzySearch").checked = state.ui.experimental_fuzzySearch ?? true;
 
-  const features = applyExperimental(FEATURES, state.ui.showExperimental ?? false);
+  const appliedFeatures = applyExperimental(FEATURES, state.ui.showExperimental ?? false);
   getElementById("historyNav-label").hidden =
-    !featureEnabled(features, "OPTIONS_NAVIGATION_STACK");
+    !featureEnabled(appliedFeatures, "OPTIONS_NAVIGATION_STACK");
   // The dropdown shows the EFFECTIVE mode, not the raw stored value: a stored
   // mode whose flag got disabled falls back (traditional ↔ compact, disabled
   // when neither is available). The stored preference itself is NOT rewritten,
   // so re-enabling the flag restores the user's original choice.
-  const mode = resolveNavMode(features, state.ui);
+  const mode = resolveNavMode(appliedFeatures, state.ui);
   getElementById("historyNav").value = mode === "off" ? "disabled" : mode;
   // modes whose feature flag is off aren't offered
   for (const [value, flag] of [
@@ -90,16 +91,24 @@ async function render() {
   ]) {
     /** @type {HTMLElement} */ (
       document.querySelector(`#historyNav option[value="${value}"]`)
-    ).hidden = !featureEnabled(features, flag);
+    ).hidden = !featureEnabled(appliedFeatures, flag);
   }
   getElementById("searchEmptyFilter-label").hidden =
-    !featureEnabled(features, "SEARCH_AUTO_SELECT_ALL");
-  const allowExperimental = featureEnabled(features, "ALLOW_EXPERIMENTAL");
+    !featureEnabled(appliedFeatures, "SEARCH_AUTO_SELECT_ALL");
+  // offered only when experimental features are on AND FUZZY_SEARCH is enabled
+  // BECAUSE of that opt-in (raw flag off, resolved flag on) — once the flag
+  // ships enabled the pref is ignored and the toggle goes away
+  getElementById("experimental_fuzzySearch-label").hidden = !(
+    (state.ui.showExperimental ?? false) &&
+    !featureEnabled(FEATURES, "FUZZY_SEARCH") &&
+    featureEnabled(appliedFeatures, "FUZZY_SEARCH")
+  );
+  const allowExperimental = featureEnabled(appliedFeatures, "ALLOW_EXPERIMENTAL");
   getElementById("showExperimental-label").hidden = !allowExperimental;
   getElementById("experimental-warning").hidden =
     !(allowExperimental && (state.ui.showExperimental ?? false));
   getElementById("perf-section").hidden =
-    !featureEnabled(features, "SHOW_PERFORMANCE_INFO");
+    !featureEnabled(appliedFeatures, "SHOW_PERFORMANCE_INFO");
   applyTheme(state.ui.theme);
 
   getElementById("about").textContent = aboutText(chrome.runtime.getManifest().version);
@@ -155,6 +164,7 @@ const UI_FIELDS = [
   { id: "historyNav", prop: "value" },
   { id: "showExperimental", prop: "checked" },
   { id: "hideUpdateBanner", prop: "checked" },
+  { id: "experimental_fuzzySearch", prop: "checked" },
 ];
 for (const { id, prop, parse, apply } of UI_FIELDS) {
   getElementById(id).addEventListener("change", async () => {

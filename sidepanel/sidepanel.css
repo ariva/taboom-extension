@@ -197,6 +197,16 @@ main.compact .row .meta { display: none; }
 }
 
 .row .host { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* search-match highlight — bold yellow text, no background (rows + hover tip) */
+.row mark,
+#hover-tip mark {
+  background: none;
+  font-weight: 700;
+  color: light-dark(#b58900, #ffd75e); /* darker yellow on light for contrast */
+  border-radius: 2px;
+}
+/* domain matches in the accent hue so they read apart from title hits */
+.row .host mark { color: var(--accent); }
 
 .badge {
   background: var(--badge-bg);
@@ -393,6 +403,18 @@ footer button:disabled:hover { background: none; }
 /* tab history nav: arrows + popover list right of search */
 .search-row { display: flex; gap: 4px; align-items: center; }
 .search-row #search { flex: 1; min-width: 0; }
+/* fuzzy toggle right of the search box (shown only while FUZZY_SEARCH is experimental) */
+#fuzzy-label {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  color: var(--muted);
+  cursor: pointer;
+  user-select: none;
+}
+#fuzzy-label input { width: 12px; height: 12px; margin: 0; cursor: pointer; }
 #history-pop {
   position: fixed;
   margin: 0;

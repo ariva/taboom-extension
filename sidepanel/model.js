@@ -1,6 +1,6 @@
 // Pure view logic for the side panel - easier to test.
 
-import { formatAge, hostnameOf, isProtected, isSupportedUrl } from "../core/core.js";
+import { featureEnabled, formatAge, hostnameOf, isProtected, isSupportedUrl } from "../core/core.js";
 
 // Per-tab derived data (Map by tab id), computed once per refresh — tabs and
 // rules only change there. Renders and search keystrokes then never re-parse
@@ -18,12 +18,135 @@ export function deriveTabs(tabs, rules) {
   );
 }
 
-// tabs matching the active search and window scope — the pool `filter` narrows
-export function searchCandidates(tabs, { query, scope, currentWindowId, derived }) {
+// FUZZY_SEARCH active for this view: flag on and a query is being typed.
+// While the flag is still marked experimental, the experimental_-prefixed
+// user pref can switch it off (default on); once the feature is promoted
+// stable the stale pref is ignored — the prefix acts as its own reset.
+export function fuzzyActive(view) {
+  if (!view.query?.trim() || !view.features || !featureEnabled(view.features, "FUZZY_SEARCH")) {
+    return false;
+  }
+  if (view.features.FUZZY_SEARCH?.experimental) {
+    return view.ui?.experimental_fuzzySearch ?? true;
+  }
+  return true;
+}
+
+const isWordChar = (ch) => /[a-z0-9]/.test(ch);
+
+// Relevance of one query token against a tab's haystack; 0 = no match.
+// Tiers (higher wins):
+//   exact substring — 10/char base, +15 at a word start, +15 more when it spans
+//   the whole word, +5 at the very start of the haystack (= title start);
+//   any substring outranks any scattered match (10/char > the 8/char cap below)
+//   subsequence — token chars appear in order but scattered: +8 per char that
+//   continues a contiguous run, +6 for one opening a word, +1 for a mid-word
+//   scatter — so tight clusters at word starts float, loose scatters sink
+export function fuzzyScore(haystack, token) {
+  const at = haystack.indexOf(token);
+  if (at !== -1) {
+    const wordStart = at === 0 || !isWordChar(haystack[at - 1]);
+    const end = at + token.length;
+    const wordEnd = end === haystack.length || !isWordChar(haystack[end]);
+    return 10 * token.length +
+      (wordStart ? 15 : 0) + (wordStart && wordEnd ? 15 : 0) + (at === 0 ? 5 : 0);
+  }
+  let score = 0;
+  let prev = -2;
+  for (const ch of token) {
+    const found = haystack.indexOf(ch, prev + 1);
+    if (found === -1) {
+      return 0;
+    }
+    if (found === prev + 1) {
+      score += 8; // contiguous run
+    } else if (found === 0 || !isWordChar(haystack[found - 1])) {
+      score += 6; // fresh word start
+    } else {
+      score += 1; // scattered mid-word hit
+    }
+    prev = found;
+  }
+  return score;
+}
+
+// [start, end) ranges of query-token matches in `text`, sorted and merged —
+// the view wraps them in <mark>. Substring occurrences highlight whole; with
+// fuzzy, a token with no substring falls back to the scorer's greedy scattered
+// walk and highlights each matched character (nothing if a char is missing).
+export function highlightRanges(text, tokens, fuzzy = false) {
+  const lower = text.toLocaleLowerCase();
+  const ranges = [];
+  for (const token of tokens) {
+    let at = lower.indexOf(token);
+    if (at !== -1) {
+      while (at !== -1) {
+        ranges.push([at, at + token.length]);
+        at = lower.indexOf(token, at + 1);
+      }
+    } else if (fuzzy) {
+      const positions = [];
+      let prev = -1;
+      for (const ch of token) {
+        prev = lower.indexOf(ch, prev + 1);
+        if (prev === -1) {
+          break;
+        }
+        positions.push(prev);
+      }
+      if (prev !== -1) {
+        for (const pos of positions) {
+          ranges.push([pos, pos + 1]);
+        }
+      }
+    }
+  }
+  if (ranges.length === 0) {
+    return [];
+  }
+  ranges.sort((a, b) => a[0] - b[0]);
+  const merged = [ranges[0]];
+  for (const [start, end] of ranges.slice(1)) {
+    const tail = merged[merged.length - 1];
+    if (start <= tail[1]) {
+      tail[1] = Math.max(tail[1], end);
+    } else {
+      merged.push([start, end]);
+    }
+  }
+  return merged;
+}
+
+// tabs matching the active search and window scope — the pool `filter` narrows.
+// With FUZZY_SEARCH active the result is ORDERED by relevance (summed token
+// scores, ties most-recent first) — selectVisible keeps that order.
+export function searchCandidates(tabs, view) {
+  const { query, scope, currentWindowId, derived } = view;
   const tokens = query.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
-  let result = tabs.filter((tab) =>
-    tokens.every((token) => derived.get(tab.id).haystack.includes(token)),
-  );
+  let result;
+  if (tokens.length > 0 && fuzzyActive(view)) {
+    const scored = [];
+    for (const tab of tabs) {
+      let total = 0;
+      for (const token of tokens) {
+        const score = fuzzyScore(derived.get(tab.id).haystack, token);
+        if (score === 0) {
+          total = 0;
+          break; // every token must match, like the plain search
+        }
+        total += score;
+      }
+      if (total > 0) {
+        scored.push([total, tab]);
+      }
+    }
+    scored.sort((a, b) => b[0] - a[0] || (b[1].lastAccessed ?? 0) - (a[1].lastAccessed ?? 0));
+    result = scored.map(([, tab]) => tab);
+  } else {
+    result = tabs.filter((tab) =>
+      tokens.every((token) => derived.get(tab.id).haystack.includes(token)),
+    );
+  }
   if (scope === "current-window") {
     result = result.filter((tab) => tab.windowId === currentWindowId);
   }
@@ -45,6 +168,9 @@ export function selectVisible(tabs, view) {
     case "protected": result = result.filter((tab) => derived.get(tab.id).protected); break;
   }
   const last = (tab) => tab.lastAccessed ?? now;
+  if (fuzzyActive(view)) {
+    return result; // fuzzy relevance order beats the active sort while typing
+  }
   switch (sort) {
     case "recent": result.sort((a, b) => last(b) - last(a)); break;
     case "oldest": result.sort((a, b) => last(a) - last(b)); break;
@@ -177,8 +303,19 @@ export function groupTabs(tabs, key) {
 }
 
 // everything renderRow needs to build the DOM, as plain data
-export function rowViewModel(tab, { index, cursor, now, currentWindowId, derived, selected, dotColors, indexes }) {
+export function rowViewModel(
+  tab,
+  { index, cursor, now, currentWindowId, derived, selected, dotColors, indexes,
+    queryTokens = [], fuzzy = false },
+) {
   const d = derived.get(tab.id);
+  const title = (tab.discarded ? "⏸ " : "") + (tab.title || tab.url || "(untitled)");
+  const host = d.host || tab.url || "";
+  const titleRanges = highlightRanges(title, queryTokens, fuzzy);
+  const hostRanges = highlightRanges(host, queryTokens, fuzzy);
+  // searching but nothing to mark in the visible fields: the hit is inside the
+  // raw URL — say so, otherwise the row looks like a false positive
+  const urlOnlyMatch = queryTokens.length > 0 && titleRanges.length === 0 && hostRanges.length === 0;
   return {
     classes: [
       "row",
@@ -192,10 +329,12 @@ export function rowViewModel(tab, { index, cursor, now, currentWindowId, derived
     favicon: isSupportedUrl(tab.url)
       ? { pageUrl: tab.url }
       : { letter: (d.host[0] ?? "•").toUpperCase() },
-    title: (tab.discarded ? "⏸ " : "") + (tab.title || tab.url || "(untitled)"),
-    host: d.host || tab.url || "",
+    title,
+    titleRanges,
+    host,
+    hostRanges,
     age: !tab.active && tab.lastAccessed ? formatAge(now - tab.lastAccessed) : null,
-    badges: badges(tab, d.protected),
+    badges: [...badges(tab, d.protected), ...(urlOnlyMatch ? [["url match", ""]] : [])],
     canSnooze: !tab.discarded && isSupportedUrl(tab.url),
     protected: d.protected,
     protectLabel: d.protected ? "Unprotect site" : "Protect site",

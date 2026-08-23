@@ -22,6 +22,7 @@
       <!-- caret-over-list: caret flips up while the popover is open (JS toggles .open) -->
       <button id="hist-list-btn" class="icon-btn" popovertarget="history-pop" title="Show Navigation History" aria-label="Show Navigation History" hidden><svg class="caret-closed" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m4.6 3.4 3.4 3 3.4-3"/><path d="M4 9.4h8M4 12.4h8"/></svg><svg class="caret-open" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m4.6 6.4 3.4-3 3.4 3"/><path d="M4 9.4h8M4 12.4h8"/></svg></button>
       <input id="search" type="search" placeholder="Search tabs…  ( / )" autofocus />
+      <label id="fuzzy-label" title="Fuzzy search — scattered letters match in order (no typo tolerance), best matches on top" hidden><input type="checkbox" id="fuzzy-toggle" />Fuzzy</label>
     </div>
     <div id="history-pop" popover></div>
     <div id="filters" class="segmented" role="tablist" aria-label="Filter tabs">

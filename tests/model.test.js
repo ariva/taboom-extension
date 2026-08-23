@@ -11,6 +11,9 @@ import {
   titleGroupName,
   windowGroupName,
   rowViewModel,
+  fuzzyScore,
+  highlightRanges,
+  searchCandidates,
   selectVisible,
   windowColor,
   windowMaps,
@@ -307,4 +310,114 @@ test("Model - Options - SnapshotBlocks: newest first, timestamp header, indented
   assert.equal(blocks.length, 2);
   assert.equal(blocks[0], `${new Date(1700000100000).toLocaleString()}\n  render: count 1 · avg 5.0ms · min 5.0 · max 5.0 · last 5.0`, "newest first");
   assert.deepEqual(snapshotBlocks([]), []);
+});
+
+test("Model - fuzzyScore tiers: whole word > word start > mid substring > subsequence > none", () => {
+  const wholeWord = fuzzyScore("my pull request", "pull");
+  const atStart = fuzzyScore("pull it", "pull"); // whole word AND haystack start
+  const wordStart = fuzzyScore("my pullrequests", "pull");
+  const midSubstring = fuzzyScore("spullx", "pull");
+  const subsequence = fuzzyScore("p u l l", "pull");
+  assert.ok(atStart > wholeWord, "haystack start tops everything");
+  assert.ok(wholeWord > wordStart, "whole word beats prefix-of-word");
+  assert.ok(wordStart > midSubstring, "word start beats mid-word substring");
+  assert.ok(midSubstring > subsequence, "any substring beats a scattered match");
+  assert.ok(subsequence > 0, "scattered in-order chars still match");
+  assert.equal(fuzzyScore("nothing here", "xyz"), 0, "chars out of order / missing: no match");
+});
+
+test("Model - searchCandidates with FUZZY_SEARCH ranks by relevance, ties recent-first", () => {
+  const tabs = [
+    { id: 1, windowId: 1, url: "https://a.dev/x", title: "grep manual", lastAccessed: 5 },
+    { id: 2, windowId: 1, url: "https://b.dev/y", title: "my report", lastAccessed: 9 },
+    { id: 3, windowId: 1, url: "https://c.dev/z", title: "rust example page", lastAccessed: 7 },
+    { id: 4, windowId: 1, url: "https://d.dev/q", title: "vim notes", lastAccessed: 8 },
+  ];
+  const derived = deriveTabs(tabs, []);
+  const view = { query: "rep", scope: "all-windows", currentWindowId: 1, derived };
+  const fuzzy = searchCandidates(tabs, { ...view, features: { FUZZY_SEARCH: { enabled: true } } });
+  assert.deepEqual(
+    fuzzy.map((t) => t.title),
+    ["my report", "grep manual", "rust example page"],
+    "word-start substring > mid-word substring > subsequence; no-p tab excluded",
+  );
+  const plain = searchCandidates(tabs, view);
+  assert.deepEqual(
+    plain.map((t) => t.title),
+    ["grep manual", "my report"],
+    "flag off: substring matches only, original order kept",
+  );
+  const visible = selectVisible(tabs, {
+    ...view,
+    features: { FUZZY_SEARCH: { enabled: true } },
+    filter: "all",
+    sort: "title",
+    sortDir: "asc",
+    now: 10,
+  });
+  assert.deepEqual(
+    visible.map((t) => t.title),
+    ["my report", "grep manual", "rust example page"],
+    "relevance order survives selectVisible instead of the active sort",
+  );
+});
+
+test("Model - highlightRanges: substring occurrences, overlap merge, fuzzy scatter fallback", () => {
+  assert.deepEqual(highlightRanges("My Pull Request", ["pull"]), [[3, 7]], "case-insensitive substring");
+  assert.deepEqual(highlightRanges("abab", ["ab"]), [[0, 4]], "every occurrence marked, touching ranges merge");
+  assert.deepEqual(highlightRanges("abcd", ["abc", "bcd"]), [[0, 4]], "overlapping tokens merge");
+  assert.deepEqual(highlightRanges("grep manual", ["gm"], true), [[0, 1], [5, 6]], "fuzzy marks scattered chars");
+  assert.deepEqual(highlightRanges("grep manual", ["gm"]), [], "no scatter marks without fuzzy");
+  assert.deepEqual(highlightRanges("grep manual", ["xq"], true), [], "missing char: nothing marked");
+});
+
+test("Model - URL-only matches stay searchable and get a 'url match' badge", () => {
+  const tabs = [
+    { id: 1, windowId: 1, url: "https://zzz.dev/abc", title: "report", lastAccessed: 1 },
+    // r/e/p only reachable through the raw url — nothing markable in title/host
+    { id: 2, windowId: 1, url: "https://r.dev/e-p", title: "zzz", lastAccessed: 2 },
+  ];
+  const derived = deriveTabs(tabs, []);
+  const view = {
+    query: "rep", scope: "all-windows", currentWindowId: 1, derived,
+    features: { FUZZY_SEARCH: { enabled: true } },
+  };
+  assert.deepEqual(
+    searchCandidates(tabs, view).map((t) => t.id).sort(),
+    [1, 2],
+    "url scatter still matches",
+  );
+  const vmOf = (t) => rowViewModel(t, {
+    index: 0, cursor: -1, now: 10, currentWindowId: 1, derived,
+    selected: new Set(), dotColors: new Map(), indexes: new Map(),
+    queryTokens: ["rep"], fuzzy: true,
+  });
+  assert.ok(
+    vmOf(tabs[1]).badges.some(([label]) => label === "url match"),
+    "invisible match explained by badge",
+  );
+  assert.ok(
+    !vmOf(tabs[0]).badges.some(([label]) => label === "url match"),
+    "no badge when the title carries marks",
+  );
+});
+
+test("Model - experimental_fuzzySearch pref gates fuzzy only while the flag is experimental", () => {
+  const tabs = [{ id: 1, windowId: 1, url: "https://x.dev/", title: "blahblah", lastAccessed: 1 }];
+  const derived = deriveTabs(tabs, []);
+  const base = { query: "lh", scope: "all-windows", currentWindowId: 1, derived };
+  const experimental = { FUZZY_SEARCH: { enabled: true, experimental: true } };
+  const stable = { FUZZY_SEARCH: { enabled: true } };
+  const hits = (view) => searchCandidates(tabs, view).length;
+  assert.equal(hits({ ...base, features: experimental }), 1, "pref absent: default on");
+  assert.equal(
+    hits({ ...base, features: experimental, ui: { experimental_fuzzySearch: false } }),
+    0,
+    "pref off: plain search only",
+  );
+  assert.equal(
+    hits({ ...base, features: stable, ui: { experimental_fuzzySearch: false } }),
+    1,
+    "promoted stable: stale experimental_ pref ignored",
+  );
 });

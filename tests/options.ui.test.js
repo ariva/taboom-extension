@@ -291,3 +291,22 @@ test("UI - Options - Hide update banner checkbox persists ui.hideUpdateBanner", 
     "preference persisted",
   );
 });
+
+test("UI - Options - Fuzzy-search toggle visible only while enabled AND experimental", async () => {
+  const { applyExperimental, featureEnabled } = await import("../core/core.js");
+  const effective = applyExperimental(RAW_FEATURES, stored.ui?.showExperimental ?? false);
+  const offered =
+    (stored.ui?.showExperimental ?? false) &&
+    !featureEnabled(RAW_FEATURES, "FUZZY_SEARCH") &&
+    featureEnabled(effective, "FUZZY_SEARCH");
+  assert.equal(document.getElementById("experimental_fuzzySearch-label").hidden, !offered);
+  const box = document.getElementById("experimental_fuzzySearch");
+  assert.equal(box.checked, true, "defaults on");
+  box.checked = false;
+  box.dispatchEvent(new window.Event("change", { bubbles: true }));
+  await tick();
+  assert.ok(
+    calls.some((c) => c.startsWith("storage.set") && c.includes('"experimental_fuzzySearch":false')),
+    "persisted under the experimental_ prefix",
+  );
+});
