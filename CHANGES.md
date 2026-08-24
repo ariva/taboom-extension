@@ -1,5 +1,20 @@
 # CHANGES
 
+## v0.2.13 — 2026-08-23
+
+### New Features
+- Add group by URL - allows to spot url duplicates (35d7a2c)
+- Add experimental fuzzy search - no typo tolerance (f16a4de)
+- Add option to hide the new-version update banner (76e3899)
+- Rework options change log logic - show expanded, reuse pagination (5ed5691)
+
+### Fixes
+- Keep recent release notes expanded in options (6efbc0f)
+- Hide sort-direction button when a grouped sort has only one group (c1a8695)
+
+### Other
+- Update build scrips - add checks to validate build's integrity (52e164a)
+
 ## v0.2.12 — 2026-08-20
 
 ### New Features
