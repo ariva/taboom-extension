@@ -421,3 +421,21 @@ test("Model - experimental_fuzzySearch pref gates fuzzy only while the flag is e
     "promoted stable: stale experimental_ pref ignored",
   );
 });
+
+test("Model - Group-url sort clusters duplicate urls with the shared size ordering", () => {
+  const tabs = [
+    tab({ id: 1, url: "https://b.com/x", lastAccessed: NOW - 2 * HOUR }),
+    tab({ id: 2, url: "https://a.com/y", lastAccessed: NOW - 3 * HOUR }),
+    tab({ id: 3, url: "https://b.com/x", lastAccessed: NOW - 1 * HOUR }),
+  ];
+  assert.deepEqual(
+    selectVisible(tabs, view(tabs, { sort: "group-url", sortDir: "desc" })).map((t) => t.id),
+    [3, 1, 2],
+    "duplicate-url pair first (recent-first within), then the single",
+  );
+  assert.deepEqual(
+    selectVisible(tabs, view(tabs, { sort: "group-url" })).map((t) => t.id),
+    [2, 3, 1],
+    "no direction: urls alphabetical",
+  );
+});

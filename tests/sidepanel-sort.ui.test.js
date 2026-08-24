@@ -391,3 +391,38 @@ test("UI - Sidepanel Sort - sort-dir hides with a lone group, like fold-all", ()
   scope.dispatchEvent(new window.Event("change", { bubbles: true }));
   setSort("window");
 });
+
+const GROUP_URL_ON = TEST_FEATURES.GROUP_BY_URL?.enabled === true;
+
+test(
+  "UI - Sidepanel Sort - Group by URL: full-url groups with counts",
+  { skip: !GROUP_URL_ON && "GROUP_BY_URL disabled in features.json" },
+  () => {
+    setSort("group-url");
+    const headers = [...document.querySelectorAll(".group-header .group-label")].map((el) => el.textContent);
+    assert.deepEqual(
+      headers,
+      ["https://alpha.dev/y", "https://bb.aa/q", "https://mid.io/z", "https://zeta.org/x"],
+      "one group per url (all size 1 → ties alphabetical under desc default)",
+    );
+    assert.ok(
+      [...document.querySelectorAll(".group-header .group-count")].every((el) => el.textContent === "1/1"),
+      "counts rendered per group",
+    );
+    setSort("window");
+  },
+);
+
+test(
+  "UI - Sidepanel Sort - GROUP_BY_URL off: option hidden, stored pref falls back to window",
+  { skip: GROUP_URL_ON && "GROUP_BY_URL enabled in features.json" },
+  async () => {
+    const option = document.querySelector('#sort option[value="group-url"]');
+    assert.equal(option.hidden, true, "dropdown option hidden");
+    setSort("group-url");
+    await tick();
+    const headers = [...document.querySelectorAll(".group-header .group-label")].map((el) => el.textContent);
+    assert.ok(headers.every((h) => h.startsWith("Window")), "falls back to window grouping");
+    setSort("window");
+  },
+);

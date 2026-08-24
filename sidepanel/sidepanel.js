@@ -21,6 +21,7 @@ import {
   domainGroupName,
   groupTabs,
   titleGroupName,
+  urlGroupName,
   windowGroupName,
   rowViewModel,
   selectVisible,
@@ -186,6 +187,11 @@ const GROUPINGS = {
     name: (host) => domainGroupName(host),
     noun: "group",
   },
+  "group-url": {
+    key: (tab) => tab.url ?? "",
+    name: (url) => urlGroupName(url),
+    noun: "group",
+  },
 };
 
 // sorts that only exist while their feature flag is on (option hidden + a
@@ -193,6 +199,7 @@ const GROUPINGS = {
 const FLAG_GATED_SORTS = {
   "group-title": "GROUP_BY_TITLE",
   "group-domain": "GROUP_BY_DOMAIN",
+  "group-url": "GROUP_BY_URL",
 };
 
 // Direction metadata per sort. Paired sorts (recent/oldest) swap the dropdown
@@ -207,6 +214,7 @@ const SORT_DIRECTIONS = {
   window: { states: ["none", "desc", "asc"] },
   "group-title": { states: ["desc", "asc", "none"] }, // biggest groups first by default
   "group-domain": { states: ["desc", "asc", "none"] },
+  "group-url": { states: ["desc", "asc", "none"] },
 };
 
 function canonicalDir(sort) {

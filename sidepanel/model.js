@@ -185,6 +185,9 @@ export function selectVisible(tabs, view) {
     case "group-domain":
       sortGroupedByKey(result, (tab) => derived.get(tab.id).host, sortDir, last);
       break;
+    case "group-url":
+      sortGroupedByKey(result, (tab) => tab.url ?? "", sortDir, last);
+      break;
     // "none" = current window first then windows by id (natural 1..x);
     // "desc"/"asc" = windows by visible tab count (natural order as tiebreak);
     // within a window always recent-first
@@ -288,6 +291,10 @@ export function titleGroupName(title) {
 
 export function domainGroupName(host) {
   return host || "(no domain)";
+}
+
+export function urlGroupName(url) {
+  return url || "(no url)";
 }
 
 // Generic grouping: consecutive same-key runs → ordered [key, tabs[]] pairs.
