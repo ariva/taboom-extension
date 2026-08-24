@@ -15,7 +15,9 @@ if [ "$manifest_version" != "$package_version" ]; then
   exit 1
 fi
 
-latest_tag=$(git tag --sort=-v:refname | head -1)
+# "previous release" excludes the current version's own tag — building an
+# already-tagged release (tag first, then pack) must not trip the check
+latest_tag=$(git tag --sort=-v:refname | grep -v "^release-v${manifest_version}$" | head -1)
 previous_version=${latest_tag#release-v}
 if [ -n "$previous_version" ]; then
   # highest by version-sort must be the new one, and it must not equal the old
