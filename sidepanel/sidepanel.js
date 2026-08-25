@@ -126,6 +126,14 @@ async function refresh(animate = false, preloaded = null) {
   document.documentElement.style.colorScheme = resolveColorScheme(state.ui.theme);
   state.currentWindowId = win.id;
   state.allTabs = tabs;
+  // tabs closed outside the panel (or id-swapped by discard) leave stale ids
+  // in the selection — prune so counts and select-all stay truthful
+  const liveIds = new Set(tabs.map((tab) => tab.id));
+  for (const tabId of [...state.selected]) {
+    if (!liveIds.has(tabId)) {
+      state.selected.delete(tabId);
+    }
+  }
   state.derived = deriveTabs(tabs, state.rules);
   // resolved once per refresh; the keydown handler reads this instead of
   // re-running applyExperimental (a fresh object) on every keypress
@@ -765,6 +773,14 @@ function toast(message) {
   toastTimer = setTimeout(() => (el.hidden = true), 5000);
 }
 
+// an action consumes only the tabs it acted on — the rest of the selection
+// survives (a row-button action must not wipe an unrelated multi-select)
+function unselect(tabIds) {
+  for (const tabId of tabIds) {
+    state.selected.delete(tabId);
+  }
+}
+
 async function snooze(tabIds) {
   const failures = [];
   for (const tabId of tabIds) {
@@ -774,7 +790,7 @@ async function snooze(tabIds) {
   if (failures.length > 0) {
     toast(`Could not snooze ${failures.length} tab(s): ${failures[0]}`);
   }
-  state.selected.clear();
+  unselect(tabIds);
   refresh(true);
 }
 
@@ -785,7 +801,7 @@ async function wake(tabIds) {
     (tabId) => state.allTabs.find((tab) => tab.id === tabId)?.discarded,
   );
   await Promise.all(snoozed.map((tabId) => chrome.tabs.reload(tabId).catch(() => {})));
-  state.selected.clear();
+  unselect(tabIds);
   refresh(true);
 }
 
@@ -797,7 +813,7 @@ async function closeTabs(tabIds) {
   } catch (error) {
     console.debug("close failed", error);
   }
-  state.selected.clear();
+  unselect(tabIds);
   refresh(true);
 }
 
@@ -808,7 +824,7 @@ async function protectSelected() {
     .map((tab) => hostnameOf(tab.url))
     .filter(Boolean);
   await chrome.runtime.sendMessage({ type: "protect-hosts", hosts: [...new Set(hosts)] });
-  state.selected.clear();
+  unselect([...state.selected]);
   refresh(true);
 }
 

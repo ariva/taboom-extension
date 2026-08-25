@@ -632,3 +632,33 @@ test("UI - Sidepanel - Fuzzy checkbox by the search box drives experimental_fuzz
   box.dispatchEvent(new window.Event("change", { bubbles: true }));
   await tick();
 });
+
+test("UI - Sidepanel - Closing one tab keeps the rest of the selection", async () => {
+  // clean slate — earlier tests may leave scope/filter narrowed
+  document.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  const scope = document.getElementById("scope");
+  scope.value = "all-windows";
+  scope.dispatchEvent(new window.Event("change", { bubbles: true }));
+  document.querySelector('#filters button[data-filter="all"]').click();
+  const selectAll = document.getElementById("select-all");
+  selectAll.checked = true;
+  selectAll.dispatchEvent(new window.Event("change", { bubbles: true }));
+  assert.match(document.getElementById("bulk-count").textContent, /3 selected/);
+
+  // row X close: only the closed tab leaves the selection
+  document.querySelector('.row[data-tab-id="3"] [data-action="close"]').click();
+  await tick();
+  await tick();
+  assert.ok(calls.some((c) => c.startsWith("tabs.remove 3")), "close issued");
+  assert.match(document.getElementById("bulk-count").textContent, /2 selected/, "others still selected");
+
+  // tab closed outside the panel: stale id pruned on refresh, rest survives
+  const external = tabs.splice(1, 1)[0]; // tab id 2 disappears from chrome
+  await chrome.tabs.onRemoved.fire(2, {});
+  await new Promise((resolve) => setTimeout(resolve, 200)); // refresh debounce
+  assert.match(document.getElementById("bulk-count").textContent, /1 selected/, "stale id pruned");
+
+  tabs.splice(1, 0, external); // restore fixture
+  document.getElementById("bulk-clear").click();
+  await new Promise((resolve) => setTimeout(resolve, 200));
+});
