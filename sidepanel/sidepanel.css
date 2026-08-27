@@ -350,6 +350,35 @@ footer button:disabled:hover { background: none; }
 #sort-dir[data-dir="desc"] .dir-desc { display: block; }
 
 /* custom group-header tip, positioned right of the pointer by JS */
+/* valid move target under a dragged tab */
+.drop-target { outline: 2px dashed var(--accent); outline-offset: -2px; border-radius: 6px; }
+
+/* right-click move-to-window menu */
+#ctx-menu {
+  position: fixed;
+  z-index: 30;
+  min-width: 160px;
+  padding: 4px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  box-shadow: var(--shadow-2);
+  display: flex;
+  flex-direction: column;
+}
+#ctx-menu .ctx-title { font-size: 11px; color: var(--muted); padding: 4px 8px; }
+#ctx-menu .ctx-item {
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  padding: 5px 8px;
+  border-radius: 5px;
+}
+#ctx-menu .ctx-item:hover { background: var(--hover); }
+
 #hover-tip {
   position: fixed;
   z-index: 20;

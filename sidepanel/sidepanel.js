@@ -468,6 +468,9 @@ collapseAllBtn.addEventListener("click", () => {
 function renderGroupHeader(groupKey, { isCollapsed, collapsible, name, dotColor, tabs, noun, count, total }) {
   const header = document.createElement("div");
   header.className = "group-header";
+  if (noun === "window") {
+    header.dataset.windowId = String(groupKey); // drop target for tab moves
+  }
   // WINDOW_GROUP_SELECT: checkbox left of the label selects/unselects every
   // tab of this group that the current filter/search shows
   const selectedCount = tabs.filter((tab) => state.selected.has(tab.id)).length;
@@ -598,6 +601,7 @@ function renderRowImpl(tab, vm) {
   row.className = vm.classes.join(" ");
   row.style.viewTransitionName = vm.viewTransitionName;
   row.dataset.tabId = String(tab.id);
+  row.draggable = true; // drag onto another window's rows/header to move
   if (tab.url) {
     row.dataset.tip = tab.url; // full URL in the hover tip (titles ellipsize)
   }
@@ -725,6 +729,176 @@ listEl.addEventListener("click", (event) => {
     activate(tab);
   }
 });
+
+// ---------- move tabs between windows (drag & drop + context menu) ----------
+
+let draggedTabId = null; // dataTransfer is unreadable during dragover — track here
+let dropTargetEl = null;
+
+function clearDropTarget() {
+  dropTargetEl?.classList.remove("drop-target");
+  dropTargetEl = null;
+}
+
+// window a drop on this element would move into: a window group header, or
+// any row (the row's own window) — i.e. anywhere on that window's tabs
+function dropWindowIdOf(target) {
+  const header = /** @type {HTMLElement | null} */ (target.closest(".group-header"));
+  if (header?.dataset.windowId) {
+    return Number(header.dataset.windowId);
+  }
+  const row = /** @type {HTMLElement | null} */ (target.closest(".row"));
+  if (row) {
+    return state.allTabs.find((tab) => tab.id === Number(row.dataset.tabId))?.windowId ?? null;
+  }
+  return null;
+}
+
+// dragging (or right-clicking) a selected row acts on the whole selection
+function actionIds(tabId) {
+  return state.selected.has(tabId) ? [...state.selected] : [tabId];
+}
+
+async function moveTabsToWindow(tabIds, windowId) {
+  if (windowId == null) {
+    // new window: it is created around the first tab, the rest follow
+    const [first, ...rest] = tabIds;
+    const win = await chrome.windows.create({ tabId: first });
+    if (rest.length > 0) {
+      await chrome.tabs.move(rest, { windowId: win.id, index: -1 });
+    }
+  } else {
+    await chrome.tabs.move(tabIds, { windowId, index: -1 });
+  }
+  refresh(true);
+}
+
+listEl.addEventListener("dragstart", (event) => {
+  const row = /** @type {HTMLElement} */ (event.target).closest?.(".row");
+  if (!row) {
+    return;
+  }
+  draggedTabId = Number(/** @type {HTMLElement} */ (row).dataset.tabId);
+  event.dataTransfer?.setData("text/plain", String(draggedTabId));
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = "move";
+  }
+});
+
+listEl.addEventListener("dragover", (event) => {
+  if (draggedTabId == null) {
+    return;
+  }
+  const windowId = dropWindowIdOf(/** @type {HTMLElement} */ (event.target));
+  const sourceWindowId = state.allTabs.find((tab) => tab.id === draggedTabId)?.windowId;
+  if (windowId == null || windowId === sourceWindowId) {
+    clearDropTarget();
+    return; // not a valid target — the browser shows the no-drop cursor
+  }
+  event.preventDefault();
+  if (event.dataTransfer) {
+    event.dataTransfer.dropEffect = "move";
+  }
+  const el = /** @type {HTMLElement} */ (event.target).closest(".group-header, .row");
+  if (el !== dropTargetEl) {
+    clearDropTarget();
+    dropTargetEl = /** @type {HTMLElement} */ (el);
+    dropTargetEl?.classList.add("drop-target");
+  }
+});
+
+listEl.addEventListener("drop", (event) => {
+  const windowId = dropWindowIdOf(/** @type {HTMLElement} */ (event.target));
+  const sourceWindowId = state.allTabs.find((tab) => tab.id === draggedTabId)?.windowId;
+  if (draggedTabId == null || windowId == null || windowId === sourceWindowId) {
+    return;
+  }
+  event.preventDefault();
+  moveTabsToWindow(actionIds(draggedTabId), windowId);
+  draggedTabId = null;
+  clearDropTarget();
+});
+
+listEl.addEventListener("dragend", () => {
+  draggedTabId = null;
+  clearDropTarget();
+});
+
+// right-click on a row: in-page menu moving the tab (or the selection, when
+// the clicked row is part of it) to another window / a new window
+const ctxMenu = document.createElement("div");
+ctxMenu.id = "ctx-menu";
+ctxMenu.hidden = true;
+document.body.append(ctxMenu);
+
+function hideCtxMenu() {
+  ctxMenu.hidden = true;
+}
+
+listEl.addEventListener("contextmenu", (event) => {
+  const row = /** @type {HTMLElement | null} */ (
+    /** @type {HTMLElement} */ (event.target).closest(".row")
+  );
+  if (!row) {
+    return; // headers/empty space keep the native menu
+  }
+  event.preventDefault();
+  hoverTip.hidden = true;
+  const tabId = Number(row.dataset.tabId);
+  const ids = actionIds(tabId);
+  const sourceWindows = new Set(
+    ids.map((id) => state.allTabs.find((tab) => tab.id === id)?.windowId),
+  );
+  const maps = windowMaps(state.allTabs, state.currentWindowId);
+  ctxMenu.textContent = "";
+  const title = document.createElement("div");
+  title.className = "ctx-title";
+  title.textContent = ids.length > 1 ? `Move ${ids.length} tabs to` : "Move tab to";
+  ctxMenu.append(title);
+  for (const windowId of [...maps.indexes.keys()]) {
+    // single tab: its own window is a pointless target; a mixed selection
+    // keeps every window (part of it may live elsewhere)
+    if (ids.length === 1 && sourceWindows.has(windowId)) {
+      continue;
+    }
+    const item = document.createElement("button");
+    item.className = "ctx-item";
+    item.textContent = windowGroupName(windowId, {
+      currentWindowId: state.currentWindowId,
+      indexes: maps.indexes,
+    });
+    item.addEventListener("click", () => {
+      hideCtxMenu();
+      moveTabsToWindow(ids, windowId);
+    });
+    ctxMenu.append(item);
+  }
+  const fresh = document.createElement("button");
+  fresh.className = "ctx-item";
+  fresh.textContent = "New window";
+  fresh.addEventListener("click", () => {
+    hideCtxMenu();
+    moveTabsToWindow(ids, null);
+  });
+  ctxMenu.append(fresh);
+  ctxMenu.hidden = false;
+  ctxMenu.style.left = `${Math.max(0, Math.min(event.clientX, window.innerWidth - ctxMenu.offsetWidth - 4))}px`;
+  ctxMenu.style.top = `${Math.max(0, Math.min(event.clientY, window.innerHeight - ctxMenu.offsetHeight - 4))}px`;
+});
+
+document.addEventListener("click", hideCtxMenu);
+// capture phase: an Esc that closes the menu must not also clear the search
+document.addEventListener(
+  "keydown",
+  (event) => {
+    if (event.key === "Escape" && !ctxMenu.hidden) {
+      hideCtxMenu();
+      event.stopPropagation();
+    }
+  },
+  true,
+);
+listEl.addEventListener("scroll", hideCtxMenu, { passive: true });
 
 // row action icons live in #row-template now; this one is for the history popover
 const ICONS = {

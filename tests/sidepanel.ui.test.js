@@ -662,3 +662,57 @@ test("UI - Sidepanel - Closing one tab keeps the rest of the selection", async (
   document.getElementById("bulk-clear").click();
   await new Promise((resolve) => setTimeout(resolve, 200));
 });
+
+test("UI - Sidepanel - Drag a tab onto another window's row moves it there", async () => {
+  const rowOf = (id) => document.querySelector(`.row[data-tab-id="${id}"]`);
+  calls.length = 0;
+  // tab 1 lives in window 1; tab 3 in window 2 — drop tab 1 anywhere on window 2's tabs
+  rowOf(1).dispatchEvent(new window.Event("dragstart", { bubbles: true }));
+  rowOf(3).dispatchEvent(new window.Event("dragover", { bubbles: true }));
+  assert.ok(rowOf(3).classList.contains("drop-target"), "target row highlighted");
+  rowOf(3).dispatchEvent(new window.Event("drop", { bubbles: true }));
+  await tick();
+  await tick();
+  assert.ok(
+    calls.some((c) => c.startsWith("tabs.move 1") && c.includes('"windowId":2')),
+    "moved into window 2",
+  );
+  tabs[0].windowId = 1; // restore fixture
+  await new Promise((resolve) => setTimeout(resolve, 200));
+});
+
+test("UI - Sidepanel - Right-click row offers move-to-window menu (selection-aware)", async () => {
+  const rowOf = (id) => document.querySelector(`.row[data-tab-id="${id}"]`);
+  const menu = document.getElementById("ctx-menu");
+  calls.length = 0;
+  rowOf(1).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+  assert.equal(menu.hidden, false, "menu opens on row right-click");
+  const items = [...menu.querySelectorAll(".ctx-item")].map((el) => el.textContent);
+  assert.deepEqual(items, ["Window #2", "New window"], "own window excluded, new-window offered");
+
+  menu.querySelectorAll(".ctx-item")[0].click();
+  await tick();
+  await tick();
+  assert.equal(menu.hidden, true, "menu closes after picking");
+  assert.ok(
+    calls.some((c) => c.startsWith("tabs.move 1") && c.includes('"windowId":2')),
+    "move issued to the picked window",
+  );
+  tabs[0].windowId = 1;
+
+  // bulk: right-clicking a selected row moves the whole selection to a new window
+  const selectAll = document.getElementById("select-all");
+  selectAll.checked = true;
+  selectAll.dispatchEvent(new window.Event("change", { bubbles: true }));
+  calls.length = 0;
+  rowOf(1).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+  assert.match(menu.querySelector(".ctx-title").textContent, /Move 3 tabs to/);
+  [...menu.querySelectorAll(".ctx-item")].find((el) => el.textContent === "New window").click();
+  await tick();
+  await tick();
+  assert.ok(calls.some((c) => c.startsWith("windows.create") && c.includes('"tabId":')), "new window around first tab");
+  assert.ok(calls.some((c) => c.startsWith("tabs.move") && c.includes('"windowId":900')), "rest follow into it");
+  for (const tab of tabs) tab.windowId = tab.id === 3 ? 2 : 1; // restore fixture
+  document.getElementById("bulk-clear").click();
+  await new Promise((resolve) => setTimeout(resolve, 200));
+});

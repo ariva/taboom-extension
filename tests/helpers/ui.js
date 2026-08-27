@@ -74,6 +74,13 @@ export function makeChrome({ tabs = [], stored = {}, calls = [] }) {
       },
       remove: async (ids) => calls.push(`tabs.remove ${[].concat(ids)}`),
       reload: async (id) => calls.push(`tabs.reload ${id}`),
+      move: async (ids, props) => {
+        calls.push(`tabs.move ${[].concat(ids)} ${JSON.stringify(props ?? {})}`);
+        for (const id of [].concat(ids)) {
+          const tab = tabs.find((t) => t.id === id);
+          if (tab && props?.windowId != null) tab.windowId = props.windowId;
+        }
+      },
       create: async (opts = {}) => {
         calls.push(`tabs.create ${JSON.stringify(opts)}`);
         const tab = { id: nextTabId++, active: !!opts.active, windowId: opts.windowId, url: "chrome://newtab/" };
@@ -96,6 +103,15 @@ export function makeChrome({ tabs = [], stored = {}, calls = [] }) {
       WINDOW_ID_NONE: -1,
       getLastFocused: async () => ({ id: 1 }),
       update: async (id) => calls.push(`windows.update ${id}`),
+      create: async (opts = {}) => {
+        calls.push(`windows.create ${JSON.stringify(opts)}`);
+        const win = { id: 900 };
+        if (opts.tabId != null) {
+          const tab = tabs.find((t) => t.id === opts.tabId);
+          if (tab) tab.windowId = win.id;
+        }
+        return win;
+      },
       onFocusChanged: makeEvent(),
     },
     alarms: {
