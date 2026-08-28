@@ -313,6 +313,9 @@ function renderNow() {
 }
 
 function renderNowImpl() {
+  // any re-render (selection change, tab/window events, background refresh)
+  // invalidates the open context menu's ids — close it rather than act stale
+  hideCtxMenu();
   // active search: chips count found items (what clicking each filter would show)
   const counted = state.query ? searchCandidates(state.allTabs, state) : state.allTabs;
   const byFilter = countsByFilter(counted, state.derived);
@@ -851,10 +854,43 @@ listEl.addEventListener("contextmenu", (event) => {
   );
   const maps = windowMaps(state.allTabs, state.currentWindowId);
   ctxMenu.textContent = "";
-  const title = document.createElement("div");
-  title.className = "ctx-title";
-  title.textContent = ids.length > 1 ? `Move ${ids.length} tabs to` : "Move tab to";
-  ctxMenu.append(title);
+  // bulk actions first — same semantics as the bulk bar, on ids instead
+  /** @type {[string, () => void][]} */
+  const actions = [
+    ["Snooze", () => snooze(ids)],
+    ["Wake", () => wake(ids)],
+    ["Protect", () => protectTabs(ids)],
+    ["Unprotect", () => unprotectTabs(ids)],
+    ["Close", () => closeTabs(ids)],
+  ];
+  for (const [label, run] of actions) {
+    const item = document.createElement("button");
+    item.className = "ctx-item";
+    item.textContent = ids.length > 1 ? `${label} ${ids.length} tabs` : label;
+    item.addEventListener("click", () => {
+      hideCtxMenu();
+      run();
+    });
+    ctxMenu.append(item);
+  }
+  const divider = document.createElement("div");
+  divider.className = "ctx-divider";
+  ctxMenu.append(divider);
+  // "Move to ▸" expands a nested dropdown with the window targets
+  const moveBtn = document.createElement("button");
+  moveBtn.className = "ctx-item ctx-move";
+  moveBtn.textContent = `${ids.length > 1 ? `Move ${ids.length} tabs to` : "Move tab to"} ▸`;
+  const submenu = document.createElement("div");
+  submenu.className = "ctx-submenu";
+  submenu.hidden = true;
+  moveBtn.addEventListener("click", (clickEvent) => {
+    clickEvent.stopPropagation(); // the document click-away handler must not close the menu
+    submenu.hidden = !submenu.hidden;
+  });
+  moveBtn.addEventListener("mouseenter", () => {
+    submenu.hidden = false; // hover auto-expands; stays open while the menu lives
+  });
+  ctxMenu.append(moveBtn, submenu);
   for (const windowId of [...maps.indexes.keys()]) {
     // single tab: its own window is a pointless target; a mixed selection
     // keeps every window (part of it may live elsewhere)
@@ -871,7 +907,7 @@ listEl.addEventListener("contextmenu", (event) => {
       hideCtxMenu();
       moveTabsToWindow(ids, windowId);
     });
-    ctxMenu.append(item);
+    submenu.append(item);
   }
   const fresh = document.createElement("button");
   fresh.className = "ctx-item";
@@ -880,13 +916,27 @@ listEl.addEventListener("contextmenu", (event) => {
     hideCtxMenu();
     moveTabsToWindow(ids, null);
   });
-  ctxMenu.append(fresh);
+  submenu.append(fresh);
   ctxMenu.hidden = false;
   ctxMenu.style.left = `${Math.max(0, Math.min(event.clientX, window.innerWidth - ctxMenu.offsetWidth - 4))}px`;
   ctxMenu.style.top = `${Math.max(0, Math.min(event.clientY, window.innerHeight - ctxMenu.offsetHeight - 4))}px`;
 });
 
+// cursor wandering back up to the plain actions folds the Move-to dropdown
+// (mirrors the hover that opened it)
+ctxMenu.addEventListener("mouseover", (event) => {
+  const item = /** @type {HTMLElement} */ (event.target).closest(".ctx-item");
+  if (!item || item.classList.contains("ctx-move") || item.closest(".ctx-submenu")) {
+    return;
+  }
+  const submenu = /** @type {HTMLElement | null} */ (ctxMenu.querySelector(".ctx-submenu"));
+  if (submenu) {
+    submenu.hidden = true;
+  }
+});
+
 document.addEventListener("click", hideCtxMenu);
+window.addEventListener("blur", hideCtxMenu); // focus left for another window/tab
 // capture phase: an Esc that closes the menu must not also clear the search
 document.addEventListener(
   "keydown",
@@ -991,14 +1041,24 @@ async function closeTabs(tabIds) {
   refresh(true);
 }
 
-async function protectSelected() {
-  const hosts = [...state.selected]
+function hostsOf(tabIds) {
+  const hosts = tabIds
     .map((tabId) => state.allTabs.find((tab) => tab.id === tabId))
     .filter(Boolean)
     .map((tab) => hostnameOf(tab.url))
     .filter(Boolean);
-  await chrome.runtime.sendMessage({ type: "protect-hosts", hosts: [...new Set(hosts)] });
-  unselect([...state.selected]);
+  return [...new Set(hosts)];
+}
+
+async function protectTabs(tabIds) {
+  await chrome.runtime.sendMessage({ type: "protect-hosts", hosts: hostsOf(tabIds) });
+  unselect(tabIds);
+  refresh(true);
+}
+
+async function unprotectTabs(tabIds) {
+  await chrome.runtime.sendMessage({ type: "unprotect-hosts", hosts: hostsOf(tabIds) });
+  unselect(tabIds);
   refresh(true);
 }
 
@@ -1131,7 +1191,7 @@ getElementById("settings-btn").addEventListener("click", () => {
 
 getElementById("bulk-snooze").addEventListener("click", () => snooze([...state.selected]));
 getElementById("bulk-wake").addEventListener("click", () => wake([...state.selected]));
-getElementById("bulk-protect").addEventListener("click", protectSelected);
+getElementById("bulk-protect").addEventListener("click", () => protectTabs([...state.selected]));
 getElementById("bulk-close").addEventListener("click", () => closeTabs([...state.selected]));
 getElementById("bulk-clear").addEventListener("click", () => {
   state.selected.clear();

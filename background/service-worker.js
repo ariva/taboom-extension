@@ -131,6 +131,17 @@ async function protectHosts(hosts) {
   await applyAutoDiscardable(rules);
 }
 
+// removes every rule matching any of the hosts — same removal semantics as
+// toggleSiteProtection (a wildcard rule covering the host goes away with it)
+async function unprotectHosts(hosts) {
+  const state = await loadState();
+  const rules = state.protectionRules.filter(
+    (rule) => !hosts.some((host) => host && matchesRule(host, rule)),
+  );
+  await saveState({ protectionRules: rules });
+  await applyAutoDiscardable(rules);
+}
+
 // ---------- snooze actions ----------
 
 async function snoozeTab(tabId) {
@@ -180,6 +191,8 @@ async function handleMessage(message) {
       return toggleSiteProtection(await chrome.tabs.get(message.tabId));
     case "protect-hosts":
       return protectHosts(message.hosts);
+    case "unprotect-hosts":
+      return unprotectHosts(message.hosts);
     case "snooze-all-inactive":
       return autoSnoozePass();
     case "history-back":

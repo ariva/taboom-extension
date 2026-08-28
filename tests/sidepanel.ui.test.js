@@ -688,9 +688,31 @@ test("UI - Sidepanel - Right-click row offers move-to-window menu (selection-awa
   rowOf(1).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
   assert.equal(menu.hidden, false, "menu opens on row right-click");
   const items = [...menu.querySelectorAll(".ctx-item")].map((el) => el.textContent);
-  assert.deepEqual(items, ["Window #2", "New window"], "own window excluded, new-window offered");
+  assert.deepEqual(
+    items,
+    ["Snooze", "Wake", "Protect", "Unprotect", "Close", "Move tab to ▸", "Window #2", "New window"],
+    "bulk actions first, then the Move-to dropdown (own window excluded)",
+  );
+  const submenu = menu.querySelector(".ctx-submenu");
+  assert.equal(submenu.hidden, true, "move targets folded by default");
+  const moveToggle = [...menu.querySelectorAll(".ctx-item")].find((el) =>
+    el.textContent.startsWith("Move tab to"),
+  );
+  moveToggle.dispatchEvent(new window.Event("mouseenter"));
+  assert.equal(submenu.hidden, false, "hover auto-expands the dropdown");
+  [...menu.querySelectorAll(".ctx-item")]
+    .find((el) => el.textContent === "Snooze")
+    .dispatchEvent(new window.Event("mouseover", { bubbles: true }));
+  assert.equal(submenu.hidden, true, "hovering back up over plain actions folds it");
+  moveToggle.dispatchEvent(new window.Event("mouseenter"));
+  assert.equal(submenu.hidden, false, "re-hovering Move-to reopens");
+  moveToggle.click();
+  assert.equal(submenu.hidden, true, "click still toggles");
+  moveToggle.click();
+  assert.equal(submenu.hidden, false, "Move-to expands the dropdown");
+  assert.equal(menu.hidden, false, "menu itself stays open");
 
-  menu.querySelectorAll(".ctx-item")[0].click();
+  [...menu.querySelectorAll(".ctx-item")].find((el) => el.textContent === "Window #2").click();
   await tick();
   await tick();
   assert.equal(menu.hidden, true, "menu closes after picking");
@@ -706,7 +728,11 @@ test("UI - Sidepanel - Right-click row offers move-to-window menu (selection-awa
   selectAll.dispatchEvent(new window.Event("change", { bubbles: true }));
   calls.length = 0;
   rowOf(1).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
-  assert.match(menu.querySelector(".ctx-title").textContent, /Move 3 tabs to/);
+  const moveBtn = [...menu.querySelectorAll(".ctx-item")].find((el) =>
+    el.textContent.startsWith("Move 3 tabs to"),
+  );
+  assert.ok(moveBtn, "dropdown label counts the selection");
+  moveBtn.click();
   [...menu.querySelectorAll(".ctx-item")].find((el) => el.textContent === "New window").click();
   await tick();
   await tick();
@@ -715,4 +741,66 @@ test("UI - Sidepanel - Right-click row offers move-to-window menu (selection-awa
   for (const tab of tabs) tab.windowId = tab.id === 3 ? 2 : 1; // restore fixture
   document.getElementById("bulk-clear").click();
   await new Promise((resolve) => setTimeout(resolve, 200));
+});
+
+test("UI - Sidepanel - Context menu actions act on the clicked tab / whole selection", async () => {
+  const rowOf = (id) => document.querySelector(`.row[data-tab-id="${id}"]`);
+  const menu = document.getElementById("ctx-menu");
+  const pick = (label) =>
+    [...menu.querySelectorAll(".ctx-item")].find((el) => el.textContent.startsWith(label)).click();
+
+  calls.length = 0;
+  rowOf(1).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+  pick("Snooze");
+  await tick();
+  await tick();
+  assert.ok(calls.includes("sendMessage snooze-tab"), "snooze via service worker");
+  assert.equal(menu.hidden, true, "menu closes after action");
+
+  calls.length = 0;
+  rowOf(2).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+  pick("Wake");
+  await tick();
+  await tick();
+  assert.ok(calls.some((c) => c.startsWith("tabs.reload 2")), "wake reloads the discarded tab");
+
+  calls.length = 0;
+  rowOf(1).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+  pick("Protect");
+  await tick();
+  await tick();
+  assert.ok(calls.includes("sendMessage protect-hosts"), "protect via service worker");
+
+  calls.length = 0;
+  rowOf(3).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+  pick("Unprotect");
+  await tick();
+  await tick();
+  assert.ok(calls.includes("sendMessage unprotect-hosts"), "unprotect via service worker");
+
+  calls.length = 0;
+  rowOf(1).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+  pick("Close");
+  await tick();
+  await tick();
+  assert.ok(calls.some((c) => c.startsWith("tabs.remove 1")), "close removes only the clicked tab");
+  await new Promise((resolve) => setTimeout(resolve, 200));
+});
+
+test("UI - Sidepanel - Context menu closes on selection change, outside click, window blur", async () => {
+  const rowOf = (id) => document.querySelector(`.row[data-tab-id="${id}"]`);
+  const menu = document.getElementById("ctx-menu");
+
+  const selectAll = document.getElementById("select-all");
+  selectAll.checked = true;
+  selectAll.dispatchEvent(new window.Event("change", { bubbles: true }));
+  rowOf(1).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+  assert.equal(menu.hidden, false, "menu open over the selection");
+  document.getElementById("bulk-clear").click(); // unselect all = click outside + re-render
+  assert.equal(menu.hidden, true, "unselecting closes the menu");
+
+  rowOf(1).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+  assert.equal(menu.hidden, false);
+  window.dispatchEvent(new window.Event("blur")); // clicked another window/tab
+  assert.equal(menu.hidden, true, "focus loss closes the menu");
 });

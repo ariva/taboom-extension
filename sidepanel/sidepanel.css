@@ -367,6 +367,8 @@ footer button:disabled:hover { background: none; }
   flex-direction: column;
 }
 #ctx-menu .ctx-title { font-size: 11px; color: var(--muted); padding: 4px 8px; }
+#ctx-menu .ctx-divider { border-top: 1px solid var(--border); margin: 4px 0; }
+#ctx-menu .ctx-submenu { display: flex; flex-direction: column; padding-left: 12px; }
 #ctx-menu .ctx-item {
   border: none;
   background: none;
