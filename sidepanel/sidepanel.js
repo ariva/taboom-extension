@@ -743,18 +743,38 @@ function clearDropTarget() {
   dropTargetEl = null;
 }
 
-// window a drop on this element would move into: a window group header, or
-// any row (the row's own window) — i.e. anywhere on that window's tabs
-function dropWindowIdOf(target) {
-  const header = /** @type {HTMLElement | null} */ (target.closest(".group-header"));
-  if (header?.dataset.windowId) {
-    return Number(header.dataset.windowId);
+// in-window reorder only makes sense while the list mirrors the real tab
+// strip: Group by window with the "Same as window" tab order
+function reorderActive() {
+  return effectiveSort() === "window" && (state.ui.windowTabOrder ?? "recent") === "same-as-window";
+}
+
+// What a drop on this element would do: {windowId, index} or null (invalid).
+// Cross-window: any row of the target window (drop lands AT that row's strip
+// position) or its group header (appends at the end). Same window: only a row,
+// and only while reorderActive() — that is the drag-to-reorder gesture.
+function dropSpec(target) {
+  const source = state.allTabs.find((tab) => tab.id === draggedTabId);
+  if (!source) {
+    return null;
   }
   const row = /** @type {HTMLElement | null} */ (target.closest(".row"));
-  if (row) {
-    return state.allTabs.find((tab) => tab.id === Number(row.dataset.tabId))?.windowId ?? null;
+  const targetTab = row
+    ? state.allTabs.find((tab) => tab.id === Number(row.dataset.tabId))
+    : null;
+  const header = /** @type {HTMLElement | null} */ (target.closest(".group-header"));
+  const windowId =
+    targetTab?.windowId ?? (header?.dataset.windowId ? Number(header.dataset.windowId) : null);
+  if (windowId == null) {
+    return null;
   }
-  return null;
+  if (windowId === source.windowId) {
+    if (!reorderActive() || !targetTab || targetTab.id === draggedTabId) {
+      return null;
+    }
+    return { windowId, index: targetTab.index ?? -1 };
+  }
+  return { windowId, index: targetTab?.index ?? -1 };
 }
 
 // dragging (or right-clicking) a selected row acts on the whole selection
@@ -762,7 +782,7 @@ function actionIds(tabId) {
   return state.selected.has(tabId) ? [...state.selected] : [tabId];
 }
 
-async function moveTabsToWindow(tabIds, windowId) {
+async function moveTabsToWindow(tabIds, windowId, index = -1) {
   if (windowId == null) {
     // new window: it is created around the first tab, the rest follow
     const [first, ...rest] = tabIds;
@@ -771,7 +791,7 @@ async function moveTabsToWindow(tabIds, windowId) {
       await chrome.tabs.move(rest, { windowId: win.id, index: -1 });
     }
   } else {
-    await chrome.tabs.move(tabIds, { windowId, index: -1 });
+    await chrome.tabs.move(tabIds, { windowId, index });
   }
   refresh(true);
 }
@@ -792,9 +812,8 @@ listEl.addEventListener("dragover", (event) => {
   if (draggedTabId == null) {
     return;
   }
-  const windowId = dropWindowIdOf(/** @type {HTMLElement} */ (event.target));
-  const sourceWindowId = state.allTabs.find((tab) => tab.id === draggedTabId)?.windowId;
-  if (windowId == null || windowId === sourceWindowId) {
+  const spec = dropSpec(/** @type {HTMLElement} */ (event.target));
+  if (!spec) {
     clearDropTarget();
     return; // not a valid target — the browser shows the no-drop cursor
   }
@@ -811,13 +830,15 @@ listEl.addEventListener("dragover", (event) => {
 });
 
 listEl.addEventListener("drop", (event) => {
-  const windowId = dropWindowIdOf(/** @type {HTMLElement} */ (event.target));
-  const sourceWindowId = state.allTabs.find((tab) => tab.id === draggedTabId)?.windowId;
-  if (draggedTabId == null || windowId == null || windowId === sourceWindowId) {
+  if (draggedTabId == null) {
+    return;
+  }
+  const spec = dropSpec(/** @type {HTMLElement} */ (event.target));
+  if (!spec) {
     return;
   }
   event.preventDefault();
-  moveTabsToWindow(actionIds(draggedTabId), windowId);
+  moveTabsToWindow(actionIds(draggedTabId), spec.windowId, spec.index);
   draggedTabId = null;
   clearDropTarget();
 });

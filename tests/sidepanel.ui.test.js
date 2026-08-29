@@ -6,11 +6,11 @@ const AUTO_ALL_ON = TEST_FEATURES.SEARCH_AUTO_SELECT_ALL?.enabled === true;
 
 const NOW = Date.now();
 const tabs = [
-  { id: 1, windowId: 1, active: true, discarded: false, pinned: false, audible: false,
+  { id: 1, windowId: 1, index: 0, active: true, discarded: false, pinned: false, audible: false,
     url: "https://github.com/pr/1", title: "My Pull Request", lastAccessed: NOW },
-  { id: 2, windowId: 1, active: false, discarded: true, pinned: false, audible: false,
+  { id: 2, windowId: 1, index: 1, active: false, discarded: true, pinned: false, audible: false,
     url: "https://youtube.com/watch", title: "Some Video", lastAccessed: NOW - 3_600_000 },
-  { id: 3, windowId: 2, active: true, discarded: false, pinned: true, audible: false,
+  { id: 3, windowId: 2, index: 0, active: true, discarded: false, pinned: true, audible: false,
     url: "https://mail.google.com/inbox", title: "Inbox", lastAccessed: NOW - 60_000 },
 ];
 
@@ -873,6 +873,58 @@ test("UI - Sidepanel - Window header right-click: window-wide actions + Change o
   // restore fixture state
   [...menu.querySelectorAll(".ctx-item")].find((el) => el.textContent === "Recently used").click();
   await tick();
+  sort.value = "recent";
+  sort.dispatchEvent(new window.Event("change", { bubbles: true }));
+});
+
+test("UI - Sidepanel - Same-as-window mode: in-window drag reorder; cross-window drop keeps position", async () => {
+  const sort = document.getElementById("sort");
+  sort.value = "window";
+  sort.dispatchEvent(new window.Event("change", { bubbles: true }));
+  const rowOf = (id) => document.querySelector(`.row[data-tab-id="${id}"]`);
+
+  // recency order: a same-window row is NOT a reorder target
+  rowOf(1).dispatchEvent(new window.Event("dragstart", { bubbles: true }));
+  rowOf(2).dispatchEvent(new window.Event("dragover", { bubbles: true }));
+  assert.ok(!rowOf(2).classList.contains("drop-target"), "no in-window reorder outside same-as-window");
+  rowOf(1).dispatchEvent(new window.Event("dragend", { bubbles: true }));
+
+  const { ui } = await chrome.storage.local.get("ui");
+  await chrome.storage.local.set({ ui: { ...ui, windowTabOrder: "same-as-window" } });
+  await chrome.storage.onChanged.fire({ ui: { newValue: {} } }, "local");
+  await new Promise((resolve) => setTimeout(resolve, 200)); // refresh debounce
+
+  // in-window reorder: drop lands at the target row's strip position
+  calls.length = 0;
+  rowOf(1).dispatchEvent(new window.Event("dragstart", { bubbles: true }));
+  rowOf(2).dispatchEvent(new window.Event("dragover", { bubbles: true }));
+  assert.ok(rowOf(2).classList.contains("drop-target"), "same-window row is a valid target now");
+  rowOf(2).dispatchEvent(new window.Event("drop", { bubbles: true }));
+  await tick();
+  await tick();
+  assert.ok(
+    calls.some((c) => c.startsWith("tabs.move 1") && c.includes('"windowId":1') && c.includes('"index":1')),
+    "reordered to the target row's position",
+  );
+
+  // cross-window row drop: the new position is preserved, not appended
+  calls.length = 0;
+  rowOf(2).dispatchEvent(new window.Event("dragstart", { bubbles: true }));
+  rowOf(3).dispatchEvent(new window.Event("drop", { bubbles: true }));
+  await tick();
+  await tick();
+  assert.ok(
+    calls.some((c) => c.startsWith("tabs.move 2") && c.includes('"windowId":2') && c.includes('"index":0')),
+    "moved into window 2 at the drop row's position",
+  );
+
+  // restore fixture
+  tabs[0].index = 0;
+  tabs[1].windowId = 1;
+  tabs[1].index = 1;
+  await chrome.storage.local.set({ ui: { ...ui, windowTabOrder: "recent" } });
+  await chrome.storage.onChanged.fire({ ui: { newValue: {} } }, "local");
+  await new Promise((resolve) => setTimeout(resolve, 200));
   sort.value = "recent";
   sort.dispatchEvent(new window.Event("change", { bubbles: true }));
 });
