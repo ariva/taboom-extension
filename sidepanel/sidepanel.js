@@ -838,23 +838,52 @@ function hideCtxMenu() {
   ctxMenu.hidden = true;
 }
 
-listEl.addEventListener("contextmenu", (event) => {
-  const row = /** @type {HTMLElement | null} */ (
-    /** @type {HTMLElement} */ (event.target).closest(".row")
-  );
-  if (!row) {
-    return; // headers/empty space keep the native menu
-  }
-  event.preventDefault();
-  hoverTip.hidden = true;
-  const tabId = Number(row.dataset.tabId);
-  const ids = actionIds(tabId);
-  const sourceWindows = new Set(
-    ids.map((id) => state.allTabs.find((tab) => tab.id === id)?.windowId),
-  );
-  const maps = windowMaps(state.allTabs, state.currentWindowId);
-  ctxMenu.textContent = "";
-  // bulk actions first — same semantics as the bulk bar, on ids instead
+function ctxItem(label, run) {
+  const item = document.createElement("button");
+  item.className = "ctx-item";
+  item.textContent = label;
+  item.addEventListener("click", () => {
+    hideCtxMenu();
+    run();
+  });
+  return item;
+}
+
+// "<label> ▸" toggle + nested dropdown: hover auto-expands, click toggles;
+// the shared mouseover handler below folds it when the cursor wanders off
+function ctxSubmenu(label) {
+  const btn = document.createElement("button");
+  btn.className = "ctx-item ctx-move";
+  const caret = document.createElement("span");
+  caret.className = "ctx-caret";
+  caret.textContent = "▸";
+  btn.append(`${label} `, caret); // caret pushed right via CSS for breathing room
+  const submenu = document.createElement("div");
+  submenu.className = "ctx-submenu";
+  submenu.hidden = true;
+  // caret mirrors the expanded state: ▸ folded, ▾ open (like group headers)
+  const setOpen = (open) => {
+    submenu.hidden = !open;
+    caret.textContent = open ? "▾" : "▸";
+  };
+  btn.addEventListener("click", (clickEvent) => {
+    clickEvent.stopPropagation(); // the document click-away handler must not close the menu
+    setOpen(submenu.hidden);
+  });
+  btn.addEventListener("mouseenter", () => {
+    setOpen(true);
+  });
+  return { btn, submenu };
+}
+
+function ctxDivider() {
+  const divider = document.createElement("div");
+  divider.className = "ctx-divider";
+  return divider;
+}
+
+// the five bulk-bar actions as menu items over an explicit id set
+function appendCtxActions(ids) {
   /** @type {[string, () => void][]} */
   const actions = [
     ["Snooze", () => snooze(ids)],
@@ -864,62 +893,91 @@ listEl.addEventListener("contextmenu", (event) => {
     ["Close", () => closeTabs(ids)],
   ];
   for (const [label, run] of actions) {
-    const item = document.createElement("button");
-    item.className = "ctx-item";
-    item.textContent = ids.length > 1 ? `${label} ${ids.length} tabs` : label;
-    item.addEventListener("click", () => {
-      hideCtxMenu();
-      run();
-    });
-    ctxMenu.append(item);
+    ctxMenu.append(ctxItem(ids.length > 1 ? `${label} ${ids.length} tabs` : label, run));
   }
-  const divider = document.createElement("div");
-  divider.className = "ctx-divider";
-  ctxMenu.append(divider);
-  // "Move to ▸" expands a nested dropdown with the window targets
-  const moveBtn = document.createElement("button");
-  moveBtn.className = "ctx-item ctx-move";
-  moveBtn.textContent = `${ids.length > 1 ? `Move ${ids.length} tabs to` : "Move tab to"} ▸`;
-  const submenu = document.createElement("div");
-  submenu.className = "ctx-submenu";
-  submenu.hidden = true;
-  moveBtn.addEventListener("click", (clickEvent) => {
-    clickEvent.stopPropagation(); // the document click-away handler must not close the menu
-    submenu.hidden = !submenu.hidden;
-  });
-  moveBtn.addEventListener("mouseenter", () => {
-    submenu.hidden = false; // hover auto-expands; stays open while the menu lives
-  });
-  ctxMenu.append(moveBtn, submenu);
+}
+
+function showCtxMenu(event) {
+  ctxMenu.hidden = false;
+  ctxMenu.style.left = `${Math.max(0, Math.min(event.clientX, window.innerWidth - ctxMenu.offsetWidth - 4))}px`;
+  ctxMenu.style.top = `${Math.max(0, Math.min(event.clientY, window.innerHeight - ctxMenu.offsetHeight - 4))}px`;
+}
+
+function openRowMenu(event, tabId) {
+  const ids = actionIds(tabId);
+  const sourceWindows = new Set(
+    ids.map((id) => state.allTabs.find((tab) => tab.id === id)?.windowId),
+  );
+  const maps = windowMaps(state.allTabs, state.currentWindowId);
+  ctxMenu.textContent = "";
+  appendCtxActions(ids);
+  ctxMenu.append(ctxDivider());
+  const { btn, submenu } = ctxSubmenu(ids.length > 1 ? `Move ${ids.length} tabs to` : "Move tab to");
+  ctxMenu.append(btn, submenu);
   for (const windowId of [...maps.indexes.keys()]) {
     // single tab: its own window is a pointless target; a mixed selection
     // keeps every window (part of it may live elsewhere)
     if (ids.length === 1 && sourceWindows.has(windowId)) {
       continue;
     }
-    const item = document.createElement("button");
-    item.className = "ctx-item";
-    item.textContent = windowGroupName(windowId, {
+    const name = windowGroupName(windowId, {
       currentWindowId: state.currentWindowId,
       indexes: maps.indexes,
     });
-    item.addEventListener("click", () => {
-      hideCtxMenu();
-      moveTabsToWindow(ids, windowId);
+    submenu.append(ctxItem(name, () => moveTabsToWindow(ids, windowId)));
+  }
+  submenu.append(ctxItem("New window", () => moveTabsToWindow(ids, null)));
+  showCtxMenu(event);
+}
+
+const WINDOW_TAB_ORDERS = [
+  ["recent", "Recently used"],
+  ["same-as-window", "Same as window"],
+  ["title-asc", "Title sorted A-Z"],
+  ["title-desc", "Title sorted Z-A"],
+];
+
+// window group header: same actions over every visible tab of that window,
+// plus a "Change order" dropdown driving ui.windowTabOrder (current one marked)
+function openWindowHeaderMenu(event, windowId) {
+  const ids = state.fullVisible.filter((tab) => tab.windowId === windowId).map((tab) => tab.id);
+  if (ids.length === 0) {
+    return;
+  }
+  ctxMenu.textContent = "";
+  appendCtxActions(ids);
+  ctxMenu.append(ctxDivider());
+  const { btn, submenu } = ctxSubmenu("Tabs Order");
+  ctxMenu.append(btn, submenu);
+  const current = state.ui.windowTabOrder ?? "recent";
+  for (const [value, label] of WINDOW_TAB_ORDERS) {
+    const item = ctxItem(label, () => {
+      state.ui = { ...state.ui, windowTabOrder: value };
+      persistUiPrefs(); // options page follows through the storage listener
+      render(false);
     });
+    if (value === current) {
+      item.classList.add("current");
+    }
     submenu.append(item);
   }
-  const fresh = document.createElement("button");
-  fresh.className = "ctx-item";
-  fresh.textContent = "New window";
-  fresh.addEventListener("click", () => {
-    hideCtxMenu();
-    moveTabsToWindow(ids, null);
-  });
-  submenu.append(fresh);
-  ctxMenu.hidden = false;
-  ctxMenu.style.left = `${Math.max(0, Math.min(event.clientX, window.innerWidth - ctxMenu.offsetWidth - 4))}px`;
-  ctxMenu.style.top = `${Math.max(0, Math.min(event.clientY, window.innerHeight - ctxMenu.offsetHeight - 4))}px`;
+  showCtxMenu(event);
+}
+
+listEl.addEventListener("contextmenu", (event) => {
+  const target = /** @type {HTMLElement} */ (event.target);
+  const header = /** @type {HTMLElement | null} */ (target.closest(".group-header"));
+  const row = /** @type {HTMLElement | null} */ (target.closest(".row"));
+  if (!header?.dataset.windowId && !row) {
+    return; // non-window headers/empty space keep the native menu
+  }
+  event.preventDefault();
+  hoverTip.hidden = true;
+  if (header?.dataset.windowId) {
+    openWindowHeaderMenu(event, Number(header.dataset.windowId));
+  } else if (row) {
+    openRowMenu(event, Number(row.dataset.tabId));
+  }
 });
 
 // cursor wandering back up to the plain actions folds the Move-to dropdown
@@ -932,6 +990,10 @@ ctxMenu.addEventListener("mouseover", (event) => {
   const submenu = /** @type {HTMLElement | null} */ (ctxMenu.querySelector(".ctx-submenu"));
   if (submenu) {
     submenu.hidden = true;
+    const caret = ctxMenu.querySelector(".ctx-caret");
+    if (caret) {
+      caret.textContent = "▸"; // folded again — caret follows
+    }
   }
 });
 

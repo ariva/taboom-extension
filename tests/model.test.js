@@ -439,3 +439,19 @@ test("Model - Group-url sort clusters duplicate urls with the shared size orderi
     "no direction: urls alphabetical",
   );
 });
+
+test("Model - windowTabOrder controls within-window order in the window grouping", () => {
+  const tabs = [
+    tab({ id: 1, title: "Bravo", index: 2, lastAccessed: NOW - 1 * HOUR }),
+    tab({ id: 2, title: "Alpha", index: 0, lastAccessed: NOW - 3 * HOUR }),
+    tab({ id: 3, title: "Charlie", index: 1, lastAccessed: NOW - 2 * HOUR }),
+  ];
+  const order = (windowTabOrder) =>
+    selectVisible(tabs, view(tabs, { sort: "window", ui: windowTabOrder ? { windowTabOrder } : {} }))
+      .map((t) => t.id);
+  assert.deepEqual(order(undefined), [1, 3, 2], "default: recently used first");
+  assert.deepEqual(order("recent"), [1, 3, 2], "explicit recent matches default");
+  assert.deepEqual(order("same-as-window"), [2, 3, 1], "same-as-window: tab strip position");
+  assert.deepEqual(order("title-asc"), [2, 1, 3], "titles A-Z");
+  assert.deepEqual(order("title-desc"), [3, 1, 2], "titles Z-A");
+});

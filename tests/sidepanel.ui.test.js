@@ -700,10 +700,12 @@ test("UI - Sidepanel - Right-click row offers move-to-window menu (selection-awa
   );
   moveToggle.dispatchEvent(new window.Event("mouseenter"));
   assert.equal(submenu.hidden, false, "hover auto-expands the dropdown");
+  assert.equal(moveToggle.querySelector(".ctx-caret").textContent, "▾", "caret shows expanded state");
   [...menu.querySelectorAll(".ctx-item")]
     .find((el) => el.textContent === "Snooze")
     .dispatchEvent(new window.Event("mouseover", { bubbles: true }));
   assert.equal(submenu.hidden, true, "hovering back up over plain actions folds it");
+  assert.equal(moveToggle.querySelector(".ctx-caret").textContent, "▸", "caret folds with it");
   moveToggle.dispatchEvent(new window.Event("mouseenter"));
   assert.equal(submenu.hidden, false, "re-hovering Move-to reopens");
   moveToggle.click();
@@ -803,4 +805,74 @@ test("UI - Sidepanel - Context menu closes on selection change, outside click, w
   assert.equal(menu.hidden, false);
   window.dispatchEvent(new window.Event("blur")); // clicked another window/tab
   assert.equal(menu.hidden, true, "focus loss closes the menu");
+});
+
+test("UI - Sidepanel - windowTabOrder reorders tabs inside window groups", async () => {
+  const select = document.getElementById("sort");
+  select.value = "window";
+  select.dispatchEvent(new window.Event("change", { bubbles: true }));
+  const titles = () => [...document.querySelectorAll(".row .title")].map((el) => el.textContent);
+  assert.deepEqual(titles(), ["My Pull Request", "⏸ Some Video", "Inbox"], "recent within window 1");
+
+  const { ui } = await chrome.storage.local.get("ui");
+  await chrome.storage.local.set({ ui: { ...ui, windowTabOrder: "title-desc" } });
+  await chrome.storage.onChanged.fire({ ui: { newValue: {} } }, "local");
+  await new Promise((resolve) => setTimeout(resolve, 200)); // refresh debounce
+  assert.deepEqual(titles(), ["⏸ Some Video", "My Pull Request", "Inbox"], "titles Z-A within window 1");
+
+  await chrome.storage.local.set({ ui: { ...ui, windowTabOrder: "recent" } });
+  await chrome.storage.onChanged.fire({ ui: { newValue: {} } }, "local");
+  await new Promise((resolve) => setTimeout(resolve, 200));
+  select.value = "recent";
+  select.dispatchEvent(new window.Event("change", { bubbles: true }));
+});
+
+test("UI - Sidepanel - Window header right-click: window-wide actions + Change order dropdown", async () => {
+  const sort = document.getElementById("sort");
+  sort.value = "window";
+  sort.dispatchEvent(new window.Event("change", { bubbles: true }));
+  const menu = document.getElementById("ctx-menu");
+  const header = document.querySelector('.group-header[data-window-id="1"]');
+  assert.ok(header, "window header carries its windowId");
+  header.dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+  assert.equal(menu.hidden, false, "menu opens on header right-click");
+  const items = [...menu.querySelectorAll(".ctx-item")].map((el) => el.textContent);
+  assert.deepEqual(
+    items,
+    [
+      "Snooze 2 tabs", "Wake 2 tabs", "Protect 2 tabs", "Unprotect 2 tabs", "Close 2 tabs",
+      "Tabs Order ▸",
+      "Recently used", "Same as window", "Title sorted A-Z", "Title sorted Z-A",
+    ],
+    "actions cover the window's visible tabs; order dropdown follows",
+  );
+  const currentItems = [...menu.querySelectorAll(".ctx-item.current")].map((el) => el.textContent);
+  assert.deepEqual(currentItems, ["Recently used"], "current order highlighted");
+
+  // picking an order persists ui.windowTabOrder and reorders the group live
+  calls.length = 0;
+  [...menu.querySelectorAll(".ctx-item")].find((el) => el.textContent === "Title sorted Z-A").click();
+  await tick();
+  assert.equal(menu.hidden, true, "menu closes after picking");
+  assert.ok(
+    calls.some((c) => c.startsWith("storage.set") && c.includes('"windowTabOrder":"title-desc"')),
+    "option persisted — options page will mirror it",
+  );
+  const titles = [...document.querySelectorAll(".row .title")].map((el) => el.textContent);
+  assert.deepEqual(titles.slice(0, 2), ["⏸ Some Video", "My Pull Request"], "window 1 reordered Z-A");
+
+  // reopening shows the new current selection
+  document.querySelector('.group-header[data-window-id="1"]')
+    .dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+  assert.deepEqual(
+    [...menu.querySelectorAll(".ctx-item.current")].map((el) => el.textContent),
+    ["Title sorted Z-A"],
+    "highlight follows the stored option",
+  );
+
+  // restore fixture state
+  [...menu.querySelectorAll(".ctx-item")].find((el) => el.textContent === "Recently used").click();
+  await tick();
+  sort.value = "recent";
+  sort.dispatchEvent(new window.Event("change", { bubbles: true }));
 });

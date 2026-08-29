@@ -190,7 +190,8 @@ export function selectVisible(tabs, view) {
       break;
     // "none" = current window first then windows by id (natural 1..x);
     // "desc"/"asc" = windows by visible tab count (natural order as tiebreak);
-    // within a window always recent-first
+    // within a window: ui.windowTabOrder — recent (default) | same-as-window
+    // (tab strip position) | title-asc | title-desc
     case "window": {
       const rank = (tab) => (tab.windowId === currentWindowId ? 0 : tab.windowId);
       const sizes = new Map();
@@ -198,16 +199,31 @@ export function selectVisible(tabs, view) {
         sizes.set(tab.windowId, (sizes.get(tab.windowId) ?? 0) + 1);
       }
       const bySize = sortDir === "desc" ? -1 : sortDir === "asc" ? 1 : 0;
+      const within = windowTabComparator(view.ui?.windowTabOrder, last);
       result.sort(
         (a, b) =>
           bySize * (sizes.get(a.windowId) - sizes.get(b.windowId)) ||
           rank(a) - rank(b) ||
-          last(b) - last(a),
+          within(a, b),
       );
       break;
     }
   }
   return result;
+}
+
+// within-window tab order for the window grouping (ui.windowTabOrder)
+function windowTabComparator(order, last) {
+  switch (order) {
+    case "same-as-window":
+      return (a, b) => (a.index ?? 0) - (b.index ?? 0); // tab strip position
+    case "title-asc":
+      return (a, b) => (a.title ?? "").localeCompare(b.title ?? "");
+    case "title-desc":
+      return (a, b) => (b.title ?? "").localeCompare(a.title ?? "");
+    default:
+      return (a, b) => last(b) - last(a); // recently used
+  }
 }
 
 // shared ordering for key-grouped sorts — see the group-* cases above

@@ -69,6 +69,7 @@ async function render() {
   getElementById("fontSize").value = String(state.ui.fontSize ?? 1);
   getElementById("density").value = state.ui.density ?? "comfortable";
   getElementById("sortDirMode").value = state.ui.sortDirMode ?? "default";
+  getElementById("windowTabOrder").value = state.ui.windowTabOrder ?? "recent";
   getElementById("searchEmptyFilter").value = state.ui.searchEmptyFilter ?? "keep";
   getElementById("theme").value = state.ui.theme ?? "auto";
   getElementById("showExperimental").checked = state.ui.showExperimental ?? false;
@@ -159,6 +160,7 @@ const UI_FIELDS = [
   { id: "fontSize", prop: "value", parse: clampFontSize, apply: (v, input) => { input.value = String(v); } },
   { id: "density", prop: "value" },
   { id: "sortDirMode", prop: "value" },
+  { id: "windowTabOrder", prop: "value" },
   { id: "searchEmptyFilter", prop: "value" },
   { id: "theme", prop: "value", apply: (v) => applyTheme(v) },
   { id: "historyNav", prop: "value" },

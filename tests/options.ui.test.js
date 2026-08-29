@@ -310,3 +310,18 @@ test("UI - Options - Fuzzy-search toggle visible only while enabled AND experime
     "persisted under the experimental_ prefix",
   );
 });
+
+test("UI - Options - Window tab-order dropdown defaults to recent and persists", async () => {
+  const select = document.getElementById("windowTabOrder");
+  assert.equal(select.value, "recent", "default: recently used");
+  select.value = "title-asc";
+  select.dispatchEvent(new window.Event("change", { bubbles: true }));
+  await tick();
+  assert.ok(
+    calls.some((c) => c.startsWith("storage.set") && c.includes('"windowTabOrder":"title-asc"')),
+    "preference persisted",
+  );
+  select.value = "recent";
+  select.dispatchEvent(new window.Event("change", { bubbles: true }));
+  await tick();
+});

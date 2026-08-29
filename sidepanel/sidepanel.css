@@ -368,7 +368,15 @@ footer button:disabled:hover { background: none; }
 }
 #ctx-menu .ctx-title { font-size: 11px; color: var(--muted); padding: 4px 8px; }
 #ctx-menu .ctx-divider { border-top: 1px solid var(--border); margin: 4px 0; }
-#ctx-menu .ctx-submenu { display: flex; flex-direction: column; padding-left: 12px; }
+#ctx-menu .ctx-submenu {
+  display: flex;
+  flex-direction: column;
+  padding-left: 12px;
+  /* expanded options set off from the toggle row above */
+  border-top: 1px solid var(--border);
+  margin-top: 3px;
+  padding-top: 3px;
+}
 #ctx-menu .ctx-item {
   border: none;
   background: none;
@@ -380,6 +388,12 @@ footer button:disabled:hover { background: none; }
   border-radius: 5px;
 }
 #ctx-menu .ctx-item:hover { background: var(--hover); }
+/* current selection inside a settings submenu (e.g. Change order) */
+#ctx-menu .ctx-item.current { color: var(--accent); font-weight: 600; }
+/* submenu toggles: caret right-aligned, clear gap from the label */
+#ctx-menu .ctx-move { display: flex; align-items: center; gap: 12px; }
+#ctx-menu .ctx-move .ctx-caret { margin-left: auto; }
+#ctx-menu .ctx-item.current::after { content: " ✓"; }
 
 #hover-tip {
   position: fixed;
