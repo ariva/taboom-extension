@@ -1,5 +1,23 @@
 # CHANGES
 
+## v0.2.14 — 2026-08-30
+
+### New Features
+- Let users opt out of the side-panel restore banner via a options setting (8fee838)
+- Persist per-window side-panel state (5a622ec)
+- Allow reordering tabs by drag in same-as-window mode (40d985c)
+- Let users control tab order inside window groups from options or a new header right-click menu (11136c9)
+- Add more tab context-menu actions in side-bar (a35acd1)
+- Add cross-window tab moves: drag rows onto any target window (1714a1d)
+
+### Fixes
+- Make header right-click act on the selection if any of items are selected (975f894)
+- Make context-menu hover highlight visible in dark theme (d20ffab)
+- Keep multi-select intact when closing or snoozing individual tabs (0f3ad87)
+
+### Other
+- Build tools latest-tag usage change (4fbb233)
+
 ## v0.2.13 — 2026-08-23
 
 ### New Features
