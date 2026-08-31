@@ -873,6 +873,24 @@ test("UI - Sidepanel - Window header right-click: window-wide actions + Change o
   // restore fixture state
   [...menu.querySelectorAll(".ctx-item")].find((el) => el.textContent === "Recently used").click();
   await tick();
+
+  // with a selection inside the window, header actions target only the selected tabs
+  document.querySelector('.row[data-tab-id="1"] input').click(); // toggles checked + fires click
+  document.querySelector('.group-header[data-window-id="1"]')
+    .dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+  assert.deepEqual(
+    [...menu.querySelectorAll(".ctx-item")].map((el) => el.textContent).slice(0, 5),
+    ["Snooze", "Wake", "Protect", "Unprotect", "Close"],
+    "1 of 2 selected — actions cover the selection, not the whole window",
+  );
+  calls.length = 0;
+  [...menu.querySelectorAll(".ctx-item")].find((el) => el.textContent === "Close").click();
+  await tick();
+  await tick();
+  assert.ok(calls.includes("tabs.remove 1"), "only the selected tab closed");
+  document.getElementById("bulk-clear").click();
+  await new Promise((resolve) => setTimeout(resolve, 200));
+
   sort.value = "recent";
   sort.dispatchEvent(new window.Event("change", { bubbles: true }));
 });

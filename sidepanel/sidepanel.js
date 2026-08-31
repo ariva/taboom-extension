@@ -958,10 +958,13 @@ const WINDOW_TAB_ORDERS = [
   ["title-desc", "Title sorted Z-A"],
 ];
 
-// window group header: same actions over every visible tab of that window,
-// plus a "Change order" dropdown driving ui.windowTabOrder (current one marked)
+// window group header: same actions over the window's selected tabs — or every
+// visible tab when nothing in it is selected — plus a "Change order" dropdown
+// driving ui.windowTabOrder (current one marked)
 function openWindowHeaderMenu(event, windowId) {
-  const ids = state.fullVisible.filter((tab) => tab.windowId === windowId).map((tab) => tab.id);
+  const windowTabs = state.fullVisible.filter((tab) => tab.windowId === windowId);
+  const selectedHere = windowTabs.filter((tab) => state.selected.has(tab.id));
+  const ids = (selectedHere.length > 0 ? selectedHere : windowTabs).map((tab) => tab.id);
   if (ids.length === 0) {
     return;
   }
