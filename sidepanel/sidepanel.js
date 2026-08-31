@@ -1684,18 +1684,36 @@ trackPanelOpen().then(async (windowId) => {
   if (windows.length === 0) {
     return;
   }
+  const { ui } = /** @type {Record<string, any>} */ (await chrome.storage.local.get("ui"));
+  const mode = ui?.onExtensionUpdate ?? "banner";
+  const forget = () =>
+    chrome.runtime.sendMessage({ type: "panels-restore-dismiss", windowIds: windows }).catch(() => {});
+  if (mode === "none") {
+    forget(); // same as dismissing the banner — those windows aren't offered again
+    return;
+  }
+  const reopenAll = async () => {
+    let allOpened = true;
+    for (const id of windows) {
+      await chrome.sidePanel.open({ windowId: id }).catch(() => { allOpened = false; });
+    }
+    return allOpened;
+  };
+  // sidePanel.open() wants a user gesture; a fresh page has none, so "auto"
+  // is best-effort — when Chrome refuses, fall through to the banner
+  if (mode === "auto" && (await reopenAll())) {
+    return;
+  }
   const banner = getElementById("restore-banner");
   getElementById("restore-open").textContent =
     `Side panel was open in ${windows.length} other window${windows.length > 1 ? "s" : ""} — restore?`;
   getElementById("restore-open").addEventListener("click", async () => {
-    for (const id of windows) {
-      await chrome.sidePanel.open({ windowId: id }).catch(() => {});
-    }
+    await reopenAll();
     banner.hidden = true;
   });
   getElementById("restore-dismiss").addEventListener("click", () => {
     banner.hidden = true;
-    chrome.runtime.sendMessage({ type: "panels-restore-dismiss", windowIds: windows }).catch(() => {});
+    forget();
   });
   banner.hidden = false;
 });

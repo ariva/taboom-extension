@@ -74,6 +74,7 @@ async function render() {
   getElementById("theme").value = state.ui.theme ?? "auto";
   getElementById("showExperimental").checked = state.ui.showExperimental ?? false;
   getElementById("hideUpdateBanner").checked = state.ui.hideUpdateBanner ?? false;
+  getElementById("onExtensionUpdate").value = state.ui.onExtensionUpdate ?? "banner";
   getElementById("experimental_fuzzySearch").checked = state.ui.experimental_fuzzySearch ?? true;
 
   const appliedFeatures = applyExperimental(FEATURES, state.ui.showExperimental ?? false);
@@ -166,6 +167,7 @@ const UI_FIELDS = [
   { id: "historyNav", prop: "value" },
   { id: "showExperimental", prop: "checked" },
   { id: "hideUpdateBanner", prop: "checked" },
+  { id: "onExtensionUpdate", prop: "value" },
   { id: "experimental_fuzzySearch", prop: "checked" },
 ];
 for (const { id, prop, parse, apply } of UI_FIELDS) {

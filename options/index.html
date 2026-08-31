@@ -293,6 +293,13 @@
       </select>
       <span class="muted">(prev/next buttons in side panel, History in context menu)</span></label>
     <label><input type="checkbox" id="hideUpdateBanner" /> Hide new-version update banner</label>
+    <label>On extension update
+      <select id="onExtensionUpdate">
+        <!-- "auto" hidden: sidePanel.open() needs a user gesture a fresh panel lacks — needs SW-side trigger first -->
+        <option value="banner">Show restore side panel banner</option>
+        <option value="none">Do nothing</option>
+      </select>
+      <span class="muted">(side panels open in other windows on update or browser restart)</span></label>
   </section>
 
   <section class="card">

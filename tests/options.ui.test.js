@@ -292,6 +292,19 @@ test("UI - Options - Hide update banner checkbox persists ui.hideUpdateBanner", 
   );
 });
 
+test("UI - Options - On-extension-update dropdown persists ui.onExtensionUpdate", async () => {
+  const select = document.getElementById("onExtensionUpdate");
+  assert.equal(select.value, "banner", "default: offer the restore banner");
+  assert.deepEqual([...select.options].map((o) => o.value), ["banner", "none"], "auto hidden until gesture-safe");
+  select.value = "none";
+  select.dispatchEvent(new window.Event("change", { bubbles: true }));
+  await tick();
+  assert.ok(
+    calls.some((c) => c.startsWith("storage.set") && c.includes('"onExtensionUpdate":"none"')),
+    "preference persisted",
+  );
+});
+
 test("UI - Options - Fuzzy-search toggle visible only while enabled AND experimental", async () => {
   const { applyExperimental, featureEnabled } = await import("../core/core.js");
   const effective = applyExperimental(RAW_FEATURES, stored.ui?.showExperimental ?? false);
