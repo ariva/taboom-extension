@@ -387,7 +387,9 @@ footer button:disabled:hover { background: none; }
   padding: 5px 8px;
   border-radius: 5px;
 }
-#ctx-menu .ctx-item:hover { background: var(--hover); }
+/* --hover is near-invisible on card-bg — same stronger tone as #history-pop */
+#ctx-menu .ctx-item:hover,
+#ctx-menu .ctx-item:focus-visible { background: var(--badge-bg); }
 /* current selection inside a settings submenu (e.g. Change order) */
 #ctx-menu .ctx-item.current { color: var(--accent); font-weight: 600; }
 /* submenu toggles: caret right-aligned, clear gap from the label */
