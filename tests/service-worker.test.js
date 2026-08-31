@@ -119,7 +119,7 @@ test("Service Worker - Show-manager menu click opens the side panel", async () =
   calls.length = 0;
   await chrome.contextMenus.onClicked.fire({ menuItemId: "show-manager" }, { id: 1, windowId: 1 });
   await tick();
-  assert.ok(calls.includes("sidePanel.open"));
+  assert.ok(calls.some((c) => c.startsWith("sidePanel.open")));
 });
 
 test("Service Worker - Protect menu title follows active tab's protection state", async () => {
@@ -342,4 +342,75 @@ test("Service Worker - history-remove message drops one entry by index", async (
   await tick();
   const { tabHistory } = await chrome.storage.local.get();
   assert.deepEqual(tabHistory, { stack: [2, 3], cursor: 1 }, "indexed entry gone, duplicate kept");
+});
+
+test("Service Worker - Window identity: profiles follow tab changes under stable logical ids", async () => {
+  await new Promise((resolve) => setTimeout(resolve, 600)); // initial debounce flush
+  let { windowProfiles } = await chrome.storage.local.get("windowProfiles");
+  assert.ok(windowProfiles && Object.keys(windowProfiles).length >= 2, "one profile per window");
+  const before = structuredClone(windowProfiles);
+  const logical1 = Object.entries(before).find(([, p]) => p.chromeWindowId === 1)?.[0];
+  assert.ok(logical1?.startsWith("w-"), "logical id minted");
+
+  // rearrangement refreshes the profile (fingerprint set itself is order-blind)
+  await chrome.tabs.onMoved.fire(1, { windowId: 1, fromIndex: 0, toIndex: 2 });
+  await new Promise((resolve) => setTimeout(resolve, 600));
+  ({ windowProfiles } = await chrome.storage.local.get("windowProfiles"));
+  assert.deepEqual(Object.keys(windowProfiles).sort(), Object.keys(before).sort(), "ids stable across refreshes");
+  assert.ok(windowProfiles[logical1].updatedAt >= before[logical1].updatedAt, "refreshed on move");
+
+  // closing a tab shrinks the same logical window's fingerprint
+  const removedIndex = tabs.findIndex((t) => t.windowId === 1);
+  const removed = tabs.splice(removedIndex, 1)[0];
+  await chrome.tabs.onRemoved.fire(removed.id, { windowId: 1, isWindowClosing: false });
+  await new Promise((resolve) => setTimeout(resolve, 600));
+  ({ windowProfiles } = await chrome.storage.local.get("windowProfiles"));
+  assert.equal(windowProfiles[logical1].tabCount, before[logical1].tabCount - 1, "close captured");
+  assert.equal(windowProfiles[logical1].chromeWindowId, 1, "still bound to the live chrome id");
+
+  tabs.splice(removedIndex, 0, removed); // restore fixture
+  await chrome.tabs.onCreated.fire(removed);
+  await new Promise((resolve) => setTimeout(resolve, 600));
+});
+
+test("Service Worker - Panel tracking: connect marks panelOpen, disconnect clears, restore list built", async () => {
+  const disconnectFns = [];
+  const port = { name: "sidepanel:1", onDisconnect: { addListener: (fn) => disconnectFns.push(fn) } };
+  await chrome.runtime.onConnect.fire(port);
+  await tick();
+  await tick();
+  let { windowProfiles } = await chrome.storage.local.get("windowProfiles");
+  const logical1 = Object.entries(windowProfiles).find(([, p]) => p.chromeWindowId === 1)?.[0];
+  assert.equal(windowProfiles[logical1]?.panelOpen, true, "connect marks the window's panel open");
+
+  // live port: the same window is never offered back for restore
+  let response = await send({ type: "panels-to-restore", excludeWindowId: 2 });
+  assert.deepEqual(response.windows, [], "connected window not offered");
+
+  // deliberate close clears the flag
+  for (const fn of disconnectFns) fn();
+  await tick();
+  await tick();
+  ({ windowProfiles } = await chrome.storage.local.get("windowProfiles"));
+  assert.equal(windowProfiles[logical1]?.panelOpen, false, "disconnect clears panelOpen");
+
+  // extension teardown persists the flag but leaves no live port → offered
+  windowProfiles[logical1] = { ...windowProfiles[logical1], panelOpen: true };
+  await chrome.storage.local.set({ windowProfiles });
+  response = await send({ type: "panels-to-restore", excludeWindowId: 2 });
+  assert.deepEqual(response.windows, [1], "stale panelOpen without a port is restorable");
+  response = await send({ type: "panels-to-restore", excludeWindowId: 1 });
+  assert.deepEqual(response.windows, [], "the asking panel's own window is excluded");
+
+  // dismissing the banner forgets ALL offered windows in one write — per-window
+  // concurrent writes used to clobber each other and leave some flags set
+  const logical2 = Object.entries(windowProfiles).find(([, p]) => p.chromeWindowId === 2)?.[0];
+  windowProfiles[logical2] = { ...windowProfiles[logical2], panelOpen: true };
+  await chrome.storage.local.set({ windowProfiles });
+  await send({ type: "panels-restore-dismiss", windowIds: [1, 2] });
+  ({ windowProfiles } = await chrome.storage.local.get("windowProfiles"));
+  assert.equal(windowProfiles[logical1]?.panelOpen, false, "dismiss clears panelOpen (1)");
+  assert.equal(windowProfiles[logical2]?.panelOpen, false, "dismiss clears panelOpen (2)");
+  response = await send({ type: "panels-to-restore", excludeWindowId: 3 });
+  assert.deepEqual(response.windows, [], "dismissed windows no longer offered");
 });

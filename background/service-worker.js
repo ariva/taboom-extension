@@ -16,6 +16,7 @@ import {
   selectAutoSnoozeTargets,
 } from "../core/core.js";
 import { loadFeatures, loadState, saveState } from "../core/storage.js";
+import { buildFingerprint, matchProfiles } from "../core/window-identity.js";
 
 const ALARM_NAME = "auto-snooze";
 
@@ -203,6 +204,11 @@ async function handleMessage(message) {
       return historyJump(message.index);
     case "history-remove":
       return withHistory((hist) => removeHistoryAt(hist, message.index));
+    case "panels-to-restore":
+      return panelsToRestore(message.excludeWindowId);
+    case "panels-restore-dismiss":
+      // user declined — forget those windows so the offer doesn't come back
+      return setPanelOpen(message.windowIds, false);
     case "sidebar-focused":
     case "sidebar-no-focus":
       return; // acknowledged; no behavior yet — hook points for future focus-aware features
@@ -478,3 +484,167 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
       break;
   }
 });
+
+// ---------- window identity (logical ids stable across restarts) ----------
+// Every window gets a logical id kept in storage.session (chromeWindowId →
+// logicalId); its content fingerprint lives in storage.local.windowProfiles.
+// Chrome wipes storage.session on browser restart but not on extension
+// reload — an empty map with stored profiles means "restart": recover the
+// ids by fingerprint matching before minting fresh ones.
+
+const PROFILE_DEBOUNCE_MS = 400;
+const PROFILE_TTL_MS = 14 * 24 * 3_600_000;
+let profileTimer = null;
+
+function scheduleProfileRefresh() {
+  clearTimeout(profileTimer);
+  profileTimer = setTimeout(() => refreshWindowProfiles().catch(() => {}), PROFILE_DEBOUNCE_MS);
+}
+
+async function refreshWindowProfiles() {
+  const [allTabs, windows] = await Promise.all([
+    chrome.tabs.query({}),
+    chrome.windows.getAll().catch(() => []),
+  ]);
+  const byWindow = new Map();
+  for (const tab of allTabs) {
+    if (!byWindow.has(tab.windowId)) {
+      byWindow.set(tab.windowId, []);
+    }
+    byWindow.get(tab.windowId).push(tab);
+  }
+  const boundsOf = new Map(windows.map((win) => /** @type {[number, any]} */ ([win.id, win])));
+  const now = Date.now();
+  const candidates = [...byWindow.entries()].map(([windowId, windowTabs]) => [
+    windowId,
+    buildFingerprint(windowTabs, boundsOf.get(windowId) ?? null, now),
+  ]);
+
+  const { windowSessionMap = {} } = /** @type {Record<string, any>} */ (
+    await chrome.storage.session.get("windowSessionMap")
+  );
+  const { windowProfiles = {} } = /** @type {Record<string, any>} */ (
+    await chrome.storage.local.get("windowProfiles")
+  );
+
+  let map = windowSessionMap;
+  if (Object.keys(map).length === 0 && Object.keys(windowProfiles).length > 0) {
+    // fresh browser session: recover logical ids by fingerprint
+    map = Object.fromEntries(matchProfiles(windowProfiles, candidates));
+  }
+  // drop entries for windows that no longer exist, mint ids for new ones
+  map = Object.fromEntries(Object.entries(map).filter(([id]) => byWindow.has(Number(id))));
+  for (const [windowId] of candidates) {
+    if (!map[windowId]) {
+      map[windowId] = `w-${crypto.randomUUID()}`;
+    }
+  }
+
+  // upsert current windows; profiles of closed windows are kept on purpose —
+  // browser shutdown fires close events too, and deleting then would break
+  // restart matching. The TTL sweep is the only removal path.
+  const profiles = { ...windowProfiles };
+  for (const [windowId, fingerprint] of candidates) {
+    // merge, don't replace — panelOpen (and future per-window flags) survive
+    profiles[map[windowId]] = { ...profiles[map[windowId]], ...fingerprint, chromeWindowId: windowId };
+  }
+  for (const [logicalId, profile] of Object.entries(profiles)) {
+    if (now - (profile.updatedAt ?? 0) > PROFILE_TTL_MS) {
+      delete profiles[logicalId];
+    }
+  }
+  await chrome.storage.session.set({ windowSessionMap: map });
+  await chrome.storage.local.set({ windowProfiles: profiles });
+}
+
+// membership + placement changes: create/close/rearrange/move between windows
+for (const identityEvent of [
+  chrome.tabs.onCreated,
+  chrome.tabs.onRemoved,
+  chrome.tabs.onMoved,
+  chrome.tabs.onAttached,
+  chrome.tabs.onDetached,
+  chrome.windows.onCreated,
+  chrome.windows.onRemoved,
+]) {
+  identityEvent.addListener(scheduleProfileRefresh);
+}
+chrome.tabs.onUpdated.addListener((_tabId, changeInfo) => {
+  if (changeInfo.url || changeInfo.pinned !== undefined) {
+    scheduleProfileRefresh();
+  }
+});
+scheduleProfileRefresh(); // worker start doubles as the restart-recovery pass
+
+// ---------- panel-open tracking + restore ----------
+// Each panel holds a runtime.connect port named "sidepanel:<windowId>".
+// Connect/disconnect flips panelOpen on the window's logical profile — so the
+// flag survives extension teardown (no disconnect fires then) and describes
+// exactly which windows had a panel when the update/restart hit.
+
+const connectedPanelWindows = new Set(); // live ports, this worker instance
+
+chrome.runtime.onConnect.addListener((port) => {
+  if (!port.name?.startsWith("sidepanel:")) {
+    return;
+  }
+  const windowId = Number(port.name.slice("sidepanel:".length));
+  connectedPanelWindows.add(windowId);
+  setPanelOpen([windowId], true);
+  port.onDisconnect.addListener(() => {
+    connectedPanelWindows.delete(windowId);
+    setPanelOpen([windowId], false); // deliberate close — don't restore it later
+  });
+});
+
+// One read + one write for the whole batch — concurrent per-window
+// read-modify-writes clobber each other (last writer wins).
+async function setPanelOpen(windowIds, open) {
+  let { windowSessionMap = {} } = /** @type {Record<string, any>} */ (
+    await chrome.storage.session.get("windowSessionMap")
+  );
+  if (windowIds.some((id) => !windowSessionMap[id])) {
+    await refreshWindowProfiles(); // window not mapped yet (fresh window / fresh session)
+    ({ windowSessionMap = {} } = /** @type {Record<string, any>} */ (
+      await chrome.storage.session.get("windowSessionMap")
+    ));
+  }
+  const { windowProfiles = {} } = /** @type {Record<string, any>} */ (
+    await chrome.storage.local.get("windowProfiles")
+  );
+  let changed = false;
+  for (const windowId of windowIds) {
+    const logicalId = windowSessionMap[windowId];
+    if (logicalId && windowProfiles[logicalId]) {
+      windowProfiles[logicalId] = { ...windowProfiles[logicalId], panelOpen: open };
+      changed = true;
+    }
+  }
+  if (changed) {
+    await chrome.storage.local.set({ windowProfiles });
+  }
+}
+
+// Windows (other than the asking panel's) whose profile says a panel was open
+// but no live port exists — the panel offers to reopen them via its banner.
+// Runs an immediate profile refresh first so restart recovery has happened.
+async function panelsToRestore(excludeWindowId) {
+  await refreshWindowProfiles();
+  const { windowSessionMap = {} } = /** @type {Record<string, any>} */ (
+    await chrome.storage.session.get("windowSessionMap")
+  );
+  const { windowProfiles = {} } = /** @type {Record<string, any>} */ (
+    await chrome.storage.local.get("windowProfiles")
+  );
+  const windows = [];
+  for (const [chromeId, logicalId] of Object.entries(windowSessionMap)) {
+    const windowId = Number(chromeId);
+    if (windowId === excludeWindowId || connectedPanelWindows.has(windowId)) {
+      continue;
+    }
+    if (windowProfiles[logicalId]?.panelOpen) {
+      windows.push(windowId);
+    }
+  }
+  return { windows };
+}

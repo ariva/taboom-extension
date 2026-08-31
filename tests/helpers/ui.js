@@ -102,6 +102,13 @@ export function makeChrome({ tabs = [], stored = {}, calls = [] }) {
     windows: {
       WINDOW_ID_NONE: -1,
       getLastFocused: async () => ({ id: 1 }),
+      getCurrent: async () => ({ id: 1 }),
+      getAll: async () =>
+        [...new Set(tabs.map((t) => t.windowId))].map((id) => ({
+          id, left: 0, top: 0, width: 1280, height: 800,
+        })),
+      onCreated: makeEvent(),
+      onRemoved: makeEvent(),
       update: async (id) => calls.push(`windows.update ${id}`),
       create: async (opts = {}) => {
         calls.push(`windows.create ${JSON.stringify(opts)}`);
@@ -157,6 +164,11 @@ export function makeChrome({ tabs = [], stored = {}, calls = [] }) {
     runtime: {
       getURL: (path) => `chrome-extension://test${path}`,
       sendMessage: async (msg) => { calls.push(`sendMessage ${msg.type}`); return {}; },
+      connect: (info) => {
+        calls.push(`runtime.connect ${info?.name ?? ""}`);
+        return { name: info?.name, onDisconnect: makeEvent(), disconnect: () => {} };
+      },
+      onConnect: makeEvent(),
       openOptionsPage: () => calls.push("openOptionsPage"),
       getManifest: () => ({ version: "0.0.0-test" }),
       onMessage: makeEvent(),
@@ -166,7 +178,7 @@ export function makeChrome({ tabs = [], stored = {}, calls = [] }) {
       reload: () => calls.push("runtime.reload"),
     },
     sidePanel: {
-      open: async () => calls.push("sidePanel.open"),
+      open: async (opts) => calls.push(`sidePanel.open ${JSON.stringify(opts ?? {})}`),
       setPanelBehavior: async (opts) => calls.push(`sidePanel.setPanelBehavior ${JSON.stringify(opts)}`),
     },
   };

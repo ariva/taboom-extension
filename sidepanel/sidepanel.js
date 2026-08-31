@@ -1351,7 +1351,10 @@ chrome.tabs.onUpdated.addListener((_tabId, changeInfo) => {
 // our own perf flush + history bookkeeping write storage constantly — don't
 // let those echo back into renders (history buttons have their own listener)
 chrome.storage.onChanged.addListener((changes) => {
-  const ignored = ["perfMetrics", "perfSnapshots", "tabHistory", "updateAvailable", "dismissedUpdate"];
+  const ignored = [
+    "perfMetrics", "perfSnapshots", "tabHistory", "updateAvailable", "dismissedUpdate",
+    "windowProfiles", "windowSessionMap", // identity bookkeeping churns on every tab event
+  ];
   const relevant = Object.keys(changes).filter((key) => !ignored.includes(key));
   if (relevant.length === 0) {
     return;
@@ -1651,4 +1654,45 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (isPopoverOpen()) {
     fillHistoryPopover();
   }
+});
+
+// ---------- panel-open tracking + restore banner ----------
+// The held port tells the service worker THIS window has a panel; the SW
+// persists that on the window's logical profile. On load we ask which OTHER
+// windows had a panel before the update/restart and offer to reopen them —
+// the banner click supplies the user gesture sidePanel.open() requires.
+
+async function trackPanelOpen() {
+  const win = await chrome.windows.getCurrent();
+  const connect = () => {
+    const port = chrome.runtime.connect({ name: `sidepanel:${win.id}` });
+    // the worker gets idle-killed routinely — reconnect so the flag stays live
+    port.onDisconnect.addListener(() => setTimeout(connect, 1000));
+  };
+  connect();
+  return win.id;
+}
+
+trackPanelOpen().then(async (windowId) => {
+  const response = await chrome.runtime
+    .sendMessage({ type: "panels-to-restore", excludeWindowId: windowId })
+    .catch(() => null);
+  const windows = response?.windows ?? [];
+  if (windows.length === 0) {
+    return;
+  }
+  const banner = getElementById("restore-banner");
+  getElementById("restore-open").textContent =
+    `Side panel was open in ${windows.length} other window${windows.length > 1 ? "s" : ""} — restore?`;
+  getElementById("restore-open").addEventListener("click", async () => {
+    for (const id of windows) {
+      await chrome.sidePanel.open({ windowId: id }).catch(() => {});
+    }
+    banner.hidden = true;
+  });
+  getElementById("restore-dismiss").addEventListener("click", () => {
+    banner.hidden = true;
+    chrome.runtime.sendMessage({ type: "panels-restore-dismiss", windowIds: windows }).catch(() => {});
+  });
+  banner.hidden = false;
 });
