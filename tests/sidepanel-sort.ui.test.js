@@ -69,7 +69,7 @@ test("UI - Sidepanel Sort - Domain: alphabetical by hostname", () => {
 
 test("UI - Sidepanel Sort - Group by window: current window first, headers with counts", () => {
   setSort("window");
-  assert.deepEqual(titles(), ["Bravo", "Alpha", "Charlie", "Delta"], "current window recent-first, then window 2");
+  assert.deepEqual(titles(), ["Charlie", "Bravo", "Alpha", "Delta"], "current window in strip order (default same-as-window), then window 2");
   const headers = [...document.querySelectorAll(".group-header")].map((el) => el.textContent);
   assert.deepEqual(headers, ["Window Current #13/3▾", "Window #21/1▾"], "name + counts + arrow spans");
   assert.deepEqual(

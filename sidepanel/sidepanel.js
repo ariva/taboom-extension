@@ -748,7 +748,7 @@ function clearDropTarget() {
 // in-window reorder only makes sense while the list mirrors the real tab
 // strip: Group by window with the "Same as window" tab order
 function reorderActive() {
-  return effectiveSort() === "window" && (state.ui.windowTabOrder ?? "recent") === "same-as-window";
+  return effectiveSort() === "window" && (state.ui.groupByWindowTabsOrder ?? "same-as-window") === "same-as-window";
 }
 
 // What a drop on this element would do: {windowId, index} or null (invalid).
@@ -962,7 +962,7 @@ const WINDOW_TAB_ORDERS = [
 
 // window group header: same actions over the window's selected tabs — or every
 // visible tab when nothing in it is selected — plus a "Change order" dropdown
-// driving ui.windowTabOrder (current one marked)
+// driving ui.groupByWindowTabsOrder (current one marked)
 function openWindowHeaderMenu(event, windowId) {
   const windowTabs = state.fullVisible.filter((tab) => tab.windowId === windowId);
   const selectedHere = windowTabs.filter((tab) => state.selected.has(tab.id));
@@ -975,10 +975,10 @@ function openWindowHeaderMenu(event, windowId) {
   ctxMenu.append(ctxDivider());
   const { btn, submenu } = ctxSubmenu("Tabs Order");
   ctxMenu.append(btn, submenu);
-  const current = state.ui.windowTabOrder ?? "recent";
+  const current = state.ui.groupByWindowTabsOrder ?? "same-as-window";
   for (const [value, label] of WINDOW_TAB_ORDERS) {
     const item = ctxItem(label, () => {
-      state.ui = { ...state.ui, windowTabOrder: value };
+      state.ui = { ...state.ui, groupByWindowTabsOrder: value };
       persistUiPrefs(); // options page follows through the storage listener
       render(false);
     });

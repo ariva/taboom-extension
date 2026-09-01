@@ -807,7 +807,7 @@ test("UI - Sidepanel - Context menu closes on selection change, outside click, w
   assert.equal(menu.hidden, true, "focus loss closes the menu");
 });
 
-test("UI - Sidepanel - windowTabOrder reorders tabs inside window groups", async () => {
+test("UI - Sidepanel - groupByWindowTabsOrder reorders tabs inside window groups", async () => {
   const select = document.getElementById("sort");
   select.value = "window";
   select.dispatchEvent(new window.Event("change", { bubbles: true }));
@@ -815,12 +815,12 @@ test("UI - Sidepanel - windowTabOrder reorders tabs inside window groups", async
   assert.deepEqual(titles(), ["My Pull Request", "⏸ Some Video", "Inbox"], "recent within window 1");
 
   const { ui } = await chrome.storage.local.get("ui");
-  await chrome.storage.local.set({ ui: { ...ui, windowTabOrder: "title-desc" } });
+  await chrome.storage.local.set({ ui: { ...ui, groupByWindowTabsOrder: "title-desc" } });
   await chrome.storage.onChanged.fire({ ui: { newValue: {} } }, "local");
   await new Promise((resolve) => setTimeout(resolve, 200)); // refresh debounce
   assert.deepEqual(titles(), ["⏸ Some Video", "My Pull Request", "Inbox"], "titles Z-A within window 1");
 
-  await chrome.storage.local.set({ ui: { ...ui, windowTabOrder: "recent" } });
+  await chrome.storage.local.set({ ui: { ...ui, groupByWindowTabsOrder: "recent" } });
   await chrome.storage.onChanged.fire({ ui: { newValue: {} } }, "local");
   await new Promise((resolve) => setTimeout(resolve, 200));
   select.value = "recent";
@@ -849,13 +849,13 @@ test("UI - Sidepanel - Window header right-click: window-wide actions + Change o
   const currentItems = [...menu.querySelectorAll(".ctx-item.current")].map((el) => el.textContent);
   assert.deepEqual(currentItems, ["Recently used"], "current order highlighted");
 
-  // picking an order persists ui.windowTabOrder and reorders the group live
+  // picking an order persists ui.groupByWindowTabsOrder and reorders the group live
   calls.length = 0;
   [...menu.querySelectorAll(".ctx-item")].find((el) => el.textContent === "Title sorted Z-A").click();
   await tick();
   assert.equal(menu.hidden, true, "menu closes after picking");
   assert.ok(
-    calls.some((c) => c.startsWith("storage.set") && c.includes('"windowTabOrder":"title-desc"')),
+    calls.some((c) => c.startsWith("storage.set") && c.includes('"groupByWindowTabsOrder":"title-desc"')),
     "option persisted — options page will mirror it",
   );
   const titles = [...document.querySelectorAll(".row .title")].map((el) => el.textContent);
@@ -908,7 +908,7 @@ test("UI - Sidepanel - Same-as-window mode: in-window drag reorder; cross-window
   rowOf(1).dispatchEvent(new window.Event("dragend", { bubbles: true }));
 
   const { ui } = await chrome.storage.local.get("ui");
-  await chrome.storage.local.set({ ui: { ...ui, windowTabOrder: "same-as-window" } });
+  await chrome.storage.local.set({ ui: { ...ui, groupByWindowTabsOrder: "same-as-window" } });
   await chrome.storage.onChanged.fire({ ui: { newValue: {} } }, "local");
   await new Promise((resolve) => setTimeout(resolve, 200)); // refresh debounce
 
@@ -940,7 +940,7 @@ test("UI - Sidepanel - Same-as-window mode: in-window drag reorder; cross-window
   tabs[0].index = 0;
   tabs[1].windowId = 1;
   tabs[1].index = 1;
-  await chrome.storage.local.set({ ui: { ...ui, windowTabOrder: "recent" } });
+  await chrome.storage.local.set({ ui: { ...ui, groupByWindowTabsOrder: "recent" } });
   await chrome.storage.onChanged.fire({ ui: { newValue: {} } }, "local");
   await new Promise((resolve) => setTimeout(resolve, 200));
   sort.value = "recent";

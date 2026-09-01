@@ -16,7 +16,7 @@ export const DEFAULTS = {
     defaultFilter: "all",
     scope: "all-windows",
     sort: "window",
-    windowTabOrder: "recent", // within-window order in Group by window: recent | same-as-window | title-asc | title-desc
+    groupByWindowTabsOrder: "same-as-window", // within-window order in Group by window: recent | same-as-window | title-asc | title-desc
     sortDirMode: "default", // "default" = canonical on every sort change; "remember" = per-sort memory
     sortDirections: {}, // last-used direction per sort value (used when sortDirMode = remember)
     fontSize: 1, // rem, relative to browser default

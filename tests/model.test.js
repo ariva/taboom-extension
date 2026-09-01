@@ -440,14 +440,14 @@ test("Model - Group-url sort clusters duplicate urls with the shared size orderi
   );
 });
 
-test("Model - windowTabOrder controls within-window order in the window grouping", () => {
+test("Model - groupByWindowTabsOrder controls within-window order in the window grouping", () => {
   const tabs = [
     tab({ id: 1, title: "Bravo", index: 2, lastAccessed: NOW - 1 * HOUR }),
     tab({ id: 2, title: "Alpha", index: 0, lastAccessed: NOW - 3 * HOUR }),
     tab({ id: 3, title: "Charlie", index: 1, lastAccessed: NOW - 2 * HOUR }),
   ];
-  const order = (windowTabOrder) =>
-    selectVisible(tabs, view(tabs, { sort: "window", ui: windowTabOrder ? { windowTabOrder } : {} }))
+  const order = (groupByWindowTabsOrder) =>
+    selectVisible(tabs, view(tabs, { sort: "window", ui: groupByWindowTabsOrder ? { groupByWindowTabsOrder } : {} }))
       .map((t) => t.id);
   assert.deepEqual(order(undefined), [1, 3, 2], "default: recently used first");
   assert.deepEqual(order("recent"), [1, 3, 2], "explicit recent matches default");

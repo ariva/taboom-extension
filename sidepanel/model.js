@@ -190,8 +190,8 @@ export function selectVisible(tabs, view) {
       break;
     // "none" = current window first then windows by id (natural 1..x);
     // "desc"/"asc" = windows by visible tab count (natural order as tiebreak);
-    // within a window: ui.windowTabOrder — recent (default) | same-as-window
-    // (tab strip position) | title-asc | title-desc
+    // within a window: ui.groupByWindowTabsOrder — same-as-window (default, tab strip position) | recent
+    // (last used) | title-asc | title-desc
     case "window": {
       const rank = (tab) => (tab.windowId === currentWindowId ? 0 : tab.windowId);
       const sizes = new Map();
@@ -199,7 +199,7 @@ export function selectVisible(tabs, view) {
         sizes.set(tab.windowId, (sizes.get(tab.windowId) ?? 0) + 1);
       }
       const bySize = sortDir === "desc" ? -1 : sortDir === "asc" ? 1 : 0;
-      const within = windowTabComparator(view.ui?.windowTabOrder, last);
+      const within = windowTabComparator(view.ui?.groupByWindowTabsOrder, last);
       result.sort(
         (a, b) =>
           bySize * (sizes.get(a.windowId) - sizes.get(b.windowId)) ||
@@ -212,7 +212,7 @@ export function selectVisible(tabs, view) {
   return result;
 }
 
-// within-window tab order for the window grouping (ui.windowTabOrder)
+// within-window tab order for the window grouping (ui.groupByWindowTabsOrder)
 function windowTabComparator(order, last) {
   switch (order) {
     case "same-as-window":
