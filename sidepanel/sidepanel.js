@@ -27,7 +27,9 @@ import {
   selectVisible,
   windowMaps,
 } from "./model.js";
+import { markDevPage } from "../core/env.js";
 
+markDevPage();
 // state read races the features fetch instead of queuing behind the top-level await
 const initialStatePromise = loadState();
 const FEATURES = await loadFeatures();

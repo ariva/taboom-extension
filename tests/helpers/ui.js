@@ -170,12 +170,18 @@ export function makeChrome({ tabs = [], stored = {}, calls = [] }) {
       },
       onConnect: makeEvent(),
       openOptionsPage: () => calls.push("openOptionsPage"),
-      getManifest: () => ({ version: "0.0.0-test" }),
+      // update_url = store install; tests exercise the shipped (non-DEV) behaviour
+      getManifest: () => ({ version: "0.0.0-test", update_url: "https://clients2.google.com/service/update2/crx" }),
       onMessage: makeEvent(),
       onInstalled: makeEvent(),
       onStartup: makeEvent(),
       onUpdateAvailable: makeEvent(),
       reload: () => calls.push("runtime.reload"),
+    },
+    action: {
+      setBadgeText: async (opts) => calls.push(`action.setBadgeText ${JSON.stringify(opts)}`),
+      setBadgeBackgroundColor: async () => {},
+      setIcon: async () => {},
     },
     sidePanel: {
       open: async (opts) => calls.push(`sidePanel.open ${JSON.stringify(opts ?? {})}`),

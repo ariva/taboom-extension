@@ -9,7 +9,9 @@ import {
 } from "../core/core.js";
 import { getElementById, FOLD_ICONS } from "../core/dom.js";
 import { loadFeatures, loadState, saveState } from "../core/storage.js";
+import { markDevPage } from "../core/env.js";
 
+markDevPage();
 const FEATURES = await loadFeatures();
 import {
   aboutText,

@@ -15,5 +15,6 @@ cd "$ROOT_PATH"
 mkdir -p dist
 rm -f dist/taboom-tabs-manager.zip
 zip -r dist/taboom-tabs-manager.zip manifest.json CHANGES.md features.json \
-  background core sidepanel options icons styles images/moon.svg
+  background core sidepanel options icons styles images/moon.svg \
+  -x 'icons/dev/*' # unpacked-only blue icons; the store build never switches to them
 echo "dist/taboom-tabs-manager.zip ready"

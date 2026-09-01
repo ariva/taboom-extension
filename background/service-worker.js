@@ -17,6 +17,7 @@ import {
 } from "../core/core.js";
 import { loadFeatures, loadState, saveState } from "../core/storage.js";
 import { buildFingerprint, matchProfiles } from "../core/window-identity.js";
+import { DEV_PREFIX, IS_DEV } from "../core/env.js";
 
 const ALARM_NAME = "auto-snooze";
 
@@ -50,6 +51,15 @@ async function init() {
   await applyAutoDiscardable(state.protectionRules);
   await createContextMenus();
   await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
+  if (IS_DEV) {
+    // unpacked copy running next to the store one: blue moon + DEV badge in the toolbar
+    await chrome.action.setIcon({
+      // root-relative: setIcon resolves bare paths against the worker's own directory
+      path: { 16: "/icons/dev/icon16.png", 32: "/icons/dev/icon32.png", 48: "/icons/dev/icon48.png", 128: "/icons/dev/icon128.png" },
+    });
+    await chrome.action.setBadgeText({ text: "dev" });
+    await chrome.action.setBadgeBackgroundColor({ color: "#1a63d4" });
+  }
   await chrome.storage.local.remove(["updateAvailable", "dismissedUpdate"]); // running the new version now
   // history persists across extension reloads — just prune tabs that vanished meanwhile
   const openIds = new Set((await chrome.tabs.query({})).map((tab) => tab.id));
@@ -414,7 +424,7 @@ const MENU_ITEMS = [
 
 async function createContextMenus() {
   await chrome.contextMenus.removeAll();
-  chrome.contextMenus.create({ id: "root", title: "Taboom - Tabs Manager", contexts: ["page"] });
+  chrome.contextMenus.create({ id: "root", title: `${DEV_PREFIX}Taboom - Tabs Manager`, contexts: ["page"] });
   for (const item of MENU_ITEMS) {
     chrome.contextMenus.create({ ...item, parentId: "root", contexts: ["page"] });
   }
