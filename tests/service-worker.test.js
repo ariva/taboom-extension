@@ -238,6 +238,31 @@ test(
 );
 
 test(
+  "Service Worker - Overlapping history-menu rebuilds are serialized (no duplicate-id creates)",
+  { skip: !NAV_ON && "navigation disabled in features.json" },
+  async () => {
+    calls.length = 0;
+    // two storage echoes back-to-back — rapid tab switching does exactly this
+    await Promise.all([
+      chrome.storage.onChanged.fire({ tabHistory: {} }, "local"),
+      chrome.storage.onChanged.fire({ tabHistory: {} }, "local"),
+      chrome.storage.onChanged.fire({ ui: {} }, "local"),
+    ]);
+    await tick();
+    await tick();
+    const menuOps = calls.filter((c) => /^contextMenus\.(create|remove) history$/.test(c));
+    assert.ok(menuOps.includes("contextMenus.create history"), "menu rebuilt");
+    for (let i = 1; i < menuOps.length; i++) {
+      assert.ok(
+        !(menuOps[i] === "contextMenus.create history" && menuOps[i - 1] === "contextMenus.create history"),
+        `create without a remove in between at op ${i}: ${menuOps.join(" → ")}`,
+      );
+    }
+    assert.ok(menuOps.length <= 4, `coalesced into at most two passes, got: ${menuOps.join(" → ")}`);
+  },
+);
+
+test(
   "Service Worker - NAVIGATION_STACK off: history menu removed and never created",
   { skip: NAV_ON && "navigation enabled in features.json" },
   async () => {

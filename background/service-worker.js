@@ -444,7 +444,26 @@ const removeMenu = (id) =>
 
 // "Navigation stack" submenu after a separator: newest first, radio dot marks current.
 // Hidden entirely (incl. separator) when ui.historyNav is off.
-async function rebuildHistoryMenu() {
+// Serialized + coalesced: every tabHistory/ui storage change triggers a rebuild,
+// and rapid tab switching overlaps them — two interleaved remove→create passes
+// end in "Cannot create item with duplicate id". Calls that land while a pass
+// runs fold into one follow-up pass.
+let menuChain = Promise.resolve();
+let menuDirty = false;
+function rebuildHistoryMenu() {
+  menuDirty = true;
+  const run = menuChain.then(async () => {
+    if (!menuDirty) {
+      return; // an earlier queued pass already rebuilt from fresh state
+    }
+    menuDirty = false;
+    await rebuildHistoryMenuNow();
+  });
+  menuChain = run.catch(() => {});
+  return run;
+}
+
+async function rebuildHistoryMenuNow() {
   const [{ ui }, rawFeatures] = await Promise.all([loadState(), getFeatures()]);
   const features = applyExperimental(rawFeatures, ui.showExperimental ?? false);
   await removeMenu("history");
