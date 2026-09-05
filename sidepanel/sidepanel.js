@@ -126,6 +126,12 @@ async function refresh(animate = false, preloaded = null) {
   document.documentElement.style.fontSize = `${state.ui.fontSize ?? 1}rem`;
   // light-dark() colors resolve via color-scheme, so forcing it flips the palette
   document.documentElement.style.colorScheme = resolveColorScheme(state.ui.theme);
+  // focus moved to another window: the window grouping reorders (new current
+  // window jumps to the top) — without a scroll the viewport stays mid-list
+  // and the current group sits above it
+  if (state.currentWindowId != null && win.id !== state.currentWindowId && effectiveSort() === "window") {
+    state.followCurrent = true;
+  }
   state.currentWindowId = win.id;
   state.allTabs = tabs;
   // tabs closed outside the panel (or id-swapped by discard) leave stale ids
@@ -407,13 +413,11 @@ function renderNowImpl() {
 
   if (state.followCurrent) {
     state.followCurrent = false;
+    // top first (group headers/padding show), then the minimal scroll that
+    // reveals the current row — near the top both hold, far down the row wins
+    listEl.scrollTop = 0;
     const current = listEl.querySelector(".row.current");
-    // topmost row → scroll fully to top so headers/padding show; else just reveal it
-    if (current === listEl.querySelector(".row")) {
-      listEl.scrollTop = 0;
-    } else {
-      current?.scrollIntoView({ block: "nearest" });
-    }
+    current?.scrollIntoView({ block: "nearest" });
   }
   renderBulkBar();
 }
