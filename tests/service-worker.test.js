@@ -52,6 +52,17 @@ test("Service Worker - Init: alarm uses configured interval, menus created, prot
   assert.ok(!calls.some((c) => c.startsWith("tabs.update 2") && c.includes("autoDiscardable")));
 });
 
+test("Service Worker - Concurrent onInstalled + onStartup coalesce into one init pass", async () => {
+  calls.length = 0;
+  // browser launch with a pending update fires both back-to-back
+  await Promise.all([chrome.runtime.onInstalled.fire(), chrome.runtime.onStartup.fire()]);
+  await tick();
+  await tick();
+  assert.equal(calls.filter((c) => c === "contextMenus.removeAll").length, 1, "one menu wipe");
+  assert.equal(calls.filter((c) => c === "contextMenus.create root").length, 1, "root created once");
+  assert.equal(calls.filter((c) => c.startsWith("alarms.create")).length, 1, "alarm ensured once");
+});
+
 test("Service Worker - Alarm pass discards inactive unprotected tabs only", async () => {
   calls.length = 0;
   // the onAlarm listener kicks off autoSnoozePass without awaiting it

@@ -44,7 +44,18 @@ function navMode() {
 chrome.runtime.onInstalled.addListener(init);
 chrome.runtime.onStartup.addListener(init);
 
-async function init() {
+// onInstalled and onStartup both fire at a browser launch that carries a
+// pending update/reload — two concurrent passes interleave their menu
+// removeAll/create and double the alarm/profile work. Coalesce into one.
+let initPromise = null;
+function init() {
+  initPromise ??= initNow().finally(() => {
+    initPromise = null;
+  });
+  return initPromise;
+}
+
+async function initNow() {
   const state = await loadState();
   await saveState(state); // persist defaults on first run
   await ensureAlarm(state.settings);
@@ -263,11 +274,18 @@ chrome.storage.onChanged.addListener(async (changes, area) => {
 async function syncProtectMenu(tab) {
   if (!tab || !isSupportedUrl(tab.url)) return;
   const { protectionRules } = await loadState();
-  chrome.contextMenus.update("protect-this-site", {
-    title: isProtected(tab.url, protectionRules)
-      ? "Remove site protection"
-      : "Protect site",
-  });
+  const title = isProtected(tab.url, protectionRules)
+    ? "Remove site protection"
+    : "Protect site";
+  await enqueueMenuOp(
+    () =>
+      new Promise((resolve) =>
+        chrome.contextMenus.update("protect-this-site", { title }, () => {
+          void chrome.runtime.lastError; // item may be gone mid-rebuild — expected
+          resolve(undefined);
+        }),
+      ),
+  );
 }
 
 chrome.tabs.onActivated.addListener(async ({ tabId }) => {
@@ -422,13 +440,16 @@ const MENU_ITEMS = [
   { id: "snooze-all-inactive", title: "Snooze all inactive tabs" },
 ];
 
-async function createContextMenus() {
-  await chrome.contextMenus.removeAll();
-  chrome.contextMenus.create({ id: "root", title: `${DEV_PREFIX}Taboom - Tabs Manager`, contexts: ["page"] });
-  for (const item of MENU_ITEMS) {
-    chrome.contextMenus.create({ ...item, parentId: "root", contexts: ["page"] });
-  }
-  await rebuildHistoryMenu();
+function createContextMenus() {
+  return enqueueMenuOp(async () => {
+    await chrome.contextMenus.removeAll();
+    chrome.contextMenus.create({ id: "root", title: `${DEV_PREFIX}Taboom - Tabs Manager`, contexts: ["page"] });
+    for (const item of MENU_ITEMS) {
+      chrome.contextMenus.create({ ...item, parentId: "root", contexts: ["page"] });
+    }
+    menuDirty = false; // the fresh rebuild below covers any queued history pass
+    await rebuildHistoryMenuNow();
+  });
 }
 
 const MENU_HISTORY_MAX = 15;
@@ -442,25 +463,29 @@ const removeMenu = (id) =>
     }),
   );
 
+// EVERY menu mutation runs through this one queue. Interleaved passes
+// (createContextMenus racing rebuilds, protect-title updates landing in a
+// removeAll→create gap) end in "duplicate id" / "cannot find menu item".
+let menuChain = Promise.resolve();
+function enqueueMenuOp(op) {
+  const run = menuChain.then(op);
+  menuChain = run.catch(() => {}); // one failure must not jam the queue
+  return run;
+}
+
 // "Navigation stack" submenu after a separator: newest first, radio dot marks current.
 // Hidden entirely (incl. separator) when ui.historyNav is off.
-// Serialized + coalesced: every tabHistory/ui storage change triggers a rebuild,
-// and rapid tab switching overlaps them — two interleaved remove→create passes
-// end in "Cannot create item with duplicate id". Calls that land while a pass
-// runs fold into one follow-up pass.
-let menuChain = Promise.resolve();
+// Coalesced: calls that land while a pass runs fold into one follow-up pass.
 let menuDirty = false;
 function rebuildHistoryMenu() {
   menuDirty = true;
-  const run = menuChain.then(async () => {
+  return enqueueMenuOp(async () => {
     if (!menuDirty) {
       return; // an earlier queued pass already rebuilt from fresh state
     }
     menuDirty = false;
     await rebuildHistoryMenuNow();
   });
-  menuChain = run.catch(() => {});
-  return run;
 }
 
 async function rebuildHistoryMenuNow() {

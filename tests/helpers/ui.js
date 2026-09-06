@@ -129,7 +129,10 @@ export function makeChrome({ tabs = [], stored = {}, calls = [] }) {
     contextMenus: {
       removeAll: async () => calls.push("contextMenus.removeAll"),
       create: (props) => calls.push(`contextMenus.create ${props.id}`),
-      update: (id, props) => calls.push(`contextMenus.update ${id} ${JSON.stringify(props)}`),
+      update: (id, props, done) => {
+        calls.push(`contextMenus.update ${id} ${JSON.stringify(props)}`);
+        done?.();
+      },
       remove: (id, done) => {
         calls.push(`contextMenus.remove ${id}`);
         done?.();
