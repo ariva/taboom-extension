@@ -800,6 +800,10 @@ function renderRowImpl(tab, vm) {
       dot.classList.add("current");
     }
     dot.title = vm.dot.title;
+    // active-tab left bar picks this up ("" = current window → accent fallback)
+    if (vm.dot.color) {
+      row.style.setProperty("--win-color", vm.dot.color);
+    }
   } else {
     dot.remove();
   }
