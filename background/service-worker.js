@@ -230,6 +230,11 @@ async function handleMessage(message) {
     case "panels-restore-dismiss":
       // user declined — forget those windows so the offer doesn't come back
       return setPanelOpen(message.windowIds, false);
+    case "window-rename":
+      // empty name clears — undefined is dropped by the storage write
+      return patchWindowProfiles([message.windowId], { name: message.name?.trim() || undefined });
+    case "window-set-color":
+      return patchWindowProfiles([message.windowId], { color: message.color || undefined });
     case "sidebar-focused":
     case "sidebar-no-focus":
       return; // acknowledged; no behavior yet — hook points for future focus-aware features
@@ -603,6 +608,11 @@ async function refreshWindowProfiles() {
     profiles[map[windowId]] = { ...profiles[map[windowId]], ...fingerprint, chromeWindowId: windowId };
   }
   for (const [logicalId, profile] of Object.entries(profiles)) {
+    // user-customized windows (name or color) are exempt — losing a name to
+    // the sweep after two weeks of vacation would feel like data loss
+    if (profile.name || profile.color) {
+      continue;
+    }
     if (now - (profile.updatedAt ?? 0) > PROFILE_TTL_MS) {
       delete profiles[logicalId];
     }
@@ -651,9 +661,14 @@ chrome.runtime.onConnect.addListener((port) => {
   });
 });
 
+function setPanelOpen(windowIds, open) {
+  return patchWindowProfiles(windowIds, { panelOpen: open });
+}
+
 // One read + one write for the whole batch — concurrent per-window
-// read-modify-writes clobber each other (last writer wins).
-async function setPanelOpen(windowIds, open) {
+// read-modify-writes clobber each other (last writer wins). `undefined`
+// values in the patch drop the key on the storage write (clear name/color).
+async function patchWindowProfiles(windowIds, patch) {
   let { windowSessionMap = {} } = /** @type {Record<string, any>} */ (
     await chrome.storage.session.get("windowSessionMap")
   );
@@ -670,7 +685,7 @@ async function setPanelOpen(windowIds, open) {
   for (const windowId of windowIds) {
     const logicalId = windowSessionMap[windowId];
     if (logicalId && windowProfiles[logicalId]) {
-      windowProfiles[logicalId] = { ...windowProfiles[logicalId], panelOpen: open };
+      windowProfiles[logicalId] = { ...windowProfiles[logicalId], ...patch };
       changed = true;
     }
   }

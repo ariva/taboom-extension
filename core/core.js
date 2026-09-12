@@ -25,6 +25,7 @@ export const DEFAULTS = {
     historyNav: "traditional", // "disabled" | "traditional" | "compact" (legacy: true/false)
     searchEmptyFilter: "keep", // "keep" | "all" — when search matches are hidden by the current filter
     hideUpdateBanner: false, // suppress the new-version banner in the side panel
+    windowNamesEnabled: true, // WINDOW_NAMES flag: show custom window names/colors (user toggle)
     onExtensionUpdate: "banner", // "auto" | "banner" | "none" — reopen side panels lost to an update/restart
     showExperimental: false, // opt into experimental features (needs ALLOW_EXPERIMENTAL flag)
   },

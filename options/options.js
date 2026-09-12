@@ -76,12 +76,15 @@ async function render() {
   getElementById("theme").value = state.ui.theme ?? "auto";
   getElementById("showExperimental").checked = state.ui.showExperimental ?? false;
   getElementById("hideUpdateBanner").checked = state.ui.hideUpdateBanner ?? false;
+  getElementById("windowNamesEnabled").checked = state.ui.windowNamesEnabled ?? true;
   getElementById("onExtensionUpdate").value = state.ui.onExtensionUpdate ?? "banner";
   getElementById("experimental_fuzzySearch").checked = state.ui.experimental_fuzzySearch ?? true;
 
   const appliedFeatures = applyExperimental(FEATURES, state.ui.showExperimental ?? false);
   getElementById("historyNav-label").hidden =
     !featureEnabled(appliedFeatures, "OPTIONS_NAVIGATION_STACK");
+  getElementById("windowNamesEnabled-label").hidden =
+    !featureEnabled(appliedFeatures, "WINDOW_NAMES");
   // The dropdown shows the EFFECTIVE mode, not the raw stored value: a stored
   // mode whose flag got disabled falls back (traditional ↔ compact, disabled
   // when neither is available). The stored preference itself is NOT rewritten,
@@ -169,6 +172,7 @@ const UI_FIELDS = [
   { id: "historyNav", prop: "value" },
   { id: "showExperimental", prop: "checked" },
   { id: "hideUpdateBanner", prop: "checked" },
+  { id: "windowNamesEnabled", prop: "checked" },
   { id: "onExtensionUpdate", prop: "value" },
   { id: "experimental_fuzzySearch", prop: "checked" },
 ];

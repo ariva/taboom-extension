@@ -258,13 +258,17 @@ export function countsByFilter(tabs, derived) {
 }
 
 // mid-saturation hues legible on both themes; current window uses --accent via CSS
-const WINDOW_DOT_COLORS = ["#e4572e", "#17bebb", "#ffc914", "#76b041", "#b96ac9", "#f28db2", "#8d99ae", "#c9a227"];
+// (exported: the header ctx-menu color submenu offers exactly this palette)
+export const WINDOW_DOT_COLORS = ["#e4572e", "#17bebb", "#ffc914", "#76b041", "#b96ac9", "#f28db2", "#8d99ae", "#c9a227"];
 // beyond the palette: golden-angle hue spacing — unlimited, no repeats
 export const windowColor = (i) => WINDOW_DOT_COLORS[i] ?? `hsl(${Math.round(i * 137.508) % 360} 65% 55%)`;
 
 // stable small indexes instead of Chrome's real window ids (current window = #1,
 // others by ascending id) + per-window dot colors (only when >1 window)
-export function windowMaps(tabs, currentWindowId) {
+// meta: Map(windowId → { name, color }) from windowProfiles (WINDOW_NAMES) —
+// a custom color overrides the positional auto-color (and, for the current
+// window, the accent) and stays stable across sessions
+export function windowMaps(tabs, currentWindowId, meta = null) {
   const ids = [...new Set(tabs.map((tab) => tab.windowId))].sort((a, b) => a - b);
   const ordered = [currentWindowId, ...ids.filter((id) => id !== currentWindowId)];
   const indexes = new Map(ordered.map((id, i) => [id, i + 1]));
@@ -272,10 +276,15 @@ export function windowMaps(tabs, currentWindowId) {
   if (ids.length > 1) {
     let i = 0;
     for (const id of ids) {
-      dotColors.set(id, id === currentWindowId ? "" : windowColor(i++));
+      const custom = meta?.get(id)?.color;
+      if (id === currentWindowId) {
+        dotColors.set(id, custom ?? ""); // "" = accent via CSS
+      } else {
+        dotColors.set(id, custom ?? windowColor(i++));
+      }
     }
   }
-  return { indexes, dotColors };
+  return { indexes, dotColors, names: meta ?? new Map() };
 }
 
 export function badges(tab, isProtectedTab) {
@@ -296,7 +305,12 @@ export function emptyMessage(query, filter) {
 
 // Group NAME only — the view renders counts and the collapse arrow as their
 // own right-side spans so a long name can ellipsize without eating them.
-export function windowGroupName(windowId, { currentWindowId, indexes }) {
+export function windowGroupName(windowId, { currentWindowId, indexes, names }) {
+  const custom = names?.get(windowId)?.name;
+  if (custom) {
+    // index survives in the current-window suffix (and tooltips) so "#N" stays learnable
+    return windowId === currentWindowId ? `${custom} — Current #${indexes.get(windowId)}` : custom;
+  }
   const label = windowId === currentWindowId ? "Window Current" : "Window";
   return `${label} #${indexes.get(windowId)}`;
 }

@@ -699,19 +699,19 @@ test("UI - Sidepanel - Right-click row offers move-to-window menu (selection-awa
     el.textContent.startsWith("Move tab to"),
   );
   moveToggle.dispatchEvent(new window.Event("mouseenter"));
-  assert.equal(submenu.hidden, false, "hover auto-expands the dropdown");
+  assert.equal(submenu.hidden, true, "not yet — hover-intent delay");
+  await new Promise((resolve) => setTimeout(resolve, 600)); // > SUBMENU_HOVER_DELAY_MS (500)
+  assert.equal(submenu.hidden, false, "hover auto-expands the dropdown after the delay");
   assert.equal(moveToggle.querySelector(".ctx-caret").textContent, "▾", "caret shows expanded state");
   [...menu.querySelectorAll(".ctx-item")]
     .find((el) => el.textContent === "Snooze")
     .dispatchEvent(new window.Event("mouseover", { bubbles: true }));
-  assert.equal(submenu.hidden, true, "hovering back up over plain actions folds it");
-  assert.equal(moveToggle.querySelector(".ctx-caret").textContent, "▸", "caret folds with it");
-  moveToggle.dispatchEvent(new window.Event("mouseenter"));
-  assert.equal(submenu.hidden, false, "re-hovering Move-to reopens");
+  assert.equal(submenu.hidden, false, "hovering plain actions keeps it expanded");
+  assert.equal(moveToggle.querySelector(".ctx-caret").textContent, "▾", "caret stays expanded");
   moveToggle.click();
-  assert.equal(submenu.hidden, true, "click still toggles");
+  assert.equal(submenu.hidden, true, "click folds it");
   moveToggle.click();
-  assert.equal(submenu.hidden, false, "Move-to expands the dropdown");
+  assert.equal(submenu.hidden, false, "click again expands the dropdown");
   assert.equal(menu.hidden, false, "menu itself stays open");
 
   [...menu.querySelectorAll(".ctx-item")].find((el) => el.textContent === "Window #2").click();
@@ -837,17 +837,37 @@ test("UI - Sidepanel - Window header right-click: window-wide actions + Change o
   header.dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
   assert.equal(menu.hidden, false, "menu opens on header right-click");
   const items = [...menu.querySelectorAll(".ctx-item")].map((el) => el.textContent);
+  const NAMES_ON = TEST_FEATURES.WINDOW_NAMES?.enabled === true;
   assert.deepEqual(
     items,
     [
+      // WINDOW_NAMES puts focus/rename/color on top (+ 8 palette swatches and
+      // Auto); Focus window only for non-current windows (header 1 IS current)
+      ...(NAMES_ON ? ["Rename window…", "Window color ▸",
+        "Red", "Teal", "Yellow", "Green", "Purple", "Pink", "Gray", "Gold", "Auto"] : []),
       "Snooze 2 tabs", "Wake 2 tabs", "Protect 2 tabs", "Unprotect 2 tabs", "Close 2 tabs",
       "Tabs Order ▸",
       "Recently used", "Same as window", "Title sorted A-Z", "Title sorted Z-A",
     ],
     "actions cover the window's visible tabs; order dropdown follows",
   );
+  if (NAMES_ON) {
+    // accordion: opening one submenu folds the other
+    const toggles = [...menu.querySelectorAll(".ctx-item.ctx-move")];
+    const orderToggle = toggles.find((el) => el.textContent.startsWith("Tabs Order"));
+    const colorToggle = toggles.find((el) => el.textContent.startsWith("Window color"));
+    orderToggle.dispatchEvent(new window.Event("mouseenter"));
+    await new Promise((resolve) => setTimeout(resolve, 600)); // > SUBMENU_HOVER_DELAY_MS (500)
+    assert.equal(orderToggle.nextElementSibling.hidden, false, "Tabs Order expands");
+    colorToggle.dispatchEvent(new window.Event("mouseenter"));
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    assert.equal(colorToggle.nextElementSibling.hidden, false, "Window color expands");
+    assert.equal(orderToggle.nextElementSibling.hidden, true, "Tabs Order folds (accordion)");
+    colorToggle.click(); // fold again for the assertions below
+  }
   const currentItems = [...menu.querySelectorAll(".ctx-item.current")].map((el) => el.textContent);
-  assert.deepEqual(currentItems, ["Recently used"], "current order highlighted");
+  // WINDOW_NAMES: unset window color marks the "Auto" swatch current too
+  assert.deepEqual(currentItems, [...(NAMES_ON ? ["Auto"] : []), "Recently used"], "current order highlighted");
 
   // picking an order persists ui.groupByWindowTabsOrder and reorders the group live
   calls.length = 0;
@@ -866,7 +886,7 @@ test("UI - Sidepanel - Window header right-click: window-wide actions + Change o
     .dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
   assert.deepEqual(
     [...menu.querySelectorAll(".ctx-item.current")].map((el) => el.textContent),
-    ["Title sorted Z-A"],
+    [...(NAMES_ON ? ["Auto"] : []), "Title sorted Z-A"],
     "highlight follows the stored option",
   );
 
@@ -878,8 +898,11 @@ test("UI - Sidepanel - Window header right-click: window-wide actions + Change o
   document.querySelector('.row[data-tab-id="1"] input').click(); // toggles checked + fires click
   document.querySelector('.group-header[data-window-id="1"]')
     .dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+  const actionLabels = [...menu.querySelectorAll(".ctx-item")]
+    .map((el) => el.textContent)
+    .filter((t) => /^(Snooze|Wake|Protect|Unprotect|Close)( \d+ tabs)?$/.test(t));
   assert.deepEqual(
-    [...menu.querySelectorAll(".ctx-item")].map((el) => el.textContent).slice(0, 5),
+    actionLabels,
     ["Snooze", "Wake", "Protect", "Unprotect", "Close"],
     "1 of 2 selected — actions cover the selection, not the whole window",
   );
@@ -946,3 +969,101 @@ test("UI - Sidepanel - Same-as-window mode: in-window drag reorder; cross-window
   sort.value = "recent";
   sort.dispatchEvent(new window.Event("change", { bubbles: true }));
 });
+
+test(
+  "UI - Sidepanel - WINDOW_NAMES: named headers, custom dots, overview list, inline rename",
+  { skip: !(TEST_FEATURES.WINDOW_NAMES?.enabled === true) && "WINDOW_NAMES disabled in features.json" },
+  async () => {
+    // third window named "Alpha" — proves the overview sorts others by name
+    tabs.push({ id: 99, windowId: 3, index: 0, active: true, discarded: false, pinned: false,
+      audible: false, url: "https://alpha.example.com/", title: "Alpha Tab", lastAccessed: NOW });
+    await chrome.storage.session.set({ windowSessionMap: { 1: "w-t1", 2: "w-t2", 3: "w-t3" } });
+    await chrome.storage.local.set({
+      windowProfiles: {
+        "w-t1": { chromeWindowId: 1, name: "Research", updatedAt: Date.now() },
+        "w-t2": { chromeWindowId: 2, color: "#123456", updatedAt: Date.now() },
+        "w-t3": { chromeWindowId: 3, name: "Alpha", updatedAt: Date.now() },
+      },
+    });
+    const sort = document.getElementById("sort");
+    sort.value = "window";
+    sort.dispatchEvent(new window.Event("change", { bubbles: true }));
+    await chrome.tabs.onActivated.fire({});
+    await new Promise((resolve) => setTimeout(resolve, 200)); // refresh debounce
+
+    const labels = [...document.querySelectorAll(".group-header .group-label")].map((el) => el.textContent);
+    assert.deepEqual(labels, ["Research — Current #1", "Window #2", "Alpha"], "custom name on the header");
+    const header2 = document.querySelector('.group-header[data-window-id="2"]');
+    assert.equal(header2.querySelector(".win-dot").style.background, "#123456", "custom dot color");
+    assert.ok(header2.querySelector(".group-menu-btn"), "⋯ window-actions button present");
+
+    // windows popover (S2): button visible, rows with stats; click focuses
+    const winBtn = document.getElementById("win-list-btn");
+    assert.equal(winBtn.hidden, false, "windows-list button visible with the flag on");
+    winBtn.click(); // fills the popover (popovertarget handles show/hide natively)
+    await tick();
+    const pop = document.getElementById("windows-pop");
+    assert.match(pop.querySelector(".win-head .muted").textContent, /Windows \(3\)/);
+    const rows = [...pop.querySelectorAll(".win-row")];
+    assert.deepEqual(
+      rows.map((el) => el.querySelector(".win-title").textContent),
+      ["Research — Current #1", "Alpha", "Window #2"],
+      "current first, then others ABC by display name (Alpha before Window #2)",
+    );
+    assert.deepEqual(
+      rows.map((el) => el.querySelector(".win-stats").textContent),
+      ["2 tabs · 1 awake · 1 snoozed", "1 tab · 1 awake · 0 snoozed", "1 tab · 1 awake · 0 snoozed"],
+    );
+    assert.ok(rows[0].classList.contains("current"), "current window row emphasized");
+    assert.match(rows[0].title, /Research — Current #1\n2 tabs · 1 awake · 1 snoozed\n0 pinned · 0 audible\nActive tab: My Pull Request/,
+      "hover tooltip carries full name + stats + active tab");
+    calls.length = 0;
+    rows[1].click(); // "Alpha" = window 3
+    await tick();
+    assert.ok(calls.includes("windows.update 3"), "popover row click focuses the window");
+
+    // right-click a popover row → the slim window-scoped menu (no tab actions)
+    rows[2].dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+    const ctx = document.getElementById("ctx-menu");
+    assert.equal(ctx.hidden, false, "window menu opens from a popover row");
+    assert.equal(ctx.querySelector(".ctx-title").textContent, "Window #2", "menu header names the window");
+    assert.deepEqual(
+      [...ctx.querySelectorAll(".ctx-item")].map((el) => el.textContent),
+      ["Focus window", "Rename window…", "Window color ▸",
+        "Red", "Teal", "Yellow", "Green", "Purple", "Pink", "Gray", "Gold", "Auto"],
+      "only rename/color/focus — no bulk actions, no Tabs Order",
+    );
+    ctx.querySelector(".ctx-close").click();
+    assert.equal(ctx.hidden, true, "corner X closes the menu");
+
+    // each row carries a ⋯ trigger for the same menu (no right-click needed)
+    const menuBtns = [...pop.querySelectorAll(".win-menu-btn")];
+    assert.equal(menuBtns.length, rows.length, "one ⋯ per window row");
+    menuBtns[1].click();
+    assert.equal(ctx.hidden, false, "⋯ opens the window menu");
+    document.body.click();
+
+    // inline rename: ctx menu entry swaps the label for an input; Enter commits
+    document.querySelector('.group-header[data-window-id="2"]')
+      .dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+    const menu = document.getElementById("ctx-menu");
+    [...menu.querySelectorAll(".ctx-item")].find((el) => el.textContent === "Rename window…").click();
+    const input = document.querySelector(".rename-input");
+    assert.ok(input, "label replaced by input");
+    input.value = "Media";
+    calls.length = 0;
+    input.dispatchEvent(new window.Event("blur"));
+    await tick();
+    await tick();
+    assert.ok(calls.includes("sendMessage window-rename"), "rename sent to the service worker");
+
+    // cleanup: profiles away, extra window gone, sort back
+    tabs.splice(tabs.findIndex((t) => t.id === 99), 1);
+    await chrome.storage.local.set({ windowProfiles: {} });
+    await chrome.storage.session.set({ windowSessionMap: {} });
+    sort.value = "recent";
+    sort.dispatchEvent(new window.Event("change", { bubbles: true }));
+    await chrome.tabs.onActivated.fire({});
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  },
+);

@@ -338,3 +338,24 @@ test("UI - Options - Window tab-order dropdown defaults to same-as-window and pe
   select.dispatchEvent(new window.Event("change", { bubbles: true }));
   await tick();
 });
+
+test("UI - Options - Window-names toggle visible only with WINDOW_NAMES; persists ui.windowNamesEnabled", async () => {
+  const { applyExperimental, featureEnabled } = await import("../core/core.js");
+  await chrome.storage.onChanged.fire({ protectionRules: {} }, "local"); // re-render with the ui prior tests left
+  await tick();
+  await tick();
+  // adaptive like the fuzzy-search test: visibility follows the STORED
+  // showExperimental (earlier tests reset it), not the scenario's injection
+  const effective = applyExperimental(RAW_FEATURES, stored.ui?.showExperimental ?? false);
+  const flagOn = featureEnabled(effective, "WINDOW_NAMES");
+  assert.equal(document.getElementById("windowNamesEnabled-label").hidden, !flagOn, "visible iff flag resolves on");
+  const box = document.getElementById("windowNamesEnabled");
+  assert.equal(box.checked, true, "default: names shown");
+  box.checked = false;
+  box.dispatchEvent(new window.Event("change", { bubbles: true }));
+  await tick();
+  assert.ok(
+    calls.some((c) => c.startsWith("storage.set") && c.includes('"windowNamesEnabled":false')),
+    "preference persisted",
+  );
+});

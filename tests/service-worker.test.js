@@ -450,3 +450,43 @@ test("Service Worker - Panel tracking: connect marks panelOpen, disconnect clear
   response = await send({ type: "panels-to-restore", excludeWindowId: 3 });
   assert.deepEqual(response.windows, [], "dismissed windows no longer offered");
 });
+
+test("Service Worker - Window rename/color write to the logical profile; empty clears", async () => {
+  let { windowProfiles } = await chrome.storage.local.get("windowProfiles");
+  const logical1 = Object.entries(windowProfiles).find(([, p]) => p.chromeWindowId === 1)?.[0];
+
+  await send({ type: "window-rename", windowId: 1, name: "  Research  " });
+  ({ windowProfiles } = await chrome.storage.local.get("windowProfiles"));
+  assert.equal(windowProfiles[logical1].name, "Research", "trimmed name stored");
+
+  await send({ type: "window-set-color", windowId: 1, color: "#123456" });
+  ({ windowProfiles } = await chrome.storage.local.get("windowProfiles"));
+  assert.equal(windowProfiles[logical1].color, "#123456", "color stored");
+
+  await send({ type: "window-rename", windowId: 1, name: "" });
+  await send({ type: "window-set-color", windowId: 1, color: null });
+  ({ windowProfiles } = await chrome.storage.local.get("windowProfiles"));
+  assert.equal(windowProfiles[logical1].name, undefined, "empty rename clears");
+  assert.equal(windowProfiles[logical1].color, undefined, "null color clears");
+});
+
+test("Service Worker - TTL sweep keeps customized profiles, drops stale plain ones", async () => {
+  const { windowProfiles } = await chrome.storage.local.get("windowProfiles");
+  const stale = Date.now() - 15 * 24 * 3_600_000; // past the 14d TTL
+  windowProfiles["w-stale-named"] = { chromeWindowId: 999, name: "Keep me", updatedAt: stale };
+  windowProfiles["w-stale-colored"] = { chromeWindowId: 998, color: "#123456", updatedAt: stale };
+  windowProfiles["w-stale-plain"] = { chromeWindowId: 997, updatedAt: stale };
+  await chrome.storage.local.set({ windowProfiles });
+
+  await chrome.tabs.onMoved.fire(1, { windowId: 1, fromIndex: 0, toIndex: 1 });
+  await new Promise((resolve) => setTimeout(resolve, 600)); // profile-refresh debounce
+
+  const { windowProfiles: after } = await chrome.storage.local.get("windowProfiles");
+  assert.ok(after["w-stale-named"], "named profile survives the sweep");
+  assert.ok(after["w-stale-colored"], "colored profile survives the sweep");
+  assert.equal(after["w-stale-plain"], undefined, "plain stale profile swept");
+
+  delete after["w-stale-named"];
+  delete after["w-stale-colored"];
+  await chrome.storage.local.set({ windowProfiles: after }); // restore fixture
+});

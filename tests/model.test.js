@@ -455,3 +455,35 @@ test("Model - groupByWindowTabsOrder controls within-window order in the window 
   assert.deepEqual(order("title-asc"), [2, 1, 3], "titles A-Z");
   assert.deepEqual(order("title-desc"), [3, 1, 2], "titles Z-A");
 });
+
+test("Model - WINDOW_NAMES: custom names and colors resolve through windowMaps meta", () => {
+  const tabs = [tab({ id: 1 }), tab({ id: 2, windowId: 2 }), tab({ id: 3, windowId: 3 })];
+  const meta = new Map([
+    [1, { name: "Research" }],
+    [2, { color: "#123456" }],
+  ]);
+  const maps = windowMaps(tabs, 1, meta);
+  assert.equal(
+    windowGroupName(1, { currentWindowId: 1, indexes: maps.indexes, names: maps.names }),
+    "Research — Current #1",
+    "named current window keeps its index suffix",
+  );
+  assert.equal(
+    windowGroupName(2, { currentWindowId: 1, indexes: maps.indexes, names: maps.names }),
+    "Window #2",
+    "color-only meta leaves the default label",
+  );
+  assert.equal(maps.dotColors.get(2), "#123456", "custom color wins over positional");
+  assert.equal(maps.dotColors.get(1), "", "current window: accent while no custom color");
+  const coloredCurrent = windowMaps(tabs, 1, new Map([[1, { color: "#abcdef" }]]));
+  assert.equal(coloredCurrent.dotColors.get(1), "#abcdef", "custom color wins on the current window too");
+  assert.ok(maps.dotColors.get(3).startsWith("#"), "unset window keeps auto color");
+
+  const named = new Map([[2, { name: "Media" }]]);
+  const namedMaps = windowMaps(tabs, 1, named);
+  assert.equal(
+    windowGroupName(2, { currentWindowId: 1, indexes: namedMaps.indexes, names: namedMaps.names }),
+    "Media",
+    "named other window: name only, no index",
+  );
+});

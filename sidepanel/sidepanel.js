@@ -22,6 +22,7 @@ import {
   groupTabs,
   titleGroupName,
   urlGroupName,
+  WINDOW_DOT_COLORS,
   windowGroupName,
   rowViewModel,
   selectVisible,
@@ -108,7 +109,13 @@ const state = {
   // follow it on the next event-driven re-render so it doesn't vanish off-screen
   followCurrent: false,
   pendingScroll: null, // scrollTop to apply after the next render (filter/search switches)
+  windowMeta: new Map(), // windowId → { name, color } from windowProfiles (WINDOW_NAMES)
 };
+
+// WINDOW_NAMES resolved flag + user toggle — every naming surface gates on this
+function namesActive() {
+  return featureEnabled(state.features, "WINDOW_NAMES") && (state.ui.windowNamesEnabled ?? true);
+}
 
 // ---------- data ----------
 
@@ -116,10 +123,12 @@ const state = {
 // (tab/storage/focus changes — incl. renders triggered in OTHER open panels)
 // re-render without a view transition
 async function refresh(animate = false, preloaded = null) {
-  const [persisted, tabs, win] = await Promise.all([
+  const [persisted, tabs, win, { windowProfiles = {} }, { windowSessionMap = {} }] = await Promise.all([
     preloaded ?? loadState(), // startup passes its already-read state — no second read
     chrome.tabs.query({}),
     chrome.windows.getLastFocused(),
+    chrome.storage.local.get("windowProfiles"),
+    chrome.storage.session.get("windowSessionMap"),
   ]);
   state.rules = persisted.protectionRules;
   state.ui = persisted.ui;
@@ -146,6 +155,16 @@ async function refresh(animate = false, preloaded = null) {
   // resolved once per refresh; the keydown handler reads this instead of
   // re-running applyExperimental (a fresh object) on every keypress
   state.features = applyExperimental(FEATURES, state.ui.showExperimental ?? false);
+  // window names/colors: session map binds live chrome ids to logical profiles
+  state.windowMeta = new Map();
+  if (namesActive()) {
+    for (const [chromeId, logicalId] of Object.entries(windowSessionMap)) {
+      const profile = windowProfiles[logicalId];
+      if (profile && (profile.name || profile.color)) {
+        state.windowMeta.set(Number(chromeId), { name: profile.name, color: profile.color });
+      }
+    }
+  }
   // flag turned off mid-navigation: drop the cursor so no stale outline lingers
   if (!featureEnabled(state.features, "SIDEBAR_KEYBOARD_NAVIGATION")) {
     state.cursor = -1;
@@ -161,6 +180,7 @@ async function refresh(animate = false, preloaded = null) {
   getElementById("hist-back").hidden = state.navMode === "off";
   getElementById("hist-forward").hidden = state.navMode === "off";
   getElementById("hist-list-btn").hidden = !featureEnabled(state.features, "NAVIGATION_DROPDOWN");
+  getElementById("win-list-btn").hidden = !namesActive();
   // offered only when experimental features are on AND FUZZY_SEARCH is enabled
   // BECAUSE of that opt-in (raw flag off, resolved flag on) — drives the same
   // ui.experimental_fuzzySearch pref as the options page
@@ -191,7 +211,11 @@ const GROUPINGS = {
     noun: "window",
     key: (tab) => tab.windowId,
     name: (windowId, maps) =>
-      windowGroupName(windowId, { currentWindowId: state.currentWindowId, indexes: maps.indexes }),
+      windowGroupName(windowId, {
+        currentWindowId: state.currentWindowId,
+        indexes: maps.indexes,
+        names: maps.names,
+      }),
   },
   "group-title": {
     key: (tab) => tab.title ?? "",
@@ -344,7 +368,7 @@ function renderNowImpl() {
     frag.append(empty);
   }
 
-  const maps = windowMaps(state.allTabs, state.currentWindowId);
+  const maps = windowMaps(state.allTabs, state.currentWindowId, state.windowMeta);
   const now = Date.now();
   // tokenized once per render — rows highlight their matches while searching
   const queryTokens = state.query.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
@@ -473,6 +497,118 @@ collapseAllBtn.addEventListener("click", () => {
   render();
 });
 
+// S2: windows list as a popover (same shell as the history popover) — one row
+// per window with dot, name and stats; click focuses the window, right-click
+// opens the window menu (popover closes first: the ctx menu is not in the
+// top layer and would render underneath it).
+const winListBtn = getElementById("win-list-btn");
+const winPop = getElementById("windows-pop");
+
+winListBtn.addEventListener("click", fillWindowsPopover);
+
+function fillWindowsPopover() {
+  // anchored under the titlebar, right-aligned with the buttons
+  const anchor = winListBtn.getBoundingClientRect();
+  winPop.style.top = `${anchor.bottom + 4}px`;
+  winPop.style.right = "8px";
+  winPop.style.left = "auto";
+  const maps = windowMaps(state.allTabs, state.currentWindowId, state.windowMeta);
+  winPop.textContent = "";
+
+  const head = document.createElement("div");
+  head.className = "win-head";
+  const heading = document.createElement("span");
+  heading.className = "muted";
+  heading.textContent = `Windows (${maps.indexes.size})`;
+  const close = document.createElement("button");
+  close.type = "button";
+  close.className = "win-close";
+  close.textContent = "Close";
+  close.addEventListener("click", () => winPop.hidePopover?.());
+  head.append(heading, close);
+  winPop.append(head);
+
+  // current window first, the rest alphabetical by display name
+  const labelOf = (windowId) =>
+    windowGroupName(windowId, {
+      currentWindowId: state.currentWindowId,
+      indexes: maps.indexes,
+      names: maps.names,
+    });
+  const ordered = [...maps.indexes.keys()].sort((a, b) => {
+    if (a === state.currentWindowId || b === state.currentWindowId) {
+      return a === state.currentWindowId ? -1 : 1;
+    }
+    return labelOf(a).localeCompare(labelOf(b), undefined, { sensitivity: "base" });
+  });
+  for (const windowId of ordered) {
+    const tabs = state.allTabs.filter((tab) => tab.windowId === windowId);
+    const snoozed = tabs.filter((tab) => tab.discarded).length;
+    const awake = tabs.length - snoozed; // filter-chip terminology: awake = not snoozed
+    const row = document.createElement("button");
+    row.type = "button";
+    row.className = windowId === state.currentWindowId ? "win-row current" : "win-row";
+    row.dataset.windowId = String(windowId); // right-click → window menu
+    const dot = document.createElement("span");
+    dot.className = "win-dot";
+    const color = maps.dotColors.get(windowId);
+    if (color) {
+      dot.style.background = color;
+    } else {
+      dot.classList.add("current");
+    }
+    const name = document.createElement("span");
+    name.className = "win-title";
+    name.textContent = labelOf(windowId);
+    const stats = document.createElement("span");
+    stats.className = "win-stats muted";
+    stats.textContent = `${tabs.length} tab${tabs.length === 1 ? "" : "s"} · ${awake} awake · ${snoozed} snoozed`;
+    row.append(dot, name, stats);
+    // native title, not #hover-tip: the popover lives in the top layer and
+    // draws over any fixed-position tip; the browser tooltip renders above it
+    const pinned = tabs.filter((tab) => tab.pinned).length;
+    const audible = tabs.filter((tab) => tab.audible).length;
+    const activeTab = tabs.find((tab) => tab.active);
+    row.title = [
+      labelOf(windowId),
+      `${tabs.length} tab${tabs.length === 1 ? "" : "s"} · ${awake} awake · ${snoozed} snoozed`,
+      `${pinned} pinned · ${audible} audible`,
+      activeTab ? `Active tab: ${activeTab.title || activeTab.url}` : null,
+    ].filter(Boolean).join("\n");
+    row.addEventListener("click", () => {
+      winPop.hidePopover?.();
+      chrome.windows.update(windowId, { focused: true }).catch(() => {});
+    });
+    // ⋯ beside the row (a button can't nest one) — same window menu as right-click
+    const menuBtn = document.createElement("button");
+    menuBtn.type = "button";
+    menuBtn.className = "win-menu-btn";
+    menuBtn.title = menuBtn.ariaLabel = "Window actions";
+    menuBtn.textContent = "⋯";
+    menuBtn.addEventListener("click", (event) => {
+      event.stopPropagation();
+      openWindowListMenu(event, windowId);
+    });
+    const item = document.createElement("div");
+    item.className = "win-item";
+    item.append(row, menuBtn);
+    winPop.append(item);
+  }
+}
+
+winPop.addEventListener("contextmenu", (event) => {
+  const row = /** @type {HTMLElement | null} */ (
+    /** @type {HTMLElement} */ (event.target).closest(".win-row")
+  );
+  if (!row) {
+    return;
+  }
+  event.preventDefault();
+  // windows popover stays open behind — the ctx menu is a manual popover
+  // shown after it, so it stacks above in the top layer
+  openWindowListMenu(event, Number(row.dataset.windowId));
+});
+
 // clickable group header (any grouping): toggles collapse of the group's rows
 function renderGroupHeader(groupKey, { isCollapsed, collapsible, name, dotColor, tabs, noun, count, total }) {
   const header = document.createElement("div");
@@ -537,6 +673,19 @@ function renderGroupHeader(groupKey, { isCollapsed, collapsible, name, dotColor,
     header.classList.add("static");
     header.dataset.tip = info;
     return header;
+  }
+  // ⋯ opens the same menu as header right-click — a visible, keyboard-reachable
+  // trigger (hover/focus-only via CSS)
+  if (noun === "window" && namesActive()) {
+    const menuBtn = document.createElement("button");
+    menuBtn.className = "group-menu-btn";
+    menuBtn.title = menuBtn.ariaLabel = "Window actions";
+    menuBtn.textContent = "⋯";
+    menuBtn.addEventListener("click", (event) => {
+      event.stopPropagation(); // header click = collapse
+      openWindowHeaderMenu(event, Number(groupKey));
+    });
+    header.append(menuBtn);
   }
   // collapse chevron right-aligned (accordion layout) — far from the
   // group-select checkbox on the left so the two targets can't be confused
@@ -859,10 +1008,19 @@ listEl.addEventListener("dragend", () => {
 const ctxMenu = document.createElement("div");
 ctxMenu.id = "ctx-menu";
 ctxMenu.hidden = true;
+// manual popover: promoted to the top layer so it can sit ABOVE the windows
+// popover (plain z-index never beats the top layer). "manual" = no light
+// dismiss, our own click-away/Escape handlers keep working.
+ctxMenu.setAttribute("popover", "manual");
 document.body.append(ctxMenu);
 
 function hideCtxMenu() {
   ctxMenu.hidden = true;
+  try {
+    ctxMenu.hidePopover();
+  } catch {
+    // not open / no popover API (tests) — the hidden attr already did the job
+  }
 }
 
 function ctxItem(label, run) {
@@ -876,8 +1034,11 @@ function ctxItem(label, run) {
   return item;
 }
 
-// "<label> ▸" toggle + nested dropdown: hover auto-expands, click toggles;
-// the shared mouseover handler below folds it when the cursor wanders off
+// "<label> ▸" toggle + nested dropdown: hover auto-expands, click toggles.
+// Accordion: opening one folds the menu's other submenus; wandering over
+// plain items leaves it open (deliberate — see ctx menu handlers below)
+const SUBMENU_HOVER_DELAY_MS = 500;
+
 function ctxSubmenu(label) {
   const btn = document.createElement("button");
   btn.className = "ctx-item ctx-move";
@@ -890,17 +1051,52 @@ function ctxSubmenu(label) {
   submenu.hidden = true;
   // caret mirrors the expanded state: ▸ folded, ▾ open (like group headers)
   const setOpen = (open) => {
+    if (open) {
+      for (const other of /** @type {NodeListOf<HTMLElement>} */ (
+        ctxMenu.querySelectorAll(".ctx-submenu")
+      )) {
+        if (other !== submenu && !other.hidden) {
+          other.hidden = true;
+          const otherCaret = other.previousElementSibling?.querySelector(".ctx-caret");
+          if (otherCaret) {
+            otherCaret.textContent = "▸";
+          }
+        }
+      }
+    }
     submenu.hidden = !open;
     caret.textContent = open ? "▾" : "▸";
   };
+  let hoverTimer = null;
   btn.addEventListener("click", (clickEvent) => {
     clickEvent.stopPropagation(); // the document click-away handler must not close the menu
+    clearTimeout(hoverTimer); // a pending hover-open must not undo a click-fold
     setOpen(submenu.hidden);
   });
+  // hover intent: a cursor traveling past the toggle (e.g. down to Focus
+  // window) must not expand it — open only after it settles for a beat
   btn.addEventListener("mouseenter", () => {
-    setOpen(true);
+    hoverTimer = setTimeout(() => setOpen(true), SUBMENU_HOVER_DELAY_MS);
   });
+  btn.addEventListener("mouseleave", () => clearTimeout(hoverTimer));
   return { btn, submenu };
+}
+
+function ctxTitle(text) {
+  const title = document.createElement("div");
+  title.className = "ctx-title";
+  title.textContent = text;
+  return title;
+}
+
+// display name of a window (custom name or "Window #N") for menu headers
+function windowLabel(windowId) {
+  const maps = windowMaps(state.allTabs, state.currentWindowId, state.windowMeta);
+  return windowGroupName(windowId, {
+    currentWindowId: state.currentWindowId,
+    indexes: maps.indexes,
+    names: maps.names,
+  });
 }
 
 function ctxDivider() {
@@ -925,7 +1121,21 @@ function appendCtxActions(ids) {
 }
 
 function showCtxMenu(event) {
+  // every menu build ends here — stamp an X in the top-right corner
+  const close = document.createElement("button");
+  close.type = "button";
+  close.className = "ctx-close";
+  close.title = close.ariaLabel = "Close menu";
+  close.innerHTML =
+    '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg>';
+  close.addEventListener("click", hideCtxMenu);
+  ctxMenu.prepend(close);
   ctxMenu.hidden = false;
+  try {
+    ctxMenu.showPopover();
+  } catch {
+    // already open / no popover API (tests) — visible via hidden=false anyway
+  }
   ctxMenu.style.left = `${Math.max(0, Math.min(event.clientX, window.innerWidth - ctxMenu.offsetWidth - 4))}px`;
   ctxMenu.style.top = `${Math.max(0, Math.min(event.clientY, window.innerHeight - ctxMenu.offsetHeight - 4))}px`;
 }
@@ -935,8 +1145,13 @@ function openRowMenu(event, tabId) {
   const sourceWindows = new Set(
     ids.map((id) => state.allTabs.find((tab) => tab.id === id)?.windowId),
   );
-  const maps = windowMaps(state.allTabs, state.currentWindowId);
+  const maps = windowMaps(state.allTabs, state.currentWindowId, state.windowMeta);
   ctxMenu.textContent = "";
+  const clicked = state.allTabs.find((tab) => tab.id === tabId);
+  ctxMenu.append(
+    ctxTitle(ids.length > 1 ? `${ids.length} tabs selected` : clicked?.title || "Tab"),
+    ctxDivider(),
+  );
   appendCtxActions(ids);
   ctxMenu.append(ctxDivider());
   const { btn, submenu } = ctxSubmenu(ids.length > 1 ? `Move ${ids.length} tabs to` : "Move tab to");
@@ -950,6 +1165,7 @@ function openRowMenu(event, tabId) {
     const name = windowGroupName(windowId, {
       currentWindowId: state.currentWindowId,
       indexes: maps.indexes,
+      names: maps.names,
     });
     submenu.append(ctxItem(name, () => moveTabsToWindow(ids, windowId)));
   }
@@ -964,6 +1180,89 @@ const WINDOW_TAB_ORDERS = [
   ["title-desc", "Title sorted Z-A"],
 ];
 
+// human labels for WINDOW_DOT_COLORS, same order
+const WINDOW_DOT_COLOR_NAMES = ["Red", "Teal", "Yellow", "Green", "Purple", "Pink", "Gray", "Gold"];
+
+async function setWindowColor(windowId, color) {
+  await chrome.runtime.sendMessage({ type: "window-set-color", windowId, color }).catch(() => {});
+  refresh(true);
+}
+
+// swap the header label for an input; Enter/blur commit, Esc cancels.
+// An event-driven re-render mid-edit rebuilds the header and ends the edit —
+// rare and harmless (rename again), not worth pausing renders for.
+function startRenameWindow(windowId) {
+  const label = listEl.querySelector(`.group-header[data-window-id="${windowId}"] .group-label`);
+  if (!label) {
+    return;
+  }
+  const input = document.createElement("input");
+  input.className = "rename-input";
+  input.value = state.windowMeta.get(windowId)?.name ?? "";
+  input.placeholder = "Window name";
+  input.addEventListener("click", (event) => event.stopPropagation()); // header click = collapse
+  let cancelled = false;
+  input.addEventListener("keydown", (event) => {
+    event.stopPropagation(); // list keyboard nav must not fire mid-edit
+    if (event.key === "Enter") {
+      input.blur();
+    }
+    if (event.key === "Escape") {
+      cancelled = true;
+      input.blur();
+    }
+  });
+  input.addEventListener("blur", async () => {
+    if (!cancelled) {
+      // empty commits too — it clears the name back to the default label
+      await chrome.runtime
+        .sendMessage({ type: "window-rename", windowId, name: input.value })
+        .catch(() => {});
+    }
+    refresh(false);
+  });
+  label.replaceWith(input);
+  input.focus();
+  input.select();
+}
+
+// Rename + Window color entries (shared by the header menu and the
+// windows-list menu)
+function appendWindowIdentityItems(windowId) {
+  ctxMenu.append(ctxItem("Rename window…", () => startRenameWindow(windowId)));
+  const color = ctxSubmenu("Window color");
+  ctxMenu.append(color.btn, color.submenu);
+  const currentColor = state.windowMeta.get(windowId)?.color;
+  WINDOW_DOT_COLORS.forEach((swatch, index) => {
+    const item = ctxItem(WINDOW_DOT_COLOR_NAMES[index] ?? swatch, () => setWindowColor(windowId, swatch));
+    const dot = document.createElement("span");
+    dot.className = "win-dot";
+    dot.style.background = swatch;
+    item.prepend(dot);
+    if (swatch === currentColor) {
+      item.classList.add("current");
+    }
+    color.submenu.append(item);
+  });
+  const auto = ctxItem("Auto", () => setWindowColor(windowId, null));
+  if (!currentColor) {
+    auto.classList.add("current");
+  }
+  color.submenu.append(auto);
+}
+
+// windows-list rows get a window-scoped menu only — no tab bulk actions,
+// no Tabs Order (those belong to the header of a visible tab group)
+function openWindowListMenu(event, windowId) {
+  ctxMenu.textContent = "";
+  ctxMenu.append(ctxTitle(windowLabel(windowId)), ctxDivider());
+  if (windowId !== state.currentWindowId) {
+    ctxMenu.append(ctxItem("Focus window", () => chrome.windows.update(windowId, { focused: true })));
+  }
+  appendWindowIdentityItems(windowId);
+  showCtxMenu(event);
+}
+
 // window group header: same actions over the window's selected tabs — or every
 // visible tab when nothing in it is selected — plus a "Change order" dropdown
 // driving ui.groupByWindowTabsOrder (current one marked)
@@ -975,8 +1274,28 @@ function openWindowHeaderMenu(event, windowId) {
     return;
   }
   ctxMenu.textContent = "";
+
+  // header: window display name (custom name or "Window #N")
+  ctxMenu.append(ctxTitle(windowLabel(windowId)), ctxDivider());
+
+  // window-identity section (WINDOW_NAMES feature only)
+  if (namesActive()) {
+    // "Focus window" — bring that window to front (pointless on the current one)
+    if (windowId !== state.currentWindowId) {
+      ctxMenu.append(ctxItem("Focus window", () => chrome.windows.update(windowId, { focused: true })));
+    }
+    // "Rename window…" + "Window color ▸" (palette swatches + Auto)
+    appendWindowIdentityItems(windowId);
+    ctxMenu.append(ctxDivider());
+  }
+
+  // "Snooze / Wake / Protect / Unprotect / Close" — the five bulk-bar actions
+  // over the window's selection (or all its visible tabs)
   appendCtxActions(ids);
   ctxMenu.append(ctxDivider());
+
+  // "Tabs Order ▸" — within-window order for the window grouping
+  // (Recently used / Same as window / Title A-Z / Title Z-A, current marked)
   const { btn, submenu } = ctxSubmenu("Tabs Order");
   ctxMenu.append(btn, submenu);
   const current = state.ui.groupByWindowTabsOrder ?? "same-as-window";
@@ -991,6 +1310,7 @@ function openWindowHeaderMenu(event, windowId) {
     }
     submenu.append(item);
   }
+
   showCtxMenu(event);
 }
 
@@ -1012,20 +1332,8 @@ listEl.addEventListener("contextmenu", (event) => {
 
 // cursor wandering back up to the plain actions folds the Move-to dropdown
 // (mirrors the hover that opened it)
-ctxMenu.addEventListener("mouseover", (event) => {
-  const item = /** @type {HTMLElement} */ (event.target).closest(".ctx-item");
-  if (!item || item.classList.contains("ctx-move") || item.closest(".ctx-submenu")) {
-    return;
-  }
-  const submenu = /** @type {HTMLElement | null} */ (ctxMenu.querySelector(".ctx-submenu"));
-  if (submenu) {
-    submenu.hidden = true;
-    const caret = ctxMenu.querySelector(".ctx-caret");
-    if (caret) {
-      caret.textContent = "▸"; // folded again — caret follows
-    }
-  }
-});
+// an expanded submenu stays expanded while the cursor visits plain items —
+// only opening another submenu (accordion in ctxSubmenu) or closing the menu folds it
 
 document.addEventListener("click", hideCtxMenu);
 window.addEventListener("blur", hideCtxMenu); // focus left for another window/tab
@@ -1519,7 +1827,7 @@ async function fillHistoryPopover() {
   const { stack, cursor } = await getTabHistory();
   const allTabs = await chrome.tabs.query({});
   const byId = new Map(allTabs.map((t) => [t.id, t]));
-  const { dotColors } = windowMaps(allTabs, state.currentWindowId);
+  const { dotColors } = windowMaps(allTabs, state.currentWindowId, state.windowMeta);
   histPop.textContent = "";
 
   const head = document.createElement("div");

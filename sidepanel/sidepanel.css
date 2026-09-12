@@ -23,6 +23,7 @@ header {
   justify-content: space-between;
   align-items: center;
 }
+.titlebar h1 { margin-right: auto; }
 
 h1 { font-size: 1.08rem; margin: 0; }
 
@@ -338,6 +339,39 @@ footer button:disabled:hover { background: none; }
 .group-header .fold-arrow { flex: none; margin-left: auto; }
 
 .group-header:hover { color: light-dark(#333, #ddd); }
+
+/* WINDOW_NAMES: ⋯ window-actions trigger — visible on hover/keyboard only */
+.group-header .group-menu-btn {
+  flex: none;
+  margin-left: auto;
+  border: none;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  padding: 0 4px;
+  border-radius: 4px;
+  visibility: hidden;
+}
+/* ⋯ takes the auto margin when present; arrow follows right after */
+.group-header .group-menu-btn + .fold-arrow { margin-left: 0; }
+.group-header:hover .group-menu-btn,
+.group-header:focus-within .group-menu-btn { visibility: visible; }
+.group-header .group-menu-btn:hover { background: var(--badge-bg); }
+
+/* WINDOW_NAMES: inline rename input replacing the header label */
+.rename-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  font: inherit;
+  color: inherit;
+  background: var(--card-bg);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  padding: 0 4px;
+  text-transform: none; /* header uppercases — the name being typed must not */
+  letter-spacing: normal;
+}
+
 .group-header.static { cursor: default; }
 .group-header.static:hover { color: var(--muted); }
 
@@ -357,6 +391,10 @@ footer button:disabled:hover { background: none; }
 #ctx-menu {
   position: fixed;
   z-index: 30;
+  /* shown as a manual popover: cancel the UA's inset:0/margin:auto centering
+     so the inline left/top from JS position it at the cursor */
+  inset: auto;
+  margin: 0;
   min-width: 160px;
   padding: 4px;
   background: var(--card-bg);
@@ -366,7 +404,32 @@ footer button:disabled:hover { background: none; }
   display: flex;
   flex-direction: column;
 }
-#ctx-menu .ctx-title { font-size: 11px; color: var(--muted); padding: 4px 8px; }
+/* menu header: what the menu acts on; room for the corner X, never wraps */
+#ctx-menu .ctx-title {
+  font-size: 11px;
+  color: var(--muted);
+  padding: 4px 24px 4px 8px;
+  max-width: 220px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* corner X: absolute so the item column ignores it; first item keeps clear of it */
+#ctx-menu .ctx-close {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  border: none;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 3px;
+  border-radius: 4px;
+  display: inline-flex;
+}
+#ctx-menu .ctx-close svg { width: 10px; height: 10px; }
+#ctx-menu .ctx-close:hover { background: var(--badge-bg); color: inherit; }
+
 #ctx-menu .ctx-divider { border-top: 1px solid var(--border); margin: 4px 0; }
 #ctx-menu .ctx-submenu {
   display: flex;
@@ -390,6 +453,19 @@ footer button:disabled:hover { background: none; }
 /* --hover is near-invisible on card-bg — same stronger tone as #history-pop */
 #ctx-menu .ctx-item:hover,
 #ctx-menu .ctx-item:focus-visible { background: var(--badge-bg); }
+/* color swatches: .win-dot sizes via flex parents elsewhere — a plain button
+   is not one, so make the row flex and the dot bigger for a real target */
+#ctx-menu .ctx-item .win-dot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+}
+#ctx-menu .ctx-item:has(.win-dot) {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 22px;
+}
 /* current selection inside a settings submenu (e.g. Change order) */
 #ctx-menu .ctx-item.current { color: var(--accent); font-weight: 600; }
 /* submenu toggles: caret right-aligned, clear gap from the label */
@@ -495,6 +571,7 @@ footer button:disabled:hover { background: none; }
 /* row + its X share a line; X only shows while the entry is hovered/focused */
 #history-pop .hist-item { display: flex; align-items: center; gap: 2px; }
 #history-pop .hist-item .hist-row { flex: 1; min-width: 0; }
+
 #history-pop .hist-x { visibility: hidden; flex: none; }
 #history-pop .hist-item:hover .hist-x,
 #history-pop .hist-item:focus-within .hist-x { visibility: visible; }
@@ -524,3 +601,77 @@ footer button:disabled:hover { background: none; }
   transition: background var(--transition);
 }
 #history-pop .hist-close:hover { background: var(--badge-bg); }
+
+/* windows-list popover (WINDOW_NAMES) — own styles, independent of the
+   history popover even where the two currently look alike */
+#windows-pop {
+  position: fixed;
+  margin: 0;
+  inset: auto; /* top/right set from JS relative to the titlebar button */
+  max-width: 90vw;
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  background: var(--card-bg);
+  box-shadow: var(--shadow-2);
+  font-size: 0.75rem;
+}
+#windows-pop .win-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 0 6px 8px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 6px;
+}
+#windows-pop .win-close {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-s);
+  background: none;
+  padding: 2px 10px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background var(--transition);
+}
+#windows-pop .win-close:hover { background: var(--badge-bg); }
+/* row + its ⋯ share a line; ⋯ only shows while the entry is hovered/focused */
+#windows-pop .win-item { display: flex; align-items: center; gap: 2px; }
+#windows-pop .win-item .win-row { flex: 1; min-width: 0; }
+#windows-pop .win-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  text-align: left;
+  padding: 5px 8px;
+  border: none;
+  border-radius: var(--radius-s);
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+#windows-pop .win-row:hover { background: var(--badge-bg); }
+#windows-pop .win-row.current { font-weight: 700; color: var(--accent); }
+#windows-pop .win-title {
+    font-size: 0.85rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+#windows-pop .win-stats { flex: none; margin-left: auto; font-size: 0.85em; color: var(--muted); }
+#windows-pop .win-menu-btn {
+  visibility: hidden;
+  flex: none;
+  border: none;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+#windows-pop .win-item:hover .win-menu-btn,
+#windows-pop .win-item:focus-within .win-menu-btn { visibility: visible; }
+#windows-pop .win-menu-btn:hover { background: var(--badge-bg); }

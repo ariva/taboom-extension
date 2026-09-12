@@ -71,7 +71,8 @@ test("UI - Sidepanel Sort - Group by window: current window first, headers with 
   setSort("window");
   assert.deepEqual(titles(), ["Charlie", "Bravo", "Alpha", "Delta"], "current window in strip order (default same-as-window), then window 2");
   const headers = [...document.querySelectorAll(".group-header")].map((el) => el.textContent);
-  assert.deepEqual(headers, ["Window Current #13/3▾", "Window #21/1▾"], "name + counts + arrow spans");
+  const dots = TEST_FEATURES.WINDOW_NAMES?.enabled === true ? "⋯" : ""; // ⋯ window-menu button
+  assert.deepEqual(headers, [`Window Current #13/3${dots}▾`, `Window #21/1${dots}▾`], "name + counts + arrow spans");
   assert.deepEqual(
     [...document.querySelectorAll(".group-header .group-count")].map((el) => el.textContent),
     ["3/3", "1/1"],
