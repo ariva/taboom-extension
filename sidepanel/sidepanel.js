@@ -1126,6 +1126,25 @@ function ctxSubmenu(label) {
     }
     submenu.hidden = !open;
     caret.textContent = open ? "▾" : "▸";
+    if (open) {
+      position(); // after unhide — offsetWidth/Height need layout
+    }
+  };
+  // flyout placement: right of the menu (A), flip left when tight (A),
+  // pinned to the panel's right edge over the menu as last resort (B)
+  const position = () => {
+    const menuRect = ctxMenu.getBoundingClientRect();
+    const btnRect = btn.getBoundingClientRect();
+    const width = submenu.offsetWidth;
+    const height = submenu.offsetHeight;
+    let left = menuRect.right - 2; // slight overlap: no hover gap to cross
+    if (left + width > window.innerWidth - 4) {
+      const flipped = menuRect.left - width + 2;
+      left = flipped >= 4 ? flipped : Math.max(4, window.innerWidth - width - 4);
+    }
+    const top = Math.max(4, Math.min(btnRect.top, window.innerHeight - height - 4));
+    submenu.style.left = `${left}px`;
+    submenu.style.top = `${top}px`;
   };
   let hoverTimer = null;
   btn.addEventListener("click", (clickEvent) => {

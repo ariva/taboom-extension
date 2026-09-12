@@ -419,14 +419,18 @@ footer button:disabled:hover { background: none; }
 #ctx-menu .ctx-close:hover { background: var(--badge-bg); color: inherit; }
 
 #ctx-menu .ctx-divider { border-top: 1px solid var(--border); margin: 4px 0; }
+/* submenu = flyout panel beside the menu (fixed; JS sets left/top: right of
+   the menu, flipped left when tight, right-edge overlap in narrow panels) */
 #ctx-menu .ctx-submenu {
+  position: fixed;
+  min-width: 120px;
+  padding: 4px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  box-shadow: var(--shadow-2);
   display: flex;
   flex-direction: column;
-  padding-left: 12px;
-  /* expanded options set off from the toggle row above */
-  border-top: 1px solid var(--border);
-  margin-top: 3px;
-  padding-top: 3px;
 }
 #ctx-menu .ctx-item {
   border: none;
