@@ -444,6 +444,7 @@ function renderNowImpl() {
     current?.scrollIntoView({ block: "nearest" });
   }
   renderBulkBar();
+  refillWindowsPopoverIfOpen();
 }
 
 // Feed the real row height back into the content-visibility placeholder
@@ -595,6 +596,31 @@ function fillWindowsPopover() {
     winPop.append(item);
   }
 }
+
+// renders happen on every tab/storage event — keep an open popover current,
+// but never yank a rename input out from under the user
+function refillWindowsPopoverIfOpen() {
+  if (winPopOpen() && !winPop.querySelector(".rename-input")) {
+    fillWindowsPopover();
+  }
+}
+
+function winPopOpen() {
+  try {
+    return winPop.matches(":popover-open");
+  } catch {
+    return false; // happy-dom: selector unsupported
+  }
+}
+
+// popover="manual": no light dismiss — close on outside click, Escape (below,
+// shared with the ctx menu) and window blur; clicks in the ctx menu keep it open
+document.addEventListener("click", (event) => {
+  const target = /** @type {HTMLElement} */ (event.target);
+  if (winPopOpen() && !winPop.contains(target) && !winListBtn.contains(target) && !ctxMenu.contains(target)) {
+    winPop.hidePopover?.();
+  }
+});
 
 winPop.addEventListener("contextmenu", (event) => {
   const row = /** @type {HTMLElement | null} */ (
@@ -1191,11 +1217,7 @@ async function setWindowColor(windowId, color) {
 // swap the header label for an input; Enter/blur commit, Esc cancels.
 // An event-driven re-render mid-edit rebuilds the header and ends the edit —
 // rare and harmless (rename again), not worth pausing renders for.
-function startRenameWindow(windowId) {
-  const label = listEl.querySelector(`.group-header[data-window-id="${windowId}"] .group-label`);
-  if (!label) {
-    return;
-  }
+function buildRenameInput(windowId, onDone) {
   const input = document.createElement("input");
   input.className = "rename-input";
   input.value = state.windowMeta.get(windowId)?.name ?? "";
@@ -1203,7 +1225,7 @@ function startRenameWindow(windowId) {
   input.addEventListener("click", (event) => event.stopPropagation()); // header click = collapse
   let cancelled = false;
   input.addEventListener("keydown", (event) => {
-    event.stopPropagation(); // list keyboard nav must not fire mid-edit
+    event.stopPropagation(); // list keyboard nav / popover Esc must not fire mid-edit
     if (event.key === "Enter") {
       input.blur();
     }
@@ -1219,17 +1241,41 @@ function startRenameWindow(windowId) {
         .sendMessage({ type: "window-rename", windowId, name: input.value })
         .catch(() => {});
     }
+    onDone();
+  });
+  return input;
+}
+
+function startRenameWindow(windowId) {
+  const label = listEl.querySelector(`.group-header[data-window-id="${windowId}"] .group-label`);
+  if (!label) {
+    return;
+  }
+  const input = buildRenameInput(windowId, () => refresh(false));
+  label.replaceWith(input);
+  input.focus();
+  input.select();
+}
+
+// rename without leaving the windows popover: swap the row's name for the input
+function startRenameWindowInList(windowId) {
+  const title = winPop.querySelector(`.win-row[data-window-id="${windowId}"] .win-title`);
+  if (!title) {
+    return;
+  }
+  const input = buildRenameInput(windowId, () => {
+    fillWindowsPopover(); // fresh name in place, popover stays open
     refresh(false);
   });
-  label.replaceWith(input);
+  title.replaceWith(input);
   input.focus();
   input.select();
 }
 
 // Rename + Window color entries (shared by the header menu and the
 // windows-list menu)
-function appendWindowIdentityItems(windowId) {
-  ctxMenu.append(ctxItem("Rename window…", () => startRenameWindow(windowId)));
+function appendWindowIdentityItems(windowId, startRename = startRenameWindow) {
+  ctxMenu.append(ctxItem("Rename window…", () => startRename(windowId)));
   const color = ctxSubmenu("Window color");
   ctxMenu.append(color.btn, color.submenu);
   const currentColor = state.windowMeta.get(windowId)?.color;
@@ -1259,7 +1305,7 @@ function openWindowListMenu(event, windowId) {
   if (windowId !== state.currentWindowId) {
     ctxMenu.append(ctxItem("Focus window", () => chrome.windows.update(windowId, { focused: true })));
   }
-  appendWindowIdentityItems(windowId);
+  appendWindowIdentityItems(windowId, startRenameWindowInList);
   showCtxMenu(event);
 }
 
@@ -1343,6 +1389,9 @@ document.addEventListener(
   (event) => {
     if (event.key === "Escape" && !ctxMenu.hidden) {
       hideCtxMenu();
+      event.stopPropagation();
+    } else if (event.key === "Escape" && winPopOpen()) {
+      winPop.hidePopover?.();
       event.stopPropagation();
     }
   },
@@ -1759,6 +1808,9 @@ window.addEventListener("focus", () => {
 window.addEventListener("blur", () => {
   try {
     histPop.hidePopover?.();
+  } catch {} // already hidden
+  try {
+    winPop.hidePopover?.();
   } catch {} // already hidden
   chrome.runtime.sendMessage({ type: "sidebar-no-focus" }).catch(() => {});
 });

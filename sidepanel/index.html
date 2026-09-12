@@ -30,7 +30,8 @@
       <label id="fuzzy-label" title="Fuzzy search — scattered letters match in order (no typo tolerance), best matches on top" hidden><input type="checkbox" id="fuzzy-toggle" />Fuzzy</label>
     </div>
     <div id="history-pop" popover></div>
-    <div id="windows-pop" popover></div>
+    <!-- manual: picking from the window ctx menu must not light-dismiss it -->
+    <div id="windows-pop" popover="manual"></div>
     <div id="filters" class="segmented" role="tablist" aria-label="Filter tabs">
       <button data-filter="all" aria-pressed="true">All <span class="count"></span></button>
       <button data-filter="awake" aria-pressed="false">Awake <span class="count"></span></button>

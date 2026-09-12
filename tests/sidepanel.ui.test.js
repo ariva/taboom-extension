@@ -1041,6 +1041,17 @@ test(
     assert.equal(menuBtns.length, rows.length, "one ⋯ per window row");
     menuBtns[1].click();
     assert.equal(ctx.hidden, false, "⋯ opens the window menu");
+
+    // rename from the windows list edits IN the popover row, not the header
+    [...ctx.querySelectorAll(".ctx-item")].find((el) => el.textContent === "Rename window…").click();
+    const listInput = pop.querySelector(".rename-input");
+    assert.ok(listInput, "input replaces the row's name inside the popover");
+    listInput.value = "Beta";
+    calls.length = 0;
+    listInput.dispatchEvent(new window.Event("blur"));
+    await tick();
+    await tick();
+    assert.ok(calls.includes("sendMessage window-rename"), "in-list rename sent to the service worker");
     document.body.click();
 
     // inline rename: ctx menu entry swaps the label for an input; Enter commits
