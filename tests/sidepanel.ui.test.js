@@ -900,14 +900,14 @@ test("UI - Sidepanel - Window header right-click: window-wide actions + Change o
     .dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
   const actionLabels = [...menu.querySelectorAll(".ctx-item")]
     .map((el) => el.textContent)
-    .filter((t) => /^(Snooze|Wake|Protect|Unprotect|Close)( \d+ tabs)?$/.test(t));
+    .filter((t) => /^(Snooze|Wake|Protect|Unprotect|Close)( \d+ tabs?)?$/.test(t));
   assert.deepEqual(
     actionLabels,
-    ["Snooze", "Wake", "Protect", "Unprotect", "Close"],
-    "1 of 2 selected — actions cover the selection, not the whole window",
+    ["Snooze 1 tab", "Wake 1 tab", "Protect 1 tab", "Unprotect 1 tab", "Close 1 tab"],
+    "1 of 2 selected — actions name the single-tab scope explicitly",
   );
   calls.length = 0;
-  [...menu.querySelectorAll(".ctx-item")].find((el) => el.textContent === "Close").click();
+  [...menu.querySelectorAll(".ctx-item")].find((el) => el.textContent === "Close 1 tab").click();
   await tick();
   await tick();
   assert.ok(calls.includes("tabs.remove 1"), "only the selected tab closed");

@@ -1185,7 +1185,10 @@ function ctxDivider() {
 }
 
 // the five bulk-bar actions as menu items over an explicit id set
-function appendCtxActions(ids) {
+// alwaysCount: window menus say "Close 1 tab" even for a lone tab — bare
+// "Close" on a window header reads as "close the window"; the row menu keeps
+// bare labels (the clicked tab is unambiguous there)
+function appendCtxActions(ids, alwaysCount = false) {
   /** @type {[string, () => void][]} */
   const actions = [
     ["Snooze", () => snooze(ids)],
@@ -1194,8 +1197,9 @@ function appendCtxActions(ids) {
     ["Unprotect", () => unprotectTabs(ids)],
     ["Close", () => closeTabs(ids)],
   ];
+  const suffix = ` ${ids.length} tab${ids.length === 1 ? "" : "s"}`;
   for (const [label, run] of actions) {
-    ctxMenu.append(ctxItem(ids.length > 1 ? `${label} ${ids.length} tabs` : label, run));
+    ctxMenu.append(ctxItem(ids.length > 1 || alwaysCount ? label + suffix : label, run));
   }
 }
 
@@ -1400,7 +1404,7 @@ function openWindowHeaderMenu(event, windowId) {
 
   // "Snooze / Wake / Protect / Unprotect / Close" — the five bulk-bar actions
   // over the window's selection (or all its visible tabs)
-  appendCtxActions(ids);
+  appendCtxActions(ids, true);
   ctxMenu.append(ctxDivider());
 
   // "Tabs Order ▸" — within-window order for the window grouping
