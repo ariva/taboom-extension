@@ -463,11 +463,17 @@ test("Service Worker - Window rename/color write to the logical profile; empty c
   ({ windowProfiles } = await chrome.storage.local.get("windowProfiles"));
   assert.equal(windowProfiles[logical1].color, "#123456", "color stored");
 
+  await send({ type: "window-pin", windowId: 1, pinned: true });
+  ({ windowProfiles } = await chrome.storage.local.get("windowProfiles"));
+  assert.equal(windowProfiles[logical1].pinnedWindow, true, "pin stored");
+
   await send({ type: "window-rename", windowId: 1, name: "" });
   await send({ type: "window-set-color", windowId: 1, color: null });
+  await send({ type: "window-pin", windowId: 1, pinned: false });
   ({ windowProfiles } = await chrome.storage.local.get("windowProfiles"));
   assert.equal(windowProfiles[logical1].name, undefined, "empty rename clears");
   assert.equal(windowProfiles[logical1].color, undefined, "null color clears");
+  assert.equal(windowProfiles[logical1].pinnedWindow, undefined, "unpin clears");
 });
 
 test("Service Worker - TTL sweep keeps customized profiles, drops stale plain ones", async () => {
@@ -475,6 +481,7 @@ test("Service Worker - TTL sweep keeps customized profiles, drops stale plain on
   const stale = Date.now() - 15 * 24 * 3_600_000; // past the 14d TTL
   windowProfiles["w-stale-named"] = { chromeWindowId: 999, name: "Keep me", updatedAt: stale };
   windowProfiles["w-stale-colored"] = { chromeWindowId: 998, color: "#123456", updatedAt: stale };
+  windowProfiles["w-stale-pinned"] = { chromeWindowId: 996, pinnedWindow: true, updatedAt: stale };
   windowProfiles["w-stale-plain"] = { chromeWindowId: 997, updatedAt: stale };
   await chrome.storage.local.set({ windowProfiles });
 
@@ -484,9 +491,11 @@ test("Service Worker - TTL sweep keeps customized profiles, drops stale plain on
   const { windowProfiles: after } = await chrome.storage.local.get("windowProfiles");
   assert.ok(after["w-stale-named"], "named profile survives the sweep");
   assert.ok(after["w-stale-colored"], "colored profile survives the sweep");
+  assert.ok(after["w-stale-pinned"], "pinned profile survives the sweep");
   assert.equal(after["w-stale-plain"], undefined, "plain stale profile swept");
 
   delete after["w-stale-named"];
   delete after["w-stale-colored"];
+  delete after["w-stale-pinned"];
   await chrome.storage.local.set({ windowProfiles: after }); // restore fixture
 });

@@ -650,6 +650,8 @@ footer button:disabled:hover { background: none; }
     white-space: nowrap;
 }
 #windows-pop .win-stats { flex: none; margin-left: auto; font-size: 0.85em; color: var(--muted); }
+#windows-pop .win-pin { flex: none; font-size: 0.8em; }
+.group-header .win-pin { flex: none; font-size: 0.8em; }
 #windows-pop .win-menu-btn {
   visibility: hidden;
   flex: none;

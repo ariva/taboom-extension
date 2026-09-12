@@ -235,6 +235,9 @@ async function handleMessage(message) {
       return patchWindowProfiles([message.windowId], { name: message.name?.trim() || undefined });
     case "window-set-color":
       return patchWindowProfiles([message.windowId], { color: message.color || undefined });
+    case "window-pin":
+      // "pinnedWindow", not "pinned" — the fingerprint already owns that key
+      return patchWindowProfiles([message.windowId], { pinnedWindow: message.pinned || undefined });
     case "sidebar-focused":
     case "sidebar-no-focus":
       return; // acknowledged; no behavior yet — hook points for future focus-aware features
@@ -610,7 +613,7 @@ async function refreshWindowProfiles() {
   for (const [logicalId, profile] of Object.entries(profiles)) {
     // user-customized windows (name or color) are exempt — losing a name to
     // the sweep after two weeks of vacation would feel like data loss
-    if (profile.name || profile.color) {
+    if (profile.name || profile.color || profile.pinnedWindow) {
       continue;
     }
     if (now - (profile.updatedAt ?? 0) > PROFILE_TTL_MS) {

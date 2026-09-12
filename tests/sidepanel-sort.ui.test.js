@@ -305,7 +305,8 @@ test("UI - Sidepanel Sort - Direction: pair swap, flat flip, grouped tri-state c
   dirBtn.click();
   await tick();
   assert.equal(dirBtn.dataset.dir, "asc");
-  assert.match(firstHeader(), /Window #2/, "fewest tabs first: window 2 (1 tab)");
+  // two-list model: current window always leads; size orders the rest
+  assert.match(firstHeader(), /Window Current #1/, "current window stays first under size sort");
   dirBtn.click();
   await tick();
   assert.equal(dirBtn.dataset.dir, "none", "cycle wraps back to natural");

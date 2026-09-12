@@ -70,10 +70,12 @@ test("Model - SortDir: flat sorts flip, grouped sorts order groups by visible si
     [1, 2, 3],
     "most tabs first (window 1), recent-first within",
   );
+  // two-list model: the current window stays first; size ordering applies
+  // to the remaining windows (each band sorts internally)
   assert.deepEqual(
     selectVisible(tabs, view(tabs, { sort: "window", sortDir: "asc" })).map((t) => t.id),
-    [3, 1, 2],
-    "fewest tabs first (window 2)",
+    [1, 2, 3],
+    "current window first, then fewest tabs first",
   );
   assert.deepEqual(
     selectVisible(tabs, view(tabs, { sort: "window" })).map((t) => t.id),
@@ -454,6 +456,30 @@ test("Model - groupByWindowTabsOrder controls within-window order in the window 
   assert.deepEqual(order("same-as-window"), [2, 3, 1], "same-as-window: tab strip position");
   assert.deepEqual(order("title-asc"), [2, 1, 3], "titles A-Z");
   assert.deepEqual(order("title-desc"), [3, 1, 2], "titles Z-A");
+});
+
+test("Model - Pinned windows sort above unpinned in the window grouping (current always first)", () => {
+  const tabs = [
+    tab({ id: 1, windowId: 1 }),
+    tab({ id: 2, windowId: 2 }),
+    tab({ id: 3, windowId: 3 }),
+  ];
+  const windowMeta = new Map([[3, { pinnedWindow: true }]]);
+  const order = selectVisible(tabs, view(tabs, { sort: "window", windowMeta })).map((t) => t.windowId);
+  assert.deepEqual(order, [1, 3, 2], "current #1, pinned #3 lifted above #2");
+  const noMeta = selectVisible(tabs, view(tabs, { sort: "window" })).map((t) => t.windowId);
+  assert.deepEqual(noMeta, [1, 2, 3], "no meta: default labels keep chrome-id order");
+
+  // two lists, same internal ordering: names sort ABC inside each band
+  const named = new Map([
+    [2, { name: "Zulu", pinnedWindow: true }],
+    [3, { name: "Alpha", pinnedWindow: true }],
+    [4, { name: "Mid" }],
+  ]);
+  const four = [...tabs, tab({ id: 4, windowId: 4 })];
+  const banded = selectVisible(four, view(four, { sort: "window", windowMeta: named })).map((t) => t.windowId);
+  // current 1, pinned band ABC (Alpha=3, Zulu=2), unpinned band ABC (Mid=4)
+  assert.deepEqual(banded, [1, 3, 2, 4], "pinned band ABC above unpinned band");
 });
 
 test("Model - WINDOW_NAMES: custom names and colors resolve through windowMaps meta", () => {

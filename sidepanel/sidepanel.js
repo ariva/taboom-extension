@@ -117,6 +117,11 @@ function namesActive() {
   return featureEnabled(state.features, "WINDOW_NAMES") && (state.ui.windowNamesEnabled ?? true);
 }
 
+// window pinning rides the names feature but has its own kill switch
+function pinActive() {
+  return namesActive() && featureEnabled(state.features, "WINDOW_PIN");
+}
+
 // ---------- data ----------
 
 // animate only for user-initiated refreshes; background event echoes
@@ -160,8 +165,13 @@ async function refresh(animate = false, preloaded = null) {
   if (namesActive()) {
     for (const [chromeId, logicalId] of Object.entries(windowSessionMap)) {
       const profile = windowProfiles[logicalId];
-      if (profile && (profile.name || profile.color)) {
-        state.windowMeta.set(Number(chromeId), { name: profile.name, color: profile.color });
+      if (profile && (profile.name || profile.color || profile.pinnedWindow)) {
+        state.windowMeta.set(Number(chromeId), {
+          name: profile.name,
+          color: profile.color,
+          // model + popover read meta blindly — omit the pin when its flag is off
+          pinnedWindow: featureEnabled(state.features, "WINDOW_PIN") ? profile.pinnedWindow : undefined,
+        });
       }
     }
   }
@@ -536,11 +546,17 @@ function fillWindowsPopover() {
       indexes: maps.indexes,
       names: maps.names,
     });
+  // current window first, pinned windows next, the rest ABC by display name
+  const pinRank = (windowId) =>
+    pinActive() && state.windowMeta.get(windowId)?.pinnedWindow ? 0 : 1;
   const ordered = [...maps.indexes.keys()].sort((a, b) => {
     if (a === state.currentWindowId || b === state.currentWindowId) {
       return a === state.currentWindowId ? -1 : 1;
     }
-    return labelOf(a).localeCompare(labelOf(b), undefined, { sensitivity: "base" });
+    return (
+      pinRank(a) - pinRank(b) ||
+      labelOf(a).localeCompare(labelOf(b), undefined, { numeric: true, sensitivity: "base" })
+    );
   });
   for (const windowId of ordered) {
     const tabs = state.allTabs.filter((tab) => tab.windowId === windowId);
@@ -561,10 +577,17 @@ function fillWindowsPopover() {
     const name = document.createElement("span");
     name.className = "win-title";
     name.textContent = labelOf(windowId);
+    let pin = null;
+    if (pinActive() && state.windowMeta.get(windowId)?.pinnedWindow) {
+      pin = document.createElement("span");
+      pin.className = "win-pin";
+      pin.textContent = "📌";
+      pin.title = "Pinned window";
+    }
     const stats = document.createElement("span");
     stats.className = "win-stats muted";
     stats.textContent = `${tabs.length} tab${tabs.length === 1 ? "" : "s"} · ${awake} awake · ${snoozed} snoozed`;
-    row.append(dot, name, stats);
+    row.append(dot, name, ...(pin ? [pin] : []), stats);
     // native title, not #hover-tip: the popover lives in the top layer and
     // draws over any fixed-position tip; the browser tooltip renders above it
     const pinned = tabs.filter((tab) => tab.pinned).length;
@@ -682,12 +705,19 @@ function renderGroupHeader(groupKey, { isCollapsed, collapsible, name, dotColor,
   const label = document.createElement("span");
   label.className = "group-label";
   label.textContent = name;
+  let pin = null;
+  if (noun === "window" && pinActive() && state.windowMeta.get(Number(groupKey))?.pinnedWindow) {
+    pin = document.createElement("span");
+    pin.className = "win-pin";
+    pin.textContent = "📌";
+    pin.title = "Pinned window";
+  }
   // counts in their own non-shrinking span: a long name ellipsizes without
   // ever swallowing the visible/total numbers
   const counts = document.createElement("span");
   counts.className = "group-count";
   counts.textContent = `${count}/${total}`;
-  header.append(label, counts);
+  header.append(label, ...(pin ? [pin] : []), counts);
   // hover: generic group info (name + how many tabs) plus the click action.
   // Custom tip (not title=): native tooltips render under the cursor and the
   // pointer hides the first line — ours sits to the right of the pointer.
@@ -1213,6 +1243,11 @@ const WINDOW_TAB_ORDERS = [
 // human labels for WINDOW_DOT_COLORS, same order
 const WINDOW_DOT_COLOR_NAMES = ["Red", "Teal", "Yellow", "Green", "Purple", "Pink", "Gray", "Gold"];
 
+async function setWindowPin(windowId, pinned) {
+  await chrome.runtime.sendMessage({ type: "window-pin", windowId, pinned }).catch(() => {});
+  refresh(true);
+}
+
 async function setWindowColor(windowId, color) {
   await chrome.runtime.sendMessage({ type: "window-set-color", windowId, color }).catch(() => {});
   refresh(true);
@@ -1279,6 +1314,11 @@ function startRenameWindowInList(windowId) {
 // Rename + Window color entries (shared by the header menu and the
 // windows-list menu)
 function appendWindowIdentityItems(windowId, startRename = startRenameWindow) {
+  // "Pin window" — pinned windows sort to the top of the windows list
+  if (pinActive()) {
+    const isPinned = state.windowMeta.get(windowId)?.pinnedWindow ?? false;
+    ctxMenu.append(ctxItem(isPinned ? "Unpin window" : "Pin window", () => setWindowPin(windowId, !isPinned)));
+  }
   ctxMenu.append(ctxItem("Rename window…", () => startRename(windowId)));
   const color = ctxSubmenu("Window color");
   ctxMenu.append(color.btn, color.submenu);

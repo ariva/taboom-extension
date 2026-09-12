@@ -843,7 +843,7 @@ test("UI - Sidepanel - Window header right-click: window-wide actions + Change o
     [
       // WINDOW_NAMES puts focus/rename/color on top (+ 8 palette swatches and
       // Auto); Focus window only for non-current windows (header 1 IS current)
-      ...(NAMES_ON ? ["Rename window…", "Window color ▸",
+      ...(NAMES_ON ? ["Pin window", "Rename window…", "Window color ▸",
         "Red", "Teal", "Yellow", "Green", "Purple", "Pink", "Gray", "Gold", "Auto"] : []),
       "Snooze 2 tabs", "Wake 2 tabs", "Protect 2 tabs", "Unprotect 2 tabs", "Close 2 tabs",
       "Tabs Order ▸",
@@ -992,7 +992,8 @@ test(
     await new Promise((resolve) => setTimeout(resolve, 200)); // refresh debounce
 
     const labels = [...document.querySelectorAll(".group-header .group-label")].map((el) => el.textContent);
-    assert.deepEqual(labels, ["Research — Current #1", "Window #2", "Alpha"], "custom name on the header");
+    // sidebar groups: current first, then ABC by display name ("Alpha" < "Window #2")
+    assert.deepEqual(labels, ["Research — Current #1", "Alpha", "Window #2"], "custom name on the header");
     const header2 = document.querySelector('.group-header[data-window-id="2"]');
     assert.equal(header2.querySelector(".win-dot").style.background, "#123456", "custom dot color");
     assert.ok(header2.querySelector(".group-menu-btn"), "⋯ window-actions button present");
@@ -1029,7 +1030,7 @@ test(
     assert.equal(ctx.querySelector(".ctx-title").textContent, "Window #2", "menu header names the window");
     assert.deepEqual(
       [...ctx.querySelectorAll(".ctx-item")].map((el) => el.textContent),
-      ["Focus window", "Rename window…", "Window color ▸",
+      ["Focus window", "Pin window", "Rename window…", "Window color ▸",
         "Red", "Teal", "Yellow", "Green", "Purple", "Pink", "Gray", "Gold", "Auto"],
       "only rename/color/focus — no bulk actions, no Tabs Order",
     );
@@ -1067,6 +1068,48 @@ test(
     await tick();
     await tick();
     assert.ok(calls.includes("sendMessage window-rename"), "rename sent to the service worker");
+
+    // pin window 2 → sorts above Alpha despite the name; 📌 marker; Unpin label
+    const { windowProfiles } = await chrome.storage.local.get("windowProfiles");
+    windowProfiles["w-t2"] = { ...windowProfiles["w-t2"], pinnedWindow: true };
+    await chrome.storage.local.set({ windowProfiles });
+    await chrome.tabs.onActivated.fire({});
+    await new Promise((resolve) => setTimeout(resolve, 200)); // refresh debounce
+    winBtn.click(); // refill
+    await tick();
+    assert.deepEqual(
+      [...pop.querySelectorAll(".win-row .win-title")].map((el) => el.textContent),
+      ["Research — Current #1", "Window #2", "Alpha"],
+      "pinned window jumps above the ABC block, current stays first",
+    );
+    assert.ok(pop.querySelector('.win-row[data-window-id="2"] .win-pin'), "pinned row carries the marker");
+    pop.querySelector('.win-row[data-window-id="2"]').parentElement.querySelector(".win-menu-btn").click();
+    assert.ok(
+      [...ctx.querySelectorAll(".ctx-item")].some((el) => el.textContent === "Unpin window"),
+      "menu offers Unpin for a pinned window",
+    );
+    document.body.click();
+
+    // sidebar list follows: pin window 3 too → its group lifts above window 2
+    windowProfiles["w-t3"] = { ...windowProfiles["w-t3"], pinnedWindow: true };
+    windowProfiles["w-t2"] = { ...windowProfiles["w-t2"], pinnedWindow: undefined };
+    await chrome.storage.local.set({ windowProfiles });
+    await chrome.tabs.onActivated.fire({});
+    await new Promise((resolve) => setTimeout(resolve, 200)); // refresh debounce
+    assert.deepEqual(
+      [...document.querySelectorAll(".group-header .group-label")].map((el) => el.textContent),
+      ["Research — Current #1", "Alpha", "Window #2"],
+      "pinned window's group lifts above unpinned in the sidebar list",
+    );
+    assert.ok(
+      document.querySelector('.group-header[data-window-id="3"] .win-pin'),
+      "pinned group header carries the 📌 marker",
+    );
+    assert.equal(
+      document.querySelector('.group-header[data-window-id="2"] .win-pin'),
+      null,
+      "unpinned header has none",
+    );
 
     // cleanup: profiles away, extra window gone, sort back
     tabs.splice(tabs.findIndex((t) => t.id === 99), 1);

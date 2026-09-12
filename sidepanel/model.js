@@ -193,7 +193,16 @@ export function selectVisible(tabs, view) {
     // within a window: ui.groupByWindowTabsOrder — same-as-window (default, tab strip position) | recent
     // (last used) | title-asc | title-desc
     case "window": {
-      const rank = (tab) => (tab.windowId === currentWindowId ? 0 : tab.windowId);
+      // Two independent lists: pinned windows always above unpinned (current
+      // window above both). Within each band the same internal ordering:
+      // size (when the direction button says so), then display name (numeric-
+      // aware, so Window #2 < Window #10) — matching the windows popover.
+      const meta = view.windowMeta;
+      const maps = windowMaps(tabs, currentWindowId, meta ?? null);
+      const labelOf = (windowId) =>
+        windowGroupName(windowId, { currentWindowId, indexes: maps.indexes, names: maps.names });
+      const band = (tab) =>
+        tab.windowId === currentWindowId ? 0 : meta?.get(tab.windowId)?.pinnedWindow ? 1 : 2;
       const sizes = new Map();
       for (const tab of result) {
         sizes.set(tab.windowId, (sizes.get(tab.windowId) ?? 0) + 1);
@@ -202,8 +211,9 @@ export function selectVisible(tabs, view) {
       const within = windowTabComparator(view.ui?.groupByWindowTabsOrder, last);
       result.sort(
         (a, b) =>
+          band(a) - band(b) ||
           bySize * (sizes.get(a.windowId) - sizes.get(b.windowId)) ||
-          rank(a) - rank(b) ||
+          labelOf(a.windowId).localeCompare(labelOf(b.windowId), undefined, { numeric: true, sensitivity: "base" }) ||
           within(a, b),
       );
       break;
