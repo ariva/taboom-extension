@@ -1,5 +1,23 @@
 # CHANGES
 
+## v0.2.15 — 2026-09-12
+
+### New Features
+- Add window pin feature (27976db)
+- Redesign tab list style (07e88d7)
+- Add possibility to have custom window names/colors, windows list popup for easy switch (24649d0)
+- Make [Same as window] the default in-window tab order for new and existing installs (8d7b3cb)
+- Differentiate local build and official releases, have dev banner for local builds, allows easier local development (b0cbbe4)
+
+### Fixes
+- Replace native toolbar select popups with a custom dropdown list that positions correctly in the side panel (6e10880)
+- Always show the tab count in window-menu action labels (f4cb6e9)
+- Display context-menu submenus correctly based width (d3e4e5d)
+- Keep the windows popover open through color picks and rename windows inline (a62a67a)
+- Fix duplicate-id and cannot-find menu errors (d24f715)
+- Keep the current tab focused on window switch (4b9c81e)
+- Fix overlapping navigation-stack menu rebuilds (5a307e9)
+
 ## v0.2.14 — 2026-08-30
 
 ### New Features
