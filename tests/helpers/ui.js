@@ -213,6 +213,7 @@ export function loadPage(htmlPath, chrome) {
   globalThis.window = window;
   globalThis.document = window.document;
   globalThis.matchMedia = window.matchMedia.bind(window);
+  globalThis.Event = window.Event; // page code dispatches synthetic events (custom dropdown)
   globalThis.confirm = () => true;
   globalThis.chrome = chrome;
   return window;

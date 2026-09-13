@@ -50,6 +50,41 @@ test("UI - Sidepanel - Badges: snoozed=warn, protected=ok, pinned plain", () => 
   assert.ok(pinned && !pinned.classList.contains("ok") && !pinned.classList.contains("warn"));
 });
 
+test("UI - Sidepanel - Toolbar selects open the custom dropdown, not the native popup", async () => {
+  const scope = document.getElementById("scope");
+  const dd = document.querySelector(".dd-pop");
+  const down = new window.Event("mousedown", { bubbles: true, cancelable: true });
+  scope.dispatchEvent(down);
+  assert.equal(down.defaultPrevented, true, "native popup suppressed");
+  assert.equal(dd.hidden, false, "custom list opens");
+  const items = [...dd.querySelectorAll(".dd-item")].map((el) => el.textContent);
+  assert.deepEqual(items, ["All windows", "Current window"], "scope options listed");
+  assert.ok(dd.querySelector(".dd-item.current").textContent === "All windows", "current value marked");
+
+  // picking an option updates the select and fires its change handler
+  [...dd.querySelectorAll(".dd-item")].find((el) => el.textContent === "Current window").click();
+  assert.equal(dd.hidden, true, "list closes on pick");
+  assert.equal(scope.value, "current-window", "select value follows");
+  assert.equal(document.querySelectorAll(".row").length, 2, "scope change applied (window 1 only)");
+
+  // restore
+  scope.dispatchEvent(new window.Event("mousedown", { bubbles: true, cancelable: true }));
+  [...dd.querySelectorAll(".dd-item")].find((el) => el.textContent === "All windows").click();
+  assert.equal(scope.value, "all-windows");
+  await tick();
+
+  // hidden (flag-gated) sort options never appear in the custom list
+  const sort = document.getElementById("sort");
+  sort.dispatchEvent(new window.Event("mousedown", { bubbles: true, cancelable: true }));
+  const sortItems = [...dd.querySelectorAll(".dd-item")].map((el) => el.textContent);
+  const hiddenLabels = [...sort.options].filter((o) => o.hidden).map((o) => o.textContent);
+  for (const label of hiddenLabels) {
+    assert.ok(!sortItems.includes(label), `hidden option not offered: ${label}`);
+  }
+  document.dispatchEvent(new window.Event("mousedown", { bubbles: true })); // click-away closes
+  assert.equal(dd.hidden, true, "outside mousedown closes the list");
+});
+
 test("UI - Sidepanel - UI prefs applied: dark theme + compact density", () => {
   assert.equal(document.documentElement.style.colorScheme, "dark");
   assert.ok(document.getElementById("tab-list").classList.contains("compact"));
