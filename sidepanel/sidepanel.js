@@ -1278,12 +1278,20 @@ function ctxDivider() {
 // "Close" on a window header reads as "close the window"; the row menu keeps
 // bare labels (the clicked tab is unambiguous there)
 function appendCtxActions(ids, alwaysCount = false) {
+  const targets = ids.map((id) => state.allTabs.find((tab) => tab.id === id)).filter(Boolean);
   /** @type {[string, () => void][]} */
   const actions = [
     ["Snooze", () => snooze(ids)],
     ["Wake", () => wake(ids)],
     ["Protect", () => protectTabs(ids)],
     ["Unprotect", () => unprotectTabs(ids)],
+    // Pin/Unpin only when they would do something for at least one target tab
+    ...(targets.some((tab) => !tab.pinned)
+      ? [/** @type {[string, () => void]} */ (["Pin", () => pinTabs(ids, true)])]
+      : []),
+    ...(targets.some((tab) => tab.pinned)
+      ? [/** @type {[string, () => void]} */ (["Unpin", () => pinTabs(ids, false)])]
+      : []),
     ["Close", () => closeTabs(ids)],
   ];
   const suffix = ` ${ids.length} tab${ids.length === 1 ? "" : "s"}`;
@@ -1653,6 +1661,13 @@ function hostsOf(tabIds) {
     .map((tab) => hostnameOf(tab.url))
     .filter(Boolean);
   return [...new Set(hosts)];
+}
+
+// pin to the window's tab strip (Chrome-native pinning, not window pinning)
+async function pinTabs(tabIds, pinned) {
+  await Promise.allSettled(tabIds.map((tabId) => chrome.tabs.update(tabId, { pinned })));
+  unselect(tabIds);
+  refresh(true);
 }
 
 async function protectTabs(tabIds) {

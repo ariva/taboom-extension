@@ -725,7 +725,7 @@ test("UI - Sidepanel - Right-click row offers move-to-window menu (selection-awa
   const items = [...menu.querySelectorAll(".ctx-item")].map((el) => el.textContent);
   assert.deepEqual(
     items,
-    ["Snooze", "Wake", "Protect", "Unprotect", "Close", "Move tab to ▸", "Window #2", "New window"],
+    ["Snooze", "Wake", "Protect", "Unprotect", "Pin", "Close", "Move tab to ▸", "Window #2", "New window"],
     "bulk actions first, then the Move-to dropdown (own window excluded)",
   );
   const submenu = menu.querySelector(".ctx-submenu");
@@ -809,6 +809,25 @@ test("UI - Sidepanel - Context menu actions act on the clicked tab / whole selec
   assert.ok(calls.includes("sendMessage protect-hosts"), "protect via service worker");
 
   calls.length = 0;
+  rowOf(1).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+  pick("Pin");
+  await tick();
+  await tick();
+  assert.ok(calls.some((c) => c.startsWith("tabs.update 1") && c.includes('"pinned":true')), "pin via tabs.update");
+
+  calls.length = 0;
+  rowOf(1).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+  assert.ok(
+    ![...menu.querySelectorAll(".ctx-item")].some((el) => el.textContent === "Pin"),
+    "pinned tab: no Pin entry",
+  );
+  pick("Unpin");
+  await tick();
+  await tick();
+  assert.ok(calls.some((c) => c.startsWith("tabs.update 1") && c.includes('"pinned":false')), "unpin via tabs.update");
+  tabs.find((t) => t.id === 1).pinned = false; // restore fixture
+
+  calls.length = 0;
   rowOf(3).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
   pick("Unprotect");
   await tick();
@@ -880,7 +899,8 @@ test("UI - Sidepanel - Window header right-click: window-wide actions + Change o
       // Auto); Focus window only for non-current windows (header 1 IS current)
       ...(NAMES_ON ? ["Pin window", "Rename window…", "Window color ▸",
         "Red", "Teal", "Yellow", "Green", "Purple", "Pink", "Gray", "Gold", "Auto"] : []),
-      "Snooze 2 tabs", "Wake 2 tabs", "Protect 2 tabs", "Unprotect 2 tabs", "Close 2 tabs",
+      "Snooze 2 tabs", "Wake 2 tabs", "Protect 2 tabs", "Unprotect 2 tabs",
+      "Pin 2 tabs", "Close 2 tabs", // both unpinned → no Unpin offered
       "Tabs Order ▸",
       "Recently used", "Same as window", "Title sorted A-Z", "Title sorted Z-A",
     ],
