@@ -5,7 +5,7 @@
   "version": "0.2.16",
   "minimum_chrome_version": "121",
 
-  "permissions": ["tabs", "storage", "alarms", "contextMenus", "sidePanel", "favicon"],
+  "permissions": ["tabs", "tabGroups", "storage", "alarms", "contextMenus", "sidePanel", "favicon"],
 
   "background": {
     "service_worker": "background/service-worker.js",

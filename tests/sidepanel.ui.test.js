@@ -15,9 +15,11 @@ const tabs = [
 ];
 
 const calls = [];
+const groups = [{ id: 7, title: "work", color: "blue", collapsed: false, windowId: 1 }];
 const chrome = makeChrome({
   tabs,
   calls,
+  groups,
   stored: {
     protectionRules: [{ id: "r1", type: "host", pattern: "mail.google.com" }],
     ui: { defaultFilter: "all", scope: "all-windows", sort: "recent", theme: "dark", density: "compact" },
@@ -725,7 +727,10 @@ test("UI - Sidepanel - Right-click row offers move-to-window menu (selection-awa
   const items = [...menu.querySelectorAll(".ctx-item")].map((el) => el.textContent);
   assert.deepEqual(
     items,
-    ["Snooze", "Wake", "Protect", "Unprotect", "Pin", "Close", "Move tab to ▸", "Window #2", "New window"],
+    ["Snooze", "Wake", "Protect", "Unprotect", "Pin", "Close", "Move tab to ▸", "Window #2", "New window",
+      // TAB_GROUPS: move-to-group submenu (fixture has one group) — flag on in
+      // shipped+experimental; the disabled pass hides it
+      ...(TEST_FEATURES.TAB_GROUPS?.enabled === true ? ["Move to group ▸", "work", "New group"] : [])],
     "bulk actions first, then the Move-to dropdown (own window excluded)",
   );
   const submenu = menu.querySelector(".ctx-submenu");
@@ -1173,6 +1178,48 @@ test(
     sort.value = "recent";
     sort.dispatchEvent(new window.Event("change", { bubbles: true }));
     await chrome.tabs.onActivated.fire({});
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  },
+);
+
+test(
+  "UI - Sidepanel - Tab groups: move to group / new group / remove from group",
+  { skip: !(TEST_FEATURES.TAB_GROUPS?.enabled === true) && "TAB_GROUPS disabled in features.json" },
+  async () => {
+    const rowOf = (id) => document.querySelector(`.row[data-tab-id="${id}"]`);
+    const menu = document.getElementById("ctx-menu");
+    const pick = (label) =>
+      [...menu.querySelectorAll(".ctx-item")].find((el) => el.textContent.startsWith(label)).click();
+
+    // move tab 1 into the existing "work" group
+    calls.length = 0;
+    rowOf(1).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+    pick("work");
+    await tick();
+    await tick();
+    assert.ok(calls.includes("tabs.group 1 7"), "grouped into the picked group");
+
+    // grouped tab now offers Remove from group
+    await chrome.tabs.onUpdated.fire(1, { groupId: 7 });
+    await new Promise((resolve) => setTimeout(resolve, 200)); // refresh debounce
+    calls.length = 0;
+    rowOf(1).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+    pick("Remove from group");
+    await tick();
+    await tick();
+    assert.ok(calls.includes("tabs.ungroup 1"), "ungrouped");
+
+    // New group creates one around the tab
+    await chrome.tabs.onUpdated.fire(1, { groupId: -1 });
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    calls.length = 0;
+    rowOf(1).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+    pick("New group");
+    await tick();
+    await tick();
+    assert.ok(calls.includes("tabs.group 1 new"), "new group requested");
+    tabs.find((t) => t.id === 1).groupId = -1; // restore fixture
+    await chrome.tabs.onUpdated.fire(1, { groupId: -1 });
     await new Promise((resolve) => setTimeout(resolve, 200));
   },
 );

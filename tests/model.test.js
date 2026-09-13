@@ -513,3 +513,17 @@ test("Model - WINDOW_NAMES: custom names and colors resolve through windowMaps m
     "named other window: name only, no index",
   );
 });
+
+test("Model - Tab groups sort: strip order inside a group, recency in the ungrouped bucket", () => {
+  const groups = new Map([[7, { title: "work" }]]);
+  const tabs = [
+    tab({ id: 1, groupId: 7, index: 2, lastAccessed: NOW }),
+    tab({ id: 2, groupId: 7, index: 0, lastAccessed: NOW - 3 * HOUR }),
+    tab({ id: 3, groupId: 7, index: 1, lastAccessed: NOW - 1 * HOUR }),
+    tab({ id: 4, index: 5, lastAccessed: NOW - 2 * HOUR }),
+    tab({ id: 5, index: 4, lastAccessed: NOW }),
+  ];
+  const order = selectVisible(tabs, view(tabs, { sort: "group-tabgroup", tabGroups: groups })).map((t) => t.id);
+  // group "work" first (2,3,1 by strip index), then ungrouped by recency (5,4)
+  assert.deepEqual(order, [2, 3, 1, 5, 4]);
+});

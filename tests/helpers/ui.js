@@ -48,7 +48,7 @@ globalThis.fetch = async (url) => {
   throw new Error(`unmocked fetch ${url}`);
 };
 
-export function makeChrome({ tabs = [], stored = {}, calls = [] }) {
+export function makeChrome({ tabs = [], stored = {}, calls = [], groups = [] }) {
   if (TEST_EXPERIMENTAL) {
     stored.ui = { ...(stored.ui ?? {}), showExperimental: true };
   }
@@ -98,6 +98,32 @@ export function makeChrome({ tabs = [], stored = {}, calls = [] }) {
       onCreated: makeEvent(), onUpdated: makeEvent(), onActivated: makeEvent(),
       onRemoved: makeEvent(), onMoved: makeEvent(), onAttached: makeEvent(), onDetached: makeEvent(),
       onReplaced: makeEvent(),
+      group: async ({ tabIds, groupId }) => {
+        calls.push(`tabs.group ${[].concat(tabIds)} ${groupId ?? "new"}`);
+        const gid = groupId ?? 900;
+        for (const id of [].concat(tabIds)) {
+          const tab = tabs.find((t) => t.id === id);
+          if (tab) tab.groupId = gid;
+        }
+        return gid;
+      },
+      ungroup: async (tabIds) => {
+        calls.push(`tabs.ungroup ${[].concat(tabIds)}`);
+        for (const id of [].concat(tabIds)) {
+          const tab = tabs.find((t) => t.id === id);
+          if (tab) tab.groupId = -1;
+        }
+      },
+    },
+    tabGroups: {
+      query: async () => groups.map((g) => ({ ...g })),
+      update: async (groupId, props) => {
+        calls.push(`tabGroups.update ${groupId} ${JSON.stringify(props)}`);
+        const group = groups.find((g) => g.id === groupId);
+        if (group) Object.assign(group, props);
+        return group;
+      },
+      onCreated: makeEvent(), onRemoved: makeEvent(), onUpdated: makeEvent(), onMoved: makeEvent(),
     },
     windows: {
       WINDOW_ID_NONE: -1,

@@ -22,6 +22,7 @@ import {
   groupTabs,
   titleGroupName,
   urlGroupName,
+  TAB_GROUP_COLORS,
   WINDOW_DOT_COLORS,
   windowGroupName,
   rowViewModel,
@@ -199,7 +200,22 @@ const state = {
   followCurrent: false,
   pendingScroll: null, // scrollTop to apply after the next render (filter/search switches)
   windowMeta: new Map(), // windowId → { name, color } from windowProfiles (WINDOW_NAMES)
+  tabGroups: new Map(), // groupId → { title, color, collapsed } from chrome.tabGroups
 };
+
+// TAB_GROUPS flag + API present (permission granted, Chrome supports it)
+function tabGroupsActive() {
+  return featureEnabled(state.features, "TAB_GROUPS") && Boolean(chrome.tabGroups);
+}
+
+// nested tab-group sub-headers make sense only while the list mirrors the
+// real strip — grouped tabs are contiguous runs there
+function nestedTabGroupsActive() {
+  return (
+    tabGroupsActive() &&
+    (state.ui.groupByWindowTabsOrder ?? "same-as-window") === "same-as-window"
+  );
+}
 
 // WINDOW_NAMES resolved flag + user toggle — every naming surface gates on this
 function namesActive() {
@@ -217,13 +233,15 @@ function pinActive() {
 // (tab/storage/focus changes — incl. renders triggered in OTHER open panels)
 // re-render without a view transition
 async function refresh(animate = false, preloaded = null) {
-  const [persisted, tabs, win, { windowProfiles = {} }, { windowSessionMap = {} }] = await Promise.all([
+  const [persisted, tabs, win, { windowProfiles = {} }, { windowSessionMap = {} }, groups] = await Promise.all([
     preloaded ?? loadState(), // startup passes its already-read state — no second read
     chrome.tabs.query({}),
     chrome.windows.getLastFocused(),
     chrome.storage.local.get("windowProfiles"),
     chrome.storage.session.get("windowSessionMap"),
+    chrome.tabGroups?.query({}).catch(() => []) ?? [],
   ]);
+  state.tabGroups = new Map(groups.map((group) => /** @type {[number, any]} */ ([group.id, group])));
   state.rules = persisted.protectionRules;
   state.ui = persisted.ui;
   document.documentElement.style.fontSize = `${state.ui.fontSize ?? 1}rem`;
@@ -316,6 +334,12 @@ const GROUPINGS = {
         names: maps.names,
       }),
   },
+  "group-tabgroup": {
+    noun: "group",
+    key: (tab) => tab.groupId ?? -1,
+    name: (groupId) =>
+      groupId === -1 ? "No group" : state.tabGroups.get(groupId)?.title || "(unnamed group)",
+  },
   "group-title": {
     key: (tab) => tab.title ?? "",
     name: (title) => titleGroupName(title),
@@ -336,6 +360,7 @@ const GROUPINGS = {
 // sorts that only exist while their feature flag is on (option hidden + a
 // stored preference falls back to the window grouping)
 const FLAG_GATED_SORTS = {
+  "group-tabgroup": "TAB_GROUPS",
   "group-title": "GROUP_BY_TITLE",
   "group-domain": "GROUP_BY_DOMAIN",
   "group-url": "GROUP_BY_URL",
@@ -431,6 +456,11 @@ function render(animate = true) {
   state.visible = grouping
     ? state.fullVisible.filter((tab) => !collapsed.has(grouping.key(tab)))
     : state.fullVisible;
+  if (effectiveSort() === "window" && nestedTabGroupsActive()) {
+    state.visible = state.visible.filter(
+      (tab) => (tab.groupId ?? -1) === -1 || !effectiveCollapsed().has(`tg:${tab.groupId}`),
+    );
+  }
   const heavy = Math.max(state.visible.length, listEl.childElementCount) > VT_MAX_ROWS;
   if (animate && !heavy && document.startViewTransition && !reducedMotion.matches) {
     document.startViewTransition(renderNow);
@@ -508,17 +538,24 @@ function renderNowImpl() {
         isCollapsed,
         collapsible,
         name: grouping.name(groupKey, maps),
-        // window color dot only makes sense for the window grouping
+        // window grouping: per-window dot; tab-group grouping: Chrome group color
         dotColor:
           sort === "window" && maps.dotColors.size > 0
             ? (maps.dotColors.get(groupKey) ?? null)
-            : null,
+            : sort === "group-tabgroup" && groupKey !== -1
+              ? (TAB_GROUP_COLORS[state.tabGroups.get(groupKey)?.color] ?? null)
+              : null,
+        tabGroupId: sort === "group-tabgroup" ? groupKey : null, // -1 = "No group" (drop = ungroup)
         tabs: members,
         noun: grouping.noun,
         count: members.length,
         total: totals.get(groupKey) ?? 0,
       }));
       if (isCollapsed) continue;
+      if (sort === "window" && nestedTabGroupsActive()) {
+        index = renderMembersWithTabGroupRuns(frag, members, rowVm, index, collapsed);
+        continue;
+      }
       for (const tab of members) frag.append(renderRow(tab, rowVm(tab, index++)));
     }
   } else {
@@ -747,12 +784,100 @@ winPop.addEventListener("contextmenu", (event) => {
   openWindowListMenu(event, Number(row.dataset.windowId));
 });
 
+// B: contiguous runs of one tab group inside a window's rows get a sub-header
+// (rail color, title, count, collapse) — the list mirrors Chrome's strip
+function renderMembersWithTabGroupRuns(frag, members, rowVm, index, collapsed) {
+  let runGroupId = null;
+  let runCollapsed = false;
+  for (const tab of members) {
+    const gid = tab.groupId ?? -1;
+    if (gid !== runGroupId) {
+      runGroupId = gid;
+      runCollapsed = false;
+      if (gid !== -1) {
+        const runTabs = members.filter((t) => (t.groupId ?? -1) === gid);
+        runCollapsed = collapsed.has(`tg:${gid}`);
+        frag.append(renderTabGroupSubheader(gid, runTabs, runCollapsed));
+      }
+    }
+    if (gid !== -1 && runCollapsed) {
+      continue; // rows of a folded run (also excluded from state.visible)
+    }
+    frag.append(renderRow(tab, rowVm(tab, index++)));
+  }
+  return index;
+}
+
+function renderTabGroupSubheader(groupId, tabs, isCollapsed) {
+  const group = state.tabGroups.get(groupId);
+  const header = document.createElement("div");
+  header.className = "tabgroup-header";
+  header.dataset.tabGroupId = String(groupId); // right-click → tab-group menu
+  header.setAttribute("role", "button");
+  header.tabIndex = 0;
+  // same select-the-group checkbox as window headers (same flag)
+  const selectedCount = tabs.filter((tab) => state.selected.has(tab.id)).length;
+  if (featureEnabled(state.features, "WINDOW_GROUP_SELECT")) {
+    const box = document.createElement("input");
+    box.type = "checkbox";
+    box.className = "group-select";
+    box.checked = tabs.length > 0 && selectedCount === tabs.length;
+    box.indeterminate = selectedCount > 0 && selectedCount < tabs.length;
+    box.title = box.ariaLabel = `${box.checked ? "Unselect" : "Select"} group tabs`;
+    box.addEventListener("click", (event) => {
+      event.stopPropagation(); // header click collapses the run
+      for (const tab of tabs) {
+        box.checked ? state.selected.add(tab.id) : state.selected.delete(tab.id);
+      }
+      render(false);
+    });
+    header.append(box);
+  }
+  // hover: same info shape as window headers, prefixed so it reads as a group
+  const total = state.allTabs.filter((tab) => tab.groupId === groupId).length;
+  header.dataset.tip =
+    `Group "${group?.title || "(unnamed group)"}"\n` +
+    `${selectedCount}/${tabs.length} selected tabs\n` +
+    `${tabs.length}/${total} visible tabs\n` +
+    `Click to ${isCollapsed ? "expand" : "collapse"}`;
+  const rail = document.createElement("span");
+  rail.className = "tg-rail";
+  rail.style.background = TAB_GROUP_COLORS[group?.color] ?? "#5f6368";
+  const title = document.createElement("span");
+  title.className = "tg-title";
+  title.textContent = group?.title || "(unnamed group)";
+  const count = document.createElement("span");
+  count.className = "tg-count";
+  count.textContent = `${tabs.length}/${total}`; // visible/total, like window headers
+  const arrow = document.createElement("span");
+  arrow.className = "fold-arrow";
+  arrow.textContent = isCollapsed ? "▸" : "▾";
+  header.append(rail, title, count, arrow);
+  const toggle = () => {
+    const set = activeCollapsedSet();
+    const key = `tg:${groupId}`;
+    set.has(key) ? set.delete(key) : set.add(key);
+    render();
+  };
+  header.addEventListener("click", toggle);
+  header.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      toggle();
+    }
+  });
+  return header;
+}
+
 // clickable group header (any grouping): toggles collapse of the group's rows
-function renderGroupHeader(groupKey, { isCollapsed, collapsible, name, dotColor, tabs, noun, count, total }) {
+function renderGroupHeader(groupKey, { isCollapsed, collapsible, name, dotColor, tabs, noun, count, total, tabGroupId = null }) {
   const header = document.createElement("div");
   header.className = "group-header";
   if (noun === "window") {
     header.dataset.windowId = String(groupKey); // drop target for tab moves
+  }
+  if (tabGroupId != null) {
+    header.dataset.tabGroupId = String(tabGroupId); // right-click → tab-group menu
   }
   // WINDOW_GROUP_SELECT: checkbox left of the label selects/unselects every
   // tab of this group that the current filter/search shows
@@ -783,7 +908,9 @@ function renderGroupHeader(groupKey, { isCollapsed, collapsible, name, dotColor,
   // (dotColor null = no dot; "" = current window accent)
   if (dotColor !== null) {
     const dot = document.createElement("span");
-    dot.className = "win-dot";
+    // tab-group headers get the SQUARE marker (groups are squares everywhere,
+    // windows are circles)
+    dot.className = tabGroupId != null && tabGroupId !== -1 ? "tg-square" : "win-dot";
     if (dotColor) {
       dot.style.background = dotColor;
     } else {
@@ -811,7 +938,7 @@ function renderGroupHeader(groupKey, { isCollapsed, collapsible, name, dotColor,
   // Custom tip (not title=): native tooltips render under the cursor and the
   // pointer hides the first line — ours sits to the right of the pointer.
   const info =
-    `${name}\n` +
+    `${tabGroupId != null && tabGroupId !== -1 ? `Group "${name}"` : name}\n` +
     `${selectedCount}/${count} selected tabs\n` +
     `${count}/${total} visible tabs`;
   if (!collapsible) {
@@ -928,6 +1055,26 @@ function renderRowImpl(tab, vm) {
   }
 
   const favicon = row.querySelector(".favicon");
+  // grouped rows carry a small square in the group's color. Placement per view:
+  // window view — leftmost + indent (nested under the sub-header's square);
+  // Tab groups sort — none (the rows already sit under their group header);
+  // every other sort — after the window dot: checkbox, dot, square, text.
+  const sortNow = effectiveSort();
+  if (tabGroupsActive() && (tab.groupId ?? -1) !== -1 && sortNow !== "group-tabgroup") {
+    const group = state.tabGroups.get(tab.groupId);
+    const square = document.createElement("span");
+    square.className = "tg-square";
+    square.style.background = TAB_GROUP_COLORS[group?.color] ?? "#5f6368";
+    square.title = `Group "${group?.title || "(unnamed group)"}"`;
+    if (sortNow === "window") {
+      row.prepend(square);
+      row.classList.add("in-group");
+    } else if (vm.dot) {
+      dot.after(square);
+    } else {
+      favicon.before(square); // the window dot was removed above
+    }
+  }
   if (vm.favicon.pageUrl) {
     favicon.append(faviconImg(vm.favicon.pageUrl));
   } else {
@@ -976,7 +1123,7 @@ listEl.addEventListener("mouseover", (event) => {
   // buttons/checkboxes carry their own native tooltips — don't stack ours on top
   const carrier = target.closest("button, input")
     ? null
-    : /** @type {HTMLElement | null} */ (target.closest(".group-header, .row"));
+    : /** @type {HTMLElement | null} */ (target.closest(".group-header, .tabgroup-header, .row"));
   if (!carrier || !carrier.dataset.tip) {
     hoverTip.hidden = true;
     return;
@@ -1066,6 +1213,31 @@ function dropSpec(target) {
   const targetTab = row
     ? state.allTabs.find((tab) => tab.id === Number(row.dataset.tabId))
     : null;
+  if (tabGroupsActive()) {
+    // group headers (B sub-headers + Tab groups sort headers) take the drop:
+    // join that group ("No group" = leave the group)
+    const tgHeader = /** @type {HTMLElement | null} */ (target.closest("[data-tab-group-id]"));
+    if (tgHeader) {
+      return { tabGroupId: Number(tgHeader.dataset.tabGroupId) };
+    }
+    // a row inside a group the dragged tab is NOT in: drop joins that group
+    const targetGroup = targetTab?.groupId ?? -1;
+    if (targetTab && targetGroup !== -1 && (source.groupId ?? -1) !== targetGroup) {
+      return { tabGroupId: targetGroup };
+    }
+    // reorder INSIDE a group: rows are strip-ordered wherever a group renders
+    // (window view runs AND the Tab groups sort) — allow the move in both;
+    // regroupId restores the membership tabs.move strips
+    if (
+      targetTab &&
+      targetTab.id !== draggedTabId &&
+      (source.groupId ?? -1) !== -1 &&
+      targetTab.groupId === source.groupId &&
+      (reorderActive() || effectiveSort() === "group-tabgroup")
+    ) {
+      return { windowId: targetTab.windowId, index: targetTab.index ?? -1, regroupId: source.groupId };
+    }
+  }
   const header = /** @type {HTMLElement | null} */ (target.closest(".group-header"));
   const windowId =
     targetTab?.windowId ?? (header?.dataset.windowId ? Number(header.dataset.windowId) : null);
@@ -1076,7 +1248,17 @@ function dropSpec(target) {
     if (!reorderActive() || !targetTab || targetTab.id === draggedTabId) {
       return null;
     }
-    return { windowId, index: targetTab.index ?? -1 };
+    return {
+      windowId,
+      index: targetTab.index ?? -1,
+      // reorder INSIDE a group: tabs.move kicks the tab out of its group, so
+      // the drop handler re-groups it after the move (it lands inside the
+      // group's range, so membership comes back without another move)
+      regroupId:
+        (source.groupId ?? -1) !== -1 && targetTab.groupId === source.groupId
+          ? source.groupId
+          : null,
+    };
   }
   return { windowId, index: targetTab?.index ?? -1 };
 }
@@ -1125,7 +1307,7 @@ listEl.addEventListener("dragover", (event) => {
   if (event.dataTransfer) {
     event.dataTransfer.dropEffect = "move";
   }
-  const el = /** @type {HTMLElement} */ (event.target).closest(".group-header, .row");
+  const el = /** @type {HTMLElement} */ (event.target).closest(".group-header, .tabgroup-header, .row");
   if (el !== dropTargetEl) {
     clearDropTarget();
     dropTargetEl = /** @type {HTMLElement} */ (el);
@@ -1142,7 +1324,29 @@ listEl.addEventListener("drop", (event) => {
     return;
   }
   event.preventDefault();
-  moveTabsToWindow(actionIds(draggedTabId), spec.windowId, spec.index);
+  if (spec.tabGroupId != null) {
+    const ids = actionIds(draggedTabId);
+    if (spec.tabGroupId === -1) {
+      ungroupTabs(ids);
+    } else {
+      moveTabsToGroup(ids, spec.tabGroupId);
+    }
+    draggedTabId = null;
+    clearDropTarget();
+    return;
+  }
+  const movedIds = actionIds(draggedTabId);
+  const movePromise = moveTabsToWindow(movedIds, spec.windowId, spec.index);
+  if (spec.regroupId != null) {
+    // restore group membership the move just stripped, then repaint
+    movePromise
+      .then(() =>
+        chrome.tabs
+          .group({ tabIds: /** @type {[number, ...number[]]} */ (movedIds), groupId: spec.regroupId })
+          .catch(() => {}),
+      )
+      .then(() => refresh(true));
+  }
   draggedTabId = null;
   clearDropTarget();
 });
@@ -1350,6 +1554,25 @@ function openRowMenu(event, tabId) {
     submenu.append(ctxItem(name, () => moveTabsToWindow(ids, windowId)));
   }
   submenu.append(ctxItem("New window", () => moveTabsToWindow(ids, null)));
+  if (tabGroupsActive()) {
+    const groupMenu = ctxSubmenu(ids.length > 1 ? `Move ${ids.length} tabs to group` : "Move to group");
+    ctxMenu.append(groupMenu.btn, groupMenu.submenu);
+    for (const [groupId, group] of state.tabGroups) {
+      const item = ctxItem(group.title || "(unnamed group)", () => moveTabsToGroup(ids, groupId));
+      const dot = document.createElement("span");
+      dot.className = "win-dot";
+      dot.style.background = TAB_GROUP_COLORS[group.color] ?? "#5f6368";
+      item.prepend(dot);
+      groupMenu.submenu.append(item);
+    }
+    groupMenu.submenu.append(ctxItem("New group", () => moveTabsToGroup(ids, null)));
+    const grouped = ids.filter(
+      (id) => (state.allTabs.find((tab) => tab.id === id)?.groupId ?? -1) !== -1,
+    );
+    if (grouped.length > 0) {
+      ctxMenu.append(ctxItem("Remove from group", () => ungroupTabs(grouped)));
+    }
+  }
   showCtxMenu(event);
 }
 
@@ -1376,11 +1599,13 @@ async function setWindowColor(windowId, color) {
 // swap the header label for an input; Enter/blur commit, Esc cancels.
 // An event-driven re-render mid-edit rebuilds the header and ends the edit —
 // rare and harmless (rename again), not worth pausing renders for.
-function buildRenameInput(windowId, onDone) {
+// swap `label` for a text input; Enter/blur commit (empty commits too), Esc
+// cancels. `commit(value)` persists; `finish()` re-renders whatever hosts it.
+function inlineEdit(label, { initial, placeholder, commit, finish }) {
   const input = document.createElement("input");
   input.className = "rename-input";
-  input.value = state.windowMeta.get(windowId)?.name ?? "";
-  input.placeholder = "Window name";
+  input.value = initial;
+  input.placeholder = placeholder;
   input.addEventListener("click", (event) => event.stopPropagation()); // header click = collapse
   let cancelled = false;
   input.addEventListener("keydown", (event) => {
@@ -1395,14 +1620,13 @@ function buildRenameInput(windowId, onDone) {
   });
   input.addEventListener("blur", async () => {
     if (!cancelled) {
-      // empty commits too — it clears the name back to the default label
-      await chrome.runtime
-        .sendMessage({ type: "window-rename", windowId, name: input.value })
-        .catch(() => {});
+      await commit(input.value);
     }
-    onDone();
+    finish();
   });
-  return input;
+  label.replaceWith(input);
+  input.focus();
+  input.select();
 }
 
 function startRenameWindow(windowId) {
@@ -1410,10 +1634,14 @@ function startRenameWindow(windowId) {
   if (!label) {
     return;
   }
-  const input = buildRenameInput(windowId, () => refresh(false));
-  label.replaceWith(input);
-  input.focus();
-  input.select();
+  inlineEdit(label, {
+    initial: state.windowMeta.get(windowId)?.name ?? "",
+    placeholder: "Window name",
+    // empty commits too — it clears the name back to the default label
+    commit: (name) =>
+      chrome.runtime.sendMessage({ type: "window-rename", windowId, name }).catch(() => {}),
+    finish: () => refresh(false),
+  });
 }
 
 // rename without leaving the windows popover: swap the row's name for the input
@@ -1422,13 +1650,101 @@ function startRenameWindowInList(windowId) {
   if (!title) {
     return;
   }
-  const input = buildRenameInput(windowId, () => {
-    fillWindowsPopover(); // fresh name in place, popover stays open
-    refresh(false);
+  inlineEdit(title, {
+    initial: state.windowMeta.get(windowId)?.name ?? "",
+    placeholder: "Window name",
+    commit: (name) =>
+      chrome.runtime.sendMessage({ type: "window-rename", windowId, name }).catch(() => {}),
+    finish: () => {
+      fillWindowsPopover(); // fresh name in place, popover stays open
+      refresh(false);
+    },
   });
-  title.replaceWith(input);
-  input.focus();
-  input.select();
+}
+
+// tab-group rename: the label lives on a C header (.group-label) or a B
+// sub-header (.tg-title), whichever is on screen
+function startRenameTabGroup(groupId) {
+  const label = listEl.querySelector(
+    `.group-header[data-tab-group-id="${groupId}"] .group-label, .tabgroup-header[data-tab-group-id="${groupId}"] .tg-title`,
+  );
+  if (!label) {
+    return;
+  }
+  inlineEdit(label, {
+    initial: state.tabGroups.get(groupId)?.title ?? "",
+    placeholder: "Group name",
+    commit: (title) => chrome.tabGroups.update(groupId, { title }).catch(() => {}),
+    finish: () => refresh(false),
+  });
+}
+
+async function updateTabGroup(groupId, patch) {
+  await chrome.tabGroups.update(groupId, patch).catch(() => {});
+  refresh(true);
+}
+
+async function moveTabsToGroup(tabIds, groupId) {
+  try {
+    if (groupId != null) {
+      // Chrome refuses to group across windows — move foreign tabs over first
+      const group = state.tabGroups.get(groupId);
+      const foreign = tabIds.filter(
+        (id) => state.allTabs.find((tab) => tab.id === id)?.windowId !== group?.windowId,
+      );
+      if (group && foreign.length > 0) {
+        await chrome.tabs.move(foreign, { windowId: group.windowId, index: -1 });
+      }
+      await chrome.tabs.group({ tabIds, groupId });
+    } else {
+      await chrome.tabs.group({ tabIds });
+    }
+  } catch (error) {
+    toast(String(/** @type {any} */ (error)?.message ?? error));
+  }
+  refresh(true);
+}
+
+async function ungroupTabs(tabIds) {
+  await chrome.tabs.ungroup(tabIds).catch(() => {});
+  refresh(true);
+}
+
+// E: tab-group menu — identity actions on top, Chrome-strip controls, then
+// the usual bulk actions over the group's visible tabs
+function openTabGroupMenu(event, groupId) {
+  const group = state.tabGroups.get(groupId);
+  if (!group) {
+    return;
+  }
+  const ids = state.fullVisible.filter((tab) => tab.groupId === groupId).map((tab) => tab.id);
+  ctxMenu.textContent = "";
+  ctxMenu.append(ctxTitle(group.title || "(unnamed group)"), ctxDivider());
+  ctxMenu.append(ctxItem("Rename group…", () => startRenameTabGroup(groupId)));
+  const color = ctxSubmenu("Group color");
+  ctxMenu.append(color.btn, color.submenu);
+  for (const [colorName, hex] of Object.entries(TAB_GROUP_COLORS)) {
+    const item = ctxItem(colorName[0].toUpperCase() + colorName.slice(1), () =>
+      updateTabGroup(groupId, { color: /** @type {any} */ (colorName) }));
+    const dot = document.createElement("span");
+    dot.className = "win-dot";
+    dot.style.background = hex;
+    item.prepend(dot);
+    if (colorName === group.color) {
+      item.classList.add("current");
+    }
+    color.submenu.append(item);
+  }
+  ctxMenu.append(
+    ctxItem(group.collapsed ? "Expand in tab strip" : "Collapse in tab strip", () =>
+      updateTabGroup(groupId, { collapsed: !group.collapsed })),
+    ctxItem(`Ungroup ${ids.length} tab${ids.length === 1 ? "" : "s"}`, () => ungroupTabs(ids)),
+  );
+  if (ids.length > 0) {
+    ctxMenu.append(ctxDivider());
+    appendCtxActions(ids, true);
+  }
+  showCtxMenu(event);
 }
 
 // Rename + Window color entries (shared by the header menu and the
@@ -1528,12 +1844,17 @@ listEl.addEventListener("contextmenu", (event) => {
   const target = /** @type {HTMLElement} */ (event.target);
   const header = /** @type {HTMLElement | null} */ (target.closest(".group-header"));
   const row = /** @type {HTMLElement | null} */ (target.closest(".row"));
-  if (!header?.dataset.windowId && !row) {
+  const tgHeaderEl = /** @type {HTMLElement | null} */ (target.closest("[data-tab-group-id]"));
+  // "No group" bucket (-1) is a drop target but has no menu — keep native there
+  const tgHeader = tgHeaderEl && Number(tgHeaderEl.dataset.tabGroupId) !== -1 ? tgHeaderEl : null;
+  if (!header?.dataset.windowId && !row && !tgHeader) {
     return; // non-window headers/empty space keep the native menu
   }
   event.preventDefault();
   hoverTip.hidden = true;
-  if (header?.dataset.windowId) {
+  if (tgHeader) {
+    openTabGroupMenu(event, Number(tgHeader.dataset.tabGroupId));
+  } else if (header?.dataset.windowId) {
     openWindowHeaderMenu(event, Number(header.dataset.windowId));
   } else if (row) {
     openRowMenu(event, Number(row.dataset.tabId));
@@ -1874,13 +2195,16 @@ for (const event of [
   chrome.tabs.onAttached,
   chrome.tabs.onDetached,
   chrome.windows.onFocusChanged,
+  ...(chrome.tabGroups
+    ? [chrome.tabGroups.onCreated, chrome.tabGroups.onRemoved, chrome.tabGroups.onUpdated, chrome.tabGroups.onMoved]
+    : []),
 ]) {
   event.addListener(scheduleRefresh);
 }
 
 // onUpdated fires for every tab's loading progress — with hundreds of tabs that's
 // a constant stream; only changes the list actually shows should trigger a render
-const RENDERED_TAB_PROPS = ["title", "url", "favIconUrl", "discarded", "audible", "pinned"];
+const RENDERED_TAB_PROPS = ["title", "url", "favIconUrl", "discarded", "audible", "pinned", "groupId"];
 chrome.tabs.onUpdated.addListener((_tabId, changeInfo) => {
   if (RENDERED_TAB_PROPS.some((prop) => prop in changeInfo)) scheduleRefresh();
 });

@@ -359,6 +359,41 @@ footer button:disabled:hover { background: none; }
 
 .group-header:hover { color: light-dark(#333, #ddd); }
 
+/* B: tab-group sub-header inside a window group — rail carries Chrome's group color */
+.tabgroup-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  /* indented one level: starts under the window header's color dot
+     (window header: 14 pad + 14 checkbox + 6 gap = 34) — the nesting reads */
+  padding: 4px 14px 2px 34px;
+  font-size: 0.72rem;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--muted);
+  cursor: pointer;
+  user-select: none;
+}
+.tabgroup-header:hover { color: light-dark(#333, #ddd); }
+.tabgroup-header .tg-rail { width: 8px; height: 8px; border-radius: 2px; flex: none; }
+.tabgroup-header .group-select { width: 14px; height: 14px; margin: 0; flex: none; }
+/* per-row group marker: square (vs the round window dot) in the group color,
+   leftmost in the row; .in-group indents the row so the square sits exactly
+   under the sub-header's square (sub-header: 34 pad + 14 checkbox + 6 gap = 54;
+   row: 6 margin + 48 pad = 54) and the checkbox shifts right with the rest */
+.row .tg-square { width: 8px; height: 8px; border-radius: 2px; flex: none; margin-top: 5px; }
+.group-header .tg-square { width: 8px; height: 8px; border-radius: 2px; flex: none; }
+.row.in-group { padding-left: 48px; }
+.tabgroup-header .tg-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+.tabgroup-header .tg-count { flex: none; }
+.tabgroup-header .fold-arrow { flex: none; margin-left: auto; }
+
 /* WINDOW_NAMES: ⋯ window-actions trigger — visible on hover/keyboard only */
 .group-header .group-menu-btn {
   flex: none;

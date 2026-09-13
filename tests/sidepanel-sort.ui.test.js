@@ -15,7 +15,12 @@ const tabs = [
 ];
 
 const stored = {};
-const chrome = makeChrome({ tabs, calls: [], stored });
+const calls = [];
+const groups = [
+  { id: 7, title: "work", color: "blue", collapsed: false, windowId: 1 },
+  { id: 8, title: "beta", color: "red", collapsed: false, windowId: 1 },
+];
+const chrome = makeChrome({ tabs, calls, stored, groups });
 loadPage("../../sidepanel/index.html", chrome);
 await import("../sidepanel/sidepanel.js");
 await tick();
@@ -458,3 +463,168 @@ test("UI - Sidepanel Sort - Window focus switch scrolls current window's group i
   await new Promise((resolve) => setTimeout(resolve, 200));
   listEl.scrollTop = 0;
 });
+
+test(
+  "UI - Sidepanel Sort - Tab groups sort: ABC groups, ungrouped last, group menu",
+  { skip: !(TEST_FEATURES.TAB_GROUPS?.enabled === true) && "TAB_GROUPS disabled in features.json" },
+  async () => {
+    // tabs 1,2 (win 1) → groups; 3,4 stay ungrouped
+    tabs.find((t) => t.id === 1).groupId = 7; // work
+    tabs.find((t) => t.id === 2).groupId = 8; // beta
+    await chrome.tabs.onUpdated.fire(1, { groupId: 7 });
+    await new Promise((resolve) => setTimeout(resolve, 200)); // refresh debounce
+    setSort("group-tabgroup");
+    await tick();
+    assert.deepEqual(
+      [...document.querySelectorAll(".group-header .group-label")].map((el) => el.textContent),
+      ["beta", "work", "No group"],
+      "groups ABC by title, ungrouped bucket last",
+    );
+
+    // right-click a group header → tab-group menu
+    const header = document.querySelector('.group-header[data-tab-group-id="7"]');
+    assert.ok(header, "group header carries its group id");
+    assert.ok(header.querySelector(".tg-square"), "group header marker is a square");
+    assert.equal(header.querySelector(".win-dot"), null, "…not a circle");
+    assert.equal(
+      document.querySelector('.row[data-tab-id="1"] .tg-square'),
+      null,
+      "rows under a group header carry no redundant square",
+    );
+    header.dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+    const menu = document.getElementById("ctx-menu");
+    assert.equal(menu.querySelector(".ctx-title").textContent, "work", "menu header = group title");
+    const items = [...menu.querySelectorAll(".ctx-item")].map((el) => el.textContent);
+    assert.ok(items.includes("Rename group…"), "rename offered");
+    assert.ok(items.includes("Collapse in tab strip"), "strip collapse offered");
+    assert.ok(items.includes("Ungroup 1 tab"), "ungroup with count");
+
+    // pick a color → tabGroups.update
+    calls.length = 0;
+    [...menu.querySelectorAll(".ctx-item")].find((el) => el.textContent === "Red").click();
+    await tick();
+    await tick();
+    assert.ok(calls.includes('tabGroups.update 7 {"color":"red"}'), "color persisted via Chrome");
+    document.body.click();
+
+    // drag a grouped tab onto the "No group" header → ungrouped
+    const rowOf = (id) => document.querySelector(`.row[data-tab-id="${id}"]`);
+    calls.length = 0;
+    rowOf(1).dispatchEvent(new window.Event("dragstart", { bubbles: true }));
+    const noGroup = document.querySelector('.group-header[data-tab-group-id="-1"]');
+    assert.ok(noGroup, "ungrouped bucket is a drop target");
+    noGroup.dispatchEvent(new window.Event("drop", { bubbles: true }));
+    await tick();
+    await tick();
+    assert.ok(calls.includes("tabs.ungroup 1"), "drop on No group ungroups");
+    tabs.find((t) => t.id === 1).groupId = 7; // stub does mutate — keep grouped for the B section
+
+    // B: window sort shows the runs as sub-headers; collapsing folds the rows
+    setSort("window");
+    await tick();
+    const sub = document.querySelector('.tabgroup-header[data-tab-group-id="7"]');
+    assert.ok(sub, "sub-header rendered inside the window group");
+    assert.equal(sub.querySelector(".tg-title").textContent, "work");
+    assert.equal(sub.querySelector(".tg-count").textContent, "1/1", "visible/total like window headers");
+    assert.match(sub.dataset.tip, /Group "work"\n0\/1 selected tabs\n1\/1 visible tabs\nClick to collapse/,
+      "hover tip mirrors the window-header info shape");
+    if (GROUP_SELECT_ON) {
+      const box = sub.querySelector(".group-select");
+      assert.ok(box, "sub-header carries the select checkbox");
+      box.checked = true;
+      box.dispatchEvent(new window.Event("click", { bubbles: true }));
+      await tick();
+      assert.equal(
+        document.querySelector('.row[data-tab-id="1"] input').checked,
+        true,
+        "checkbox selects the run's tabs",
+      );
+      const boxAgain = document.querySelector('.tabgroup-header[data-tab-group-id="7"] .group-select');
+      boxAgain.checked = false;
+      boxAgain.dispatchEvent(new window.Event("click", { bubbles: true }));
+      await tick();
+    }
+    assert.ok(
+      document.querySelector('.row[data-tab-id="1"] .tg-square'),
+      "grouped row carries the group square",
+    );
+    assert.equal(
+      document.querySelector('.row[data-tab-id="3"] .tg-square'),
+      null,
+      "ungrouped row has none",
+    );
+
+    // flat sorts: square sits AFTER the window dot, no indent
+    setSort("recent");
+    await tick();
+    const flatRow = document.querySelector('.row[data-tab-id="1"]');
+    assert.ok(!flatRow.classList.contains("in-group"), "no nesting indent outside the window view");
+    const flatKids = [...flatRow.children].map((el) => el.className.split(" ")[0]);
+    assert.ok(
+      flatKids.indexOf("win-dot") < flatKids.indexOf("tg-square"),
+      `square after the window dot, got: ${flatKids.join(",")}`,
+    );
+    setSort("window");
+    await tick();
+    const rowsBefore = document.querySelectorAll(".row").length;
+    sub.click();
+    await tick();
+    assert.equal(document.querySelectorAll(".row").length, rowsBefore - 1, "folded run hides its row");
+    document.querySelector('.tabgroup-header[data-tab-group-id="7"]').click(); // unfold
+    await tick();
+
+    // drag & drop into groups (window sort still active from the B section)
+    calls.length = 0;
+    rowOf(4).dispatchEvent(new window.Event("dragstart", { bubbles: true })); // window 2, ungrouped
+    document.querySelector('.tabgroup-header[data-tab-group-id="7"]')
+      .dispatchEvent(new window.Event("drop", { bubbles: true }));
+    await tick();
+    await tick();
+    assert.ok(
+      calls.some((c) => c.startsWith("tabs.move 4") && c.includes('"windowId":1')),
+      "cross-window join moves into the group's window first",
+    );
+    assert.ok(calls.includes("tabs.group 4 7"), "then joins the group");
+    await new Promise((resolve) => setTimeout(resolve, 200)); // refresh debounce
+
+    calls.length = 0;
+    rowOf(3).dispatchEvent(new window.Event("dragstart", { bubbles: true })); // win 1, ungrouped
+    rowOf(1).dispatchEvent(new window.Event("drop", { bubbles: true })); // row inside group 7
+    await tick();
+    await tick();
+    assert.ok(calls.includes("tabs.group 3 7"), "drop on a grouped row joins its group");
+    await new Promise((resolve) => setTimeout(resolve, 200)); // refresh debounce
+
+    // reorder INSIDE a group: move + re-group (tabs.move strips membership)
+    tabs.find((t) => t.id === 4).groupId = 7; // 1 and 4 now share group 7 (both win 1)
+    tabs.find((t) => t.id === 4).windowId = 1;
+    await chrome.tabs.onUpdated.fire(4, { groupId: 7 });
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    calls.length = 0;
+    rowOf(4).dispatchEvent(new window.Event("dragstart", { bubbles: true }));
+    rowOf(1).dispatchEvent(new window.Event("drop", { bubbles: true }));
+    await tick();
+    await tick();
+    assert.ok(calls.some((c) => c.startsWith("tabs.move 4")), "in-group drop moves the tab");
+    assert.ok(calls.includes("tabs.group 4 7"), "membership restored after the move");
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
+    // in-group reorder also works in the Tab groups sort (strip-ordered there)
+    setSort("group-tabgroup");
+    await tick();
+    calls.length = 0;
+    rowOf(1).dispatchEvent(new window.Event("dragstart", { bubbles: true }));
+    rowOf(4).dispatchEvent(new window.Event("drop", { bubbles: true }));
+    await tick();
+    await tick();
+    assert.ok(calls.some((c) => c.startsWith("tabs.move 1")), "reorder allowed in Tab groups sort");
+    assert.ok(calls.includes("tabs.group 1 7"), "membership kept there too");
+
+    // restore fixture
+    tabs.find((t) => t.id === 4).windowId = 2;
+    for (const id of [1, 2, 3, 4]) tabs.find((t) => t.id === id).groupId = -1;
+    await chrome.tabs.onUpdated.fire(1, { groupId: -1 });
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    setSort("window");
+  },
+);

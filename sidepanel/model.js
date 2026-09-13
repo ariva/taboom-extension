@@ -188,6 +188,34 @@ export function selectVisible(tabs, view) {
     case "group-url":
       sortGroupedByKey(result, (tab) => tab.url ?? "", sortDir, last);
       break;
+    // Chrome tab groups: groups ABC by title, ungrouped bucket last; the
+    // gid suffix keeps same-titled groups apart. Inside a group rows follow
+    // STRIP order (a group is a strip structure — moves must mirror it);
+    // the ungrouped bucket spans windows, so recency is more useful there.
+    case "group-tabgroup": {
+      const keyOf = (tab) => {
+        const gid = tab.groupId ?? -1;
+        if (gid === -1) {
+          return "\uffff"; // sorts after every real title
+        }
+        const title = view.tabGroups?.get(gid)?.title || "untitled";
+        return `${title.toLocaleLowerCase()}\u0000${gid}`;
+      };
+      const sizes = new Map();
+      for (const tab of result) {
+        sizes.set(keyOf(tab), (sizes.get(keyOf(tab)) ?? 0) + 1);
+      }
+      const bySize = sortDir === "desc" ? -1 : sortDir === "asc" ? 1 : 0;
+      result.sort(
+        (a, b) =>
+          bySize * (sizes.get(keyOf(a)) - sizes.get(keyOf(b))) ||
+          keyOf(a).localeCompare(keyOf(b)) ||
+          ((a.groupId ?? -1) !== -1
+            ? (a.index ?? 0) - (b.index ?? 0)
+            : last(b) - last(a)),
+      );
+      break;
+    }
     // "none" = current window first then windows by id (natural 1..x);
     // "desc"/"asc" = windows by visible tab count (natural order as tiebreak);
     // within a window: ui.groupByWindowTabsOrder — same-as-window (default, tab strip position) | recent
@@ -235,6 +263,12 @@ function windowTabComparator(order, last) {
       return (a, b) => last(b) - last(a); // recently used
   }
 }
+
+// Chrome's 9 fixed tab-group colors (chrome.tabGroups.Color → hex)
+export const TAB_GROUP_COLORS = {
+  grey: "#5f6368", blue: "#1a73e8", red: "#d93025", yellow: "#f9ab00",
+  green: "#188038", pink: "#d01884", purple: "#a142f4", cyan: "#007b83", orange: "#fa903e",
+};
 
 // shared ordering for key-grouped sorts — see the group-* cases above
 function sortGroupedByKey(result, keyOf, sortDir, last) {
