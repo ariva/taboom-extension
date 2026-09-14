@@ -553,7 +553,10 @@ function renderNowImpl() {
       }));
       if (isCollapsed) continue;
       if (sort === "window" && nestedTabGroupsActive()) {
-        index = renderMembersWithTabGroupRuns(frag, members, rowVm, index, collapsed);
+        index = renderMembersWithTabGroupRuns(
+          frag, members, rowVm, index, collapsed,
+          maps.dotColors.size > 0 ? (maps.dotColors.get(groupKey) ?? null) : null,
+        );
         continue;
       }
       for (const tab of members) frag.append(renderRow(tab, rowVm(tab, index++)));
@@ -951,7 +954,7 @@ winPop.addEventListener("contextmenu", (event) => {
 
 // B: contiguous runs of one tab group inside a window's rows get a sub-header
 // (rail color, title, count, collapse) — the list mirrors Chrome's strip
-function renderMembersWithTabGroupRuns(frag, members, rowVm, index, collapsed) {
+function renderMembersWithTabGroupRuns(frag, members, rowVm, index, collapsed, windowDotColor) {
   let runGroupId = null;
   let runCollapsed = false;
   for (const tab of members) {
@@ -962,7 +965,7 @@ function renderMembersWithTabGroupRuns(frag, members, rowVm, index, collapsed) {
       if (gid !== -1) {
         const runTabs = members.filter((t) => (t.groupId ?? -1) === gid);
         runCollapsed = collapsed.has(`tg:${gid}`);
-        frag.append(renderTabGroupSubheader(gid, runTabs, runCollapsed));
+        frag.append(renderTabGroupSubheader(gid, runTabs, runCollapsed, windowDotColor));
       }
     }
     if (gid !== -1 && runCollapsed) {
@@ -973,7 +976,7 @@ function renderMembersWithTabGroupRuns(frag, members, rowVm, index, collapsed) {
   return index;
 }
 
-function renderTabGroupSubheader(groupId, tabs, isCollapsed) {
+function renderTabGroupSubheader(groupId, tabs, isCollapsed, windowDotColor) {
   const group = state.tabGroups.get(groupId);
   const header = document.createElement("div");
   header.className = "tabgroup-header";
@@ -1005,8 +1008,19 @@ function renderTabGroupSubheader(groupId, tabs, isCollapsed) {
     `${selectedCount}/${tabs.length} selected tabs\n` +
     `${tabs.length}/${total} visible tabs\n` +
     `Click to ${isCollapsed ? "expand" : "collapse"}`;
+  // window membership stays visible on the group line: dot before the square
+  let windowDot = null;
+  if (windowDotColor !== null && windowDotColor !== undefined) {
+    windowDot = document.createElement("span");
+    windowDot.className = "win-dot";
+    if (windowDotColor) {
+      windowDot.style.background = windowDotColor;
+    } else {
+      windowDot.classList.add("current");
+    }
+  }
   const rail = document.createElement("span");
-  rail.className = "tg-rail";
+  rail.className = "tg-square";
   rail.style.background = TAB_GROUP_COLORS[group?.color] ?? "#5f6368";
   const title = document.createElement("span");
   title.className = "tg-title";
@@ -1017,7 +1031,7 @@ function renderTabGroupSubheader(groupId, tabs, isCollapsed) {
   const arrow = document.createElement("span");
   arrow.className = "fold-arrow";
   arrow.textContent = isCollapsed ? "▸" : "▾";
-  header.append(rail, title, count, arrow);
+  header.append(...(windowDot ? [windowDot] : []), rail, title, count, arrow);
   const toggle = () => {
     const set = activeCollapsedSet();
     const key = `tg:${groupId}`;

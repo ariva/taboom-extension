@@ -525,6 +525,8 @@ test(
     const sub = document.querySelector('.tabgroup-header[data-tab-group-id="7"]');
     assert.ok(sub, "sub-header rendered inside the window group");
     assert.equal(sub.querySelector(".tg-title").textContent, "work");
+    assert.ok(sub.querySelector(".win-dot"), "window indicator on the group line");
+    assert.ok(sub.querySelector(".tg-square"), "…followed by the group square");
     assert.equal(sub.querySelector(".tg-count").textContent, "1/1", "visible/total like window headers");
     assert.match(sub.dataset.tip, /Group "work"\n0\/1 selected tabs\n1\/1 visible tabs\nClick to collapse/,
       "hover tip mirrors the window-header info shape");

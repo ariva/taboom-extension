@@ -114,7 +114,7 @@ main {
   display: flex;
   align-items: flex-start;
   gap: 6px;
-  padding: 6px 8px;
+  padding: 6px 8px 6px 18px;
   margin: 1px 6px;
   border: 1px solid transparent; /* reserved so .current border causes no shift */
   border-radius: 0 9999px 9999px 0; /* flat left / round right — same shape for hover, cursor and active pill */
@@ -131,8 +131,9 @@ main {
 .row:hover, .row.cursor { background: var(--hover); box-shadow: var(--shadow-1); }
 
 /* compact density: tighter rows, no meta line */
-main.compact .row { padding: 3px 8px; contain-intrinsic-size: auto var(--row-h, 26px); }
+main.compact .row { padding: 3px 8px 3px 16px; contain-intrinsic-size: auto var(--row-h, 26px); }
 main.compact .row .meta { display: none; }
+main.compact .row.in-group { padding: 3px 8px 3px 25px; }
 
 /* snoozed = dimmed; hover restores full strength so actions stay readable */
 .row.snoozed { opacity: 0.55; }
@@ -321,7 +322,7 @@ footer button:disabled:hover { background: none; }
   position: sticky;
   top: -4px; /* cancels main's 4px top padding */
   z-index: 1;
-  padding: 6px 14px 2px;
+  padding: 6px 14px 2px 15px; /* 15 = the rows' checkbox column */
   font-size: 0.77rem;
   letter-spacing: 0.4px;
   text-transform: uppercase;
@@ -343,7 +344,12 @@ footer button:disabled:hover { background: none; }
    font context — row and window checkboxes must look the same */
 .row input[type="checkbox"],
 .group-header .group-select { width: 14px; height: 14px; }
+/* margin 0 EVERYWHERE: the UA gives checkboxes ~4px side margins that differ
+   per platform — with them zeroed, headers, group lines and rows share one
+   exact checkbox column (rows: 6 margin + 1 border + 8 pad = 15) */
+.row input[type="checkbox"] { margin: 0; flex: none; }
 .group-header .group-select { margin: 0; flex: none; }
+.tabgroup-header .group-select { width: 14px; height: 14px; margin: 0; flex: none; }
 .group-header .group-label {
   flex: 0 1 auto;
   min-width: 0;
@@ -364,9 +370,7 @@ footer button:disabled:hover { background: none; }
   display: flex;
   align-items: center;
   gap: 6px;
-  /* indented one level: starts under the window header's color dot
-     (window header: 14 pad + 14 checkbox + 6 gap = 34) — the nesting reads */
-  padding: 4px 14px 2px 34px;
+  padding: 4px 14px 2px 25px;
   font-size: 0.72rem;
   letter-spacing: 0.4px;
   text-transform: uppercase;
@@ -375,15 +379,11 @@ footer button:disabled:hover { background: none; }
   user-select: none;
 }
 .tabgroup-header:hover { color: light-dark(#333, #ddd); }
-.tabgroup-header .tg-rail { width: 8px; height: 8px; border-radius: 2px; flex: none; }
-.tabgroup-header .group-select { width: 14px; height: 14px; margin: 0; flex: none; }
-/* per-row group marker: square (vs the round window dot) in the group color,
-   leftmost in the row; .in-group indents the row so the square sits exactly
-   under the sub-header's square (sub-header: 34 pad + 14 checkbox + 6 gap = 54;
-   row: 6 margin + 48 pad = 54) and the checkbox shifts right with the rest */
+.tabgroup-header .tg-square { width: 8px; height: 8px; border-radius: 2px; flex: none; }
+.tabgroup-header .win-dot { flex: none; }
 .row .tg-square { width: 8px; height: 8px; border-radius: 2px; flex: none; margin-top: 5px; }
 .group-header .tg-square { width: 8px; height: 8px; border-radius: 2px; flex: none; }
-.row.in-group { padding-left: 48px; }
+.row.in-group { padding-left: 50px; }
 .tabgroup-header .tg-title {
   min-width: 0;
   overflow: hidden;
