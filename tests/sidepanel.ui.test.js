@@ -1064,7 +1064,13 @@ test(
     winBtn.click(); // fills the popover (popovertarget handles show/hide natively)
     await tick();
     const pop = document.getElementById("windows-pop");
-    assert.match(pop.querySelector(".win-head .muted").textContent, /Windows \(3\)/);
+    // fixture has a Chrome group and a pinned tab → view switcher shows all three
+    assert.deepEqual(
+      [...pop.querySelectorAll(".win-view")].map((el) => el.textContent),
+      ["Windows (3)", "Groups (1)", "Pins (1)"],
+      "view tabs with counts",
+    );
+    assert.match(pop.querySelector(".win-view.on").textContent, /Windows \(3\)/, "Windows selected by default");
     const rows = [...pop.querySelectorAll(".win-row")];
     assert.deepEqual(
       rows.map((el) => el.querySelector(".win-title").textContent),
@@ -1149,6 +1155,31 @@ test(
       "menu offers Unpin for a pinned window",
     );
     document.body.click();
+
+    // Groups view: group row navigates to the group's first tab
+    winBtn.click();
+    await tick();
+    [...pop.querySelectorAll(".win-view")].find((el) => el.textContent.startsWith("Groups")).click();
+    await tick();
+    const groupRow = pop.querySelector('.win-row[data-tab-group-id="7"]');
+    assert.ok(groupRow, "group listed");
+    assert.equal(groupRow.querySelector(".win-title").textContent, "work");
+    assert.ok(groupRow.querySelector(".tg-square"), "square marker");
+    assert.equal(groupRow.querySelector(".win-stats").textContent, "0 tabs · 0 awake · 0 snoozed",
+      "same stats shape as the Windows view");
+
+    // Pins view: pinned tab row activates the tab
+    [...pop.querySelectorAll(".win-view")].find((el) => el.textContent.startsWith("Pins")).click();
+    await tick();
+    const pinRow = pop.querySelector('.win-row[data-tab-id="3"]');
+    assert.ok(pinRow, "pinned tab listed");
+    assert.match(pinRow.querySelector(".win-title").textContent, /Inbox/);
+    calls.length = 0;
+    pinRow.click();
+    await tick();
+    await tick();
+    assert.ok(calls.includes("windows.update 2"), "pin click focuses its window");
+    assert.ok(calls.some((c) => c.startsWith("tabs.update 3") && c.includes('"active":true')), "…and activates the tab");
 
     // sidebar list follows: pin window 3 too → its group lifts above window 2
     windowProfiles["w-t3"] = { ...windowProfiles["w-t3"], pinnedWindow: true };

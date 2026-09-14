@@ -695,6 +695,21 @@ footer button:disabled:hover { background: none; }
   transition: background var(--transition);
 }
 #windows-pop .win-close:hover { background: var(--badge-bg); }
+/* view switcher: Windows | Groups | Pins (only when there is something to switch to) */
+#windows-pop .win-views { display: flex; gap: 4px; min-width: 0; }
+#windows-pop .win-view {
+  border: none;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+  padding: 2px 8px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+#windows-pop .win-view:hover { background: var(--badge-bg); }
+#windows-pop .win-view.on { background: var(--accent); color: var(--accent-fg); }
+#windows-pop .win-row .tg-square { width: 8px; height: 8px; border-radius: 2px; flex: none; }
 /* row + its ⋯ share a line; ⋯ only shows while the entry is hovered/focused */
 #windows-pop .win-item { display: flex; align-items: center; gap: 2px; }
 #windows-pop .win-item .win-row { flex: 1; min-width: 0; }

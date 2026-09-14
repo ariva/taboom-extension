@@ -641,7 +641,24 @@ collapseAllBtn.addEventListener("click", () => {
 const winListBtn = getElementById("win-list-btn");
 const winPop = getElementById("windows-pop");
 
-winListBtn.addEventListener("click", fillWindowsPopover);
+winListBtn.addEventListener("click", () => {
+  winPopView = "windows"; // every open starts on the Windows list
+  // fresh open: re-derive the size lock from the Windows list
+  winPop.style.minWidth = "";
+  winPop.style.minHeight = "";
+  fillWindowsPopover();
+  // lock the opened size so switching to shorter Groups/Pins lists doesn't
+  // shrink the box under the cursor (measure after the popover is shown —
+  // the popovertarget default action runs after this listener)
+  requestAnimationFrame?.(() => {
+    if (winPopOpen() && winPop.offsetWidth > 0 && !winPop.style.minWidth) {
+      winPop.style.minWidth = `${winPop.offsetWidth}px`;
+      winPop.style.minHeight = `${winPop.offsetHeight}px`;
+    }
+  });
+});
+
+let winPopView = "windows"; // "windows" | "groups" | "pins" — reset on ▦ open
 
 function fillWindowsPopover() {
   // anchored under the titlebar, right-aligned with the buttons
@@ -650,20 +667,60 @@ function fillWindowsPopover() {
   winPop.style.right = "8px";
   winPop.style.left = "auto";
   const maps = windowMaps(state.allTabs, state.currentWindowId, state.windowMeta);
+  const groupList = tabGroupsActive() ? [...state.tabGroups.values()] : [];
+  const pinnedTabs = state.allTabs.filter((tab) => tab.pinned);
+  // Groups / Pins views exist only while there is something to list
+  const views = [
+    ["windows", `Windows (${maps.indexes.size})`],
+    ...(groupList.length > 0 ? [["groups", `Groups (${groupList.length})`]] : []),
+    ...(pinnedTabs.length > 0 ? [["pins", `Pins (${pinnedTabs.length})`]] : []),
+  ];
+  if (!views.some(([view]) => view === winPopView)) {
+    winPopView = "windows"; // the shown view's last member vanished under us
+  }
   winPop.textContent = "";
 
   const head = document.createElement("div");
   head.className = "win-head";
-  const heading = document.createElement("span");
-  heading.className = "muted";
-  heading.textContent = `Windows (${maps.indexes.size})`;
+  if (views.length === 1) {
+    // only Windows: a plain heading, nothing to switch to
+    const heading = document.createElement("span");
+    heading.className = "muted";
+    heading.textContent = views[0][1];
+    head.append(heading);
+  } else {
+    const bar = document.createElement("span");
+    bar.className = "win-views";
+    for (const [view, label] of views) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = view === winPopView ? "win-view on" : "win-view";
+      btn.textContent = label;
+      btn.addEventListener("click", (event) => {
+        event.stopPropagation(); // the refill detaches this button — see click-away guard
+        winPopView = /** @type {any} */ (view);
+        fillWindowsPopover();
+      });
+      bar.append(btn);
+    }
+    head.append(bar);
+  }
   const close = document.createElement("button");
   close.type = "button";
   close.className = "win-close";
   close.textContent = "Close";
   close.addEventListener("click", () => winPop.hidePopover?.());
-  head.append(heading, close);
+  head.append(close);
   winPop.append(head);
+
+  if (winPopView === "groups") {
+    fillGroupRows(groupList);
+    return;
+  }
+  if (winPopView === "pins") {
+    fillPinRows(pinnedTabs, maps);
+    return;
+  }
 
   // current window first, the rest alphabetical by display name
   const labelOf = (windowId) =>
@@ -746,6 +803,103 @@ function fillWindowsPopover() {
   }
 }
 
+// Groups view: one row per Chrome tab group — click activates the group's
+// first tab (focuses its window), ⋯/right-click opens the group menu
+function fillGroupRows(groupList) {
+  const sorted = [...groupList].sort((a, b) =>
+    (a.title || "").localeCompare(b.title || "", undefined, { sensitivity: "base" }));
+  for (const group of sorted) {
+    const tabs = state.allTabs
+      .filter((tab) => tab.groupId === group.id)
+      .sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
+    const row = document.createElement("button");
+    row.type = "button";
+    row.className = "win-row";
+    row.dataset.tabGroupId = String(group.id);
+    const square = document.createElement("span");
+    square.className = "tg-square";
+    square.style.background = TAB_GROUP_COLORS[group.color] ?? "#5f6368";
+    const name = document.createElement("span");
+    name.className = "win-title";
+    name.textContent = group.title || "(unnamed group)";
+    const snoozed = tabs.filter((tab) => tab.discarded).length;
+    const awake = tabs.length - snoozed; // filter-chip terminology, like the Windows view
+    const stats = document.createElement("span");
+    stats.className = "win-stats muted";
+    stats.textContent = `${tabs.length} tab${tabs.length === 1 ? "" : "s"} · ${awake} awake · ${snoozed} snoozed`;
+    row.append(square, name, stats);
+    row.title = [
+      `Group "${group.title || "(unnamed group)"}"`,
+      `${tabs.length} tab${tabs.length === 1 ? "" : "s"} · ${awake} awake · ${snoozed} snoozed`,
+      `In ${windowLabel(group.windowId)}`,
+    ].join("\n");
+    row.addEventListener("click", () => {
+      winPop.hidePopover?.();
+      if (tabs[0]) {
+        activate(tabs[0]);
+      }
+    });
+    const menuBtn = document.createElement("button");
+    menuBtn.type = "button";
+    menuBtn.className = "win-menu-btn";
+    menuBtn.title = menuBtn.ariaLabel = "Group actions";
+    menuBtn.textContent = "⋯";
+    menuBtn.addEventListener("click", (event) => {
+      event.stopPropagation();
+      openTabGroupMenu(event, group.id);
+    });
+    const item = document.createElement("div");
+    item.className = "win-item";
+    item.append(row, menuBtn);
+    winPop.append(item);
+  }
+}
+
+// Pins view: every pinned tab — click activates it, ⋯/right-click = row menu
+function fillPinRows(pinnedTabs, maps) {
+  const sorted = [...pinnedTabs].sort(
+    (a, b) => a.windowId - b.windowId || (a.index ?? 0) - (b.index ?? 0));
+  for (const tab of sorted) {
+    const row = document.createElement("button");
+    row.type = "button";
+    row.className = "win-row";
+    row.dataset.tabId = String(tab.id);
+    const dot = document.createElement("span");
+    dot.className = "win-dot";
+    const color = maps.dotColors.get(tab.windowId);
+    if (color) {
+      dot.style.background = color;
+    } else {
+      dot.classList.add("current");
+    }
+    const name = document.createElement("span");
+    name.className = "win-title";
+    name.textContent = tab.title || tab.url || "(tab)";
+    const stats = document.createElement("span");
+    stats.className = "win-stats muted";
+    stats.textContent = windowLabel(tab.windowId);
+    row.append(dot, name, stats);
+    row.title = [tab.title, tab.url, `In ${windowLabel(tab.windowId)}`].filter(Boolean).join("\n");
+    row.addEventListener("click", () => {
+      winPop.hidePopover?.();
+      activate(tab);
+    });
+    const menuBtn = document.createElement("button");
+    menuBtn.type = "button";
+    menuBtn.className = "win-menu-btn";
+    menuBtn.title = menuBtn.ariaLabel = "Tab actions";
+    menuBtn.textContent = "⋯";
+    menuBtn.addEventListener("click", (event) => {
+      event.stopPropagation();
+      openRowMenu(event, tab.id);
+    });
+    const item = document.createElement("div");
+    item.className = "win-item";
+    item.append(row, menuBtn);
+    winPop.append(item);
+  }
+}
+
 // renders happen on every tab/storage event — keep an open popover current,
 // but never yank a rename input out from under the user
 function refillWindowsPopoverIfOpen() {
@@ -766,6 +920,11 @@ function winPopOpen() {
 // shared with the ctx menu) and window blur; clicks in the ctx menu keep it open
 document.addEventListener("click", (event) => {
   const target = /** @type {HTMLElement} */ (event.target);
+  // a click on popover content may REBUILD the popover before this handler
+  // runs (view switch) — the detached target would read as "outside"
+  if (!target.isConnected) {
+    return;
+  }
   if (winPopOpen() && !winPop.contains(target) && !winListBtn.contains(target) && !ctxMenu.contains(target)) {
     winPop.hidePopover?.();
   }
@@ -781,7 +940,13 @@ winPop.addEventListener("contextmenu", (event) => {
   event.preventDefault();
   // windows popover stays open behind — the ctx menu is a manual popover
   // shown after it, so it stacks above in the top layer
-  openWindowListMenu(event, Number(row.dataset.windowId));
+  if (row.dataset.tabGroupId) {
+    openTabGroupMenu(event, Number(row.dataset.tabGroupId));
+  } else if (row.dataset.tabId) {
+    openRowMenu(event, Number(row.dataset.tabId));
+  } else {
+    openWindowListMenu(event, Number(row.dataset.windowId));
+  }
 });
 
 // B: contiguous runs of one tab group inside a window's rows get a sub-header
