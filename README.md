@@ -33,6 +33,7 @@ Taboom is a privacy-first extension. It requests the bare minimum Chrome permiss
 | Permission | Why it's needed |
 |---|---|
 | `tabs` | List tabs (title/URL) in the side panel, snooze (discard), activate, and close them |
+| `tabGroups` | Show Chrome tab groups (title, color, collapsed) in the list, rename/recolor/collapse them, move tabs in or out |
 | `storage` | Save your settings and protection rules locally (`chrome.storage.local`) |
 | `alarms` | Run the periodic automatic-snooze check (survives service-worker sleep) |
 | `contextMenus` | Right-click menu: snooze this tab, protect this site |
@@ -45,6 +46,7 @@ Nothing else is requested: Taboom cannot read or modify page content, cannot see
 
 Side panel:
 
+![Side panel - Quick Launch](images/sidemenu_quicklaunch.png)
 ![Side panel](images/sidemenu.png)
 
 Options page:
