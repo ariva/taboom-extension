@@ -99,8 +99,20 @@ async function autoSnoozePass() {
   const state = await loadState();
   if (!state.settings.autoSnoozeEnabled) return;
   const tabs = await chrome.tabs.query({});
+  // manual wakes reset the inactivity clock (storage.session: survives SW
+  // idle-death, gone with the browser session like the tabs themselves)
+  const { wakeTimes = {} } = /** @type {Record<string, any>} */ (
+    await chrome.storage.session.get("wakeTimes")
+  );
+  const openIds = new Set(tabs.map((tab) => tab.id));
+  const pruned = Object.fromEntries(
+    Object.entries(wakeTimes).filter(([tabId]) => openIds.has(Number(tabId))),
+  );
+  if (Object.keys(pruned).length !== Object.keys(wakeTimes).length) {
+    await chrome.storage.session.set({ wakeTimes: pruned });
+  }
   await Promise.allSettled(
-    selectAutoSnoozeTargets(tabs, state.settings, state.protectionRules).map((tabId) =>
+    selectAutoSnoozeTargets(tabs, state.settings, state.protectionRules, Date.now(), pruned).map((tabId) =>
       chrome.tabs.discard(tabId).catch((error) => console.debug("discard failed", tabId, error)),
     ),
   );
@@ -235,6 +247,17 @@ async function handleMessage(message) {
       return patchWindowProfiles([message.windowId], { name: message.name?.trim() || undefined });
     case "window-set-color":
       return patchWindowProfiles([message.windowId], { color: message.color || undefined });
+    case "tabs-woken": {
+      // manual wake — restart the inactivity clock for these tabs
+      const { wakeTimes = {} } = /** @type {Record<string, any>} */ (
+        await chrome.storage.session.get("wakeTimes")
+      );
+      const now = Date.now();
+      for (const tabId of message.tabIds) {
+        wakeTimes[tabId] = now;
+      }
+      return chrome.storage.session.set({ wakeTimes });
+    }
     case "window-pin":
       // "pinnedWindow", not "pinned" — the fingerprint already owns that key
       return patchWindowProfiles([message.windowId], { pinnedWindow: message.pinned || undefined });

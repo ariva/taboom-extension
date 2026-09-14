@@ -75,6 +75,21 @@ test("Service Worker - Alarm pass discards inactive unprotected tabs only", asyn
   assert.equal(tabs.find((t) => t.id === 2).discarded, true);
 });
 
+test("Service Worker - Manual wake (tabs-woken) protects a tab from the next pass", async () => {
+  // tab 2 was discarded by the previous pass — wake it and mark the wake
+  const tab = tabs.find((t) => t.id === 2);
+  tab.discarded = false; // reloaded by the panel
+  await send({ type: "tabs-woken", tabIds: [2] });
+  calls.length = 0;
+  await chrome.alarms.onAlarm.fire({ name: "auto-snooze" });
+  await tick();
+  await tick();
+  assert.equal(calls.filter((c) => c.startsWith("tabs.discard")).length, 0,
+    "stale lastAccessed no longer re-snoozes the woken tab");
+  await chrome.storage.session.set({ wakeTimes: {} }); // reset for later tests
+  tab.discarded = true; // restore the state the earlier pass left
+});
+
 test("Service Worker - Alarm with different name does nothing", async () => {
   calls.length = 0;
   await chrome.alarms.onAlarm.fire({ name: "unrelated" });

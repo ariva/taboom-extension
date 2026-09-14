@@ -68,7 +68,10 @@ export function isProtected(url, rules) {
   return rules.some((rule) => matchesRule(host, rule));
 }
 
-export function isEligibleForAutoSnooze(tab, settings, rules, now = Date.now()) {
+// wakeTimes: tabId → ms timestamp of a MANUAL wake — a reload of a discarded
+// tab leaves lastAccessed at its pre-snooze value, so without this the next
+// pass would re-snooze the tab the user just woke
+export function isEligibleForAutoSnooze(tab, settings, rules, now = Date.now(), wakeTimes = null) {
   if (!tab.id) return false;
   if (tab.active) return false;
   if (tab.discarded) return false;
@@ -76,15 +79,15 @@ export function isEligibleForAutoSnooze(tab, settings, rules, now = Date.now()) 
   if (settings.excludeAudible && tab.audible) return false;
   if (!isSupportedUrl(tab.url)) return false;
   if (isProtected(tab.url, rules)) return false;
-  const lastAccessed = tab.lastAccessed ?? now;
+  const lastAccessed = Math.max(tab.lastAccessed ?? now, wakeTimes?.[tab.id] ?? 0);
   return now - lastAccessed >= settings.inactivityMinutes * 60_000;
 }
 
 // Which tabs should this auto-snooze pass discard? Applies eligibility, then
 // keeps at least settings.minAwakePerWindow awake tabs per window (oldest
 // eligible tabs get discarded first, so the freshest stay awake).
-export function selectAutoSnoozeTargets(tabs, settings, rules, now = Date.now()) {
-  const eligible = tabs.filter((tab) => isEligibleForAutoSnooze(tab, settings, rules, now));
+export function selectAutoSnoozeTargets(tabs, settings, rules, now = Date.now(), wakeTimes = null) {
+  const eligible = tabs.filter((tab) => isEligibleForAutoSnooze(tab, settings, rules, now, wakeTimes));
   const minAwake = settings.minAwakePerWindow ?? 0;
   if (minAwake <= 0) return eligible.map((tab) => tab.id);
 

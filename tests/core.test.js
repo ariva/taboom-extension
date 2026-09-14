@@ -307,3 +307,27 @@ test("Core - RecordMetric keeps count/avg/min/max/last as a running summary", as
   assert.equal(m.other.count, 1);
   assert.equal(m.render.count, 3, "keys independent");
 });
+
+test("Auto-snooze - manual wake resets the inactivity clock (wakeTimes)", async () => {
+  const { isEligibleForAutoSnooze, selectAutoSnoozeTargets } = await import("../core/core.js");
+  const now = Date.now();
+  const settings = { autoSnoozeEnabled: true, inactivityMinutes: 60, excludePinned: false, excludeAudible: false, minAwakePerWindow: 0 };
+  const tab = { id: 9, windowId: 1, active: false, discarded: false, pinned: false, audible: false,
+    url: "https://a.example.com/", lastAccessed: now - 5 * 3_600_000 };
+  assert.equal(isEligibleForAutoSnooze(tab, settings, [], now), true, "5h idle: eligible");
+  assert.equal(
+    isEligibleForAutoSnooze(tab, settings, [], now, { 9: now - 10 * 60_000 }),
+    false,
+    "woken 10m ago: clock restarted",
+  );
+  assert.equal(
+    isEligibleForAutoSnooze(tab, settings, [], now, { 9: now - 2 * 3_600_000 }),
+    true,
+    "woken 2h ago: eligible again",
+  );
+  assert.deepEqual(
+    selectAutoSnoozeTargets([tab], settings, [], now, { 9: now }),
+    [],
+    "targets respect wake times",
+  );
+});

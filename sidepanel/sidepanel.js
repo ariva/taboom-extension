@@ -2124,6 +2124,10 @@ async function wake(tabIds) {
     (tabId) => state.allTabs.find((tab) => tab.id === tabId)?.discarded,
   );
   await Promise.all(snoozed.map((tabId) => chrome.tabs.reload(tabId).catch(() => {})));
+  if (snoozed.length > 0) {
+    // reload keeps the old lastAccessed — tell the SW to restart their clocks
+    chrome.runtime.sendMessage({ type: "tabs-woken", tabIds: snoozed }).catch(() => {});
+  }
   unselect(tabIds);
   refresh(true);
 }

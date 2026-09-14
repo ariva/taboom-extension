@@ -193,6 +193,7 @@ test("UI - Sidepanel - Bulk bar appears on selection; Wake reloads only discarde
   await tick();
   const reloads = calls.filter((c) => c.startsWith("tabs.reload"));
   assert.deepEqual(reloads, ["tabs.reload 2"], "only the discarded tab is reloaded");
+  assert.ok(calls.includes("sendMessage tabs-woken"), "wake reported so the SW restarts its clock");
 });
 
 test("UI - Sidepanel - Activating a row scrolls the current tab into view after re-render", async () => {
