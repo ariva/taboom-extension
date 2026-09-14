@@ -694,10 +694,18 @@ function setPanelOpen(windowIds, open) {
   return patchWindowProfiles(windowIds, { panelOpen: open });
 }
 
-// One read + one write for the whole batch — concurrent per-window
-// read-modify-writes clobber each other (last writer wins). `undefined`
-// values in the patch drop the key on the storage write (clear name/color).
-async function patchWindowProfiles(windowIds, patch) {
+// One read + one write for the whole batch, and every batch serialized on one
+// chain — a panel connecting while another panel's restore-dismiss is mid-write
+// would otherwise clobber it (last writer wins). `undefined` values in the
+// patch drop the key on the storage write (clear name/color).
+let profileChain = Promise.resolve();
+function patchWindowProfiles(windowIds, patch) {
+  const run = profileChain.then(() => patchWindowProfilesNow(windowIds, patch));
+  profileChain = run.catch(() => {}); // one failure must not jam the queue
+  return run;
+}
+
+async function patchWindowProfilesNow(windowIds, patch) {
   let { windowSessionMap = {} } = /** @type {Record<string, any>} */ (
     await chrome.storage.session.get("windowSessionMap")
   );

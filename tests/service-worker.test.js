@@ -466,6 +466,31 @@ test("Service Worker - Panel tracking: connect marks panelOpen, disconnect clear
   assert.deepEqual(response.windows, [], "dismissed windows no longer offered");
 });
 
+test("Service Worker - Profile patches are serialized: concurrent writes never clobber", async () => {
+  let { windowProfiles } = await chrome.storage.local.get("windowProfiles");
+  const logicalOf = (chromeId) =>
+    Object.entries(windowProfiles).find(([, p]) => p.chromeWindowId === chromeId)?.[0];
+  const logical1 = logicalOf(1);
+  const logical2 = logicalOf(2);
+  windowProfiles[logical1] = { ...windowProfiles[logical1], panelOpen: true };
+  windowProfiles[logical2] = { ...windowProfiles[logical2], panelOpen: true };
+  await chrome.storage.local.set({ windowProfiles });
+
+  // restore click forgets [1,2] while window 2's freshly opened panel connects
+  const port = { name: "sidepanel:2", onDisconnect: { addListener: () => {} } };
+  await Promise.all([
+    send({ type: "panels-restore-dismiss", windowIds: [1, 2] }),
+    chrome.runtime.onConnect.fire(port),
+  ]);
+  await tick();
+  await tick();
+  ({ windowProfiles } = await chrome.storage.local.get("windowProfiles"));
+  assert.equal(windowProfiles[logical1]?.panelOpen, false, "forgotten window stays forgotten");
+  assert.equal(windowProfiles[logical2]?.panelOpen, true, "connected window ends up open");
+  const response = await send({ type: "panels-to-restore", excludeWindowId: 3 });
+  assert.deepEqual(response.windows, [], "nothing left to offer");
+});
+
 test("Service Worker - Window rename/color write to the logical profile; empty clears", async () => {
   let { windowProfiles } = await chrome.storage.local.get("windowProfiles");
   const logical1 = Object.entries(windowProfiles).find(([, p]) => p.chromeWindowId === 1)?.[0];

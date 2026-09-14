@@ -2736,7 +2736,11 @@ trackPanelOpen().then(async (windowId) => {
     forget(); // same as dismissing the banner — those windows aren't offered again
     return;
   }
+  // forget FIRST: each reopened panel asks panels-to-restore as it loads, and
+  // a sibling whose port hasn't connected yet would still be offered to it —
+  // onConnect flips the flag back to true for every panel that does open
   const reopenAll = async () => {
+    await forget();
     let allOpened = true;
     for (const id of windows) {
       await chrome.sidePanel.open({ windowId: id }).catch(() => { allOpened = false; });
