@@ -212,7 +212,7 @@ test("Core - UI defaults", async () => {
 });
 
 // ---------- tab activation history ----------
-const { pushHistoryCompact, pushHistoryTraditional, dedupeHistory, resolveNavMode, removeFromHistory, removeHistoryAt } =
+const { pushHistoryCompact, pushHistoryTraditional, dedupeHistory, collapseAdjacent, resolveNavMode, removeFromHistory, removeHistoryAt } =
   await import("../core/core.js");
 
 test("Core - PushHistoryCompact appends new tabs, moves cursor to known tabs, caps size", () => {
@@ -295,6 +295,18 @@ test("Core - RemoveFromHistory drops a closed tab and keeps the cursor sane", ()
   assert.deepEqual(removeFromHistory({ stack: [1, 2, 3], cursor: 2 }, 2), { stack: [1, 3], cursor: 1 });
   assert.deepEqual(removeFromHistory({ stack: [1, 2, 3], cursor: 1 }, 3), { stack: [1, 2], cursor: 1 });
   assert.deepEqual(removeFromHistory({ stack: [1], cursor: 0 }, 1), { stack: [], cursor: -1 });
+});
+
+test("Core - CollapseAdjacent drops back-to-back duplicates, cursor follows", () => {
+  const clean = { stack: [1, 2, 1], cursor: 2 };
+  assert.equal(collapseAdjacent(clean).stack, clean.stack, "clean stack: same ref (no write)");
+  assert.deepEqual(collapseAdjacent({ stack: [1, 1, 1], cursor: 0 }), { stack: [1], cursor: 0 }, "run at cursor 0");
+  assert.deepEqual(collapseAdjacent({ stack: [1, 1, 1], cursor: 2 }), { stack: [1], cursor: 0 }, "cursor on last dupe");
+  assert.deepEqual(collapseAdjacent({ stack: [2, 1, 1, 3], cursor: 3 }), { stack: [2, 1, 3], cursor: 2 }, "cursor past the run");
+  assert.deepEqual(collapseAdjacent({ stack: [2, 1, 1, 3], cursor: 0 }), { stack: [2, 1, 3], cursor: 0 }, "cursor before the run");
+  assert.deepEqual(collapseAdjacent({ stack: [], cursor: -1 }), { stack: [], cursor: -1 });
+  // the real-world path: [1,2,1*] close tab 2 → filterHistory gives [1,1*]
+  assert.deepEqual(collapseAdjacent(removeFromHistory({ stack: [1, 2, 1], cursor: 2 }, 2)), { stack: [1], cursor: 0 });
 });
 
 test("Core - RecordMetric keeps count/avg/min/max/last as a running summary", async () => {

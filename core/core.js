@@ -160,6 +160,27 @@ export function pushHistoryTraditional({ stack, cursor }, tabId, max = 100) {
   return { stack: next, cursor: next.length - 1 };
 }
 
+// Same tab twice in a row is never a real step (removals collapse neighbours,
+// id swaps and jump races can too). Cursor follows its entry; on a dropped
+// duplicate it lands on the surviving one.
+export function collapseAdjacent({ stack, cursor }) {
+  if (!stack.some((id, index) => index > 0 && id === stack[index - 1])) {
+    return { stack, cursor };
+  }
+  const next = [];
+  let nextCursor = cursor;
+  for (let index = 0; index < stack.length; index++) {
+    if (index > 0 && stack[index] === stack[index - 1]) {
+      if (index <= cursor) {
+        nextCursor--;
+      }
+      continue;
+    }
+    next.push(stack[index]);
+  }
+  return { stack: next, cursor: nextCursor };
+}
+
 // Switching to compact dedupes a traditional stack once (newest occurrence
 // wins) so compact's move-cursor-to-first-occurrence never lands on a stale dupe.
 export function dedupeHistory({ stack, cursor }) {

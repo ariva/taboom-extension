@@ -1,5 +1,6 @@
 import {
   applyExperimental,
+  collapseAdjacent,
   dedupeHistory,
   featureEnabled,
   filterHistory,
@@ -342,7 +343,9 @@ let historyChain = Promise.resolve();
 function withHistory(mutate) {
   const run = historyChain.then(async () => {
     const hist = await loadHistory();
-    const next = await mutate(hist);
+    const mutated = await mutate(hist);
+    // same tab never sits twice in a row, whatever the mutation did
+    const next = mutated && collapseAdjacent(mutated);
     // pushHistory's no-op returns the same stack ref + cursor — skip the write
     if (next && !(next.stack === hist.stack && next.cursor === hist.cursor)) {
       await chrome.storage.local.set({ tabHistory: next });
