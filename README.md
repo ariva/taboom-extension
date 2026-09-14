@@ -59,3 +59,7 @@ Options page:
   After installing, pin the Taboom - Tabs Manager icon via Chrome's puzzle-piece (🧩) menu so the side panel is always one click away.
 - [Usage](docs/USAGE.md) — concepts, side panel, automatic snooze, protection rules, verifying freed memory.
 - [Testing](docs/TESTING.md) — setup (npm install, just, fd), running the suite, test layout and conventions.
+
+## Licence
+
+Free for personal, non-commercial use. Commercial use requires explicit permission from Arunas Ivanauskas (arunas.work.hg [ AT ] [g] [m] [a] [i] [l] [.] [c] [o] [m]). See [LICENCE](LICENCE).
