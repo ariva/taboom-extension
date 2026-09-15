@@ -18,7 +18,7 @@ import {
 } from "../core/core.js";
 import { loadFeatures, loadState, saveState } from "../core/storage.js";
 import { buildFingerprint, matchProfiles } from "../core/window-identity.js";
-import { DEV_PREFIX, IS_DEV } from "../core/env.js";
+import { DEV_PREFIX, IS_DEV, getAppName } from "../core/env.js";
 
 const ALARM_NAME = "auto-snooze";
 
@@ -477,7 +477,7 @@ const MENU_ITEMS = [
 function createContextMenus() {
   return enqueueMenuOp(async () => {
     await chrome.contextMenus.removeAll();
-    chrome.contextMenus.create({ id: "root", title: `${DEV_PREFIX}Taboom - Tabs Manager`, contexts: ["page"] });
+    chrome.contextMenus.create({ id: "root", title: `${DEV_PREFIX}${getAppName()}`, contexts: ["page"] });
     for (const item of MENU_ITEMS) {
       chrome.contextMenus.create({ ...item, parentId: "root", contexts: ["page"] });
     }

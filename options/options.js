@@ -9,7 +9,7 @@ import {
 } from "../core/core.js";
 import { getElementById, FOLD_ICONS } from "../core/dom.js";
 import { loadFeatures, loadState, saveState } from "../core/storage.js";
-import { markDevPage } from "../core/env.js";
+import { getReleaseVersion, markDevPage } from "../core/env.js";
 
 markDevPage();
 const FEATURES = await loadFeatures();
@@ -118,7 +118,7 @@ async function render() {
     !featureEnabled(appliedFeatures, "SHOW_PERFORMANCE_INFO");
   applyTheme(state.ui.theme);
 
-  getElementById("about").textContent = aboutText(chrome.runtime.getManifest().version);
+  getElementById("about").textContent = aboutText(getReleaseVersion());
 }
 
 async function saveSettings() {

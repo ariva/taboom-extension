@@ -29,7 +29,7 @@ import {
   selectVisible,
   windowMaps,
 } from "./model.js";
-import { markDevPage } from "../core/env.js";
+import { DEV_PREFIX, getAppName, getReleaseVersion, markDevPage } from "../core/env.js";
 
 markDevPage();
 // state read races the features fetch instead of queuing behind the top-level await
@@ -2416,6 +2416,12 @@ chrome.storage.onChanged.addListener((changes) => {
 });
 
 // ---------- init ----------
+
+function initHeading(prefix) {
+  document.querySelector("h1").title = `${prefix}${getAppName()} v${getReleaseVersion()}`;
+}
+
+initHeading(DEV_PREFIX);
 
 initialStatePromise.then((persisted) => {
   state.filter = persisted.ui.defaultFilter;
