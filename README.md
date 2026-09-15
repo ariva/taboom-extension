@@ -46,12 +46,14 @@ Nothing else is requested: Taboom cannot read or modify page content, cannot see
 
 Side panel:
 
-![Side panel - Quick Launch](images/sidemenu_quicklaunch.png)
-![Side panel](images/sidemenu.png)
+<p>
+  <img src="images/sidemenu_quicklaunch.png" alt="Side panel - Quick Launch" width="360">
+  <img src="images/sidemenu.png" alt="Side panel" width="360">
+</p>
 
 Options page:
 
-![Options](images/options.png)
+<img src="images/options.png" alt="Options" width="460">
 
 ## Documentation
 
