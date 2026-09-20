@@ -1137,6 +1137,15 @@ test(
     await tick();
     assert.ok(calls.includes("sendMessage window-rename"), "rename sent to the service worker");
 
+    // "Move tab to" targets follow the windows-list order: ABC by display name…
+    const moveTargets = () => {
+      document.querySelector('.row[data-tab-id="1"]').dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+      const names = [...ctx.querySelector(".ctx-submenu").querySelectorAll(".ctx-item")].map((el) => el.textContent);
+      document.body.click();
+      return names;
+    };
+    assert.deepEqual(moveTargets(), ["Alpha", "Window #2", "New window"], "ABC, not Chrome's window order");
+
     // pin window 2 → sorts above Alpha despite the name; 📌 marker; Unpin label
     const { windowProfiles } = await chrome.storage.local.get("windowProfiles");
     windowProfiles["w-t2"] = { ...windowProfiles["w-t2"], pinnedWindow: true };
@@ -1151,6 +1160,9 @@ test(
       "pinned window jumps above the ABC block, current stays first",
     );
     assert.ok(pop.querySelector('.win-row[data-window-id="2"] .win-pin'), "pinned row carries the marker");
+    assert.deepEqual(moveTargets(), ["Window #2", "Alpha", "New window"], "…with pinned windows lifted above");
+    winBtn.click(); // the menu's click-away closed the popover — reopen
+    await tick();
     pop.querySelector('.win-row[data-window-id="2"]').parentElement.querySelector(".win-menu-btn").click();
     assert.ok(
       [...ctx.querySelectorAll(".ctx-item")].some((el) => el.textContent === "Unpin window"),

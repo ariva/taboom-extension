@@ -663,6 +663,28 @@ winListBtn.addEventListener("click", () => {
 
 let winPopView = "windows"; // "windows" | "groups" | "pins" — reset on ▦ open
 
+// window ids the way every window list shows them (windows popover, "Move tab
+// to"): current window first, pinned windows next, the rest ABC by display name
+function orderedWindowIds(maps) {
+  const labelOf = (windowId) =>
+    windowGroupName(windowId, {
+      currentWindowId: state.currentWindowId,
+      indexes: maps.indexes,
+      names: maps.names,
+    });
+  const pinRank = (windowId) =>
+    pinActive() && state.windowMeta.get(windowId)?.pinnedWindow ? 0 : 1;
+  return [...maps.indexes.keys()].sort((a, b) => {
+    if (a === state.currentWindowId || b === state.currentWindowId) {
+      return a === state.currentWindowId ? -1 : 1;
+    }
+    return (
+      pinRank(a) - pinRank(b) ||
+      labelOf(a).localeCompare(labelOf(b), undefined, { numeric: true, sensitivity: "base" })
+    );
+  });
+}
+
 function fillWindowsPopover() {
   // anchored under the titlebar, right-aligned with the buttons
   const anchor = winListBtn.getBoundingClientRect();
@@ -733,26 +755,7 @@ function fillWindowsPopover() {
     return;
   }
 
-  // current window first, the rest alphabetical by display name
-  const labelOf = (windowId) =>
-    windowGroupName(windowId, {
-      currentWindowId: state.currentWindowId,
-      indexes: maps.indexes,
-      names: maps.names,
-    });
-  // current window first, pinned windows next, the rest ABC by display name
-  const pinRank = (windowId) =>
-    pinActive() && state.windowMeta.get(windowId)?.pinnedWindow ? 0 : 1;
-  const ordered = [...maps.indexes.keys()].sort((a, b) => {
-    if (a === state.currentWindowId || b === state.currentWindowId) {
-      return a === state.currentWindowId ? -1 : 1;
-    }
-    return (
-      pinRank(a) - pinRank(b) ||
-      labelOf(a).localeCompare(labelOf(b), undefined, { numeric: true, sensitivity: "base" })
-    );
-  });
-  for (const windowId of ordered) {
+  for (const windowId of orderedWindowIds(maps)) {
     const tabs = state.allTabs.filter((tab) => tab.windowId === windowId);
     const snoozed = tabs.filter((tab) => tab.discarded).length;
     const awake = tabs.length - snoozed; // filter-chip terminology: awake = not snoozed
@@ -770,7 +773,7 @@ function fillWindowsPopover() {
     }
     const name = document.createElement("span");
     name.className = "win-title";
-    name.textContent = labelOf(windowId);
+    name.textContent = windowLabel(windowId);
     let pin = null;
     if (pinActive() && state.windowMeta.get(windowId)?.pinnedWindow) {
       pin = document.createElement("span");
@@ -788,7 +791,7 @@ function fillWindowsPopover() {
     const audible = tabs.filter((tab) => tab.audible).length;
     const activeTab = tabs.find((tab) => tab.active);
     row.title = [
-      labelOf(windowId),
+      name.textContent,
       `${tabs.length} tab${tabs.length === 1 ? "" : "s"} · ${awake} awake · ${snoozed} snoozed`,
       `${pinned} pinned · ${audible} audible`,
       activeTab ? `Active tab: ${activeTab.title || activeTab.url}` : null,
@@ -1734,7 +1737,7 @@ function openRowMenu(event, tabId) {
   ctxMenu.append(ctxDivider());
   const { btn, submenu } = ctxSubmenu(ids.length > 1 ? `Move ${ids.length} tabs to` : "Move tab to");
   ctxMenu.append(btn, submenu);
-  for (const windowId of [...maps.indexes.keys()]) {
+  for (const windowId of orderedWindowIds(maps)) {
     // single tab: its own window is a pointless target; a mixed selection
     // keeps every window (part of it may live elsewhere)
     if (ids.length === 1 && sourceWindows.has(windowId)) {
