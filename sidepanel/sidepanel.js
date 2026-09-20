@@ -694,10 +694,11 @@ function fillWindowsPopover() {
   const maps = windowMaps(state.allTabs, state.currentWindowId, state.windowMeta);
   const groupList = tabGroupsActive() ? [...state.tabGroups.values()] : [];
   const pinnedTabs = state.allTabs.filter((tab) => tab.pinned);
-  // Groups / Pins views exist only while there is something to list
+  // Pins view exists only while there is something to list; Groups shows even
+  // empty — its "+ New group…" row is where the first group gets created
   const views = [
     ["windows", `Windows (${maps.indexes.size})`],
-    ...(groupList.length > 0 ? [["groups", `Groups (${groupList.length})`]] : []),
+    ...(tabGroupsActive() ? [["groups", `Groups (${groupList.length})`]] : []),
     ...(pinnedTabs.length > 0 ? [["pins", `Pins (${pinnedTabs.length})`]] : []),
   ];
   if (!views.some(([view]) => view === winPopView)) {
@@ -867,6 +868,55 @@ function fillGroupRows(groupList) {
     item.append(row, menuBtn);
     winPop.append(item);
   }
+  appendNewGroupRow();
+}
+
+// bottom row of the Groups view: click swaps the label for a name input (same
+// inline edit as the renames). A name groups the sidebar selection; nothing
+// selected = a background New Tab opened for the group (Chrome has no empty
+// groups) — the tab the user is on is never pulled in. Empty / Esc = nothing
+function appendNewGroupRow() {
+  const selectedIds = [...state.selected];
+  const row = document.createElement("button");
+  row.type = "button";
+  row.className = "win-row win-new";
+  row.title = selectedIds.length > 0
+    ? `Group ${selectedIds.length} selected tab${selectedIds.length === 1 ? "" : "s"}`
+    : "New group with a New Tab in it";
+  const label = document.createElement("span");
+  label.className = "win-title";
+  label.textContent = "+ New group…";
+  row.append(label);
+  row.addEventListener("click", () => {
+    if (row.querySelector(".rename-input")) {
+      return;
+    }
+    inlineEdit(label, {
+      initial: "",
+      placeholder: "New group name",
+      commit: async (name) => {
+        if (!name.trim()) {
+          return;
+        }
+        let ids = selectedIds;
+        if (ids.length === 0) {
+          try {
+            const tab = await chrome.tabs.create({ windowId: state.currentWindowId, active: false });
+            ids = [tab.id];
+          } catch (error) {
+            toast(String(/** @type {any} */ (error)?.message ?? error));
+            return;
+          }
+        }
+        await moveTabsToGroup(ids, null, name.trim());
+      },
+      finish: () => fillWindowsPopover(),
+    });
+  });
+  const item = document.createElement("div");
+  item.className = "win-item";
+  item.append(row);
+  winPop.append(item);
 }
 
 // Pins view: every pinned tab — click activates it, ⋯/right-click = row menu
@@ -958,7 +1008,7 @@ winPop.addEventListener("contextmenu", (event) => {
     openTabGroupMenu(event, Number(row.dataset.tabGroupId), startRenameTabGroupInList);
   } else if (row.dataset.tabId) {
     openRowMenu(event, Number(row.dataset.tabId));
-  } else {
+  } else if (row.dataset.windowId) {
     openWindowListMenu(event, Number(row.dataset.windowId));
   }
 });
@@ -1762,7 +1812,16 @@ function openRowMenu(event, tabId) {
       item.prepend(dot);
       groupMenu.submenu.append(item);
     }
-    groupMenu.submenu.append(ctxItem("New group", () => moveTabsToGroup(ids, null)));
+    groupMenu.submenu.append(
+      ctxItem("New group…", () => {
+        // name first — Cancel moves nothing, an empty name makes an unnamed group
+        const title = prompt("New group name");
+        if (title === null) {
+          return;
+        }
+        moveTabsToGroup(ids, null, title.trim());
+      }),
+    );
     const grouped = ids.filter(
       (id) => (state.allTabs.find((tab) => tab.id === id)?.groupId ?? -1) !== -1,
     );
@@ -1898,7 +1957,8 @@ async function updateTabGroup(groupId, patch) {
   refresh(true);
 }
 
-async function moveTabsToGroup(tabIds, groupId) {
+// groupId null = new group, titled `title` (empty = Chrome's unnamed group)
+async function moveTabsToGroup(tabIds, groupId, title = "") {
   try {
     if (groupId != null) {
       // Chrome refuses to group across windows — move foreign tabs over first
@@ -1911,7 +1971,10 @@ async function moveTabsToGroup(tabIds, groupId) {
       }
       await chrome.tabs.group({ tabIds, groupId });
     } else {
-      await chrome.tabs.group({ tabIds });
+      const newGroupId = await chrome.tabs.group({ tabIds });
+      if (title) {
+        await chrome.tabGroups.update(newGroupId, { title });
+      }
     }
   } catch (error) {
     toast(String(/** @type {any} */ (error)?.message ?? error));

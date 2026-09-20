@@ -731,7 +731,7 @@ test("UI - Sidepanel - Right-click row offers move-to-window menu (selection-awa
     ["Snooze", "Wake", "Protect", "Unprotect", "Pin", "Close", "Move tab to ▸", "Window #2", "New window",
       // TAB_GROUPS: move-to-group submenu (fixture has one group) — flag on in
       // shipped+experimental; the disabled pass hides it
-      ...(TEST_FEATURES.TAB_GROUPS?.enabled === true ? ["Move to group ▸", "work", "New group"] : [])],
+      ...(TEST_FEATURES.TAB_GROUPS?.enabled === true ? ["Move to group ▸", "work", "New group…"] : [])],
     "bulk actions first, then the Move-to dropdown (own window excluded)",
   );
   const submenu = menu.querySelector(".ctx-submenu");
@@ -1223,6 +1223,55 @@ test(
     assert.match(pop.querySelector(".win-view.on").textContent, /^Groups/, "popover stays on Groups");
     assert.equal(pop.querySelector(".rename-input"), null, "input gone after commit");
 
+    // bottom "+ New group…" row: inline name input. Esc / empty name create nothing…
+    const newGroupInput = () => {
+      pop.querySelector(".win-row.win-new").click();
+      return pop.querySelector(".win-row.win-new .rename-input");
+    };
+    // assert.ok, not equal: a failing equal would inspect whole DOM nodes
+    assert.ok(pop.querySelector(".win-item:last-child .win-row")?.classList.contains("win-new"),
+      "new-group row sits at the bottom of the list");
+    calls.length = 0;
+    const emptyName = newGroupInput();
+    assert.ok(emptyName, "click swaps the label for a name input");
+    emptyName.dispatchEvent(new window.Event("blur"));
+    await tick();
+    await tick();
+    assert.ok(!calls.some((c) => c.startsWith("tabs.group")), "empty name: no group created");
+    assert.ok(pop.querySelector(".win-row.win-new"), "row back in place");
+    // …a name opens a background New Tab in the current window and groups THAT
+    // (Chrome has no empty groups) — the active tab is left alone
+    const named = newGroupInput();
+    named.value = "reading";
+    named.dispatchEvent(new window.Event("blur"));
+    await tick();
+    await tick();
+    assert.ok(calls.includes('tabs.create {"windowId":1,"active":false}'), "background New Tab in the current window");
+    const created = tabs.find((t) => t.id >= 1000);
+    assert.ok(calls.includes(`tabs.group ${created.id} new`), "the new tab is what gets grouped");
+    assert.ok(!calls.includes("tabs.group 1 new"), "active tab stays out of the group");
+    assert.ok(calls.includes('tabGroups.update 900 {"title":"reading"}'), "group named from the input");
+    assert.match(pop.querySelector(".win-view.on").textContent, /^Groups/, "popover stays on Groups");
+    tabs.splice(tabs.indexOf(created), 1); // restore fixture
+    await chrome.tabs.onUpdated.fire(1, { groupId: -1 });
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
+    // Groups view stays reachable with no groups at all — the first one is created there
+    const savedGroups = groups.splice(0);
+    await chrome.tabs.onActivated.fire({});
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    winBtn.click();
+    await tick();
+    assert.ok(
+      [...pop.querySelectorAll(".win-view")].some((el) => el.textContent === "Groups (0)"),
+      "Groups view offered with zero groups",
+    );
+    groups.push(...savedGroups);
+    await chrome.tabs.onActivated.fire({});
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    winBtn.click();
+    await tick();
+
     // Pins view: pinned tab row activates the tab
     [...pop.querySelectorAll(".win-view")].find((el) => el.textContent.startsWith("Pins")).click();
     await tick();
@@ -1295,15 +1344,29 @@ test(
     await tick();
     assert.ok(calls.includes("tabs.ungroup 1"), "ungrouped");
 
-    // New group creates one around the tab
+    // New group asks the name first; Cancel moves nothing
     await chrome.tabs.onUpdated.fire(1, { groupId: -1 });
     await new Promise((resolve) => setTimeout(resolve, 200));
     calls.length = 0;
+    globalThis.prompt = () => null;
     rowOf(1).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
-    pick("New group");
+    pick("New group…");
+    await tick();
+    await tick();
+    assert.ok(!calls.some((c) => c.startsWith("tabs.group")), "cancelled prompt: no group created");
+
+    // …a name creates the group around the tab, then titles it
+    globalThis.prompt = () => "reading";
+    rowOf(1).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+    pick("New group…");
     await tick();
     await tick();
     assert.ok(calls.includes("tabs.group 1 new"), "new group requested");
+    assert.ok(calls.includes('tabGroups.update 900 {"title":"reading"}'), "new group named from the prompt");
+    assert.ok(
+      calls.indexOf("tabs.group 1 new") < calls.indexOf('tabGroups.update 900 {"title":"reading"}'),
+      "group first, title after",
+    );
     tabs.find((t) => t.id === 1).groupId = -1; // restore fixture
     await chrome.tabs.onUpdated.fire(1, { groupId: -1 });
     await new Promise((resolve) => setTimeout(resolve, 200));
