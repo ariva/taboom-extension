@@ -1456,6 +1456,10 @@ function actionIds(tabId) {
 }
 
 async function moveTabsToWindow(tabIds, windowId, index = -1) {
+  // Chrome unpins a tab that changes window — remember the pins, restore after
+  const pinnedIds = state.allTabs
+    .filter((tab) => tab.pinned && tabIds.includes(tab.id) && tab.windowId !== windowId)
+    .map((tab) => tab.id);
   if (windowId == null) {
     // new window: it is created around the first tab, the rest follow
     const [first, ...rest] = tabIds;
@@ -1465,6 +1469,9 @@ async function moveTabsToWindow(tabIds, windowId, index = -1) {
     }
   } else {
     await chrome.tabs.move(tabIds, { windowId, index });
+  }
+  for (const id of pinnedIds) {
+    await chrome.tabs.update(id, { pinned: true }).catch(() => {});
   }
   refresh(true);
 }

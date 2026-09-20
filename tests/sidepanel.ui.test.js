@@ -781,6 +781,7 @@ test("UI - Sidepanel - Right-click row offers move-to-window menu (selection-awa
   await tick();
   assert.ok(calls.some((c) => c.startsWith("windows.create") && c.includes('"tabId":')), "new window around first tab");
   assert.ok(calls.some((c) => c.startsWith("tabs.move") && c.includes('"windowId":900')), "rest follow into it");
+  assert.equal(tabs.find((tab) => tab.id === 3).pinned, true, "pinned tab stays pinned across the window move");
   for (const tab of tabs) tab.windowId = tab.id === 3 ? 2 : 1; // restore fixture
   document.getElementById("bulk-clear").click();
   await new Promise((resolve) => setTimeout(resolve, 200));

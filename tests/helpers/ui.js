@@ -78,7 +78,10 @@ export function makeChrome({ tabs = [], stored = {}, calls = [], groups = [] }) 
         calls.push(`tabs.move ${[].concat(ids)} ${JSON.stringify(props ?? {})}`);
         for (const id of [].concat(ids)) {
           const tab = tabs.find((t) => t.id === id);
-          if (tab && props?.windowId != null) tab.windowId = props.windowId;
+          if (tab && props?.windowId != null) {
+            if (tab.windowId !== props.windowId) tab.pinned = false; // like Chrome: a cross-window move unpins
+            tab.windowId = props.windowId;
+          }
         }
       },
       create: async (opts = {}) => {
@@ -141,7 +144,10 @@ export function makeChrome({ tabs = [], stored = {}, calls = [], groups = [] }) 
         const win = { id: 900 };
         if (opts.tabId != null) {
           const tab = tabs.find((t) => t.id === opts.tabId);
-          if (tab) tab.windowId = win.id;
+          if (tab) {
+            tab.pinned = false; // like Chrome: a cross-window move unpins
+            tab.windowId = win.id;
+          }
         }
         return win;
       },
