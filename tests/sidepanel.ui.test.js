@@ -1256,6 +1256,43 @@ test(
     await chrome.tabs.onUpdated.fire(1, { groupId: -1 });
     await new Promise((resolve) => setTimeout(resolve, 200));
 
+    // drag a group row onto another: custom list order, saved by title; a rename keeps the slot
+    groups.push({ id: 8, title: "alpha", color: "red", collapsed: false, windowId: 2 });
+    await chrome.tabs.onActivated.fire({});
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    winBtn.click();
+    await tick();
+    [...pop.querySelectorAll(".win-view")].find((el) => el.textContent.startsWith("Groups")).click();
+    const groupTitles = () =>
+      [...pop.querySelectorAll(".win-row[data-tab-group-id] .win-title")].map((el) => el.textContent);
+    const groupRowOf = (id) => pop.querySelector(`.win-row[data-tab-group-id="${id}"]`);
+    assert.deepEqual(groupTitles(), ["alpha", "work"], "ABC until the user reorders");
+    assert.equal(groupRowOf(8).draggable, true, "group rows are draggable");
+    groupRowOf(8).dispatchEvent(new window.Event("dragstart", { bubbles: true }));
+    const over = new window.Event("dragover", { bubbles: true, cancelable: true });
+    groupRowOf(7).dispatchEvent(over);
+    assert.equal(over.defaultPrevented, true, "another group row is a valid drop target");
+    groupRowOf(7).dispatchEvent(new window.Event("drop", { bubbles: true, cancelable: true }));
+    await tick();
+    assert.deepEqual(groupTitles(), ["work", "alpha"], "dragged down: lands after the target");
+    assert.deepEqual((await chrome.storage.local.get("ui")).ui.quickLaunchGroupOrder, ["work", "alpha"],
+      "order persisted by title");
+    groupRowOf(7).parentElement.querySelector(".win-menu-btn").click();
+    [...ctx.querySelectorAll(".ctx-item")].find((el) => el.textContent === "Rename group…").click();
+    const slotInput = pop.querySelector(".rename-input");
+    slotInput.value = "beta";
+    slotInput.dispatchEvent(new window.Event("blur"));
+    await tick();
+    await tick();
+    await chrome.tabs.onActivated.fire({});
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    winBtn.click();
+    await tick();
+    [...pop.querySelectorAll(".win-view")].find((el) => el.textContent.startsWith("Groups")).click();
+    assert.deepEqual(groupTitles(), ["beta", "alpha"], "renamed group keeps its slot (ABC would flip them)");
+    groups.pop(); // restore fixture
+    await chrome.tabGroups.update(7, { title: "work" });
+
     // Groups view stays reachable with no groups at all — the first one is created there
     const savedGroups = groups.splice(0);
     await chrome.tabs.onActivated.fire({});

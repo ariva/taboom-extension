@@ -821,7 +821,14 @@ function fillWindowsPopover() {
 // Groups view: one row per Chrome tab group — click activates the group's
 // first tab (focuses its window), ⋯/right-click opens the group menu
 function fillGroupRows(groupList) {
+  // user-dragged order first (ui.quickLaunchGroupOrder, by title), the rest ABC
+  const order = state.ui.quickLaunchGroupOrder ?? [];
+  const rank = (group) => {
+    const slot = order.indexOf(group.title || "");
+    return slot === -1 ? order.length : slot;
+  };
   const sorted = [...groupList].sort((a, b) =>
+    rank(a) - rank(b) ||
     (a.title || "").localeCompare(b.title || "", undefined, { sensitivity: "base" }));
   for (const group of sorted) {
     const tabs = state.allTabs
@@ -831,6 +838,7 @@ function fillGroupRows(groupList) {
     row.type = "button";
     row.className = "win-row";
     row.dataset.tabGroupId = String(group.id);
+    row.draggable = true; // drag onto another group row to reorder the list
     const square = document.createElement("span");
     square.className = "tg-square";
     square.style.background = TAB_GROUP_COLORS[group.color] ?? "#5f6368";
@@ -1011,6 +1019,66 @@ winPop.addEventListener("contextmenu", (event) => {
   } else if (row.dataset.windowId) {
     openWindowListMenu(event, Number(row.dataset.windowId));
   }
+});
+
+// Groups view: drag a group row onto another to reorder the LIST only — Chrome's
+// strip is untouched. Saved by title (group ids change on every browser restart)
+let draggedGroupId = null; // dataTransfer is unreadable during dragover — track here
+
+function groupRowUnder(event) {
+  const row = /** @type {HTMLElement | null} */ (
+    /** @type {HTMLElement} */ (event.target).closest?.(".win-row[data-tab-group-id]")
+  );
+  return row && draggedGroupId != null && Number(row.dataset.tabGroupId) !== draggedGroupId ? row : null;
+}
+
+winPop.addEventListener("dragstart", (event) => {
+  const row = /** @type {HTMLElement | null} */ (
+    /** @type {HTMLElement} */ (event.target).closest?.(".win-row[data-tab-group-id]")
+  );
+  draggedGroupId = row ? Number(row.dataset.tabGroupId) : null;
+});
+
+winPop.addEventListener("dragover", (event) => {
+  const row = groupRowUnder(event);
+  if (!row) {
+    clearDropTarget();
+    return; // not a valid target — the browser shows the no-drop cursor
+  }
+  event.preventDefault();
+  if (row !== dropTargetEl) {
+    clearDropTarget();
+    dropTargetEl = row;
+    dropTargetEl.classList.add("drop-target");
+  }
+});
+
+winPop.addEventListener("drop", (event) => {
+  const row = groupRowUnder(event);
+  if (row) {
+    event.preventDefault();
+    const ids = [...winPop.querySelectorAll(".win-row[data-tab-group-id]")].map((el) =>
+      Number(/** @type {HTMLElement} */ (el).dataset.tabGroupId));
+    // pull the dragged id out, put it back at the target's old index: lands
+    // after the target when dragged down, before it when dragged up
+    const to = ids.indexOf(Number(row.dataset.tabGroupId));
+    ids.splice(ids.indexOf(draggedGroupId), 1);
+    ids.splice(to, 0, draggedGroupId);
+    const titles = [...new Set(ids.map((id) => state.tabGroups.get(id)?.title ?? ""))];
+    // ponytail: titles of groups not open right now keep their slot at the end and
+    // are never pruned — prune on save if the list ever grows noticeably
+    const stale = (state.ui.quickLaunchGroupOrder ?? []).filter((title) => !titles.includes(title));
+    state.ui = { ...state.ui, quickLaunchGroupOrder: [...titles, ...stale] };
+    persistUiPrefs();
+    fillWindowsPopover();
+  }
+  draggedGroupId = null;
+  clearDropTarget();
+});
+
+winPop.addEventListener("dragend", () => {
+  draggedGroupId = null;
+  clearDropTarget();
 });
 
 // B: contiguous runs of one tab group inside a window's rows get a sub-header
@@ -1918,6 +1986,18 @@ function startRenameWindowInList(windowId) {
   });
 }
 
+// rename commit shared by both rename entry points — the group keeps its
+// dragged slot in the quick-launch order, which is keyed by title
+function commitTabGroupTitle(groupId, title) {
+  const old = state.tabGroups.get(groupId)?.title ?? "";
+  const order = state.ui.quickLaunchGroupOrder ?? [];
+  if (old !== title && order.includes(old)) {
+    state.ui = { ...state.ui, quickLaunchGroupOrder: order.map((slot) => (slot === old ? title : slot)) };
+    persistUiPrefs();
+  }
+  return chrome.tabGroups.update(groupId, { title }).catch(() => {});
+}
+
 // tab-group rename: the label lives on a C header (.group-label) or a B
 // sub-header (.tg-title), whichever is on screen
 function startRenameTabGroup(groupId) {
@@ -1930,7 +2010,7 @@ function startRenameTabGroup(groupId) {
   inlineEdit(label, {
     initial: state.tabGroups.get(groupId)?.title ?? "",
     placeholder: "Group name",
-    commit: (title) => chrome.tabGroups.update(groupId, { title }).catch(() => {}),
+    commit: (title) => commitTabGroupTitle(groupId, title),
     finish: () => refresh(false),
   });
 }
@@ -1944,7 +2024,7 @@ function startRenameTabGroupInList(groupId) {
   inlineEdit(title, {
     initial: state.tabGroups.get(groupId)?.title ?? "",
     placeholder: "Group name",
-    commit: (title) => chrome.tabGroups.update(groupId, { title }).catch(() => {}),
+    commit: (title) => commitTabGroupTitle(groupId, title),
     finish: () => {
       fillWindowsPopover(); // fresh name in place, popover stays open
       refresh(false);

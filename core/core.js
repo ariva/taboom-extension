@@ -16,6 +16,7 @@ export const DEFAULTS = {
     defaultFilter: "all",
     scope: "all-windows",
     sort: "window",
+    quickLaunchGroupOrder: [], // group titles in the user-dragged order of the quick-launch Groups view (rest ABC)
     groupByWindowTabsOrder: "same-as-window", // within-window order in Group by window: recent | same-as-window | title-asc | title-desc
     sortDirMode: "default", // "default" = canonical on every sort change; "remember" = per-sort memory
     sortDirections: {}, // last-used direction per sort value (used when sortDirMode = remember)

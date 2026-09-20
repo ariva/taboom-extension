@@ -729,6 +729,7 @@ footer button:disabled:hover { background: none; }
 #windows-pop .win-row:hover { background: var(--badge-bg); }
 #windows-pop .win-row.current { font-weight: 700; color: var(--accent); }
 #windows-pop .win-row.win-new { color: var(--muted); }
+#windows-pop .win-row.drop-target { border-radius: var(--radius-s); }
 #windows-pop .win-title {
     font-size: 0.85rem;
     overflow: hidden;
