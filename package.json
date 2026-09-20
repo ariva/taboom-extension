@@ -1,7 +1,7 @@
 {
   "name": "taboom-extension",
   "private": true,
-  "version": "0.2.16",
+  "version": "0.2.17",
   "type": "module",
   "description": "Node tooling metadata only (ES modules for node --test; tsc type check). Chrome ignores this file.",
   "devDependencies": {
