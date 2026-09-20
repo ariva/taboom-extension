@@ -857,7 +857,7 @@ function fillGroupRows(groupList) {
     menuBtn.textContent = "⋯";
     menuBtn.addEventListener("click", (event) => {
       event.stopPropagation();
-      openTabGroupMenu(event, group.id);
+      openTabGroupMenu(event, group.id, startRenameTabGroupInList);
     });
     const item = document.createElement("div");
     item.className = "win-item";
@@ -952,7 +952,7 @@ winPop.addEventListener("contextmenu", (event) => {
   // windows popover stays open behind — the ctx menu is a manual popover
   // shown after it, so it stacks above in the top layer
   if (row.dataset.tabGroupId) {
-    openTabGroupMenu(event, Number(row.dataset.tabGroupId));
+    openTabGroupMenu(event, Number(row.dataset.tabGroupId), startRenameTabGroupInList);
   } else if (row.dataset.tabId) {
     openRowMenu(event, Number(row.dataset.tabId));
   } else {
@@ -1866,6 +1866,23 @@ function startRenameTabGroup(groupId) {
   });
 }
 
+// rename without leaving the windows popover: swap the group row's name for the input
+function startRenameTabGroupInList(groupId) {
+  const title = winPop.querySelector(`.win-row[data-tab-group-id="${groupId}"] .win-title`);
+  if (!title) {
+    return;
+  }
+  inlineEdit(title, {
+    initial: state.tabGroups.get(groupId)?.title ?? "",
+    placeholder: "Group name",
+    commit: (title) => chrome.tabGroups.update(groupId, { title }).catch(() => {}),
+    finish: () => {
+      fillWindowsPopover(); // fresh name in place, popover stays open
+      refresh(false);
+    },
+  });
+}
+
 async function updateTabGroup(groupId, patch) {
   await chrome.tabGroups.update(groupId, patch).catch(() => {});
   refresh(true);
@@ -1899,7 +1916,7 @@ async function ungroupTabs(tabIds) {
 
 // E: tab-group menu — identity actions on top, Chrome-strip controls, then
 // the usual bulk actions over the group's visible tabs
-function openTabGroupMenu(event, groupId) {
+function openTabGroupMenu(event, groupId, startRename = startRenameTabGroup) {
   const group = state.tabGroups.get(groupId);
   if (!group) {
     return;
@@ -1907,7 +1924,7 @@ function openTabGroupMenu(event, groupId) {
   const ids = state.fullVisible.filter((tab) => tab.groupId === groupId).map((tab) => tab.id);
   ctxMenu.textContent = "";
   ctxMenu.append(ctxTitle(group.title || "(unnamed group)"), ctxDivider());
-  ctxMenu.append(ctxItem("Rename group…", () => startRenameTabGroup(groupId)));
+  ctxMenu.append(ctxItem("Rename group…", () => startRename(groupId)));
   const color = ctxSubmenu("Group color");
   ctxMenu.append(color.btn, color.submenu);
   for (const [colorName, hex] of Object.entries(TAB_GROUP_COLORS)) {

@@ -1194,6 +1194,22 @@ test(
     assert.equal(groupRow.querySelector(".win-stats").textContent, "0 tabs · 0 awake · 0 snoozed",
       "same stats shape as the Windows view");
 
+    // rename from the Groups view edits IN the popover row, like the Windows view
+    groupRow.parentElement.querySelector(".win-menu-btn").click();
+    [...ctx.querySelectorAll(".ctx-item")].find((el) => el.textContent === "Rename group…").click();
+    const groupInput = pop.querySelector('.win-row[data-tab-group-id="7"] .rename-input');
+    assert.ok(groupInput, "input replaces the group's name inside the popover");
+    assert.equal(groupInput.value, "work");
+    groupInput.value = "play";
+    calls.length = 0;
+    groupInput.dispatchEvent(new window.Event("blur"));
+    await tick();
+    await tick();
+    assert.ok(calls.includes('tabGroups.update 7 {"title":"play"}'), "in-list group rename sent to Chrome");
+    await chrome.tabGroups.update(7, { title: "work" }); // shared fixture — later tests pick "work"
+    assert.match(pop.querySelector(".win-view.on").textContent, /^Groups/, "popover stays on Groups");
+    assert.equal(pop.querySelector(".rename-input"), null, "input gone after commit");
+
     // Pins view: pinned tab row activates the tab
     [...pop.querySelectorAll(".win-view")].find((el) => el.textContent.startsWith("Pins")).click();
     await tick();
