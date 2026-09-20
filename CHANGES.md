@@ -1,5 +1,24 @@
 # CHANGES
 
+## v0.2.16 — 2026-09-19
+
+### New Features
+- Add Windows | Groups | Pins views to the quick jump popup (f3cf4cd)
+- Add Chrome's Tab Groups support (2cff397)
+- Add pin/unpin tab to the list context menus (e79f439)
+
+### Fixes
+- More predictable way of showing restore banner - no more race condition (ae31626)
+- Fix navigation history showing the same tab repeated consecutively after removals and id swaps (004add6)
+
+### Other
+- Shrink images in README.md (80db0ac)
+- Show extension version as hover text on the sidebar heading (34cd2c8)
+- Add personal non-commercial LICENCE with commercial-use-by-permission clause (bf91254)
+- README.md updates - new images, new tab-groups permission (956c990)
+- Rework group-by-window nesting layout (f62397e)
+- Better time handling on awoken tabs (c9abe17)
+
 ## v0.2.15 — 2026-09-12
 
 ### New Features
