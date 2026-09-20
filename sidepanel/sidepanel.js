@@ -1982,6 +1982,36 @@ async function setWindowColor(windowId, color) {
   refresh(true);
 }
 
+// A press that blurs an inline edit only ENDS the edit — its click must not also
+// act on whatever sits under it: a group row would navigate and close the windows
+// popover, and near the popover's edge the release can land outside once the input
+// is gone and read as a click-away. Armed by inlineEdit's blur while a press is in
+// flight; spent by that click, or dropped by the next press when no click comes
+// (the refill detached the pressed node).
+let pressInFlight = false;
+let swallowNextClick = false;
+document.addEventListener(
+  "mousedown",
+  () => {
+    pressInFlight = true;
+    swallowNextClick = false;
+  },
+  true,
+);
+document.addEventListener("mouseup", () => (pressInFlight = false), true);
+document.addEventListener(
+  "click",
+  (event) => {
+    pressInFlight = false;
+    if (swallowNextClick) {
+      swallowNextClick = false;
+      event.stopPropagation();
+      event.preventDefault();
+    }
+  },
+  true,
+);
+
 // swap the header label for an input; Enter/blur commit, Esc cancels.
 // An event-driven re-render mid-edit rebuilds the header and ends the edit —
 // rare and harmless (rename again), not worth pausing renders for.
@@ -2005,6 +2035,7 @@ function inlineEdit(label, { initial, placeholder, commit, finish }) {
     }
   });
   input.addEventListener("blur", async () => {
+    swallowNextClick = pressInFlight; // blurred by a press: that click is spent on ending the edit
     if (!cancelled) {
       await commit(input.value);
     }

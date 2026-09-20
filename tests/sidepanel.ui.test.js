@@ -1266,6 +1266,39 @@ test(
     await chrome.tabs.onUpdated.fire(1, { groupId: -1 });
     await new Promise((resolve) => setTimeout(resolve, 200));
 
+    // the press that ends an inline edit only ends the edit: clicking a group row to
+    // commit the new-group name must not ALSO navigate to that group / close the popover
+    const realHide = pop.hidePopover;
+    pop.hidePopover = () => calls.push("hidePopover"); // what a group-row click does first
+    const pressed = newGroupInput();
+    pressed.value = "later";
+    calls.length = 0;
+    const workRow = pop.querySelector('.win-row[data-tab-group-id="7"]');
+    workRow.dispatchEvent(new window.Event("mousedown", { bubbles: true }));
+    pressed.dispatchEvent(new window.Event("blur"));
+    workRow.dispatchEvent(new window.Event("mouseup", { bubbles: true }));
+    workRow.dispatchEvent(new window.Event("click", { bubbles: true, cancelable: true }));
+    await tick();
+    await tick();
+    assert.ok(calls.some((c) => c.startsWith("tabs.group")), "the edit still commits");
+    assert.ok(!calls.includes("hidePopover"), "committing click does not activate the row under it");
+    // …and only that one click is swallowed
+    calls.length = 0;
+    const workRowAgain = pop.querySelector('.win-row[data-tab-group-id="7"]');
+    workRowAgain.dispatchEvent(new window.Event("mousedown", { bubbles: true }));
+    workRowAgain.dispatchEvent(new window.Event("mouseup", { bubbles: true }));
+    workRowAgain.dispatchEvent(new window.Event("click", { bubbles: true, cancelable: true }));
+    await tick();
+    await tick();
+    assert.ok(calls.includes("hidePopover"), "next click works normally");
+    pop.hidePopover = realHide;
+    tabs.splice(tabs.findIndex((t) => t.id >= 1000), 1); // restore fixture
+    await chrome.tabs.onActivated.fire({});
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    winBtn.click();
+    await tick();
+    [...pop.querySelectorAll(".win-view")].find((el) => el.textContent.startsWith("Groups")).click();
+
     // drag a group row onto another: custom list order, saved by title; a rename keeps the slot
     groups.push({ id: 8, title: "alpha", color: "red", collapsed: false, windowId: 2 });
     await chrome.tabs.onActivated.fire({});
