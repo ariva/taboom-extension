@@ -699,9 +699,17 @@ function fillWindowsPopover() {
       btn.type = "button";
       btn.className = view === winPopView ? "win-view on" : "win-view";
       btn.textContent = label;
+      // no focus steal: a rename input must not blur (= commit) on the press, and
+      // a refill mid-press would detach this button and swallow the click
+      btn.addEventListener("mousedown", (event) => event.preventDefault());
       btn.addEventListener("click", (event) => {
         event.stopPropagation(); // the refill detaches this button — see click-away guard
+        hideCtxMenu(); // stopPropagation above keeps the document click-away from doing it
         winPopView = /** @type {any} */ (view);
+        // view switch cancels a rename in progress — Esc takes inlineEdit's cancel path
+        document
+          .querySelector(".rename-input")
+          ?.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
         fillWindowsPopover();
       });
       bar.append(btn);
@@ -2054,7 +2062,12 @@ document.addEventListener(
     if (event.key === "Escape" && !ctxMenu.hidden) {
       hideCtxMenu();
       event.stopPropagation();
-    } else if (event.key === "Escape" && winPopOpen()) {
+    } else if (
+      event.key === "Escape" &&
+      winPopOpen() &&
+      // Esc in a rename input cancels the rename (inlineEdit), popover stays
+      !(/** @type {HTMLElement} */ (event.target).matches?.(".rename-input"))
+    ) {
       winPop.hidePopover?.();
       event.stopPropagation();
     }

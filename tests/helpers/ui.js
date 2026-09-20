@@ -240,6 +240,7 @@ export function loadPage(htmlPath, chrome) {
   globalThis.document = window.document;
   globalThis.matchMedia = window.matchMedia.bind(window);
   globalThis.Event = window.Event; // page code dispatches synthetic events (custom dropdown)
+  globalThis.KeyboardEvent = window.KeyboardEvent; // page code cancels a rename with a synthetic Esc
   globalThis.confirm = () => true;
   globalThis.chrome = chrome;
   return window;

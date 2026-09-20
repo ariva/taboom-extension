@@ -1157,6 +1157,31 @@ test(
     );
     document.body.click();
 
+    // view switch closes an open window menu and cancels a rename in progress
+    winBtn.click();
+    await tick();
+    const viewBtn = (name) => [...pop.querySelectorAll(".win-view")].find((el) => el.textContent.startsWith(name));
+    pop.querySelector(".win-menu-btn").click();
+    assert.equal(ctx.hidden, false, "⋯ opens the window menu");
+    viewBtn("Groups").click();
+    assert.equal(ctx.hidden, true, "view switch closes the window menu");
+    viewBtn("Windows").click();
+    pop.querySelector(".win-menu-btn").click();
+    [...ctx.querySelectorAll(".ctx-item")].find((el) => el.textContent === "Rename window…").click();
+    pop.querySelector(".rename-input").value = "Nope";
+    calls.length = 0;
+    const press = new window.Event("mousedown", { bubbles: true, cancelable: true });
+    viewBtn("Groups").dispatchEvent(press);
+    assert.equal(press.defaultPrevented, true, "press keeps focus — no blur-commit, no refill mid-press");
+    assert.ok(pop.querySelector(".rename-input"), "rename survives the press, the click cancels it");
+    viewBtn("Groups").click();
+    await tick();
+    await tick();
+    assert.match(pop.querySelector(".win-view.on").textContent, /^Groups/, "view switched");
+    assert.ok(!calls.includes("sendMessage window-rename"), "view switch cancels the rename, nothing sent");
+    assert.equal(document.querySelector(".rename-input"), null, "rename input gone");
+    document.body.click();
+
     // Groups view: group row navigates to the group's first tab
     winBtn.click();
     await tick();
