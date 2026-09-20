@@ -1,6 +1,28 @@
 # CHANGES
 
+## v0.2.17 — 2026-09-20
+
+### Summary
+Quick launch bug fixes and group features
+
+### New Features
+- Add generic askDialog modal and use it to name new tab groups (e195cf8)
+- Add reorder for groups in quick-launch window / groups tab (d85bd90)
+- Create tab groups from the quick-launch Groups view (760a003)
+
+### Fixes
+- Fix inline edit closing the quick-launch window (9a13e4a)
+- Re-pin tabs after cross-window move (dc98a18)
+- Quick-launch "Rename group…" edits the group name inside the popover row instead of the sidebar header (a17d199)
+- Close context menu and cancel in-progress rename when switching windows/groups/pins view (2ae3d16)
+
+### Other
+- Share one window ordering between the windows popover and the row menu's move-to submenu (3feb9e8)
+
 ## v0.2.16 — 2026-09-19
+
+### Summary
+Tab groups support, quick jump views and restore banner fixes
 
 ### New Features
 - Add Windows | Groups | Pins views to the quick jump popup (f3cf4cd)
