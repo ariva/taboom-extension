@@ -1240,7 +1240,15 @@ test(
     assert.ok(!calls.some((c) => c.startsWith("tabs.group")), "empty name: no group created");
     assert.ok(pop.querySelector(".win-row.win-new"), "row back in place");
     // …a name opens a background New Tab in the current window and groups THAT
-    // (Chrome has no empty groups) — the active tab is left alone
+    // (Chrome has no empty groups) — the active tab AND a sidebar selection are left alone
+    const selectAllBox = document.getElementById("select-all");
+    selectAllBox.checked = true;
+    selectAllBox.dispatchEvent(new window.Event("change", { bubbles: true }));
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    winBtn.click();
+    await tick();
+    [...pop.querySelectorAll(".win-view")].find((el) => el.textContent.startsWith("Groups")).click();
+    calls.length = 0;
     const named = newGroupInput();
     named.value = "reading";
     named.dispatchEvent(new window.Event("blur"));
@@ -1249,7 +1257,9 @@ test(
     assert.ok(calls.includes('tabs.create {"windowId":1,"active":false}'), "background New Tab in the current window");
     const created = tabs.find((t) => t.id >= 1000);
     assert.ok(calls.includes(`tabs.group ${created.id} new`), "the new tab is what gets grouped");
-    assert.ok(!calls.includes("tabs.group 1 new"), "active tab stays out of the group");
+    assert.deepEqual(calls.filter((c) => c.startsWith("tabs.group")), [`tabs.group ${created.id} new`],
+      "nothing else grouped — not the active tab, not the selected tabs");
+    document.getElementById("bulk-clear").click();
     assert.ok(calls.includes('tabGroups.update 900 {"title":"reading"}'), "group named from the input");
     assert.match(pop.querySelector(".win-view.on").textContent, /^Groups/, "popover stays on Groups");
     tabs.splice(tabs.indexOf(created), 1); // restore fixture
@@ -1381,25 +1391,34 @@ test(
     await tick();
     assert.ok(calls.includes("tabs.ungroup 1"), "ungrouped");
 
-    // New group asks the name first; Cancel moves nothing
+    // New group asks the name first in the in-page dialog; Cancel moves nothing
     await chrome.tabs.onUpdated.fire(1, { groupId: -1 });
     await new Promise((resolve) => setTimeout(resolve, 200));
     calls.length = 0;
-    globalThis.prompt = () => null;
+    globalThis.prompt = () => assert.fail("native prompt must not be used");
+    const ask = document.getElementById("ask-dialog");
     rowOf(1).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
     pick("New group…");
+    assert.equal(ask.open, true, "dialog opens");
+    assert.equal(ask.querySelector(".ask-message").textContent, "New group name");
+    assert.ok(ask.querySelector(".ask-input"), "with a text input");
+    ask.querySelector(".ask-cancel").click();
     await tick();
     await tick();
-    assert.ok(!calls.some((c) => c.startsWith("tabs.group")), "cancelled prompt: no group created");
+    assert.equal(ask.open, false, "Cancel closes it");
+    assert.ok(!calls.some((c) => c.startsWith("tabs.group")), "cancelled dialog: no group created");
 
-    // …a name creates the group around the tab, then titles it
-    globalThis.prompt = () => "reading";
+    // …a name + Enter creates the group around the tab, then titles it
     rowOf(1).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
     pick("New group…");
+    assert.equal(ask.querySelector(".ask-input").value, "", "input starts fresh on every open");
+    ask.querySelector(".ask-input").value = "reading";
+    ask.querySelector(".ask-input").dispatchEvent(new window.KeyboardEvent("keydown", { key: "Enter" }));
     await tick();
     await tick();
+    assert.equal(ask.open, false, "Enter confirms and closes");
     assert.ok(calls.includes("tabs.group 1 new"), "new group requested");
-    assert.ok(calls.includes('tabGroups.update 900 {"title":"reading"}'), "new group named from the prompt");
+    assert.ok(calls.includes('tabGroups.update 900 {"title":"reading"}'), "new group named from the dialog");
     assert.ok(
       calls.indexOf("tabs.group 1 new") < calls.indexOf('tabGroups.update 900 {"title":"reading"}'),
       "group first, title after",

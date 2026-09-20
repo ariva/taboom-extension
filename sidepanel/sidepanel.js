@@ -880,17 +880,15 @@ function fillGroupRows(groupList) {
 }
 
 // bottom row of the Groups view: click swaps the label for a name input (same
-// inline edit as the renames). A name groups the sidebar selection; nothing
-// selected = a background New Tab opened for the group (Chrome has no empty
-// groups) — the tab the user is on is never pulled in. Empty / Esc = nothing
+// inline edit as the renames). A name opens a background New Tab for the group
+// (Chrome has no empty groups) — existing tabs are never pulled in, neither the
+// one the user is on nor a sidebar selection (grouping those is the row menu's
+// "Move to group ▸ New group…"). Empty / Esc = nothing
 function appendNewGroupRow() {
-  const selectedIds = [...state.selected];
   const row = document.createElement("button");
   row.type = "button";
   row.className = "win-row win-new";
-  row.title = selectedIds.length > 0
-    ? `Group ${selectedIds.length} selected tab${selectedIds.length === 1 ? "" : "s"}`
-    : "New group with a New Tab in it";
+  row.title = "New group with a New Tab in it";
   const label = document.createElement("span");
   label.className = "win-title";
   label.textContent = "+ New group…";
@@ -906,17 +904,12 @@ function appendNewGroupRow() {
         if (!name.trim()) {
           return;
         }
-        let ids = selectedIds;
-        if (ids.length === 0) {
-          try {
-            const tab = await chrome.tabs.create({ windowId: state.currentWindowId, active: false });
-            ids = [tab.id];
-          } catch (error) {
-            toast(String(/** @type {any} */ (error)?.message ?? error));
-            return;
-          }
+        try {
+          const tab = await chrome.tabs.create({ windowId: state.currentWindowId, active: false });
+          await moveTabsToGroup([tab.id], null, name.trim());
+        } catch (error) {
+          toast(String(/** @type {any} */ (error)?.message ?? error));
         }
-        await moveTabsToGroup(ids, null, name.trim());
       },
       finish: () => fillWindowsPopover(),
     });
@@ -997,7 +990,13 @@ document.addEventListener("click", (event) => {
   if (!target.isConnected) {
     return;
   }
-  if (winPopOpen() && !winPop.contains(target) && !winListBtn.contains(target) && !ctxMenu.contains(target)) {
+  if (
+    winPopOpen() &&
+    !winPop.contains(target) &&
+    !winListBtn.contains(target) &&
+    !ctxMenu.contains(target) &&
+    !askEl.contains(target)
+  ) {
     winPop.hidePopover?.();
   }
 });
@@ -1691,6 +1690,69 @@ function hideCtxMenu() {
   }
 }
 
+// generic modal (native <dialog>: top layer, focus trap, Esc for free) — a
+// message plus an optional text input. Resolves the input's value (true when
+// there is no input) on OK / Enter, null on Cancel / Esc / backdrop click.
+//   await askDialog({ message: "Close 12 tabs?", okLabel: "Close" })      → true | null
+//   await askDialog({ message: "New group name", input: {} })             → string | null
+const askEl = document.createElement("dialog");
+askEl.id = "ask-dialog";
+document.body.append(askEl);
+// the backdrop belongs to the dialog element — a click on it lands on askEl itself
+askEl.addEventListener("click", (event) => {
+  if (event.target === askEl) {
+    askEl.close();
+  }
+});
+
+/**
+ * @param {{ message: string, input?: { initial?: string, placeholder?: string } | null,
+ *   okLabel?: string, cancelLabel?: string }} options
+ * @returns {Promise<string | true | null>}
+ */
+function askDialog({ message, input = null, okLabel = "OK", cancelLabel = "Cancel" }) {
+  return new Promise((resolve) => {
+    /** @type {string | true | null} */
+    let result = null;
+    const text = document.createElement("p");
+    text.className = "ask-message";
+    text.textContent = message;
+    const field = input ? document.createElement("input") : null;
+    const confirm = () => {
+      result = field ? field.value : true;
+      askEl.close();
+    };
+    if (field) {
+      field.className = "ask-input";
+      field.value = input?.initial ?? "";
+      field.placeholder = input?.placeholder ?? "";
+      field.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          confirm();
+        }
+      });
+    }
+    const cancel = document.createElement("button");
+    cancel.type = "button";
+    cancel.className = "ask-cancel";
+    cancel.textContent = cancelLabel;
+    cancel.addEventListener("click", () => askEl.close());
+    const ok = document.createElement("button");
+    ok.type = "button";
+    ok.className = "ask-ok";
+    ok.textContent = okLabel;
+    ok.addEventListener("click", confirm);
+    const actions = document.createElement("div");
+    actions.className = "ask-actions";
+    actions.append(cancel, ok);
+    askEl.replaceChildren(text, ...(field ? [field] : []), actions);
+    // every exit — OK, Cancel, Esc, backdrop — funnels through the close event
+    askEl.addEventListener("close", () => resolve(result), { once: true });
+    askEl.showModal();
+    (field ?? ok).focus();
+  });
+}
+
 function ctxItem(label, run) {
   const item = document.createElement("button");
   item.className = "ctx-item";
@@ -1881,10 +1943,10 @@ function openRowMenu(event, tabId) {
       groupMenu.submenu.append(item);
     }
     groupMenu.submenu.append(
-      ctxItem("New group…", () => {
+      ctxItem("New group…", async () => {
         // name first — Cancel moves nothing, an empty name makes an unnamed group
-        const title = prompt("New group name");
-        if (title === null) {
+        const title = await askDialog({ message: "New group name", input: { placeholder: "Group name" } });
+        if (typeof title !== "string") {
           return;
         }
         moveTabsToGroup(ids, null, title.trim());
@@ -2229,6 +2291,9 @@ window.addEventListener("blur", hideCtxMenu); // focus left for another window/t
 document.addEventListener(
   "keydown",
   (event) => {
+    if (askEl.open) {
+      return; // Esc belongs to the modal dialog — the popover behind it stays
+    }
     if (event.key === "Escape" && !ctxMenu.hidden) {
       hideCtxMenu();
       event.stopPropagation();
