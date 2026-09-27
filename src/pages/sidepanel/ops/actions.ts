@@ -1,5 +1,6 @@
 // Tab actions: activate, snooze, wake, close, pin, protect / unprotect. Each one consumes
-// the tabs it acted on from the selection and refreshes the panel.
+// the tabs it acted on from the selection and refreshes the panel. copyUrls is the
+// exception: it touches no tab, so the selection stays.
 import { send } from "../../../app/messages.ts";
 import { toast } from "../../../lib/ui/toast.ts";
 import { refresh } from "../foundation/scheduler.ts";
@@ -88,4 +89,16 @@ export async function unprotectTabs(tabIds: number[]): Promise<void> {
   await send({ type: "unprotect-hosts", hosts: hostsOf(state.allTabs, tabIds) });
   unselect(tabIds);
   refresh(true);
+}
+
+// Must run synchronously from the click: clipboard writes in an extension page ride
+// on the user activation, no clipboardWrite permission needed.
+export async function copyUrls(tabIds: number[]): Promise<void> {
+  const urls = tabIds.map((tabId) => state.allTabs.find((tab) => tab.id === tabId)?.url).filter(Boolean);
+  try {
+    await navigator.clipboard.writeText(urls.join("\n"));
+    toast(urls.length === 1 ? "URL copied" : `${urls.length} URLs copied`);
+  } catch (error) {
+    toast(`Could not copy: ${String((error as Partial<Error> | null)?.message ?? error)}`);
+  }
 }

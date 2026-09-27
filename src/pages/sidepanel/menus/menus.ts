@@ -11,7 +11,7 @@ import {
   ctxTitle,
   showCtxMenu,
 } from "../../../lib/ui/context-menu.ts";
-import { actionIds, closeTabs, pinTabs, protectTabs, snooze, unprotectTabs, wake } from "../ops/actions.ts";
+import { actionIds, closeTabs, copyUrls, pinTabs, protectTabs, snooze, unprotectTabs, wake } from "../ops/actions.ts";
 import { TAB_GROUP_COLORS, WINDOW_DOT_COLORS, windowGroupName, windowMaps } from "../model/index.ts";
 import { render } from "../foundation/scheduler.ts";
 import { namesActive, pinActive, state, tabGroupsActive } from "../foundation/state.ts";
@@ -59,6 +59,7 @@ export function openRowMenu(event: MouseEvent, tabId: number): void {
   clearCtxMenu();
   const clicked = state.allTabs.find((tab) => tab.id === tabId);
   ctxAppend(ctxTitle(ids.length > 1 ? `${ids.length} tabs selected` : clicked?.title || "Tab"), ctxDivider());
+  ctxAppend(ctxItem(ids.length > 1 ? `Copy ${ids.length} URLs` : "Copy URL", () => copyUrls(ids)));
   appendCtxActions(ids);
   ctxAppend(ctxDivider());
   const { btn, submenu } = ctxSubmenu(ids.length > 1 ? `Move ${ids.length} tabs to` : "Move tab to");

@@ -775,6 +775,7 @@ test("UI - Sidepanel - Right-click row offers move-to-window menu (selection-awa
   assert.deepEqual(
     items,
     [
+      "Copy URL",
       "Snooze",
       "Wake",
       "Protect",
@@ -915,6 +916,43 @@ test("UI - Sidepanel - Context menu actions act on the clicked tab / whole selec
     calls.some((c) => c.startsWith("tabs.remove 1")),
     "close removes only the clicked tab",
   );
+  await new Promise((resolve) => setTimeout(resolve, 200));
+});
+
+test("UI - Sidepanel - Context menu Copy URL copies the clicked tab / whole selection, keeps the selection", async () => {
+  const rowOf = (id: number) => q(document, `.row[data-tab-id="${id}"]`);
+  const menu = byId("ctx-menu");
+  const pick = (label: string) => must(qa(menu, ".ctx-item").find((el) => el.textContent.startsWith(label))).click();
+  const copied: string[] = [];
+  // the test DOM has no clipboard; the page only needs writeText
+  Object.defineProperty(navigator, "clipboard", {
+    configurable: true,
+    value: { writeText: async (text: string) => void copied.push(text) },
+  });
+
+  rowOf(1).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+  pick("Copy URL");
+  await tick();
+  assert.deepEqual(copied, ["https://github.com/pr/1"], "clicked tab's url");
+  assert.equal(byId("toast").textContent, "URL copied");
+  assert.equal(menu.hidden, true, "menu closes after action");
+
+  const selectAll = byId<HTMLInputElement>("select-all");
+  selectAll.checked = true;
+  selectAll.dispatchEvent(new window.Event("change", { bubbles: true }));
+  copied.length = 0;
+  rowOf(1).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+  pick("Copy 3 URLs");
+  await tick();
+  assert.equal(copied.length, 1, "one clipboard write");
+  assert.deepEqual(copied[0]?.split("\n").sort(), [
+    "https://github.com/pr/1",
+    "https://mail.google.com/inbox",
+    "https://youtube.com/watch",
+  ]);
+  assert.equal(byId("toast").textContent, "3 URLs copied");
+  assert.equal(qa(document, ".row input:checked").length, 3, "copy is not an action on the tabs: selection survives");
+  byId("bulk-clear").click();
   await new Promise((resolve) => setTimeout(resolve, 200));
 });
 
