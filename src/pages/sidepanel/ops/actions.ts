@@ -1,0 +1,91 @@
+// Tab actions: activate, snooze, wake, close, pin, protect / unprotect. Each one consumes
+// the tabs it acted on from the selection and refreshes the panel.
+import { send } from "../../../app/messages.ts";
+import { toast } from "../../../lib/ui/toast.ts";
+import { refresh } from "../foundation/scheduler.ts";
+import { state } from "../foundation/state.ts";
+import type { PanelTab } from "../foundation/state.ts";
+import { hostsOf } from "../model/tab-hosts.ts";
+
+// dragging (or right-clicking) a selected row acts on the whole selection
+export function actionIds(tabId: number): number[] {
+  return state.selected.has(tabId) ? [...state.selected] : [tabId];
+}
+
+// ---------- actions ----------
+
+export async function activate(tab: PanelTab): Promise<void> {
+  await chrome.windows.update(tab.windowId, { focused: true });
+  await chrome.tabs.update(tab.id, { active: true });
+  state.followCurrent = true;
+}
+
+// an action consumes only the tabs it acted on — the rest of the selection
+// survives (a row-button action must not wipe an unrelated multi-select)
+function unselect(tabIds: number[]): void {
+  for (const tabId of tabIds) {
+    state.selected.delete(tabId);
+  }
+}
+
+export async function snooze(tabIds: number[]): Promise<void> {
+  const failures: string[] = [];
+  for (const tabId of tabIds) {
+    // undefined: no listener answered
+    const response = await send({ type: "snooze-tab", tabId });
+    if (response && "error" in response) {
+      failures.push(response.error);
+    }
+  }
+  if (failures.length > 0) {
+    toast(`Could not snooze ${failures.length} tab(s): ${failures[0]}`);
+  }
+  unselect(tabIds);
+  refresh(true);
+}
+
+// background reload of snoozed tabs — wakes without switching to them;
+// non-discarded tabs are skipped so a mixed selection never force-reloads live pages
+export async function wake(tabIds: number[]): Promise<void> {
+  const snoozed = tabIds.filter((tabId) => state.allTabs.find((tab) => tab.id === tabId)?.discarded);
+  await Promise.all(snoozed.map((tabId) => chrome.tabs.reload(tabId).catch(() => {})));
+  if (snoozed.length > 0) {
+    // reload keeps the old lastAccessed — tell the SW to restart their clocks
+    send({ type: "tabs-woken", tabIds: snoozed }).catch(() => {});
+  }
+  unselect(tabIds);
+  refresh(true);
+}
+
+export async function closeTabs(tabIds: number[]): Promise<void> {
+  // Native confirm for multi-close; upgrade to undo snackbar if it annoys
+  if (tabIds.length > 1 && !confirm(`Close ${tabIds.length} tabs?`)) {
+    return;
+  }
+  try {
+    await chrome.tabs.remove(tabIds);
+  } catch (error) {
+    console.debug("close failed", error);
+  }
+  unselect(tabIds);
+  refresh(true);
+}
+
+// pin to the window's tab strip (Chrome-native pinning, not window pinning)
+export async function pinTabs(tabIds: number[], pinned: boolean): Promise<void> {
+  await Promise.allSettled(tabIds.map((tabId) => chrome.tabs.update(tabId, { pinned })));
+  unselect(tabIds);
+  refresh(true);
+}
+
+export async function protectTabs(tabIds: number[]): Promise<void> {
+  await send({ type: "protect-hosts", hosts: hostsOf(state.allTabs, tabIds) });
+  unselect(tabIds);
+  refresh(true);
+}
+
+export async function unprotectTabs(tabIds: number[]): Promise<void> {
+  await send({ type: "unprotect-hosts", hosts: hostsOf(state.allTabs, tabIds) });
+  unselect(tabIds);
+  refresh(true);
+}

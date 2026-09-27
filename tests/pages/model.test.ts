@@ -1,0 +1,640 @@
+// Pure tests for sidepanel/model.js — no DOM, no chrome stub, bare node.
+import assert from "node:assert/strict";
+import { test } from "vitest";
+import {
+  badges,
+  bulkSummary,
+  countsByFilter,
+  deriveTabs,
+  emptyMessage,
+  groupTabs,
+  titleGroupName,
+  windowGroupName,
+  rowViewModel,
+  fuzzyScore,
+  highlightRanges,
+  searchCandidates,
+  selectVisible,
+  windowColor,
+  windowMaps,
+} from "../../src/pages/sidepanel/model/index.ts";
+import type { RowContext, RowViewModel, SearchView, SelectView } from "../../src/pages/sidepanel/model/index.ts";
+import type { ProtectionRule, UiPrefs } from "../../src/app/types.ts";
+
+type Tab = chrome.tabs.Tab;
+type TabGroup = chrome.tabGroups.TabGroup;
+
+const NOW = 1_700_000_000_000;
+const HOUR = 3_600_000;
+// chrome.tabs.Tab also requires index / groupId / highlighted / frozen / incognito / selected /
+// autoDiscardable. The models read a missing index as 0 and a missing groupId as -1 and never
+// read the rest, so these defaults keep every fixture's observable values unchanged.
+const tab = (overrides: Partial<Tab> = {}): Tab => ({
+  index: 0,
+  groupId: -1,
+  highlighted: false,
+  frozen: false,
+  incognito: false,
+  selected: false,
+  autoDiscardable: true,
+  id: 1,
+  windowId: 1,
+  active: false,
+  discarded: false,
+  pinned: false,
+  audible: false,
+  url: "https://example.com/x",
+  title: "Example",
+  lastAccessed: NOW - 2 * HOUR,
+  ...overrides,
+});
+// derived defaults to no protection rules; pass rules when a test needs them
+// the tests' rules carry no createdAt (nothing in the models reads it)
+const rule = (partial: Omit<ProtectionRule, "createdAt">): ProtectionRule => ({ createdAt: 0, ...partial });
+// only a tab group's title is read by the models
+const tabGroup = (partial: Partial<TabGroup>): TabGroup => ({
+  id: 0,
+  windowId: 1,
+  collapsed: false,
+  shared: false,
+  color: "grey",
+  ...partial,
+});
+// the favicon is { pageUrl } | { letter }: read .letter like the untyped test did (undefined on the other variant)
+const letterOf = (favicon: RowViewModel["favicon"]): string | undefined =>
+  "letter" in favicon ? favicon.letter : undefined;
+const view = (tabs: Tab[], overrides: Partial<SelectView> = {}, rules: ProtectionRule[] = []): SelectView => ({
+  query: "",
+  scope: "all-windows",
+  filter: "all",
+  sort: "recent",
+  currentWindowId: 1,
+  derived: deriveTabs(tabs, rules),
+  now: NOW,
+  ...overrides,
+});
+
+test("Model - SelectVisible combines search, scope, filter, and sort", () => {
+  const tabs = [
+    tab({ id: 1, title: "Alpha", lastAccessed: NOW - 1 * HOUR }),
+    tab({ id: 2, title: "Beta", discarded: true, lastAccessed: NOW - 2 * HOUR }),
+    tab({ id: 3, title: "Gamma", windowId: 2, lastAccessed: NOW - 3 * HOUR }),
+  ];
+  assert.deepEqual(
+    selectVisible(tabs, view(tabs)).map((t) => t.id),
+    [1, 2, 3],
+    "recent",
+  );
+  assert.deepEqual(
+    selectVisible(tabs, view(tabs, { sort: "oldest" })).map((t) => t.id),
+    [3, 2, 1],
+  );
+  assert.deepEqual(
+    selectVisible(tabs, view(tabs, { filter: "snoozed" })).map((t) => t.id),
+    [2],
+  );
+  assert.deepEqual(
+    selectVisible(tabs, view(tabs, { scope: "current-window" })).map((t) => t.id),
+    [1, 2],
+  );
+  assert.deepEqual(
+    selectVisible(tabs, view(tabs, { query: "gam" })).map((t) => t.id),
+    [3],
+  );
+  // window sort: current window (1) first, recent-first within
+  assert.deepEqual(
+    selectVisible(tabs, view(tabs, { sort: "window" })).map((t) => t.id),
+    [1, 2, 3],
+  );
+  assert.deepEqual(
+    selectVisible(tabs, view(tabs, { sort: "window", currentWindowId: 2 })).map((t) => t.id),
+    [3, 1, 2],
+    "window 2 current → its tabs first",
+  );
+});
+
+test("Model - SortDir: flat sorts flip, grouped sorts order groups by visible size", () => {
+  const tabs = [
+    tab({ id: 1, title: "Alpha", lastAccessed: NOW - 1 * HOUR }),
+    tab({ id: 2, title: "Beta", lastAccessed: NOW - 2 * HOUR }),
+    tab({ id: 3, title: "Gamma", windowId: 2, lastAccessed: NOW - 3 * HOUR }),
+  ];
+  assert.deepEqual(
+    selectVisible(tabs, view(tabs, { sort: "title", sortDir: "desc" })).map((t) => t.id),
+    [3, 2, 1],
+    "title Z..A",
+  );
+  // window 1 has 2 visible tabs, window 2 has 1
+  assert.deepEqual(
+    selectVisible(tabs, view(tabs, { sort: "window", sortDir: "desc" })).map((t) => t.id),
+    [1, 2, 3],
+    "most tabs first (window 1), recent-first within",
+  );
+  // two-list model: the current window stays first; size ordering applies
+  // to the remaining windows (each band sorts internally)
+  assert.deepEqual(
+    selectVisible(tabs, view(tabs, { sort: "window", sortDir: "asc" })).map((t) => t.id),
+    [1, 2, 3],
+    "current window first, then fewest tabs first",
+  );
+  assert.deepEqual(
+    selectVisible(tabs, view(tabs, { sort: "window" })).map((t) => t.id),
+    [1, 2, 3],
+    "no sortDir: natural order (current window first)",
+  );
+  const dupes = [tab({ id: 1, title: "Beta" }), tab({ id: 2, title: "Beta" }), tab({ id: 3, title: "Alpha" })];
+  assert.deepEqual(
+    selectVisible(dupes, view(dupes, { sort: "group-title", sortDir: "asc" })).map((t) => t.title),
+    ["Alpha", "Beta", "Beta"],
+    "group-title asc: smallest groups first",
+  );
+});
+
+test("Model - DeriveTabs precomputes host, lowercase haystack, protected flag", () => {
+  const rules = [rule({ id: "r", type: "host", pattern: "example.com" })];
+  const derived = deriveTabs([tab({ title: "Example PAGE" }), tab({ id: 2, url: "https://other.io/" })], rules);
+  assert.equal(derived.get(1)?.host, "example.com");
+  assert.ok(derived.get(1)?.haystack.includes("example page"), "haystack lowercased");
+  assert.equal(derived.get(1)?.protected, true);
+  assert.equal(derived.get(2)?.protected, false);
+});
+
+test("Model - WindowMaps indexes current window as #1 and colors only when multi-window", () => {
+  const single = windowMaps([tab()], 1);
+  assert.equal(single.indexes.get(1), 1);
+  assert.equal(single.dotColors.size, 0, "no dots for single window");
+
+  const multi = windowMaps([tab({ windowId: 5 }), tab({ windowId: 2 }), tab({ windowId: 9 })], 5);
+  assert.equal(multi.indexes.get(5), 1, "current = #1");
+  assert.equal(multi.indexes.get(2), 2);
+  assert.equal(multi.indexes.get(9), 3);
+  assert.equal(multi.dotColors.get(5), "", "current marked with empty color (accent via CSS)");
+  assert.ok(multi.dotColors.get(2)?.startsWith("#"));
+});
+
+test("Model - WindowColor: palette first, unique golden-angle hues beyond", () => {
+  assert.ok(windowColor(0).startsWith("#"));
+  assert.ok(windowColor(8).startsWith("hsl("), "9th color is procedural");
+  const fifty = new Set(Array.from({ length: 50 }, (_, i) => windowColor(i)));
+  assert.equal(fifty.size, 50, "no repeats");
+});
+
+test("Model - Group names: window label and title fallback (counts/arrow live in the view)", () => {
+  const tabs = [tab({ id: 1 }), tab({ id: 2 }), tab({ id: 3, windowId: 2 })];
+  const { indexes } = windowMaps(tabs, 1);
+  assert.equal(windowGroupName(1, { currentWindowId: 1, indexes }), "Window Current #1");
+  assert.equal(windowGroupName(2, { currentWindowId: 1, indexes }), "Window #2");
+  assert.equal(titleGroupName("Some tab"), "Some tab");
+  assert.equal(titleGroupName(""), "(untitled)");
+});
+
+test("Model - GroupTabs keeps order and splits runs by any key", () => {
+  const tabs = [tab({ id: 1 }), tab({ id: 2 }), tab({ id: 3, windowId: 2 }), tab({ id: 4, windowId: 2 })];
+  const byWindow = groupTabs(tabs, (t) => t.windowId);
+  assert.deepEqual(
+    byWindow.map(([id, list]) => [id, list.map((t) => t.id)]),
+    [
+      [1, [1, 2]],
+      [2, [3, 4]],
+    ],
+  );
+  assert.deepEqual(
+    groupTabs([], (t: Tab) => t.windowId),
+    [],
+  );
+
+  const titled = [tab({ id: 1, title: "A" }), tab({ id: 2, title: "A" }), tab({ id: 3, title: "B" })];
+  assert.deepEqual(
+    groupTabs(titled, (t) => t.title ?? "").map(([key, list]) => [key, list.map((t) => t.id)]),
+    [
+      ["A", [1, 2]],
+      ["B", [3]],
+    ],
+    "same key fn contract works for titles",
+  );
+});
+
+test("Model - Group-domain sort clusters by host with the shared size ordering", () => {
+  const tabs = [
+    tab({ id: 1, url: "https://b.com/x", lastAccessed: NOW - 2 * HOUR }),
+    tab({ id: 2, url: "https://a.com/y", lastAccessed: NOW - 3 * HOUR }),
+    tab({ id: 3, url: "https://b.com/z", lastAccessed: NOW - 1 * HOUR }),
+  ];
+  assert.deepEqual(
+    selectVisible(tabs, view(tabs, { sort: "group-domain", sortDir: "desc" })).map((t) => t.id),
+    [3, 1, 2],
+    "b.com pair first (recent-first within), then a.com",
+  );
+  assert.deepEqual(
+    selectVisible(tabs, view(tabs, { sort: "group-domain" })).map((t) => t.id),
+    [2, 3, 1],
+    "no direction: hosts alphabetical",
+  );
+});
+
+test("Model - Group-title sort: natural = alphabetical, desc = biggest groups first", () => {
+  const tabs = [
+    tab({ id: 1, title: "Beta", lastAccessed: NOW - 2 * HOUR }),
+    tab({ id: 2, title: "Alpha", lastAccessed: NOW - 3 * HOUR }),
+    tab({ id: 3, title: "Beta", lastAccessed: NOW - 1 * HOUR }),
+    tab({ id: 4, title: "Zulu", lastAccessed: NOW - 1 * HOUR }),
+  ];
+  assert.deepEqual(
+    selectVisible(tabs, view(tabs, { sort: "group-title" })).map((t) => t.id),
+    [2, 3, 1, 4],
+    "natural: groups alphabetical, recent-first within Beta",
+  );
+  assert.deepEqual(
+    selectVisible(tabs, view(tabs, { sort: "group-title", sortDir: "desc" })).map((t) => t.id),
+    [3, 1, 2, 4],
+    "desc: Beta pair (size 2) first, then singles alphabetical",
+  );
+});
+
+test("Model - EmptyMessage picks the right hint", () => {
+  assert.match(emptyMessage("xyz", "all"), /No tabs match/);
+  assert.match(emptyMessage("", "snoozed"), /Nothing snoozed/);
+  assert.match(emptyMessage("", "protected"), /No protected tabs/);
+  assert.equal(emptyMessage("", "all"), "No open tabs.");
+});
+
+test("Model - RowViewModel maps tab state to plain data", () => {
+  const rules = [rule({ id: "r", type: "host", pattern: "example.com" })];
+  const rowTabs = [
+    tab({ active: true }),
+    tab({ id: 3, discarded: true, title: "Zzz" }),
+    tab({ id: 4, url: "chrome://settings" }),
+    tab({ id: 5, url: "about:blank" }),
+  ];
+  const ctx: RowContext = {
+    index: 0,
+    cursor: 0,
+    now: NOW,
+    currentWindowId: 1,
+    derived: deriveTabs(rowTabs, rules),
+    selected: new Set([1]),
+    ...windowMaps([tab(), tab({ id: 2, windowId: 2 })], 1),
+    dotColors: windowMaps([tab(), tab({ id: 2, windowId: 2 })], 1).dotColors,
+    indexes: windowMaps([tab(), tab({ id: 2, windowId: 2 })], 1).indexes,
+  };
+  const vm = rowViewModel(tab({ active: true }), ctx);
+  assert.deepEqual(vm.classes, ["row", "cursor", "active-tab", "current"]);
+  assert.equal(vm.checked, true);
+  assert.equal(vm.viewTransitionName, "tab-1");
+  assert.equal(vm.protectLabel, "Unprotect site");
+  assert.equal(vm.protected, true, "protected flag drives the shield-off icon");
+  assert.equal(vm.age, null, "active tab shows no age");
+  assert.equal(vm.dot?.title, "Current window");
+
+  const snoozed = rowViewModel(tab({ id: 3, discarded: true, title: "Zzz" }), {
+    ...ctx,
+    cursor: -1,
+    selected: new Set(),
+  });
+  assert.ok(snoozed.title.startsWith("⏸ "));
+  assert.equal(snoozed.canSnooze, false);
+  assert.deepEqual(snoozed.badges[0], ["snoozed", "warn"]);
+
+  const internal = rowViewModel(tab({ id: 4, url: "chrome://settings" }), { ...ctx, cursor: -1 });
+  assert.equal(letterOf(internal.favicon), "S", "first letter of chrome page hostname");
+  assert.equal(internal.canSnooze, false);
+  const hostless = rowViewModel(tab({ id: 5, url: "about:blank" }), { ...ctx, cursor: -1 });
+  assert.equal(letterOf(hostless.favicon), "•", "no hostname → bullet fallback");
+});
+
+test("Model - Badges order and kinds", () => {
+  const full = badges(tab({ discarded: true, pinned: true, audible: true }), true);
+  assert.deepEqual(full, [
+    ["snoozed", "warn"],
+    ["protected", "ok"],
+    ["pinned", ""],
+    ["🔊", ""],
+  ]);
+  assert.deepEqual(badges(tab(), false), []);
+});
+
+test("Model - CountsByFilter", () => {
+  const rules = [rule({ id: "r", type: "host", pattern: "example.com" })];
+  const tabs = [tab(), tab({ id: 2, discarded: true }), tab({ id: 3, url: "https://other.io/" })];
+  assert.deepEqual(countsByFilter(tabs, deriveTabs(tabs, rules)), { all: 3, awake: 2, snoozed: 1, protected: 2 });
+});
+
+test("Model - BulkSummary states: none, partial, all selected", () => {
+  const tabs = [tab(), tab({ id: 2 })];
+  assert.deepEqual(bulkSummary(tabs, new Set()), {
+    hidden: true,
+    text: "0 selected",
+    allChecked: false,
+    indeterminate: false,
+    selectAllTitle: "Select all 2 shown",
+  });
+  const partial = bulkSummary(tabs, new Set([1]));
+  assert.equal(partial.indeterminate, true);
+  assert.equal(partial.allChecked, false);
+  const all = bulkSummary(tabs, new Set([1, 2]));
+  assert.equal(all.allChecked, true);
+  assert.equal(all.selectAllTitle, "Unselect all");
+});
+
+// ---------- options/model.js ----------
+const { aboutText, clampFontSize, clampedNumber, hasRule, releaseNotes, releaseSections } = await import(
+  "../../src/pages/options/model.ts"
+);
+
+test("Model - Options - Clamps, rule lookup, about text", () => {
+  assert.equal(clampFontSize("9"), 1.5, "max");
+  assert.equal(clampFontSize("0.1"), 0.6, "min");
+  assert.equal(clampFontSize("1.2"), 1.2);
+  assert.equal(clampFontSize("garbage"), 1, "fallback then clamp");
+  assert.equal(clampedNumber("50", 1), 50);
+  assert.equal(clampedNumber("-3", 1), 1, "floor");
+  assert.equal(clampedNumber("", 5), 5, "empty → floor");
+  assert.equal(hasRule([{ pattern: "*.a.com" }], "*.a.com"), true);
+  assert.equal(hasRule([{ pattern: "*.a.com" }], "a.com"), false);
+  assert.equal(aboutText("1.2.3"), "Taboom 1.2.3");
+});
+
+test("Model - Options - ReleaseNotes picks version section, falls back to newest", () => {
+  const md = "# CHANGES\n\n## v0.2.7 — 2026-08-16\n\n- new stuff\n\n## v0.2.6 — 2026-08-15\n\n- old stuff\n";
+  assert.deepEqual(releaseNotes(md, "0.2.6"), { title: "v0.2.6 — 2026-08-15", body: "- old stuff" });
+  assert.deepEqual(
+    releaseNotes(md, "9.9.9"),
+    { title: "v0.2.7 — 2026-08-16", body: "- new stuff" },
+    "fallback to newest",
+  );
+  assert.equal(releaseNotes("no sections here", "1.0.0"), null);
+});
+
+test("Model - Options - ReleaseSections caps history, newest first, drops file header", () => {
+  const md = "# CHANGES\n\n## v3 — a\n\n- c3\n\n## v2 — b\n\n- c2\n\n## v1 — c\n\n- c1\n";
+  assert.deepEqual(releaseSections(md, 2), [
+    { title: "v3 — a", body: "- c3" },
+    { title: "v2 — b", body: "- c2" },
+  ]);
+  assert.equal(releaseSections(md).length, 3, "count beyond sections is fine");
+  assert.deepEqual(releaseSections("no sections", 5), []);
+});
+
+// ---------- core resolveColorScheme ----------
+const { resolveColorScheme } = await import("../../src/app/core.ts");
+
+test("Model - ResolveColorScheme: explicit themes pass, anything else follows system", () => {
+  assert.equal(resolveColorScheme("light"), "light");
+  assert.equal(resolveColorScheme("dark"), "dark");
+  assert.equal(resolveColorScheme("auto"), "");
+  assert.equal(resolveColorScheme(undefined), "");
+});
+
+test("Model - Options - PerfLines formats metrics readably", async () => {
+  const { perfLines } = await import("../../src/pages/options/model.ts");
+  const lines = perfLines({ "sidepanel.render": { count: 3, avg: 12.34, min: 6, max: 20.5, last: 6 } });
+  assert.equal(lines.length, 1);
+  // lines[0]!: exactly one line asserted above
+  assert.match(lines[0]!, /^sidepanel\.render: count 3 · avg 12\.3ms · min 6\.0 · max 20\.5 · last 6\.0$/);
+  assert.deepEqual(perfLines({}), []);
+});
+
+test("Model - Options - SnapshotBlocks: newest first, timestamp header, indented metrics", async () => {
+  const { snapshotBlocks } = await import("../../src/pages/options/model.ts");
+  const metrics = { render: { count: 1, avg: 5, min: 5, max: 5, last: 5 } };
+  const blocks = snapshotBlocks([
+    { at: 1700000000000, metrics },
+    { at: 1700000100000, metrics },
+  ]);
+  assert.equal(blocks.length, 2);
+  assert.equal(
+    blocks[0],
+    `${new Date(1700000100000).toLocaleString()}\n  render: count 1 · avg 5.0ms · min 5.0 · max 5.0 · last 5.0`,
+    "newest first",
+  );
+  assert.deepEqual(snapshotBlocks([]), []);
+});
+
+test("Model - fuzzyScore tiers: whole word > word start > mid substring > subsequence > none", () => {
+  const wholeWord = fuzzyScore("my pull request", "pull");
+  const atStart = fuzzyScore("pull it", "pull"); // whole word AND haystack start
+  const wordStart = fuzzyScore("my pullrequests", "pull");
+  const midSubstring = fuzzyScore("spullx", "pull");
+  const subsequence = fuzzyScore("p u l l", "pull");
+  assert.ok(atStart > wholeWord, "haystack start tops everything");
+  assert.ok(wholeWord > wordStart, "whole word beats prefix-of-word");
+  assert.ok(wordStart > midSubstring, "word start beats mid-word substring");
+  assert.ok(midSubstring > subsequence, "any substring beats a scattered match");
+  assert.ok(subsequence > 0, "scattered in-order chars still match");
+  assert.equal(fuzzyScore("nothing here", "xyz"), 0, "chars out of order / missing: no match");
+});
+
+test("Model - searchCandidates with FUZZY_SEARCH ranks by relevance, ties recent-first", () => {
+  const tabs = [
+    tab({ id: 1, windowId: 1, url: "https://a.dev/x", title: "grep manual", lastAccessed: 5 }),
+    tab({ id: 2, windowId: 1, url: "https://b.dev/y", title: "my report", lastAccessed: 9 }),
+    tab({ id: 3, windowId: 1, url: "https://c.dev/z", title: "rust example page", lastAccessed: 7 }),
+    tab({ id: 4, windowId: 1, url: "https://d.dev/q", title: "vim notes", lastAccessed: 8 }),
+  ];
+  const derived = deriveTabs(tabs, []);
+  const view = { query: "rep", scope: "all-windows", currentWindowId: 1, derived };
+  const fuzzy = searchCandidates(tabs, { ...view, features: { FUZZY_SEARCH: { enabled: true } } });
+  assert.deepEqual(
+    fuzzy.map((t) => t.title),
+    ["my report", "grep manual", "rust example page"],
+    "word-start substring > mid-word substring > subsequence; no-p tab excluded",
+  );
+  const plain = searchCandidates(tabs, view);
+  assert.deepEqual(
+    plain.map((t) => t.title),
+    ["grep manual", "my report"],
+    "flag off: substring matches only, original order kept",
+  );
+  const visible = selectVisible(tabs, {
+    ...view,
+    features: { FUZZY_SEARCH: { enabled: true } },
+    filter: "all",
+    sort: "title",
+    sortDir: "asc",
+    now: 10,
+  });
+  assert.deepEqual(
+    visible.map((t) => t.title),
+    ["my report", "grep manual", "rust example page"],
+    "relevance order survives selectVisible instead of the active sort",
+  );
+});
+
+test("Model - highlightRanges: substring occurrences, overlap merge, fuzzy scatter fallback", () => {
+  assert.deepEqual(highlightRanges("My Pull Request", ["pull"]), [[3, 7]], "case-insensitive substring");
+  assert.deepEqual(highlightRanges("abab", ["ab"]), [[0, 4]], "every occurrence marked, touching ranges merge");
+  assert.deepEqual(highlightRanges("abcd", ["abc", "bcd"]), [[0, 4]], "overlapping tokens merge");
+  assert.deepEqual(
+    highlightRanges("grep manual", ["gm"], true),
+    [
+      [0, 1],
+      [5, 6],
+    ],
+    "fuzzy marks scattered chars",
+  );
+  assert.deepEqual(highlightRanges("grep manual", ["gm"]), [], "no scatter marks without fuzzy");
+  assert.deepEqual(highlightRanges("grep manual", ["xq"], true), [], "missing char: nothing marked");
+});
+
+test("Model - URL-only matches stay searchable and get a 'url match' badge", () => {
+  const tabs = [
+    tab({ id: 1, windowId: 1, url: "https://zzz.dev/abc", title: "report", lastAccessed: 1 }),
+    // r/e/p only reachable through the raw url — nothing markable in title/host
+    tab({ id: 2, windowId: 1, url: "https://r.dev/e-p", title: "zzz", lastAccessed: 2 }),
+  ];
+  const derived = deriveTabs(tabs, []);
+  const view = {
+    query: "rep",
+    scope: "all-windows",
+    currentWindowId: 1,
+    derived,
+    features: { FUZZY_SEARCH: { enabled: true } },
+  };
+  assert.deepEqual(
+    searchCandidates(tabs, view)
+      .map((t) => t.id)
+      .sort(),
+    [1, 2],
+    "url scatter still matches",
+  );
+  const vmOf = (t: Tab) =>
+    rowViewModel(t, {
+      index: 0,
+      cursor: -1,
+      now: 10,
+      currentWindowId: 1,
+      derived,
+      selected: new Set(),
+      dotColors: new Map(),
+      indexes: new Map(),
+      queryTokens: ["rep"],
+      fuzzy: true,
+    });
+  assert.ok(
+    vmOf(tabs[1]!).badges.some(([label]) => label === "url match"),
+    "invisible match explained by badge",
+  );
+  assert.ok(!vmOf(tabs[0]!).badges.some(([label]) => label === "url match"), "no badge when the title carries marks");
+});
+
+test("Model - experimental_fuzzySearch pref gates fuzzy only while the flag is experimental", () => {
+  const tabs = [tab({ id: 1, windowId: 1, url: "https://x.dev/", title: "blahblah", lastAccessed: 1 })];
+  const derived = deriveTabs(tabs, []);
+  const base = { query: "lh", scope: "all-windows", currentWindowId: 1, derived };
+  const experimental = { FUZZY_SEARCH: { enabled: true, experimental: true } };
+  const stable = { FUZZY_SEARCH: { enabled: true } };
+  const hits = (view: SearchView) => searchCandidates(tabs, view).length;
+  assert.equal(hits({ ...base, features: experimental }), 1, "pref absent: default on");
+  assert.equal(
+    hits({ ...base, features: experimental, ui: { experimental_fuzzySearch: false } }),
+    0,
+    "pref off: plain search only",
+  );
+  assert.equal(
+    hits({ ...base, features: stable, ui: { experimental_fuzzySearch: false } }),
+    1,
+    "promoted stable: stale experimental_ pref ignored",
+  );
+});
+
+test("Model - Group-url sort clusters duplicate urls with the shared size ordering", () => {
+  const tabs = [
+    tab({ id: 1, url: "https://b.com/x", lastAccessed: NOW - 2 * HOUR }),
+    tab({ id: 2, url: "https://a.com/y", lastAccessed: NOW - 3 * HOUR }),
+    tab({ id: 3, url: "https://b.com/x", lastAccessed: NOW - 1 * HOUR }),
+  ];
+  assert.deepEqual(
+    selectVisible(tabs, view(tabs, { sort: "group-url", sortDir: "desc" })).map((t) => t.id),
+    [3, 1, 2],
+    "duplicate-url pair first (recent-first within), then the single",
+  );
+  assert.deepEqual(
+    selectVisible(tabs, view(tabs, { sort: "group-url" })).map((t) => t.id),
+    [2, 3, 1],
+    "no direction: urls alphabetical",
+  );
+});
+
+test("Model - groupByWindowTabsOrder controls within-window order in the window grouping", () => {
+  const tabs = [
+    tab({ id: 1, title: "Bravo", index: 2, lastAccessed: NOW - 1 * HOUR }),
+    tab({ id: 2, title: "Alpha", index: 0, lastAccessed: NOW - 3 * HOUR }),
+    tab({ id: 3, title: "Charlie", index: 1, lastAccessed: NOW - 2 * HOUR }),
+  ];
+  const order = (groupByWindowTabsOrder: UiPrefs["groupByWindowTabsOrder"] | undefined) =>
+    selectVisible(
+      tabs,
+      view(tabs, { sort: "window", ui: groupByWindowTabsOrder ? { groupByWindowTabsOrder } : {} }),
+    ).map((t) => t.id);
+  assert.deepEqual(order(undefined), [1, 3, 2], "default: recently used first");
+  assert.deepEqual(order("recent"), [1, 3, 2], "explicit recent matches default");
+  assert.deepEqual(order("same-as-window"), [2, 3, 1], "same-as-window: tab strip position");
+  assert.deepEqual(order("title-asc"), [2, 1, 3], "titles A-Z");
+  assert.deepEqual(order("title-desc"), [3, 1, 2], "titles Z-A");
+});
+
+test("Model - Pinned windows sort above unpinned in the window grouping (current always first)", () => {
+  const tabs = [tab({ id: 1, windowId: 1 }), tab({ id: 2, windowId: 2 }), tab({ id: 3, windowId: 3 })];
+  const windowMeta = new Map([[3, { pinnedWindow: true }]]);
+  const order = selectVisible(tabs, view(tabs, { sort: "window", windowMeta })).map((t) => t.windowId);
+  assert.deepEqual(order, [1, 3, 2], "current #1, pinned #3 lifted above #2");
+  const noMeta = selectVisible(tabs, view(tabs, { sort: "window" })).map((t) => t.windowId);
+  assert.deepEqual(noMeta, [1, 2, 3], "no meta: default labels keep chrome-id order");
+
+  // two lists, same internal ordering: names sort ABC inside each band
+  const named = new Map([
+    [2, { name: "Zulu", pinnedWindow: true }],
+    [3, { name: "Alpha", pinnedWindow: true }],
+    [4, { name: "Mid" }],
+  ]);
+  const four = [...tabs, tab({ id: 4, windowId: 4 })];
+  const banded = selectVisible(four, view(four, { sort: "window", windowMeta: named })).map((t) => t.windowId);
+  // current 1, pinned band ABC (Alpha=3, Zulu=2), unpinned band ABC (Mid=4)
+  assert.deepEqual(banded, [1, 3, 2, 4], "pinned band ABC above unpinned band");
+});
+
+test("Model - WINDOW_NAMES: custom names and colors resolve through windowMaps meta", () => {
+  const tabs = [tab({ id: 1 }), tab({ id: 2, windowId: 2 }), tab({ id: 3, windowId: 3 })];
+  const meta = new Map([
+    [1, { name: "Research" }],
+    [2, { color: "#123456" }],
+  ]);
+  const maps = windowMaps(tabs, 1, meta);
+  assert.equal(
+    windowGroupName(1, { currentWindowId: 1, indexes: maps.indexes, names: maps.names }),
+    "Research — Current #1",
+    "named current window keeps its index suffix",
+  );
+  assert.equal(
+    windowGroupName(2, { currentWindowId: 1, indexes: maps.indexes, names: maps.names }),
+    "Window #2",
+    "color-only meta leaves the default label",
+  );
+  assert.equal(maps.dotColors.get(2), "#123456", "custom color wins over positional");
+  assert.equal(maps.dotColors.get(1), "", "current window: accent while no custom color");
+  const coloredCurrent = windowMaps(tabs, 1, new Map([[1, { color: "#abcdef" }]]));
+  assert.equal(coloredCurrent.dotColors.get(1), "#abcdef", "custom color wins on the current window too");
+  assert.ok(maps.dotColors.get(3)?.startsWith("#"), "unset window keeps auto color");
+
+  const named = new Map([[2, { name: "Media" }]]);
+  const namedMaps = windowMaps(tabs, 1, named);
+  assert.equal(
+    windowGroupName(2, { currentWindowId: 1, indexes: namedMaps.indexes, names: namedMaps.names }),
+    "Media",
+    "named other window: name only, no index",
+  );
+});
+
+test("Model - Tab groups sort: strip order inside a group, recency in the ungrouped bucket", () => {
+  const groups = new Map([[7, tabGroup({ title: "work" })]]);
+  const tabs = [
+    tab({ id: 1, groupId: 7, index: 2, lastAccessed: NOW }),
+    tab({ id: 2, groupId: 7, index: 0, lastAccessed: NOW - 3 * HOUR }),
+    tab({ id: 3, groupId: 7, index: 1, lastAccessed: NOW - 1 * HOUR }),
+    tab({ id: 4, index: 5, lastAccessed: NOW - 2 * HOUR }),
+    tab({ id: 5, index: 4, lastAccessed: NOW }),
+  ];
+  const order = selectVisible(tabs, view(tabs, { sort: "group-tabgroup", tabGroups: groups })).map((t) => t.id);
+  // group "work" first (2,3,1 by strip index), then ungrouped by recency (5,4)
+  assert.deepEqual(order, [2, 3, 1, 5, 4]);
+});

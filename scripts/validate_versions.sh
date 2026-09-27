@@ -1,19 +1,13 @@
 #!/usr/bin/env bash
 # Version gate:
-#   1. package.json version == manifest.json version
-#   2. version is greater than the latest release-v* tag
-#   3. CHANGES.md has an entry for this version
+#   1. version (package.json — the single source; the build stamps it into manifest.json)
+#      is greater than the latest release-v* tag
+#   2. CHANGES.md has an entry for this version
 set -euo pipefail
 ROOT_PATH="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_PATH"
 
-manifest_version=$(jq -r .version manifest.json)
-package_version=$(jq -r .version package.json)
-
-if [ "$manifest_version" != "$package_version" ]; then
-  echo "version mismatch: manifest.json=${manifest_version} package.json=${package_version}" >&2
-  exit 1
-fi
+manifest_version=$(jq -r .version package.json)
 
 # "previous release" excludes the current version's own tag — building an
 # already-tagged release (tag first, then pack) must not trip the check

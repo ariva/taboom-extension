@@ -1,13 +1,22 @@
 {
   "name": "taboom-extension",
   "private": true,
-  "version": "0.2.18",
+  "version": "1.0.0",
   "type": "module",
-  "description": "Node tooling metadata only (ES modules for node --test; tsc type check). Chrome ignores this file.",
+  "engines": {
+    "node": "^24"
+  },
+  "description": "Dev tooling metadata only (Vite build, Vitest, Playwright, Biome, tsc). Chrome never sees this file; the build stamps `version` into manifest.json.",
   "devDependencies": {
+    "@biomejs/biome": "2.5.14",
+    "@playwright/test": "^1.63.0",
     "@types/chrome": "^0.2.6",
+    "@types/node": "^24.13.6",
+    "@vitest/browser-playwright": "^5.0.1",
     "happy-dom": "^20.11.2",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "vite": "^8.3.0",
+    "vitest": "^5.0.1"
   },
   "license": "SEE LICENCE IN LICENCE",
   "author": "Arunas Ivanauskas <arunas.work.hg@gmail.com>"
