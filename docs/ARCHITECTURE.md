@@ -78,7 +78,7 @@ Two things worth knowing before changing this folder:
 
 ## Options page (`src/pages/options/`)
 
-`main.ts` (entry, `render()`), `page-state.ts` (feature flags, render forwarder, saved-flash), `settings-form.ts`, `ui-prefs.ts`, `rules.ts`, `whats-new.ts` (renders `CHANGES.md`), `perf-panel.ts`, `danger-zone.ts`, and the pure `model.ts` (release-notes parsing, perf formatting).
+`main.ts` (entry, `render()`), `page-state.ts` (feature flags, render forwarder, saved-flash), `settings-form.ts`, `ui-prefs.ts`, `rules.ts`, `whats-new.ts` (renders `CHANGES.md`), `perf-panel.ts`, `danger-zone.ts`, and the pure `model.ts` (release-notes parsing, perf formatting, zoom presets).
 
 ## Generic library (`src/lib/`)
 

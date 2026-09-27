@@ -9,10 +9,22 @@ export interface ReleaseSection {
 }
 
 export const FONT_SIZE_MIN = 0.6;
-export const FONT_SIZE_MAX = 1.5;
+export const FONT_SIZE_MAX = 3;
 
 export function clampFontSize(value: string | number): number {
   return Math.min(FONT_SIZE_MAX, Math.max(FONT_SIZE_MIN, Number(value) || 1));
+}
+
+// zoom presets (rem) offered by the dropdown; Chrome's own zoom steps
+export const FONT_SIZE_STEPS = [0.6, 0.7, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.5, 3];
+
+// -/+ buttons: next preset in that direction; stuck at the ends
+export function stepFontSize(current: number, direction: 1 | -1): number {
+  const next =
+    direction === 1
+      ? FONT_SIZE_STEPS.find((step) => step > current)
+      : FONT_SIZE_STEPS.findLast((step) => step < current);
+  return next ?? clampFontSize(current);
 }
 
 // numeric setting inputs clamp to their floor; empty/garbage falls back to floor

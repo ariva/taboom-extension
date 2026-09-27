@@ -93,7 +93,7 @@ function fillWindowsPopover(): void {
   // anchored under the titlebar, right-aligned with the buttons
   const anchor = winListBtn.getBoundingClientRect();
   winPop.style.top = `${anchor.bottom + 4}px`;
-  winPop.style.right = "8px";
+  winPop.style.right = "0.5rem";
   winPop.style.left = "auto";
   const maps = windowMaps(state.allTabs, state.currentWindowId, state.windowMeta);
   const groupList = tabGroupsActive() ? [...state.tabGroups.values()] : [];

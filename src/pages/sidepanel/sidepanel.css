@@ -11,11 +11,11 @@ body {
 }
 
 header {
-  padding: 8px;
+  padding: 0.5rem;
   border-bottom: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 0.375rem;
 }
 
 .titlebar {
@@ -29,7 +29,7 @@ h1 { font-size: 1.08rem; margin: 0; }
 
 #search {
   width: 100%;
-  padding: 6px 8px;
+  padding: 0.375rem 0.5rem;
   border: 1px solid var(--border);
   border-radius: var(--radius-m);
   font-size: 1rem;
@@ -42,23 +42,23 @@ h1 { font-size: 1.08rem; margin: 0; }
 #search:focus {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent);
+  box-shadow: 0 0 0 0.1875rem color-mix(in srgb, var(--accent) 25%, transparent);
 }
 
 .segmented {
   display: flex;
   flex-wrap: wrap;
-  gap: 2px;
+  gap: 0.125rem;
   background: var(--badge-bg);
-  border-radius: 14px;
-  padding: 2px;
+  border-radius: 0.875rem;
+  padding: 0.125rem;
 }
 
 .segmented button {
   border: none;
   background: none;
-  border-radius: 12px;
-  padding: 3px 10px;
+  border-radius: 0.75rem;
+  padding: 0.1875rem 0.625rem;
   cursor: pointer;
   font-size: 0.92rem;
   transition: background var(--transition), color var(--transition);
@@ -69,7 +69,7 @@ h1 { font-size: 1.08rem; margin: 0; }
   color: var(--accent-fg);
 }
 
-.toolbar { display: flex; gap: 6px; align-items: center; }
+.toolbar { display: flex; gap: 0.375rem; align-items: center; }
 
 /* custom dropdown list for the toolbar selects */
 .dd-pop {
@@ -78,7 +78,7 @@ h1 { font-size: 1.08rem; margin: 0; }
   inset: auto; /* left/top set from JS under the select */
   max-height: 60vh;
   overflow-y: auto;
-  padding: 4px;
+  padding: 0.25rem;
   border: 1px solid var(--border);
   border-radius: var(--radius-m);
   background: var(--card-bg);
@@ -93,7 +93,7 @@ h1 { font-size: 1.08rem; margin: 0; }
   font: inherit;
   text-align: left;
   cursor: pointer;
-  padding: 5px 10px;
+  padding: 0.3125rem 0.625rem;
   border-radius: var(--radius-s);
   white-space: nowrap;
 }
@@ -101,21 +101,23 @@ h1 { font-size: 1.08rem; margin: 0; }
 .dd-pop .dd-item:focus-visible { background: var(--badge-bg); }
 .dd-pop .dd-item.current { font-weight: 700; color: var(--accent); }
 .dd-pop .dd-item.current::after { content: " ✓"; }
-.select-all { display: flex; align-items: center; padding: 0 2px; }
-.toolbar select { flex: 1; min-width: 0; }
+.select-all { display: flex; align-items: center; padding: 0 0.125rem; }
+/* native selects ignore the root font-size (zoom); 0.83rem = the UA's 13.33px
+   at 100%, so the default look stays and the text still follows the setting */
+.toolbar select { flex: 1; min-width: 0; font-size: 0.83rem; }
 
 main {
   flex: 1;
   overflow-y: auto;
-  padding: 4px 0;
+  padding: 0.25rem 0;
 }
 
 .row {
   display: flex;
   align-items: flex-start;
-  gap: 6px;
-  padding: 6px 8px 6px 18px;
-  margin: 1px 6px;
+  gap: 0.375rem;
+  padding: 0.375rem 0.5rem 0.375rem 1.125rem;
+  margin: 1px 0.375rem;
   border: 1px solid transparent; /* reserved so .current border causes no shift */
   border-radius: 0 9999px 9999px 0; /* flat left / round right — same shape for hover, cursor and active pill */
   cursor: pointer;
@@ -125,15 +127,15 @@ main {
      real row after each render (fonts differ per OS, so a fixed guess makes
      scroll restores land rows off); the px values are first-paint fallbacks. */
   content-visibility: auto;
-  contain-intrinsic-size: auto var(--row-h, 44px);
+  contain-intrinsic-size: auto var(--row-h, 2.75rem);
 }
 
 .row:hover, .row.cursor { background: var(--hover); box-shadow: var(--shadow-1); }
 
 /* compact density: tighter rows, no meta line */
-main.compact .row { padding: 3px 8px 3px 16px; contain-intrinsic-size: auto var(--row-h, 26px); }
+main.compact .row { padding: 0.1875rem 0.5rem 0.1875rem 1rem; contain-intrinsic-size: auto var(--row-h, 1.625rem); }
 main.compact .row .meta { display: none; }
-main.compact .row.in-group { padding: 3px 8px 3px 25px; }
+main.compact .row.in-group { padding: 0.1875rem 0.5rem 0.1875rem 1.5625rem; }
 
 /* snoozed = dimmed; hover restores full strength so actions stay readable */
 .row.snoozed { opacity: 0.55; }
@@ -153,8 +155,8 @@ main.compact .row.in-group { padding: 3px 8px 3px 25px; }
   left: 0;
   top: 0;
   bottom: 0;
-  width: 3px;
-  border-radius: 0 2px 2px 0; /* flush against the pill's left border */
+  width: 0.1875rem;
+  border-radius: 0 0.125rem 0.125rem 0; /* flush against the pill's left border */
   background: var(--win-color, var(--accent));
 }
 .row.active-tab:not(.current) {
@@ -162,13 +164,13 @@ main.compact .row.in-group { padding: 3px 8px 3px 25px; }
 }
 .row.active-tab .title { font-weight: 600; }
 /* keyboard cursor: amber, so it can't be confused with the accent-blue active-tab border */
-.row.cursor { outline: 2px solid var(--warn-fg); outline-offset: -2px; }
+.row.cursor { outline: 0.125rem solid var(--warn-fg); outline-offset: -0.125rem; }
 
 /* per-window color dot (rows, group headers, history popup) — present only
    when tabs span multiple windows */
 .win-dot {
-  width: 6px;
-  height: 6px;
+  width: 0.375rem;
+  height: 0.375rem;
   border-radius: 50%;
   flex: none;
 }
@@ -176,19 +178,19 @@ main.compact .row.in-group { padding: 3px 8px 3px 25px; }
 
 /* rows top-align content: nudge the dot to the checkbox's vertical middle
    (native checkbox ≈ 13px + 3px default margin → center ~9.5px) */
-.row .win-dot { margin-top: 6px; }
+.row .win-dot { margin-top: 0.375rem; }
 
 .row .favicon {
-  width: 16px;
-  height: 16px;
-  margin-top: 2px;
+  width: 1rem;
+  height: 1rem;
+  margin-top: 0.125rem;
   flex: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   font-size: 0.77rem;
   background: var(--badge-bg);
-  border-radius: 3px;
+  border-radius: 0.1875rem;
 }
 
 .row .main {
@@ -212,7 +214,7 @@ main.compact .row.in-group { padding: 3px 8px 3px 25px; }
   color: var(--muted);
   font-size: 0.85rem;
   display: flex;
-  gap: 6px;
+  gap: 0.375rem;
   align-items: center;
   overflow: hidden;
 }
@@ -224,7 +226,7 @@ main.compact .row.in-group { padding: 3px 8px 3px 25px; }
   background: none;
   font-weight: 700;
   color: light-dark(#b58900, #ffd75e); /* darker yellow on light for contrast */
-  border-radius: 2px;
+  border-radius: 0.125rem;
 }
 /* domain matches in the accent hue so they read apart from title hits */
 .row .host mark { color: var(--accent); }
@@ -232,7 +234,7 @@ main.compact .row.in-group { padding: 3px 8px 3px 25px; }
 .badge {
   background: var(--badge-bg);
   border-radius: var(--radius-s);
-  padding: 0 5px;
+  padding: 0 0.3125rem;
   font-size: 0.77rem;
 }
 
@@ -243,7 +245,7 @@ main.compact .row.in-group { padding: 3px 8px 3px 25px; }
 .row .actions {
   display: flex;
   visibility: hidden;
-  gap: 2px;
+  gap: 0.125rem;
   flex: none;
   align-self: center;
 }
@@ -255,10 +257,10 @@ main.compact .row.in-group { padding: 3px 8px 3px 25px; }
   background: none;
   cursor: pointer;
   font-size: 1rem;
-  padding: 2px 4px;
-  border-radius: 4px;
-  min-width: 24px;
-  min-height: 24px;
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.25rem;
+  min-width: 1.5rem;
+  min-height: 1.5rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -269,20 +271,20 @@ main.compact .row.in-group { padding: 3px 8px 3px 25px; }
 .icon-btn:disabled { opacity: 0.4; cursor: default; }
 .icon-btn:disabled:hover { background: none; }
 
-.icon-btn svg, .row .actions button svg { width: 14px; height: 14px; display: block; }
+.icon-btn svg, .row .actions button svg { width: 0.875rem; height: 0.875rem; display: block; }
 
 footer {
   display: flex;
   flex-wrap: wrap; /* narrow panel: buttons flow to the next line instead of cropping */
-  gap: 6px;
+  gap: 0.375rem;
   align-items: center;
-  padding: 8px;
+  padding: 0.5rem;
   border-top: 1px solid var(--border);
   background: var(--card-bg);
 }
 
 footer button {
-  padding: 4px 10px;
+  padding: 0.25rem 0.625rem;
   border: 1px solid var(--border);
   border-radius: var(--radius-s);
   background: none;
@@ -298,31 +300,31 @@ footer button:disabled:hover { background: none; }
 
 #toast {
   position: fixed;
-  bottom: 44px;
-  left: 8px;
-  right: 8px;
+  bottom: 2.75rem;
+  left: 0.5rem;
+  right: 0.5rem;
   background: var(--card-bg);
   border: 1px solid var(--border);
   border-radius: var(--radius-m);
   box-shadow: var(--shadow-2);
-  padding: 8px;
+  padding: 0.5rem;
   z-index: 10;
   transition: opacity var(--transition), transform var(--transition),
     display var(--transition) allow-discrete;
 }
 
-#toast[hidden] { display: none; opacity: 0; transform: translateY(6px); }
+#toast[hidden] { display: none; opacity: 0; transform: translateY(0.375rem); }
 
 @starting-style {
-  #toast { opacity: 0; transform: translateY(6px); }
+  #toast { opacity: 0; transform: translateY(0.375rem); }
 }
 
 /* window-group headers (sort = Group by window), sticky while scrolling */
 .group-header {
   position: sticky;
-  top: -4px; /* cancels main's 4px top padding */
+  top: -0.25rem; /* cancels main's 4px top padding */
   z-index: 1;
-  padding: 6px 14px 2px 15px; /* 15 = the rows' checkbox column */
+  padding: 0.375rem 0.875rem 0.125rem 0.9375rem; /* 15 = the rows' checkbox column */
   font-size: 0.77rem;
   letter-spacing: 0.4px;
   text-transform: uppercase;
@@ -332,24 +334,25 @@ footer button:disabled:hover { background: none; }
   user-select: none;
 }
 
-.group-header { display: flex; align-items: center; gap: 6px; }
+.group-header { display: flex; align-items: center; gap: 0.375rem; }
 
 /* group section item's divider */
 .group-header:not(:first-child) {
-  margin-top: 7px;
+  margin-top: 0.4375rem;
   border-top: 1px solid var(--border);
-  padding-top: 7px;
+  padding-top: 0.4375rem;
 }
 /* explicit identical size: native checkbox rendering varies per platform and
    font context — row and window checkboxes must look the same */
 .row input[type="checkbox"],
-.group-header .group-select { width: 14px; height: 14px; }
+header input[type="checkbox"],
+.group-header .group-select { width: 0.875rem; height: 0.875rem; }
 /* margin 0 EVERYWHERE: the UA gives checkboxes ~4px side margins that differ
    per platform — with them zeroed, headers, group lines and rows share one
    exact checkbox column (rows: 6 margin + 1 border + 8 pad = 15) */
 .row input[type="checkbox"] { margin: 0; flex: none; }
 .group-header .group-select { margin: 0; flex: none; }
-.tabgroup-header .group-select { width: 14px; height: 14px; margin: 0; flex: none; }
+.tabgroup-header .group-select { width: 0.875rem; height: 0.875rem; margin: 0; flex: none; }
 .group-header .group-label {
   flex: 0 1 auto;
   min-width: 0;
@@ -369,8 +372,8 @@ footer button:disabled:hover { background: none; }
 .tabgroup-header {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 14px 2px 25px;
+  gap: 0.375rem;
+  padding: 0.25rem 0.875rem 0.125rem 1.5625rem;
   font-size: 0.72rem;
   letter-spacing: 0.4px;
   text-transform: uppercase;
@@ -379,11 +382,11 @@ footer button:disabled:hover { background: none; }
   user-select: none;
 }
 .tabgroup-header:hover { color: light-dark(#333, #ddd); }
-.tabgroup-header .tg-square { width: 8px; height: 8px; border-radius: 2px; flex: none; }
+.tabgroup-header .tg-square { width: 0.5rem; height: 0.5rem; border-radius: 0.125rem; flex: none; }
 .tabgroup-header .win-dot { flex: none; }
-.row .tg-square { width: 8px; height: 8px; border-radius: 2px; flex: none; margin-top: 5px; }
-.group-header .tg-square { width: 8px; height: 8px; border-radius: 2px; flex: none; }
-.row.in-group { padding-left: 50px; }
+.row .tg-square { width: 0.5rem; height: 0.5rem; border-radius: 0.125rem; flex: none; margin-top: 0.3125rem; }
+.group-header .tg-square { width: 0.5rem; height: 0.5rem; border-radius: 0.125rem; flex: none; }
+.row.in-group { padding-left: 3.125rem; }
 .tabgroup-header .tg-title {
   min-width: 0;
   overflow: hidden;
@@ -402,8 +405,8 @@ footer button:disabled:hover { background: none; }
   background: none;
   color: inherit;
   cursor: pointer;
-  padding: 0 4px;
-  border-radius: 4px;
+  padding: 0 0.25rem;
+  border-radius: 0.25rem;
   visibility: hidden;
 }
 /* ⋯ takes the auto margin when present; arrow follows right after */
@@ -420,8 +423,8 @@ footer button:disabled:hover { background: none; }
   color: inherit;
   background: var(--card-bg);
   border: 1px solid var(--accent);
-  border-radius: 4px;
-  padding: 0 4px;
+  border-radius: 0.25rem;
+  padding: 0 0.25rem;
   text-transform: none; /* header uppercases — the name being typed must not */
   letter-spacing: normal;
 }
@@ -439,14 +442,14 @@ footer button:disabled:hover { background: none; }
 
 /* custom group-header tip, positioned right of the pointer by JS */
 /* valid move target under a dragged tab */
-.drop-target { outline: 2px dashed var(--accent); outline-offset: -2px; border-radius: 0 9999px 9999px 0; }
+.drop-target { outline: 0.125rem dashed var(--accent); outline-offset: -0.125rem; border-radius: 0 9999px 9999px 0; }
 
 /* right-click move-to-window menu */
 /* generic askDialog() modal */
 #ask-dialog {
-  min-width: 220px;
-  max-width: calc(100vw - 32px);
-  padding: 12px;
+  min-width: 13.75rem;
+  max-width: calc(100vw - 2rem);
+  padding: 0.75rem;
   background: var(--card-bg);
   color: inherit;
   border: 1px solid var(--border);
@@ -454,12 +457,12 @@ footer button:disabled:hover { background: none; }
   box-shadow: var(--shadow-2);
 }
 #ask-dialog::backdrop { background: rgb(0 0 0 / 0.35); }
-#ask-dialog .ask-message { margin: 0 0 8px; overflow-wrap: anywhere; }
+#ask-dialog .ask-message { margin: 0 0 0.5rem; overflow-wrap: anywhere; }
 #ask-dialog .ask-input {
   width: 100%;
   box-sizing: border-box;
-  margin-bottom: 10px;
-  padding: 6px 8px;
+  margin-bottom: 0.625rem;
+  padding: 0.375rem 0.5rem;
   font: inherit;
   color: inherit;
   background: var(--card-bg);
@@ -467,12 +470,12 @@ footer button:disabled:hover { background: none; }
   border-radius: var(--radius-m);
 }
 #ask-dialog .ask-input:focus { outline: none; border-color: var(--accent); }
-#ask-dialog .ask-actions { display: flex; justify-content: flex-end; gap: 6px; }
+#ask-dialog .ask-actions { display: flex; justify-content: flex-end; gap: 0.375rem; }
 #ask-dialog .ask-actions button {
   font: inherit;
   color: inherit;
   cursor: pointer;
-  padding: 4px 12px;
+  padding: 0.25rem 0.75rem;
   background: none;
   border: 1px solid var(--border);
   border-radius: var(--radius-m);
@@ -488,8 +491,8 @@ footer button:disabled:hover { background: none; }
      so the inline left/top from JS position it at the cursor */
   inset: auto;
   margin: 0;
-  min-width: 160px;
-  padding: 4px;
+  min-width: 10rem;
+  padding: 0.25rem;
   background: var(--card-bg);
   border: 1px solid var(--border);
   border-radius: var(--radius-m);
@@ -499,10 +502,10 @@ footer button:disabled:hover { background: none; }
 }
 /* menu header: what the menu acts on; room for the corner X, never wraps */
 #ctx-menu .ctx-title {
-  font-size: 11px;
+  font-size: 0.6875rem;
   color: var(--muted);
-  padding: 4px 24px 4px 8px;
-  max-width: 220px;
+  padding: 0.25rem 1.5rem 0.25rem 0.5rem;
+  max-width: 13.75rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -510,26 +513,26 @@ footer button:disabled:hover { background: none; }
 /* corner X: absolute so the item column ignores it; first item keeps clear of it */
 #ctx-menu .ctx-close {
   position: absolute;
-  top: 2px;
-  right: 2px;
+  top: 0.125rem;
+  right: 0.125rem;
   border: none;
   background: none;
   color: var(--muted);
   cursor: pointer;
-  padding: 3px;
-  border-radius: 4px;
+  padding: 0.1875rem;
+  border-radius: 0.25rem;
   display: inline-flex;
 }
-#ctx-menu .ctx-close svg { width: 10px; height: 10px; }
+#ctx-menu .ctx-close svg { width: 0.625rem; height: 0.625rem; }
 #ctx-menu .ctx-close:hover { background: var(--badge-bg); color: inherit; }
 
-#ctx-menu .ctx-divider { border-top: 1px solid var(--border); margin: 4px 0; }
+#ctx-menu .ctx-divider { border-top: 1px solid var(--border); margin: 0.25rem 0; }
 /* submenu = flyout panel beside the menu (fixed; JS sets left/top: right of
    the menu, flipped left when tight, right-edge overlap in narrow panels) */
 #ctx-menu .ctx-submenu {
   position: fixed;
-  min-width: 120px;
-  padding: 4px;
+  min-width: 7.5rem;
+  padding: 0.25rem;
   background: var(--card-bg);
   border: 1px solid var(--border);
   border-radius: var(--radius-m);
@@ -544,8 +547,8 @@ footer button:disabled:hover { background: none; }
   text-align: left;
   font: inherit;
   color: inherit;
-  padding: 5px 8px;
-  border-radius: 5px;
+  padding: 0.3125rem 0.5rem;
+  border-radius: 0.3125rem;
 }
 /* --hover is near-invisible on card-bg — same stronger tone as #history-pop */
 #ctx-menu .ctx-item:hover,
@@ -554,19 +557,19 @@ footer button:disabled:hover { background: none; }
    is not one, so make the row flex and the dot bigger for a real target */
 #ctx-menu .ctx-item .win-dot {
   display: inline-block;
-  width: 12px;
-  height: 12px;
+  width: 0.75rem;
+  height: 0.75rem;
 }
 #ctx-menu .ctx-item:has(.win-dot) {
   display: flex;
   align-items: center;
-  gap: 8px;
-  min-height: 22px;
+  gap: 0.5rem;
+  min-height: 1.375rem;
 }
 /* current selection inside a settings submenu (e.g. Change order) */
 #ctx-menu .ctx-item.current { color: var(--accent); font-weight: 600; }
 /* submenu toggles: caret right-aligned, clear gap from the label */
-#ctx-menu .ctx-move { display: flex; align-items: center; gap: 12px; }
+#ctx-menu .ctx-move { display: flex; align-items: center; gap: 0.75rem; }
 #ctx-menu .ctx-move .ctx-caret { margin-left: auto; }
 #ctx-menu .ctx-item.current::after { content: " ✓"; }
 
@@ -574,7 +577,7 @@ footer button:disabled:hover { background: none; }
   position: fixed;
   z-index: 20;
   max-width: 60vw;
-  padding: 6px 9px;
+  padding: 0.375rem 0.5625rem;
   background: var(--card-bg);
   border: 1px solid var(--border);
   border-radius: var(--radius-m);
@@ -585,7 +588,7 @@ footer button:disabled:hover { background: none; }
 }
 
 .empty {
-  padding: 24px;
+  padding: 1.5rem;
   text-align: center;
   color: var(--muted);
 }
@@ -597,7 +600,7 @@ footer button:disabled:hover { background: none; }
    #restore-banner (reopen panels after update/restart) shares the shell */
 #update-banner,
 #restore-banner {
-  margin-top: 6px;
+  margin-top: 0.375rem;
   display: flex;
   align-items: stretch;
   border-radius: var(--radius-m);
@@ -611,11 +614,11 @@ footer button:disabled:hover { background: none; }
   background: none;
   color: inherit;
   cursor: pointer;
-  padding: 6px 10px;
+  padding: 0.375rem 0.625rem;
 }
 #update-restart, #restore-open { flex: 1; text-align: left; }
 #update-dismiss, #restore-dismiss { flex: none; display: inline-flex; align-items: center; }
-#update-dismiss svg, #restore-dismiss svg { width: 12px; height: 12px; }
+#update-dismiss svg, #restore-dismiss svg { width: 0.75rem; height: 0.75rem; }
 #update-banner button:hover, #restore-banner button:hover { background: rgb(0 0 0 / 0.15); }
 
 /* history dropdown button: caret-down-over-list normally, caret-up while open */
@@ -624,20 +627,20 @@ footer button:disabled:hover { background: none; }
 #hist-list-btn.open .caret-open { display: block; }
 
 /* tab history nav: arrows + popover list right of search */
-.search-row { display: flex; gap: 4px; align-items: center; }
+.search-row { display: flex; gap: 0.25rem; align-items: center; }
 .search-row #search { flex: 1; min-width: 0; }
 /* fuzzy toggle right of the search box (shown only while FUZZY_SEARCH is experimental) */
 #fuzzy-label {
   flex: none;
   display: inline-flex;
   align-items: center;
-  gap: 3px;
-  font-size: 11px;
+  gap: 0.1875rem;
+  font-size: 0.6875rem;
   color: var(--muted);
   cursor: pointer;
   user-select: none;
 }
-#fuzzy-label input { width: 12px; height: 12px; margin: 0; cursor: pointer; }
+#fuzzy-label input { width: 0.75rem; height: 0.75rem; margin: 0; cursor: pointer; }
 #history-pop {
   position: fixed;
   margin: 0;
@@ -645,7 +648,7 @@ footer button:disabled:hover { background: none; }
   max-width: 90vw;
   max-height: 60vh;
   overflow-y: auto;
-  padding: 6px;
+  padding: 0.375rem;
   border: 1px solid var(--border);
   border-radius: var(--radius-m);
   background: var(--card-bg);
@@ -655,7 +658,7 @@ footer button:disabled:hover { background: none; }
   display: block;
   width: 100%;
   text-align: left;
-  padding: 5px 8px;
+  padding: 0.3125rem 0.5rem;
   border: none;
   border-radius: var(--radius-s);
   background: none;
@@ -666,7 +669,7 @@ footer button:disabled:hover { background: none; }
   text-overflow: ellipsis;
 }
 /* row + its X share a line; X only shows while the entry is hovered/focused */
-#history-pop .hist-item { display: flex; align-items: center; gap: 2px; }
+#history-pop .hist-item { display: flex; align-items: center; gap: 0.125rem; }
 #history-pop .hist-item .hist-row { flex: 1; min-width: 0; }
 
 #history-pop .hist-x { visibility: hidden; flex: none; }
@@ -676,23 +679,23 @@ footer button:disabled:hover { background: none; }
 /* --hover is near-invisible on card-bg (popover ground) — use the stronger badge tone */
 #history-pop .hist-row:hover { background: var(--badge-bg); }
 #history-pop .hist-row.current { font-weight: 700; color: var(--accent); }
-#history-pop .hist-row { display: flex; align-items: center; gap: 6px; }
+#history-pop .hist-row { display: flex; align-items: center; gap: 0.375rem; }
 #history-pop .hist-num { min-width: 1.4em; text-align: right; font-variant-numeric: tabular-nums; }
 #history-pop .hist-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #history-pop .hist-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  padding: 0 0 6px 8px;
+  gap: 0.5rem;
+  padding: 0 0 0.375rem 0.5rem;
   border-bottom: 1px solid var(--border);
-  margin-bottom: 6px;
+  margin-bottom: 0.375rem;
 }
 #history-pop .hist-close {
   border: 1px solid var(--border);
   border-radius: var(--radius-s);
   background: none;
-  padding: 2px 10px;
+  padding: 0.125rem 0.625rem;
   font-size: 0.85rem;
   cursor: pointer;
   transition: background var(--transition);
@@ -708,7 +711,7 @@ footer button:disabled:hover { background: none; }
   max-width: 90vw;
   max-height: 60vh;
   overflow-y: auto;
-  padding: 6px;
+  padding: 0.375rem;
   border: 1px solid var(--border);
   border-radius: var(--radius-m);
   background: var(--card-bg);
@@ -719,46 +722,46 @@ footer button:disabled:hover { background: none; }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  padding: 0 0 6px 8px;
+  gap: 0.5rem;
+  padding: 0 0 0.375rem 0.5rem;
   border-bottom: 1px solid var(--border);
-  margin-bottom: 6px;
+  margin-bottom: 0.375rem;
 }
 #windows-pop .win-close {
   border: 1px solid var(--border);
   border-radius: var(--radius-s);
   background: none;
-  padding: 2px 10px;
+  padding: 0.125rem 0.625rem;
   font-size: 0.85rem;
   cursor: pointer;
   transition: background var(--transition);
 }
 #windows-pop .win-close:hover { background: var(--badge-bg); }
 /* view switcher: Windows | Groups | Pins (only when there is something to switch to) */
-#windows-pop .win-views { display: flex; gap: 4px; min-width: 0; }
+#windows-pop .win-views { display: flex; gap: 0.25rem; min-width: 0; }
 #windows-pop .win-view {
   border: none;
   background: none;
   color: var(--muted);
   font: inherit;
   cursor: pointer;
-  padding: 2px 8px;
-  border-radius: 10px;
+  padding: 0.125rem 0.5rem;
+  border-radius: 0.625rem;
   white-space: nowrap;
 }
 #windows-pop .win-view:hover { background: var(--badge-bg); }
 #windows-pop .win-view.on { background: var(--accent); color: var(--accent-fg); }
-#windows-pop .win-row .tg-square { width: 8px; height: 8px; border-radius: 2px; flex: none; }
+#windows-pop .win-row .tg-square { width: 0.5rem; height: 0.5rem; border-radius: 0.125rem; flex: none; }
 /* row + its ⋯ share a line; ⋯ only shows while the entry is hovered/focused */
-#windows-pop .win-item { display: flex; align-items: center; gap: 2px; }
+#windows-pop .win-item { display: flex; align-items: center; gap: 0.125rem; }
 #windows-pop .win-item .win-row { flex: 1; min-width: 0; }
 #windows-pop .win-row {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 0.375rem;
   width: 100%;
   text-align: left;
-  padding: 5px 8px;
+  padding: 0.3125rem 0.5rem;
   border: none;
   border-radius: var(--radius-s);
   background: none;
@@ -785,8 +788,8 @@ footer button:disabled:hover { background: none; }
   background: none;
   color: inherit;
   cursor: pointer;
-  padding: 2px 6px;
-  border-radius: 4px;
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
 }
 #windows-pop .win-item:hover .win-menu-btn,
 #windows-pop .win-item:focus-within .win-menu-btn { visibility: visible; }

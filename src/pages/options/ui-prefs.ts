@@ -4,12 +4,12 @@ import { applyExperimental, featureEnabled, resolveColorScheme, resolveNavMode }
 import { loadState, saveState } from "../../app/storage.ts";
 import type { AppState, FeatureName, UiPrefs } from "../../app/types.ts";
 import { getElementById, mustQuery } from "../../lib/dom.ts";
-import { clampFontSize } from "./model.ts";
+import { clampFontSize, FONT_SIZE_STEPS, stepFontSize } from "./model.ts";
 import { flashSaved, getFeatures } from "./page-state.ts";
 
 export function renderUiPrefs(state: AppState): void {
   const FEATURES = getFeatures();
-  getElementById("fontSize").value = String(state.ui.fontSize ?? 1);
+  renderZoom(state.ui.fontSize ?? 1);
   getElementById("density").value = state.ui.density ?? "comfortable";
   getElementById("sortDirMode").value = state.ui.sortDirMode ?? "default";
   getElementById("groupByWindowTabsOrder").value = state.ui.groupByWindowTabsOrder ?? "same-as-window";
@@ -53,6 +53,57 @@ export function renderUiPrefs(state: AppState): void {
   applyTheme(state.ui.theme);
 }
 
+// Zoom control: presets dropdown, −/+ stepping through the presets, and a free rem
+// input behind "Custom…" for anything in between. The (possibly hidden) custom input
+// always holds the current value — it is what the buttons step from.
+function renderZoom(fontSize: number) {
+  const custom = !FONT_SIZE_STEPS.includes(fontSize);
+  getElementById("fontSize").value = custom ? "custom" : String(fontSize);
+  getElementById("fontSize-custom-box").hidden = !custom;
+  getElementById("fontSize-custom").value = String(fontSize);
+  getElementById("fontSize-dec").disabled = stepFontSize(fontSize, -1) === fontSize;
+  getElementById("fontSize-inc").disabled = stepFontSize(fontSize, 1) === fontSize;
+  // CSS zoom, not a root font-size: this page sizes things in px, and zoom scales
+  // those too — same feel as Ctrl+/−
+  document.documentElement.style.zoom = String(fontSize);
+}
+
+function initZoom() {
+  const select = getElementById<HTMLSelectElement>("fontSize");
+  const entries = [
+    ...FONT_SIZE_STEPS.map((step) => [String(step), `${Math.round(step * 100)}%`]),
+    ["custom", "Custom…"],
+  ];
+  select.replaceChildren(
+    ...entries.map(([value, label]) => {
+      const option = document.createElement("option");
+      option.value = value ?? "";
+      option.textContent = label ?? "";
+      return option;
+    }),
+  );
+  const commit = async (value: number) => {
+    renderZoom(value);
+    await saveUiPatch({ fontSize: value });
+  };
+  const input = getElementById("fontSize-custom");
+  select.addEventListener("change", () => {
+    if (select.value === "custom") {
+      getElementById("fontSize-custom-box").hidden = false;
+      input.focus();
+      return;
+    }
+    void commit(Number(select.value));
+  });
+  input.addEventListener("change", () => commit(clampFontSize(input.value)));
+  for (const [id, direction] of [
+    ["fontSize-dec", -1],
+    ["fontSize-inc", 1],
+  ] as const) {
+    getElementById(id).addEventListener("click", () => commit(stepFontSize(Number(input.value), direction)));
+  }
+}
+
 // light-dark() colors resolve via color-scheme, so forcing it flips the palette
 export function applyTheme(theme: string | undefined) {
   document.documentElement.style.colorScheme = resolveColorScheme(theme);
@@ -77,14 +128,6 @@ interface UiField {
   apply?: (value: UiValue, input: HTMLInputElement) => void;
 }
 const UI_FIELDS: UiField[] = [
-  {
-    id: "fontSize",
-    prop: "value",
-    parse: clampFontSize,
-    apply: (v, input) => {
-      input.value = String(v);
-    },
-  },
   { id: "density", prop: "value" },
   { id: "sortDirMode", prop: "value" },
   { id: "groupByWindowTabsOrder", prop: "value" },
@@ -99,6 +142,7 @@ const UI_FIELDS: UiField[] = [
 ];
 
 export function initUiPrefs(): void {
+  initZoom();
   for (const { id, prop, parse, apply } of UI_FIELDS) {
     getElementById(id).addEventListener("change", async () => {
       const input = getElementById(id);

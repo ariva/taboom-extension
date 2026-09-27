@@ -337,12 +337,19 @@ test("Model - BulkSummary states: none, partial, all selected", () => {
 });
 
 // ---------- options/model.js ----------
-const { aboutText, clampFontSize, clampedNumber, hasRule, releaseNotes, releaseSections } = await import(
-  "../../src/pages/options/model.ts"
-);
+const {
+  FONT_SIZE_STEPS,
+  aboutText,
+  clampFontSize,
+  clampedNumber,
+  hasRule,
+  releaseNotes,
+  releaseSections,
+  stepFontSize,
+} = await import("../../src/pages/options/model.ts");
 
 test("Model - Options - Clamps, rule lookup, about text", () => {
-  assert.equal(clampFontSize("9"), 1.5, "max");
+  assert.equal(clampFontSize("9"), 3, "max");
   assert.equal(clampFontSize("0.1"), 0.6, "min");
   assert.equal(clampFontSize("1.2"), 1.2);
   assert.equal(clampFontSize("garbage"), 1, "fallback then clamp");
@@ -352,6 +359,18 @@ test("Model - Options - Clamps, rule lookup, about text", () => {
   assert.equal(hasRule([{ pattern: "*.a.com" }], "*.a.com"), true);
   assert.equal(hasRule([{ pattern: "*.a.com" }], "a.com"), false);
   assert.equal(aboutText("1.2.3"), "Taboom 1.2.3");
+});
+
+test("Model - Options - Zoom steps walk the presets and snap in-between values", () => {
+  assert.equal(FONT_SIZE_STEPS[0], 0.6, "smallest preset = FONT_SIZE_MIN");
+  assert.equal(FONT_SIZE_STEPS[FONT_SIZE_STEPS.length - 1], 3, "largest preset = FONT_SIZE_MAX");
+  assert.equal(stepFontSize(1, 1), 1.1);
+  assert.equal(stepFontSize(1, -1), 0.9);
+  assert.equal(stepFontSize(3, 1), 3, "stays at max");
+  assert.equal(stepFontSize(0.6, -1), 0.6, "stays at min");
+  assert.equal(stepFontSize(1.05, 1), 1.1, "between presets: next preset up");
+  assert.equal(stepFontSize(1.05, -1), 1, "between presets: next preset down");
+  assert.equal(stepFontSize(9, -1), 3, "out of range steps back into it");
 });
 
 test("Model - Options - ReleaseNotes picks version section, falls back to newest", () => {

@@ -24,7 +24,7 @@ await tick();
 test("UI - Options - Renders stored settings into inputs", () => {
   assert.equal(byId<HTMLInputElement>("autoSnoozeEnabled").checked, false);
   assert.equal(byId<HTMLInputElement>("inactivityMinutes").value, "45");
-  assert.equal(byId<HTMLInputElement>("fontSize").value, "1.2");
+  assert.equal(byId<HTMLInputElement>("fontSize-custom").value, "1.2", "non-preset value lands in the custom input");
   assert.equal(byId<HTMLSelectElement>("density").value, "compact");
   assert.equal(byId<HTMLSelectElement>("theme").value, "light");
   assert.match(byId("about").textContent, /0\.0\.0-test/);
@@ -78,14 +78,68 @@ test("UI - Options - Theme change applies immediately and saves", async () => {
   assert.ok(calls.some((c) => c.includes('"theme":"dark"')));
 });
 
-test("UI - Options - FontSize is clamped to the allowed range", async () => {
-  const input = byId<HTMLInputElement>("fontSize");
-  input.value = "9";
-  input.dispatchEvent(new window.Event("change", { bubbles: true }));
-  await tick();
-  assert.equal(input.value, "1.5", "clamped to max");
-});
+test("UI - Options - Zoom: presets dropdown, +/- stepping, custom rem input, page zoom", async () => {
+  const { FONT_SIZE_STEPS } = await import("../../../src/pages/options/model.ts");
+  const select = byId<HTMLSelectElement>("fontSize");
+  const custom = byId<HTMLInputElement>("fontSize-custom");
+  const customBox = byId("fontSize-custom-box");
+  assert.deepEqual(
+    [...select.options].map((o) => o.value),
+    [...FONT_SIZE_STEPS.map(String), "custom"],
+    "dropdown offers the presets plus Custom",
+  );
+  assert.equal(select.value, "custom", "stored 1.2 is not a preset");
+  assert.equal(customBox.hidden, false, "custom input shown for a non-preset value");
+  assert.equal(custom.value, "1.2");
+  assert.equal(document.documentElement.style.zoom, "1.2", "options page zooms by the stored value");
 
+  calls.length = 0;
+  byId("fontSize-inc").click();
+  await tick();
+  await tick();
+  assert.equal(select.value, "1.25", "steps from the custom value to the next preset");
+  assert.equal(customBox.hidden, true);
+  assert.ok(
+    calls.some((c) => c.startsWith("storage.set") && c.includes('"fontSize":1.25')),
+    "persisted",
+  );
+  assert.equal(document.documentElement.style.zoom, "1.25", "page follows immediately");
+
+  select.value = "3";
+  select.dispatchEvent(new window.Event("change", { bubbles: true }));
+  await tick();
+  assert.equal(byId<HTMLButtonElement>("fontSize-inc").disabled, true, "at max: no further zoom in");
+  assert.equal(byId<HTMLButtonElement>("fontSize-dec").disabled, false);
+  byId("fontSize-dec").click();
+  await tick();
+  await tick();
+  assert.equal(select.value, "2.5");
+  assert.equal(byId<HTMLButtonElement>("fontSize-inc").disabled, false);
+
+  calls.length = 0;
+  select.value = "custom";
+  select.dispatchEvent(new window.Event("change", { bubbles: true }));
+  await tick();
+  assert.equal(customBox.hidden, false, "Custom reveals the input");
+  assert.equal(custom.value, "2.5", "prefilled with the current value");
+  assert.equal(calls.length, 0, "choosing Custom alone writes nothing");
+  custom.value = "9";
+  custom.dispatchEvent(new window.Event("change", { bubbles: true }));
+  await tick();
+  assert.equal(custom.value, "3", "clamped to max");
+  assert.equal(select.value, "3", "a clamped value that is a preset shows as that preset");
+  custom.value = "1.05";
+  select.value = "custom";
+  customBox.hidden = false;
+  custom.dispatchEvent(new window.Event("change", { bubbles: true }));
+  await tick();
+  assert.ok(
+    calls.some((c) => c.startsWith("storage.set") && c.includes('"fontSize":1.05')),
+    "custom persisted",
+  );
+  assert.equal(select.value, "custom");
+  assert.equal(document.documentElement.style.zoom, "1.05");
+});
 test("UI - Options - External rule change re-renders the protection list", async () => {
   stored.protectionRules = [{ id: "r9", type: "host", pattern: "elsewhere.example.com" }];
   await chrome.storage.onChanged.fire({ protectionRules: {} }, "local");
