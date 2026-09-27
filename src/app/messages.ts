@@ -10,7 +10,8 @@ export type Message =
   | { type: "snooze-tab"; tabId: number }
   | { type: "toggle-site-protection"; tabId: number }
   | { type: "protect-hosts"; hosts: string[] }
-  | { type: "unprotect-hosts"; hosts: string[] }
+  | { type: "protect-urls"; urls: string[] }
+  | { type: "unprotect-urls"; urls: string[] }
   | { type: "snooze-all-inactive" }
   | { type: "history-back" }
   | { type: "history-forward" }
@@ -40,7 +41,8 @@ export interface MessageResponses {
   "snooze-tab": MessageAck;
   "toggle-site-protection": { protected: boolean };
   "protect-hosts": MessageAck;
-  "unprotect-hosts": MessageAck;
+  "protect-urls": MessageAck;
+  "unprotect-urls": MessageAck;
   "snooze-all-inactive": MessageAck;
   "history-back": MessageAck;
   "history-forward": MessageAck;

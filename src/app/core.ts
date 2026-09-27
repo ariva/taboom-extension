@@ -69,10 +69,20 @@ export function isSupportedUrl(url: string | undefined): boolean {
   return url.startsWith("http:") || url.startsWith("https:") || url.startsWith("file:");
 }
 
-// rule: { id, type: "host" | "domain", pattern }
+// The rule kind is read off the pattern, not the stored `type`: rules saved
+// before "url" existed carry no such field value and must keep working.
+export function isUrlRule(rule: Pick<ProtectionRule, "pattern">): boolean {
+  return rule.pattern.includes("://");
+}
+
+// host-level match: does this hostname fall under the rule?
 // "host"  → exact hostname match, e.g. "mail.google.com"
 // "domain"→ "*.github.com" matches github.com and any subdomain
+// "url"   → never (a bare host is not an address)
 export function matchesRule(host: string, rule: Pick<ProtectionRule, "pattern">): boolean {
+  if (isUrlRule(rule)) {
+    return false;
+  }
   const pattern = rule.pattern.toLowerCase();
   if (pattern.startsWith("*.")) {
     const base = pattern.slice(2);
@@ -81,12 +91,21 @@ export function matchesRule(host: string, rule: Pick<ProtectionRule, "pattern">)
   return host === pattern;
 }
 
+// page-level match: url rules want the exact address (path case included —
+// Chrome hands us the normalized href, makeRule stores the same form), the
+// host kinds match through the hostname
+export function matchesUrl(url: string, rule: Pick<ProtectionRule, "pattern">): boolean {
+  if (isUrlRule(rule)) {
+    return url === rule.pattern;
+  }
+  return matchesRule(hostnameOf(url), rule);
+}
+
 export function isProtected(url: string | undefined, rules: ProtectionRule[]): boolean {
-  const host = hostnameOf(url);
-  if (!host) {
+  if (!url || !hostnameOf(url)) {
     return false;
   }
-  return rules.some((rule) => matchesRule(host, rule));
+  return rules.some((rule) => matchesUrl(url, rule));
 }
 
 // wakeTimes: tabId → ms timestamp of a MANUAL wake — a reload of a discarded
@@ -192,16 +211,21 @@ export function formatAge(ms: number): string {
 }
 
 export function makeRule(pattern: string): ProtectionRule | null {
-  const trimmed = pattern.trim().toLowerCase();
+  const trimmed = pattern.trim();
   if (!trimmed) {
     return null;
   }
-  return {
-    id: crypto.randomUUID(),
-    type: trimmed.startsWith("*.") ? "domain" : "host",
-    pattern: trimmed,
-    createdAt: Date.now(),
-  };
+  const base = { id: crypto.randomUUID(), createdAt: Date.now() };
+  if (trimmed.includes("://")) {
+    // URL(): lowercases the host, keeps the path's case — the form tab.url arrives in
+    try {
+      return { ...base, type: "url", pattern: new URL(trimmed).href };
+    } catch {
+      // not an address after all: treated as a plain host pattern below
+    }
+  }
+  const lowered = trimmed.toLowerCase();
+  return { ...base, type: lowered.startsWith("*.") ? "domain" : "host", pattern: lowered };
 }
 
 // ---------- tab activation history (browser-style back/forward across tabs) ----------

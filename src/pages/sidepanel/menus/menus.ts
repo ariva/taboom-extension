@@ -11,7 +11,17 @@ import {
   ctxTitle,
   showCtxMenu,
 } from "../../../lib/ui/context-menu.ts";
-import { actionIds, closeTabs, copyUrls, pinTabs, protectTabs, snooze, unprotectTabs, wake } from "../ops/actions.ts";
+import {
+  actionIds,
+  closeTabs,
+  copyUrls,
+  pinTabs,
+  protectTabs,
+  protectUrls,
+  snooze,
+  unprotectTabs,
+  wake,
+} from "../ops/actions.ts";
 import { TAB_GROUP_COLORS, WINDOW_DOT_COLORS, windowGroupName, windowMaps } from "../model/index.ts";
 import { render } from "../foundation/scheduler.ts";
 import { namesActive, pinActive, state, tabGroupsActive } from "../foundation/state.ts";
@@ -39,7 +49,8 @@ function appendCtxActions(ids: number[], alwaysCount = false): void {
   const actions: [label: string, run: () => void][] = [
     ["Snooze", () => snooze(ids)],
     ["Wake", () => wake(ids)],
-    ["Protect", () => protectTabs(ids)],
+    ["Protect domain", () => protectTabs(ids)],
+    ["Protect URL", () => protectUrls(ids)],
     ["Unprotect", () => unprotectTabs(ids)],
     // Pin/Unpin only when they would do something for at least one target tab
     ...(targets.some((tab) => !tab.pinned) ? [["Pin", () => pinTabs(ids, true)] satisfies [string, () => void]] : []),

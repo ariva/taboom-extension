@@ -76,7 +76,7 @@ Toggle and tune everything in **Settings** (⚙ in the side panel, or the extens
 - Right-click a page → Taboom - Tabs Manager → **Protect site**.
 - Settings page: add rules manually.
 
-Rule forms: `mail.google.com` (exact host) or `*.github.com` (domain incl. subdomains). Protect sites that lose state on reload: editors, admin consoles, forms, terminals, conferencing.
+Rule forms: `mail.google.com` (exact host), `*.github.com` (domain incl. subdomains) or a full address like `https://app.example.com/board` (that one page only — side panel row menu **Protect URL**). **Unprotect** on a tab removes whichever rules cover it. Protect sites that lose state on reload: editors, admin consoles, forms, terminals, conferencing.
 
 ## Context menu
 

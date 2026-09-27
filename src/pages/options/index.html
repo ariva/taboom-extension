@@ -155,14 +155,17 @@
       display: inline-flex;
       align-items: center;
       gap: 2px;
+      max-width: 100%; /* a url rule has no break points: cap the chip at the card, wrap inside */
       background: var(--badge-bg);
       border-radius: 999px;
       padding: 2px 4px 2px 10px;
       font-family: ui-monospace, monospace;
       font-size: 12px;
     }
+    #rules li span { min-width: 0; overflow-wrap: anywhere; }
     #rules li.muted { background: none; padding: 0; font-family: inherit; font-size: inherit; }
     #rules button {
+      flex: none; /* the wrapping url text must not squeeze the × */
       border: none;
       background: none;
       cursor: pointer;
@@ -243,7 +246,7 @@
 
   <section class="card">
     <h2>Protected Sites</h2>
-    <p class="muted">Exact host (<code>mail.google.com</code>) or domain with subdomains (<code>*.github.com</code>).</p>
+    <p class="muted">Exact host (<code>mail.google.com</code>), domain with subdomains (<code>*.github.com</code>) or one exact page (<code>https://app.example.com/board</code>).</p>
     <ul id="rules"></ul>
     <div class="row">
       <input type="text" id="new-rule" placeholder="*.example.com" />

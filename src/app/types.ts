@@ -14,9 +14,10 @@ export interface Settings {
 
 // "host"  → exact hostname match, e.g. "mail.google.com"
 // "domain"→ "*.github.com" matches github.com and any subdomain
+// "url"   → one exact address, e.g. "https://app.example.com/board?id=1"
 export interface ProtectionRule {
   id: string;
-  type: "host" | "domain";
+  type: "host" | "domain" | "url";
   pattern: string;
   createdAt: number;
 }

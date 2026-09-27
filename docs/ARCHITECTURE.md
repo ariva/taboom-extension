@@ -59,7 +59,7 @@ The worker is stateless across suspensions: everything is recoverable from stora
 | `foundation/` | `state.ts` (the `PanelState` singleton and state-derived predicates), `elements.ts` (static DOM references), `scheduler.ts` (render / refresh registry), `perf.ts` |
 | `model/` | pure view models — `index.ts` is the barrel over `derived.ts`, `search.ts`, `filters.ts`, `groups.ts`, `windows.ts`, `rows.ts`; plus `sort-direction.ts`, `window-order.ts`, `tab-hosts.ts` |
 | `render/` | `data.ts` (tabs, groups, stored state, window meta → `state`), `sorting.ts`, `render.ts`, `headers.ts`, `row.ts`, `hover-tip.ts` |
-| `ops/` | `actions.ts` (activate, snooze, wake, close, pin, protect), `window-ops.ts`, `tab-group-ops.ts` |
+| `ops/` | `actions.ts` (activate, snooze, wake, close, pin, protect domain / url, copy urls), `window-ops.ts`, `tab-group-ops.ts` |
 | `menus/` | `menus.ts` (row / window / tab-group menus), `list-context-menu.ts` |
 | `windows-popover/` | `popover.ts` (shell + Windows view), `groups.ts` (Groups view, new group, drag reorder), `pins.ts` |
 | `dnd/` | `tab-dnd.ts`, `drop-target.ts`, and the pure `dnd-model.ts` (`dropSpecFor`, `reorderedGroupTitles`) |

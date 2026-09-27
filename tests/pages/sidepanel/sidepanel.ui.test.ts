@@ -778,7 +778,8 @@ test("UI - Sidepanel - Right-click row offers move-to-window menu (selection-awa
       "Copy URL",
       "Snooze",
       "Wake",
-      "Protect",
+      "Protect domain",
+      "Protect URL",
       "Unprotect",
       "Pin",
       "Close",
@@ -873,10 +874,17 @@ test("UI - Sidepanel - Context menu actions act on the clicked tab / whole selec
 
   calls.length = 0;
   rowOf(1).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
-  pick("Protect");
+  pick("Protect domain");
   await tick();
   await tick();
-  assert.ok(calls.includes("sendMessage protect-hosts"), "protect via service worker");
+  assert.ok(calls.includes("sendMessage protect-hosts"), "protect domain via service worker");
+
+  calls.length = 0;
+  rowOf(1).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+  pick("Protect URL");
+  await tick();
+  await tick();
+  assert.ok(calls.includes("sendMessage protect-urls"), "protect exact url via service worker");
 
   calls.length = 0;
   rowOf(1).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
@@ -905,7 +913,7 @@ test("UI - Sidepanel - Context menu actions act on the clicked tab / whole selec
   pick("Unprotect");
   await tick();
   await tick();
-  assert.ok(calls.includes("sendMessage unprotect-hosts"), "unprotect via service worker");
+  assert.ok(calls.includes("sendMessage unprotect-urls"), "unprotect via service worker");
 
   calls.length = 0;
   rowOf(1).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
@@ -1028,7 +1036,8 @@ test("UI - Sidepanel - Window header right-click: window-wide actions + Change o
         : []),
       "Snooze 2 tabs",
       "Wake 2 tabs",
-      "Protect 2 tabs",
+      "Protect domain 2 tabs",
+      "Protect URL 2 tabs",
       "Unprotect 2 tabs",
       "Pin 2 tabs",
       "Close 2 tabs", // both unpinned → no Unpin offered
@@ -1089,10 +1098,10 @@ test("UI - Sidepanel - Window header right-click: window-wide actions + Change o
   q(document, '.group-header[data-window-id="1"]').dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
   const actionLabels = qa(menu, ".ctx-item")
     .map((el) => el.textContent)
-    .filter((t) => /^(Snooze|Wake|Protect|Unprotect|Close)( \d+ tabs?)?$/.test(t));
+    .filter((t) => /^(Snooze|Wake|Protect domain|Protect URL|Unprotect|Close)( \d+ tabs?)?$/.test(t));
   assert.deepEqual(
     actionLabels,
-    ["Snooze 1 tab", "Wake 1 tab", "Protect 1 tab", "Unprotect 1 tab", "Close 1 tab"],
+    ["Snooze 1 tab", "Wake 1 tab", "Protect domain 1 tab", "Protect URL 1 tab", "Unprotect 1 tab", "Close 1 tab"],
     "1 of 2 selected — actions name the single-tab scope explicitly",
   );
   calls.length = 0;

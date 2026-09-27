@@ -6,7 +6,7 @@ import { toast } from "../../../lib/ui/toast.ts";
 import { refresh } from "../foundation/scheduler.ts";
 import { state } from "../foundation/state.ts";
 import type { PanelTab } from "../foundation/state.ts";
-import { hostsOf } from "../model/tab-hosts.ts";
+import { hostsOf, urlsOf } from "../model/tab-hosts.ts";
 
 // dragging (or right-clicking) a selected row acts on the whole selection
 export function actionIds(tabId: number): number[] {
@@ -85,8 +85,16 @@ export async function protectTabs(tabIds: number[]): Promise<void> {
   refresh(true);
 }
 
+// exact addresses, so two tabs on one host can differ; the host stays snoozable
+export async function protectUrls(tabIds: number[]): Promise<void> {
+  await send({ type: "protect-urls", urls: urlsOf(state.allTabs, tabIds) });
+  unselect(tabIds);
+  refresh(true);
+}
+
+// by url: removes the host rule covering the page and its exact url rule alike
 export async function unprotectTabs(tabIds: number[]): Promise<void> {
-  await send({ type: "unprotect-hosts", hosts: hostsOf(state.allTabs, tabIds) });
+  await send({ type: "unprotect-urls", urls: urlsOf(state.allTabs, tabIds) });
   unselect(tabIds);
   refresh(true);
 }

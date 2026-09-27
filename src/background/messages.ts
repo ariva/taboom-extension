@@ -2,7 +2,7 @@
 // union, delegating to the feature modules.
 import { removeHistoryAt } from "../app/core.ts";
 import type { Message } from "../app/messages.ts";
-import { protectHosts, toggleSiteProtection, unprotectHosts } from "./protection.ts";
+import { protectHosts, protectUrls, toggleSiteProtection, unprotectUrls } from "./protection.ts";
 import { autoSnoozePass, recordWakes, snoozeTab } from "./snooze.ts";
 import { historyJump, loadHistory, withHistory } from "./tab-history.ts";
 import { panelsToRestore, patchWindowProfiles, setPanelOpen } from "./window-profiles.ts";
@@ -15,8 +15,10 @@ export async function handleMessage(message: Message): Promise<{ protected: bool
       return toggleSiteProtection(await chrome.tabs.get(message.tabId));
     case "protect-hosts":
       return protectHosts(message.hosts);
-    case "unprotect-hosts":
-      return unprotectHosts(message.hosts);
+    case "protect-urls":
+      return protectUrls(message.urls);
+    case "unprotect-urls":
+      return unprotectUrls(message.urls);
     case "snooze-all-inactive":
       return autoSnoozePass();
     case "history-back":

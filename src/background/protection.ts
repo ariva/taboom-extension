@@ -1,7 +1,7 @@
 // Site protection: rule edits, the autoDiscardable flag on tabs, and the
 // protect menu item's title.
 import { hostnameOf, isProtected, isSupportedUrl } from "../app/core.ts";
-import { addHostRules, removeHostRules, toggleHostRule } from "../app/protection-rules.ts";
+import { addHostRules, addUrlRules, removeRulesFor, toggleHostRule } from "../app/protection-rules.ts";
 import { loadState, saveState } from "../app/storage.ts";
 import type { ProtectionRule } from "../app/types.ts";
 import { enqueueMenuOp } from "./context-menus.ts";
@@ -24,12 +24,11 @@ export async function applyAutoDiscardable(rules: ProtectionRule[]): Promise<voi
 }
 
 export async function toggleSiteProtection(tab: chrome.tabs.Tab): Promise<{ protected: boolean }> {
-  const host = hostnameOf(tab.url);
-  if (!host) {
+  if (!tab.url || !hostnameOf(tab.url)) {
     return { protected: false };
   }
   const state = await loadState();
-  const toggled = toggleHostRule(state.protectionRules, host);
+  const toggled = toggleHostRule(state.protectionRules, tab.url);
   await saveState({ protectionRules: toggled.rules });
   await applyAutoDiscardable(toggled.rules);
   return { protected: toggled.protected };
@@ -42,9 +41,17 @@ export async function protectHosts(hosts: string[]): Promise<void> {
   await applyAutoDiscardable(rules);
 }
 
-export async function unprotectHosts(hosts: string[]): Promise<void> {
+export async function protectUrls(urls: string[]): Promise<void> {
   const state = await loadState();
-  const rules = removeHostRules(state.protectionRules, hosts);
+  const rules = addUrlRules(state.protectionRules, urls);
+  await saveState({ protectionRules: rules });
+  await applyAutoDiscardable(rules);
+}
+
+// drops host rules covering the pages as well as exact url rules for them
+export async function unprotectUrls(urls: string[]): Promise<void> {
+  const state = await loadState();
+  const rules = removeRulesFor(state.protectionRules, urls);
   await saveState({ protectionRules: rules });
   await applyAutoDiscardable(rules);
 }

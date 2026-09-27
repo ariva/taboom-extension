@@ -200,6 +200,18 @@ test("Service Worker - Protect-hosts skips hosts already covered by a rule", asy
   assert.equal(patterns.filter((p) => p === "mail.google.com").length, 1, "no duplicate rule");
 });
 
+test("Service Worker - Protect-urls adds exact rules, unprotect-urls removes them and covering host rules", async () => {
+  await send({ type: "protect-urls", urls: ["https://mail.google.com/inbox", "https://app.example.net/board", ""] });
+  let patterns = stored.protectionRules.map((r) => r.pattern);
+  assert.ok(patterns.includes("https://app.example.net/board"), "url rule added");
+  assert.ok(patterns.includes("https://mail.google.com/inbox"), "url rule added even though the host is protected");
+  await send({ type: "unprotect-urls", urls: ["https://app.example.net/board", "https://mail.google.com/x"] });
+  patterns = stored.protectionRules.map((r) => r.pattern);
+  assert.ok(!patterns.includes("https://app.example.net/board"), "url rule removed");
+  assert.ok(!patterns.includes("mail.google.com"), "host rule covering the url removed");
+  stored.protectionRules.push({ id: "r1", type: "host", pattern: "mail.google.com" }); // restore fixture
+});
+
 test("Service Worker - Unknown message type returns an error", async () => {
   const response = await send({ type: "nonsense" });
   assert.match(response.error, /unknown message/);

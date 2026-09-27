@@ -1,19 +1,19 @@
 // Pure rule-list edits behind toggle / protect / unprotect (src/app/protection-rules.ts).
 import assert from "node:assert/strict";
 import { test } from "vitest";
-import { addHostRules, removeHostRules, toggleHostRule } from "../../src/app/protection-rules.ts";
+import { addHostRules, addUrlRules, removeRulesFor, toggleHostRule } from "../../src/app/protection-rules.ts";
 import type { ProtectionRule } from "../../src/app/types.ts";
 
 const rule = (id: string, pattern: string): ProtectionRule => ({
   id,
-  type: pattern.startsWith("*.") ? "domain" : "host",
+  type: pattern.includes("://") ? "url" : pattern.startsWith("*.") ? "domain" : "host",
   pattern,
   createdAt: 0,
 });
 
 test("Core - ToggleHostRule: an uncovered host gains one host rule and reports protected", () => {
   const current = [rule("r1", "mail.google.com")];
-  const toggled = toggleHostRule(current, "work.example.com");
+  const toggled = toggleHostRule(current, "https://work.example.com/dash");
   assert.equal(toggled.protected, true);
   assert.deepEqual(
     toggled.rules.map((r) => r.pattern),
@@ -25,7 +25,7 @@ test("Core - ToggleHostRule: an uncovered host gains one host rule and reports p
 
 test("Core - ToggleHostRule: a covered host loses every rule covering it, wildcard included", () => {
   const current = [rule("r1", "docs.github.com"), rule("r2", "*.github.com"), rule("r3", "other.com")];
-  const toggled = toggleHostRule(current, "docs.github.com");
+  const toggled = toggleHostRule(current, "https://docs.github.com/en");
   assert.equal(toggled.protected, false);
   assert.deepEqual(
     toggled.rules.map((r) => r.id),
@@ -41,11 +41,37 @@ test("Core - AddHostRules: skips blank, already covered and repeated hosts", () 
   );
 });
 
-test("Core - RemoveHostRules: drops rules matching any host, ignores blank hosts", () => {
-  const current = [rule("r1", "a.com"), rule("r2", "*.github.com"), rule("r3", "b.com")];
-  assert.deepEqual(
-    removeHostRules(current, ["", "gist.github.com", "a.com"]).map((r) => r.id),
-    ["r3"],
+test("Core - ToggleHostRule: a url-protected page toggles its url rule off, adds nothing", () => {
+  const current = [rule("r1", "https://a.com/page")];
+  const toggled = toggleHostRule(current, "https://a.com/page");
+  assert.equal(toggled.protected, false);
+  assert.deepEqual(toggled.rules, []);
+});
+
+test("Core - AddUrlRules: skips blank, unsupported and repeated urls; a protected host does not block", () => {
+  const rules = addUrlRules(
+    [rule("r1", "*.github.com"), rule("r2", "https://b.com/x")],
+    ["", "chrome://settings", "https://gist.github.com/me", "https://b.com/x", "https://a.com/p", "https://a.com/p"],
   );
-  assert.deepEqual(removeHostRules(current, []), current);
+  assert.deepEqual(
+    rules.map((r) => r.pattern),
+    ["*.github.com", "https://b.com/x", "https://gist.github.com/me", "https://a.com/p"],
+    "url rule added even under a covering domain rule — it must survive unprotecting the domain later",
+  );
+  assert.equal(rules[2]?.type, "url");
+});
+
+test("Core - RemoveRulesFor: drops host rules covering a url and url rules equal to it, ignores blanks", () => {
+  const current = [
+    rule("r1", "a.com"),
+    rule("r2", "*.github.com"),
+    rule("r3", "b.com"),
+    rule("r4", "https://c.com/page"),
+    rule("r5", "https://c.com/other"),
+  ];
+  assert.deepEqual(
+    removeRulesFor(current, ["", "https://gist.github.com/x", "https://a.com/", "https://c.com/page"]).map((r) => r.id),
+    ["r3", "r5"],
+  );
+  assert.deepEqual(removeRulesFor(current, []), current);
 });

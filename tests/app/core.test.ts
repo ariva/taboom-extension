@@ -8,6 +8,7 @@ import {
   isSupportedUrl,
   makeRule,
   matchesRule,
+  matchesUrl,
   matchesSearch,
   selectAutoSnoozeTargets,
 } from "../../src/app/core.ts";
@@ -110,6 +111,23 @@ test("Core - Protection rules", () => {
     "port ignored",
   );
   assert.equal(isProtected("not a url", [host]), false);
+});
+
+test("Core - URL rules protect one exact address only", () => {
+  const rule = makeRule("  https://Example.com/Docs/Page?x=1  ");
+  assert.equal(rule?.type, "url");
+  assert.equal(rule?.pattern, "https://example.com/Docs/Page?x=1", "host normalized, path case kept");
+  assert.ok(rule, "url rule made");
+  assert.equal(matchesUrl("https://example.com/Docs/Page?x=1", rule), true);
+  assert.equal(matchesUrl("https://example.com/Docs/Page", rule), false, "different path");
+  assert.equal(matchesUrl("https://example.com/docs/page?x=1", rule), false, "path case matters");
+  assert.equal(matchesRule("example.com", rule), false, "a bare host never matches a url rule");
+  assert.equal(isProtected("https://example.com/Docs/Page?x=1", [rule]), true);
+  assert.equal(isProtected("https://example.com/", [rule]), false, "same host, other page: not protected");
+  const host = makeRule("example.com");
+  assert.ok(host);
+  assert.equal(matchesUrl("https://example.com/anything", host), true, "host rules still match by hostname");
+  assert.equal(makeRule("https://")?.type, "host", "unparsable url falls back to the plain pattern");
 });
 
 test("Core - Eligibility treats missing lastAccessed as just used", () => {

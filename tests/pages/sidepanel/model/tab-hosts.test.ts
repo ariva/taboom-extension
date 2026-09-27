@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
-import { hostsOf } from "../../../../src/pages/sidepanel/model/tab-hosts.ts";
+import { hostsOf, urlsOf } from "../../../../src/pages/sidepanel/model/tab-hosts.ts";
 
 const tabs = [
   { id: 1, url: "https://Example.com/a" },
@@ -17,4 +17,13 @@ test("UI - Sidepanel - Tab hosts - Unique hostnames in tab-id order", () => {
 test("UI - Sidepanel - Tab hosts - Unknown ids and tabs without a usable URL are dropped", () => {
   assert.deepEqual(hostsOf(tabs, [99, 4, 5, 1]), ["example.com"]);
   assert.deepEqual(hostsOf(tabs, []), []);
+});
+
+test("UI - Sidepanel - Tab urls - Unique supported urls in tab-id order, exact strings", () => {
+  assert.deepEqual(urlsOf(tabs, [3, 1, 2, 1]), [
+    "https://docs.example.org/",
+    "https://Example.com/a",
+    "https://example.com/b",
+  ]);
+  assert.deepEqual(urlsOf(tabs, [99, 4, 5]), []);
 });
