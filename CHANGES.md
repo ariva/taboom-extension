@@ -1,5 +1,15 @@
 # CHANGES
 
+## v1.0.1 — 2026-09-27
+
+### Summary
+Exact-URL protection, Copy URL in the context menu and zoom presets
+
+### New Features
+- Add exact-URL protection rules (1e50f5a)
+- Add "Copy URL" to the side panel row context menu (e160964)
+- Add zoom presets in options (c12ba60)
+
 ## v1.0.0 — 2026-09-26
 
 ### Summary
