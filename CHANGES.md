@@ -1,7 +1,12 @@
 # CHANGES
 
-## v1.0.0 — 2026-09-20
-TODO
+## v1.0.0 — 2026-09-26
+
+### Summary
+Migration of the codebase from JSDoc to TypeScript
+
+### Other
+- TS code migration: jsdoc -> typescript + refactor code (fca2f7c)
 
 ## v0.2.17 — 2026-09-20
 
