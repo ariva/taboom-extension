@@ -4,7 +4,7 @@ import { removeHistoryAt } from "../app/core.ts";
 import type { Message } from "../app/messages.ts";
 import { protectHosts, protectUrls, toggleSiteProtection, unprotectUrls } from "./protection.ts";
 import { autoSnoozePass, recordWakes, snoozeTab } from "./snooze.ts";
-import { historyJump, loadHistory, withHistory } from "./tab-history.ts";
+import { historyJump, historyStep, withHistory } from "./tab-history.ts";
 import { panelsToRestore, patchWindowProfiles, setPanelOpen } from "./window-profiles.ts";
 
 export async function handleMessage(message: Message): Promise<{ protected: boolean } | { windows: number[] } | void> {
@@ -22,9 +22,9 @@ export async function handleMessage(message: Message): Promise<{ protected: bool
     case "snooze-all-inactive":
       return autoSnoozePass();
     case "history-back":
-      return loadHistory().then((h) => historyJump(h.cursor - 1));
+      return historyStep(-1);
     case "history-forward":
-      return loadHistory().then((h) => historyJump(h.cursor + 1));
+      return historyStep(1);
     case "history-jump":
       return historyJump(message.index);
     case "history-remove":

@@ -56,6 +56,8 @@ Panel position (left or right) is a global Chrome setting: `chrome://settings/ap
 
 Keyboard: `/` focus search · `↑`/`↓` move selection · `Enter` activate · `Esc` clear search.
 
+Tab history works from any tab, no panel needed: `Ctrl+Shift+,` back · `Ctrl+Shift+.` forward (`Cmd` on Mac; reassign at `chrome://extensions/shortcuts`). Same trail as the panel's ◀ ▶ buttons and the History context menu.
+
 ## Automatic snooze
 
 Every 5 minutes (configurable) the extension discards tabs that are **all** of:

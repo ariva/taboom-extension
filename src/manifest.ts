@@ -54,6 +54,23 @@ export function manifest(version: string, _target: BuildTarget = "chrome"): chro
       "toggle-protection": {
         description: "Toggle site protection for current tab",
       },
+      // "<" and ">" keys: free in Chrome on every platform and, unlike Ctrl+Shift+Arrow,
+      // they steal no text-editing shortcut from web pages (commands are browser-wide).
+      // Chrome allows at most 4 commands with a suggested key — this uses 3.
+      "history-back": {
+        suggested_key: {
+          default: "Ctrl+Shift+Comma",
+          mac: "Command+Shift+Comma",
+        },
+        description: "Tab history: back to the previous tab",
+      },
+      "history-forward": {
+        suggested_key: {
+          default: "Ctrl+Shift+Period",
+          mac: "Command+Shift+Period",
+        },
+        description: "Tab history: forward to the next tab",
+      },
     },
   };
 }

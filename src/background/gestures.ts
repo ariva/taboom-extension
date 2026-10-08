@@ -4,10 +4,14 @@ import { isSupportedUrl } from "../app/core.ts";
 import { openPanel } from "../lib/platform/panel.ts";
 import { toggleSiteProtection } from "./protection.ts";
 import { autoSnoozePass, snoozeTab } from "./snooze.ts";
-import { historyJump } from "./tab-history.ts";
+import { historyJump, historyStep } from "./tab-history.ts";
 
 // commands.onCommand
 export async function runCommand(command: string): Promise<void> {
+  // history steps pick their own tab — the current one is irrelevant
+  if (command === "history-back" || command === "history-forward") {
+    return historyStep(command === "history-back" ? -1 : 1);
+  }
   const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
   if (!tab) {
     return;

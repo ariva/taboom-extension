@@ -9,7 +9,9 @@ import { manifestPlugin } from "./tooling/manifest-plugin.ts";
 import { staticFilesPlugin } from "./tooling/static-files-plugin.ts";
 
 const root = import.meta.dirname;
-const { version } = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8"));
+const packageJson = resolve(root, "package.json");
+// read per build, not once: `just dev` must pick up a version bump without a restart
+const packageVersion = (): string => JSON.parse(readFileSync(packageJson, "utf8")).version;
 
 export default defineConfig(({ mode }) => {
   const isDev = mode === "development";
@@ -52,7 +54,7 @@ export default defineConfig(({ mode }) => {
       },
     },
     plugins: [
-      manifestPlugin(() => manifest(version)),
+      manifestPlugin(() => manifest(packageVersion()), [packageJson]),
       staticFilesPlugin([
         { from: resolve(root, "features.json"), to: "features.json" },
         { from: resolve(root, "CHANGES.md"), to: "CHANGES.md" },

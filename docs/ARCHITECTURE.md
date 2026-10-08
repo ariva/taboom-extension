@@ -41,7 +41,7 @@ The manifest is code: `src/manifest.ts` exports `manifest(version, target = "chr
 | `snooze.ts` | the alarm, the auto-snooze pass, manual snooze, wake-time recording |
 | `protection.ts` | protection rules → `autoDiscardable`, toggle / bulk protect, protect menu sync |
 | `context-menus.ts` | browser context menu items, serialized rebuilds, history menu |
-| `tab-history.ts` | tab activation history (back / forward / jump), persisted stack |
+| `tab-history.ts` | tab activation history (back / forward / jump), persisted stack; `historyStep` serves both the panel's message and the browser-wide keyboard command; jumps start one at a time so Chrome's activation echo of a jump never lands behind the next jump (key auto-repeat) |
 | `window-profiles.ts` | window identity across restarts, names / colors / pins, side-panel port tracking, panels to restore |
 | `messages.ts` | `handleMessage`: exhaustive `switch` over the `Message` union |
 | `gestures.ts` | keyboard commands and context-menu clicks |

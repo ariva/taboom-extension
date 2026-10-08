@@ -39,24 +39,13 @@ export function withHistory(
   return run;
 }
 
-let expectedActivation: number | null = null; // our own jump's tabId — don't re-push it
-
-function isOwnJump(tabId: number): boolean {
-  if (expectedActivation !== tabId) {
-    return false;
-  }
-  expectedActivation = null; // cursor already moved by the jump
-  return true;
-}
-
 export async function recordActivation(tabId: number): Promise<void> {
   const mode = await navMode();
   if (mode === "off") {
     return; // feature off: zero writes per tab switch
   }
-  if (isOwnJump(tabId)) {
-    return;
-  }
+  // Our own jump's activation echo lands here too: it queues behind the jump in the
+  // chain, by which time the cursor already sits on that tab and push() is a no-op.
   const push = mode === "compact" ? pushHistoryCompact : pushHistoryTraditional;
   await withHistory((hist) => push(hist, tabId));
 }
@@ -102,22 +91,44 @@ export function replaceTabId(addedTabId: number, removedTabId: number): Promise<
   });
 }
 
-export async function historyJump(cursor: number): Promise<void> {
-  await withHistory(async (hist) => {
-    if (cursor < 0 || cursor >= hist.stack.length) {
-      return null;
-    }
-    const tabId = hist.stack[cursor]!; // cursor is bounds-checked just above
-    try {
-      const tab = await chrome.tabs.get(tabId);
-      expectedActivation = tabId;
-      await chrome.windows.update(tab.windowId, { focused: true });
-      await chrome.tabs.update(tabId, { active: true });
-      return { ...hist, cursor };
-    } catch {
-      // tab already gone (e.g. closed while worker slept) — drop it, stay put
-      expectedActivation = null;
-      return removeFromHistory(hist, tabId);
-    }
-  });
+// Activates stack[cursor] and moves the cursor there. Runs INSIDE the chain: the
+// target is read from the serialized state, so two quick presses (key auto-repeat)
+// step twice instead of both computing the same target from a stale read.
+async function jumpWithin(hist: TabHistory, cursor: number): Promise<TabHistory | null> {
+  if (cursor < 0 || cursor >= hist.stack.length) {
+    return null;
+  }
+  const tabId = hist.stack[cursor]!; // cursor is bounds-checked just above
+  try {
+    const tab = await chrome.tabs.get(tabId);
+    // tab first, window second: the focus change then finds the target already active,
+    // so recordWindowFocus records it (a no-op) and not the window's previous tab
+    await chrome.tabs.update(tabId, { active: true });
+    await chrome.windows.update(tab.windowId, { focused: true });
+    return { ...hist, cursor };
+  } catch {
+    // tab already gone (e.g. closed while worker slept) — drop it, stay put
+    return removeFromHistory(hist, tabId);
+  }
+}
+
+// Jumps start one at a time. Chrome echoes a jump as tabs.onActivated / windows.onFocusChanged
+// while the jump runs, and recordActivation queues that echo on the chain right then; a
+// jump started only after the previous one finished lands behind the echo, which finds
+// the cursor already on its tab and is a no-op. Queued up front (key auto-repeat) the
+// second jump would run first and the echo would truncate the trail and append.
+let jumpQueue = Promise.resolve();
+function enqueueJump(target: (hist: TabHistory) => number): Promise<void> {
+  const run = jumpQueue.then(() => withHistory((hist) => jumpWithin(hist, target(hist))));
+  jumpQueue = run.catch(() => {}); // one failure must not jam the queue
+  return run;
+}
+
+export function historyJump(cursor: number): Promise<void> {
+  return enqueueJump(() => cursor);
+}
+
+// back (-1) / forward (+1) from the current cursor; out of range = no-op
+export function historyStep(delta: -1 | 1): Promise<void> {
+  return enqueueJump((hist) => hist.cursor + delta);
 }

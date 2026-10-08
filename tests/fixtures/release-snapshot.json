@@ -67,6 +67,20 @@
       },
       "toggle-protection": {
         "description": "Toggle site protection for current tab"
+      },
+      "history-back": {
+        "suggested_key": {
+          "default": "Ctrl+Shift+Comma",
+          "mac": "Command+Shift+Comma"
+        },
+        "description": "Tab history: back to the previous tab"
+      },
+      "history-forward": {
+        "suggested_key": {
+          "default": "Ctrl+Shift+Period",
+          "mac": "Command+Shift+Period"
+        },
+        "description": "Tab history: forward to the next tab"
       }
     }
   }

@@ -297,6 +297,31 @@ test("Service Worker - Tab history: back jumps without pushing, manual pick trun
   );
 });
 
+test("Service Worker - Keyboard commands history-back / history-forward step along the trail", {
+  skip: !TRADITIONAL_DEFAULT, // continues the trail of the previous test: [3, 2, 1, 2], cursor 3
+}, async () => {
+  calls.length = 0;
+  await chrome.commands.onCommand.fire("history-back");
+  await tick();
+  assert.ok(
+    calls.some((c) => c.startsWith("tabs.update 1") && c.includes('"active":true')),
+    "back from a page shortcut activates the previous tab",
+  );
+  await chrome.tabs.onActivated.fire({ tabId: 1 }); // Chrome reporting our own jump
+
+  calls.length = 0;
+  await chrome.commands.onCommand.fire("history-forward");
+  await tick();
+  assert.ok(
+    calls.some((c) => c.startsWith("tabs.update 2") && c.includes('"active":true')),
+    "forward returns to the tab the back step left",
+  );
+  await chrome.tabs.onActivated.fire({ tabId: 2 });
+  await tick();
+  const { tabHistory } = await chrome.storage.local.get();
+  assert.deepEqual(tabHistory, { stack: [3, 2, 1, 2], cursor: 3 }, "jumps move the cursor, never push");
+});
+
 test("Service Worker - Window focus switch records the newly-current tab in history", {
   skip: !NAV_ON, // navigation resolves to off in features.json
 }, async () => {

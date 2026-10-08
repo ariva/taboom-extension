@@ -58,6 +58,8 @@ Defaults (customize at `chrome://extensions/shortcuts`):
 | Command | Default |
 |---|---|
 | Open Taboom - Tabs Manager side panel | `Ctrl+Shift+Space` (`Cmd+Shift+Space` on Mac) |
+| Tab history: back to the previous tab | `Ctrl+Shift+,` (`Cmd+Shift+,` on Mac) |
+| Tab history: forward to the next tab | `Ctrl+Shift+.` (`Cmd+Shift+.` on Mac) |
 | Snooze current tab | unassigned |
 | Toggle site protection for current tab | unassigned |
 
