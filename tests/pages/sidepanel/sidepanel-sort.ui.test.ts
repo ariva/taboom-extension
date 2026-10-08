@@ -519,6 +519,21 @@ test("UI - Sidepanel Sort - Window focus switch scrolls current window's group i
   listEl.scrollTop = 0;
 });
 
+// regression guard: a revealed row (keyboard history, arrows) must not land under
+// the sticky window header — asserts COMPUTED style, the rule hangs on a sibling combinator
+test("UI - Sidepanel Sort - Rows under a sticky window header keep scroll-margin-top clear of it", async () => {
+  setSort("window");
+  await tick();
+  const row = q(document, ".group-header ~ .row");
+  assert.equal(window.getComputedStyle(row).scrollMarginTop, "2rem", "grouped row clears the header");
+  setSort("recent");
+  await tick();
+  const flat = q(document, ".row");
+  assert.equal(window.getComputedStyle(flat).scrollMarginTop, "", "flat sort: nothing to clear");
+  setSort("window");
+  await tick();
+});
+
 test("UI - Sidepanel Sort - Tab groups sort: ABC groups, ungrouped last, group menu", {
   skip: !(TEST_FEATURES.TAB_GROUPS?.enabled === true), // TAB_GROUPS disabled in features.json
 }, async () => {

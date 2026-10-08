@@ -56,7 +56,13 @@ Panel position (left or right) is a global Chrome setting: `chrome://settings/ap
 
 Keyboard: `/` focus search · `↑`/`↓` move selection · `Enter` activate · `Esc` clear search.
 
-Tab history works from any tab, no panel needed: `Ctrl+Shift+,` back · `Ctrl+Shift+.` forward (`Cmd` on Mac; reassign at `chrome://extensions/shortcuts`). Same trail as the panel's ◀ ▶ buttons and the History context menu.
+Tab history works from any tab, no panel needed: `Ctrl+Shift+,` back · `Ctrl+Shift+.` forward (`Cmd` on Mac). Same trail as the panel's ◀ ▶ buttons and the History context menu. When the active tab changes outside the panel (these shortcuts, Ctrl+Tab, a click in the tab strip), the open panel scrolls just enough to show the new current row.
+
+### Changing the key bindings
+
+The browser-wide shortcuts are Chrome commands, so you change them in Chrome, not in Taboom's options: open `chrome://extensions/shortcuts`, find **Taboom - Tabs Manager**, click the pencil next to a command and press the new combination. Taboom registers five commands — open side panel, tab history back, tab history forward, snooze current tab, toggle site protection — and Chrome adds its own "Activate the extension" row (the toolbar-icon click). Snooze and toggle protection ship unassigned; give them a key here. Chrome rejects keys another extension already uses, and a shortcut set to "In Chrome" works only while a Chrome window is focused ("Global" works everywhere). The in-panel keys (`/`, arrows, `Enter`, `Esc`) are fixed.
+
+![Taboom commands on chrome://extensions/shortcuts](assets/change_key_bindings.png)
 
 ## Automatic snooze
 

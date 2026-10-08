@@ -266,6 +266,33 @@ test("UI - Sidepanel - Activating a row scrolls the current tab into view after 
   assert.equal(scrolled.length, 0);
 });
 
+test("UI - Sidepanel - Active tab switched outside the panel (keyboard history) reveals the new current row", async () => {
+  const scrolled: string[] = [];
+  window.HTMLElement.prototype.scrollIntoView = function (this: HTMLElement) {
+    scrolled.push(this.className);
+  };
+  const listEl = byId("tab-list");
+  listEl.scrollTop = 500; // the newly active row is far below the viewport
+  // Ctrl+Shift+, in the worker: same window, a different tab becomes active
+  must(tabs.find((tab) => tab.id === 1)).active = false;
+  must(tabs.find((tab) => tab.id === 2)).active = true;
+  try {
+    await chrome.tabs.onActivated.fire({ tabId: 2, windowId: 1 });
+    await new Promise((resolve) => setTimeout(resolve, 200)); // 150ms debounce
+    assert.ok(
+      scrolled.some((c) => c.includes("current")),
+      "new current row scrolled into view",
+    );
+    assert.equal(listEl.scrollTop, 500, "nearest reveal only: no jump to top");
+  } finally {
+    must(tabs.find((tab) => tab.id === 2)).active = false;
+    must(tabs.find((tab) => tab.id === 1)).active = true;
+    await chrome.tabs.onActivated.fire({ tabId: 1, windowId: 1 });
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    listEl.scrollTop = 0;
+  }
+});
+
 // regression guard: [hidden] must actually hide even when author CSS sets a
 // display value (.icon-btn is inline-flex, footer is flex) — asserts COMPUTED style
 test("UI - Sidepanel - [hidden] beats author display rules (computed style)", () => {

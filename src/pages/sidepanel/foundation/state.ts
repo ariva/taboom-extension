@@ -39,7 +39,9 @@ export interface PanelState {
   selected: Set<number>;
   cursor: number;
   currentWindowId: number | null; // null until the first refresh() resolves
+  activeTabId: number | null; // active tab of the current window as of the last refresh()
   followCurrent: boolean;
+  revealCurrent: boolean;
   pendingScroll: number | null;
   windowMeta: WindowMetaMap;
   tabGroups: Map<number, TabGroup>;
@@ -74,9 +76,14 @@ export const state: PanelState = {
   selected: new Set(),
   cursor: -1,
   currentWindowId: null, // until the first refresh() resolves
+  activeTabId: null,
   // after activating, the tab jumps in the list (top in recent/window sorts) —
   // follow it on the next event-driven re-render so it doesn't vanish off-screen
   followCurrent: false,
+  // the active tab changed outside the panel (keyboard history command, Ctrl+Tab):
+  // minimal scroll so the row is visible — no jump to top, a row already on
+  // screen stays where it is
+  revealCurrent: false,
   pendingScroll: null, // scrollTop to apply after the next render (filter/search switches)
   windowMeta: new Map(), // windowId → { name, color } from windowProfiles (WINDOW_NAMES)
   tabGroups: new Map(), // groupId → { title, color, collapsed } from chrome.tabGroups

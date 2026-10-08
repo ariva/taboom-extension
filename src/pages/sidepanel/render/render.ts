@@ -186,6 +186,10 @@ function renderNowImpl(): void {
     const current = listEl.querySelector(".row.current");
     current?.scrollIntoView({ block: "nearest" });
   }
+  if (state.revealCurrent) {
+    state.revealCurrent = false;
+    listEl.querySelector(".row.current")?.scrollIntoView({ block: "nearest" });
+  }
   renderBulkBar();
   refillWindowsPopoverIfOpen();
 }
