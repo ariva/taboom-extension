@@ -32,7 +32,7 @@ dist/prod/    production build — what gets zipped
   options/index.html, index.js    the options page
   chunks/*.js                     code shared between the worker and the pages
   assets/*.css, *.svg             page styles and images
-  icons/                          from public/icons
+  icons/                          from icons/prod
   features.json, CHANGES.md       copied from the repo root — the extension fetches them at run time
 ```
 

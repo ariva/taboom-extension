@@ -1,6 +1,7 @@
-// Emits files that live outside src/ and public/ into the build output, unchanged —
-// for files the runtime fetches by URL (chrome.runtime.getURL) but that must stay where
-// they are in the repo (release notes, feature flags), and for dev-only assets.
+// Emits files that live outside src/ into the build output, unchanged — for files the
+// runtime fetches by URL (chrome.runtime.getURL) but that must stay where they are in the
+// repo (release notes, feature flags), the icons, and dev-only assets. Replaces Vite's
+// publicDir, which cannot keep a file out of the production build.
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import type { Plugin } from "vite";

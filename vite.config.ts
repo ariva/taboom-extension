@@ -20,7 +20,7 @@ export default defineConfig(({ mode }) => {
     // the paths the manifest (and users' open tabs) already use
     root: resolve(root, "src/pages"),
     base: "./", // chrome-extension:// origin — every URL relative
-    publicDir: resolve(root, "public"),
+    publicDir: false, // icons/ go through staticFilesPlugin: prod always, dev only in development
     build: {
       outDir: resolve(root, isDev ? "dist/dev" : "dist/prod"),
       emptyOutDir: true,
@@ -58,7 +58,9 @@ export default defineConfig(({ mode }) => {
       staticFilesPlugin([
         { from: resolve(root, "features.json"), to: "features.json" },
         { from: resolve(root, "CHANGES.md"), to: "CHANGES.md" },
-        { from: resolve(root, "dev-assets/icons/dev"), to: "icons/dev", devOnly: true },
+        { from: resolve(root, "icons/prod"), to: "icons" },
+        // the blue icons mark a dev-loaded extension; never in dist/prod (release snapshot audits it)
+        { from: resolve(root, "icons/dev"), to: "icons/dev", devOnly: true },
       ]),
       devReloadPlugin({ pageDirs: ["sidepanel", "options"] }),
     ],
