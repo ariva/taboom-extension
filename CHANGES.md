@@ -1,5 +1,13 @@
 # CHANGES
 
+## v1.0.2 — 2026-10-07
+
+### Summary
+Browser-wide keyboard shortcuts for tab history
+
+### New Features
+- Add Ctrl+Shift+,/. (on mac: Command+Shift+,/.) commands for tab history (71bcf84)
+
 ## v1.0.1 — 2026-09-27
 
 ### Summary
