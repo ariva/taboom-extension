@@ -1,12 +1,12 @@
 // Keep-it-alive marks as pure functions: the key a page is matched by, the
 // list edits, and the reload schedule. No DOM, no chrome.* — the worker, the
 // options page and the side panel all go through here.
-import { isKeptAlive, keepAliveKey } from "./core.ts";
-import type { KeepAliveTab } from "./types.ts";
+import { hostnameOf, isKeptAlive, isSupportedUrl, keepAliveKey, matchesKeepAlive } from "./core.ts";
+import type { KeepAliveRemoval, KeepAliveTab } from "./types.ts";
 
 // the matching half lives in core.ts (auto-snooze eligibility reads it); re-exported
 // so every keep-alive caller imports from one place
-export { isKeptAlive, keepAliveKey };
+export { isKeptAlive, keepAliveKey, matchesKeepAlive };
 
 // the "Default value" dropdown choices (minutes); DEFAULTS.settings.keepAliveMinutes is one of them
 export const KEEP_ALIVE_MINUTES = [1, 5, 10, 15, 20, 25, 30, 45, 60, 90] as const;
@@ -16,22 +16,23 @@ const JITTER_MS = 55_000;
 // 1-minute interval minus the jitter would land under that
 const MIN_GAP_MS = 30_000;
 
-// the mark behind a url, fragment ignored — undefined when the page is not marked
+// the mark behind a url — undefined when the page is not marked
 export function keepAliveEntry(list: KeepAliveTab[], url: string | undefined): KeepAliveTab | undefined {
-  const key = keepAliveKey(url);
-  return key === "" ? undefined : list.find((entry) => entry.url === key);
+  return list.find((entry) => matchesKeepAlive(entry.url, url));
 }
 
-// a typed address (options "Add") made into the key a tab on that page would get:
-// URL() normalizes as Chrome reports tab urls (lowercased host, trailing slash),
-// a bare host gets https — "" when it is not a supported address
+// a typed address (options "Add") as the mark url: URL() normalizes as Chrome reports
+// tab urls (lowercased host, trailing slash), a bare host gets https. Unlike a mark
+// made from a tab the fragment stays — typing one means that exact address (hash
+// routing); only a lone trailing "#" is noise. "" when it is not a supported address.
 export function keepAliveUrlFromInput(text: string): string {
   const trimmed = text.trim();
   if (trimmed === "") {
     return "";
   }
   try {
-    return keepAliveKey(new URL(trimmed.includes("://") ? trimmed : `https://${trimmed}`).href);
+    const href = new URL(trimmed.includes("://") ? trimmed : `https://${trimmed}`).href.replace(/#$/, "");
+    return isSupportedUrl(href) ? href : "";
   } catch {
     return "";
   }
@@ -43,39 +44,49 @@ export function nextReloadAt(minutes: number, now: number, random: () => number 
   return now + Math.max(MIN_GAP_MS, Math.round(gap));
 }
 
-// undefined when every page was already marked (or unsupported) — callers skip the write.
-// `minutes` is the default at mark time: later default changes leave existing marks alone
+// `pages` carry mark urls already (keepAliveKey for a tab, keepAliveUrlFromInput for a
+// typed one; "" = unsupported, skipped). undefined when every page was already marked —
+// callers skip the write. `minutes` is the default at mark time: later default changes
+// leave existing marks alone
 export function markKeepAlive(
   list: KeepAliveTab[],
-  tabs: { url?: string; title?: string }[],
+  pages: { url: string; title?: string }[],
   minutes: number,
   nextReload: number,
 ): KeepAliveTab[] | undefined {
   const known = new Set(list.map((entry) => entry.url));
   const added: KeepAliveTab[] = [];
-  for (const tab of tabs) {
-    const url = keepAliveKey(tab.url);
+  for (const { url, title } of pages) {
     if (url === "" || known.has(url)) {
       continue;
     }
     known.add(url);
-    added.push({ url, title: tab.title || url, minutes, nextReload });
+    added.push({ url, title: title || url, minutes, nextReload });
   }
   return added.length > 0 ? [...list, ...added] : undefined;
 }
 
+// a mark's own url (options Remove, Alive view) drops that mark alone; a tab url with no
+// mark spelled exactly like it drops the mark covering it (the fragment-free one)
 export function unmarkKeepAlive(list: KeepAliveTab[], urls: (string | undefined)[]): KeepAliveTab[] | undefined {
-  const keys = new Set(urls.map(keepAliveKey));
-  const next = list.filter((entry) => !keys.has(entry.url));
-  return next.length === list.length ? undefined : next;
+  const dropped = new Set<KeepAliveTab>();
+  for (const url of urls) {
+    const exact = list.filter((entry) => entry.url === url);
+    for (const entry of exact.length > 0 ? exact : list.filter((entry) => matchesKeepAlive(entry.url, url))) {
+      dropped.add(entry);
+    }
+  }
+  return dropped.size === 0 ? undefined : list.filter((entry) => !dropped.has(entry));
 }
 
 export function dueKeepAlive(list: KeepAliveTab[], now: number): KeepAliveTab[] {
   return list.filter((entry) => !entry.paused && entry.nextReload <= now);
 }
 
-export function rearmKeepAlive(list: KeepAliveTab[], url: string, nextReload: number): KeepAliveTab[] {
-  return list.map((entry) => (entry.url === url ? { ...entry, nextReload } : entry));
+// the sweep passes the reloaded tab's title: a mark named at mark time (or by hostname
+// from the Add row) catches up with the page within one interval; "" / absent keeps it
+export function rearmKeepAlive(list: KeepAliveTab[], url: string, nextReload: number, title?: string): KeepAliveTab[] {
+  return list.map((entry) => (entry.url === url ? { ...entry, nextReload, title: title || entry.title } : entry));
 }
 
 // per-mark interval; the schedule restarts so the countdown matches the new value at once
@@ -90,6 +101,20 @@ export function setKeepAliveMinutes(
     return undefined;
   }
   return list.map((candidate) => (candidate === entry ? { ...entry, minutes, nextReload } : candidate));
+}
+
+// options url edit (click the address): the mark is re-keyed, title / interval / timer
+// stay. undefined when the mark is unknown, nothing valid was typed, the url is the
+// same, or another mark already has it (two marks on one key would shadow each other)
+export function setKeepAliveUrl(list: KeepAliveTab[], url: string, nextUrl: string): KeepAliveTab[] | undefined {
+  const entry = list.find((candidate) => candidate.url === url);
+  if (!entry || nextUrl === "" || nextUrl === url || list.some((candidate) => candidate.url === nextUrl)) {
+    return undefined;
+  }
+  // a hostname title is the Add row's placeholder (no tab seen yet): it follows the new address;
+  // a real page title stays until the sweep sees the page and refreshes it
+  const title = entry.title === hostnameOf(url) ? hostnameOf(nextUrl) : entry.title;
+  return list.map((candidate) => (candidate === entry ? { ...entry, url: nextUrl, title } : candidate));
 }
 
 // every mark restarts from now at its own interval — on re-enable, else every due
@@ -122,4 +147,41 @@ export function formatCountdown(nextReload: number, now: number): string {
     return "now";
   }
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+}
+
+// ---------- removal trash: every removal is undoable from Settings, newest first ----------
+
+// ponytail: a flat cap bounds storage.local; per-mark dedupe if anyone fills 50 actions
+const TRASH_LIMIT = 50;
+
+// newest last; actions stay until restored or pushed out by the cap
+export function recordKeepAliveRemoval(
+  trash: KeepAliveRemoval[],
+  marks: KeepAliveTab[],
+  now: number,
+): KeepAliveRemoval[] {
+  if (marks.length === 0) {
+    return trash;
+  }
+  return [...trash, { at: now, marks }].slice(-TRASH_LIMIT);
+}
+
+// the newest action back into the list: a page marked again meanwhile keeps its current mark,
+// the others return as they were (paused flag included) with a fresh timer so a restore after
+// days does not reload them all at once. undefined when the trash is empty.
+export function restoreKeepAliveRemoval(
+  list: KeepAliveTab[],
+  trash: KeepAliveRemoval[],
+  now: number,
+  random?: () => number,
+): { keepAlive: KeepAliveTab[]; keepAliveTrash: KeepAliveRemoval[] } | undefined {
+  const newest = trash.at(-1);
+  if (!newest) {
+    return undefined;
+  }
+  const known = new Set(list.map((entry) => entry.url));
+  const returning = newest.marks
+    .filter((entry) => !known.has(entry.url))
+    .map((entry) => ({ ...entry, nextReload: nextReloadAt(entry.minutes, now, random) }));
+  return { keepAlive: [...list, ...returning], keepAliveTrash: trash.slice(0, -1) };
 }

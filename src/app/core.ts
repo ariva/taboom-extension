@@ -111,9 +111,9 @@ export function isProtected(url: string | undefined, rules: ProtectionRule[]): b
   return rules.some((rule) => matchesUrl(url, rule));
 }
 
-// A keep-it-alive mark follows the page, not the tab: the fragment is dropped
-// so in-page navigation (#section) keeps matching; unsupported urls key to ""
-// and never match. Lives here (not keep-alive.ts) because eligibility needs it.
+// A keep-it-alive mark follows the page, not the tab: a mark made from a tab drops
+// the fragment so in-page navigation (#section) keeps matching; unsupported urls
+// key to "" and never match. Lives here (not keep-alive.ts) because eligibility needs it.
 export function keepAliveKey(url: string | undefined): string {
   if (!isSupportedUrl(url)) {
     return "";
@@ -121,9 +121,18 @@ export function keepAliveKey(url: string | undefined): string {
   return (url ?? "").split("#")[0] ?? "";
 }
 
+// The one rule for "is this tab the mark's page": a mark typed with a fragment
+// (hash-routed apps — /#/dashboard is not /#/mail) is exact, a mark without one
+// covers every fragment. Every caller compares through here, never by key alone.
+export function matchesKeepAlive(markUrl: string, url: string | undefined): boolean {
+  if (!isSupportedUrl(url)) {
+    return false;
+  }
+  return markUrl.includes("#") ? markUrl === url : markUrl === keepAliveKey(url);
+}
+
 export function isKeptAlive(list: KeepAliveTab[], url: string | undefined): boolean {
-  const key = keepAliveKey(url);
-  return key !== "" && list.some((entry) => entry.url === key);
+  return list.some((entry) => matchesKeepAlive(entry.url, url));
 }
 
 // wakeTimes: tabId → ms timestamp of a MANUAL wake — a reload of a discarded

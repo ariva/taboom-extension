@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
 import type { Message, MessageError, MessageResponses } from "../../src/app/messages.ts";
-import type { KeepAliveTab, ProtectionRule, Settings } from "../../src/app/types.ts";
+import type { KeepAliveRemoval, KeepAliveTab, ProtectionRule, Settings } from "../../src/app/types.ts";
 import type { ChromeMockOptions } from "../helpers/chrome-mock.ts";
 import { makeChrome, tick, TEST_EXPERIMENTAL, TEST_FEATURES } from "../helpers/ui.ts";
 
@@ -78,6 +78,7 @@ const stored: {
   settings: Settings;
   protectionRules: Omit<ProtectionRule, "createdAt">[];
   keepAlive?: KeepAliveTab[];
+  keepAliveTrash?: KeepAliveRemoval[];
   updateAvailable?: string;
 } = {
   settings: {
@@ -664,7 +665,7 @@ test("Service Worker - Keep alive: sweep reloads due, unpaused pages only and re
 }, async () => {
   const before = Date.now();
   stored.keepAlive = [
-    { url: "https://old.example.com/a", title: "Old A", minutes: 25, nextReload: before - 1 },
+    { url: "https://old.example.com/a", title: "stale name", minutes: 25, nextReload: before - 1 },
     { url: "https://work.example.com/doc", title: "Doc", minutes: 5, nextReload: before + HOUR },
     { url: "https://work.example.com/doc#paused", title: "Paused", minutes: 1, paused: true, nextReload: 0 },
   ];
@@ -679,10 +680,35 @@ test("Service Worker - Keep alive: sweep reloads due, unpaused pages only and re
   );
   const due = stored.keepAlive.find((entry) => entry.url === "https://old.example.com/a");
   assert.ok(due, "entry kept");
+  assert.equal(due.title, "Old A", "title refreshed from the reloaded tab");
   assert.ok(due.nextReload >= before + 25 * MINUTE - 55_000, "re-armed no earlier than 25 min - 55 s");
   assert.ok(due.nextReload <= Date.now() + 25 * MINUTE + 55_000, "re-armed no later than 25 min + 55 s");
   assert.equal(stored.keepAlive[1]?.nextReload, before + HOUR, "not-due entry untouched");
   assert.equal(stored.keepAlive[2]?.nextReload, 0, "paused entry neither reloaded nor re-armed");
+});
+
+test("Service Worker - Keep alive: a mark typed with a fragment reloads that exact address only", {
+  skip: !KEEP_ALIVE_ON,
+}, async () => {
+  const tab = tabs.find((t) => t.id === 2);
+  assert.ok(tab);
+  const original = tab.url;
+  tab.url = "https://old.example.com/a#/dash";
+  stored.keepAlive = [
+    { url: "https://old.example.com/a#/dash", title: "Dash", minutes: 25, nextReload: 0 },
+    { url: "https://old.example.com/a#/mail", title: "Mail", minutes: 25, nextReload: 0 },
+  ];
+  calls.length = 0;
+  await chrome.alarms.onAlarm.fire({ name: "keep-alive" });
+  await tick();
+  await tick();
+  await tick();
+  assert.deepEqual(
+    calls.filter((c) => c.startsWith("tabs.reload")),
+    ["tabs.reload 2"],
+    "the #/dash mark hits the tab, the #/mail one does not",
+  );
+  tab.url = original;
 });
 
 test("Service Worker - Keep alive: sweep does nothing while the setting is off", { skip: !KEEP_ALIVE_ON }, async () => {
@@ -742,6 +768,11 @@ test("Service Worker - Keep alive: menu click marks the page and arms the sweep;
   await tick();
   assert.deepEqual(stored.keepAlive, []);
   assert.ok(calls.includes("alarms.clear keep-alive"), "empty list: sweep cleared");
+  assert.deepEqual(
+    stored.keepAliveTrash?.at(-1)?.marks.map((entry) => entry.url),
+    ["https://old.example.com/a"],
+    "menu unmark recorded for Restore too",
+  );
 });
 
 test("Service Worker - Keep alive: keep-alive-set message marks and unmarks tabs by id", {
@@ -760,11 +791,17 @@ test("Service Worker - Keep alive: keep-alive-set message marks and unmarks tabs
     [25, 25],
     "the default interval at mark time is copied onto each mark",
   );
+  stored.keepAliveTrash = [];
   response = await send({ type: "keep-alive-set", tabIds: [2], kept: false });
   assert.deepEqual(response, { ok: true });
   assert.deepEqual(
     stored.keepAlive.map((entry) => entry.url),
     ["https://work.example.com/doc"],
+  );
+  assert.deepEqual(
+    stored.keepAliveTrash.map((action) => action.marks.map((entry) => entry.url)),
+    [["https://old.example.com/a"]],
+    "the removed mark is kept for Settings → Restore",
   );
 });
 

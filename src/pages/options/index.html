@@ -10,7 +10,7 @@
     /* brand backdrop from store promo art: navy gradient + moon */
     body {
       margin: 0 auto;
-      max-width: 560px;
+      max-width: 840px; /* 560 × 1.5: room for the keep-alive table's url column */
       min-height: 100vh;
       padding: 24px 16px;
       background: linear-gradient(135deg, #1c274c 0%, #2b3a6b 100%) fixed;
@@ -185,8 +185,22 @@
     #keep-alive-table th { text-align: left; font-weight: 500; color: var(--muted); font-size: 11px; padding: 2px 6px 4px 0; }
     #keep-alive-table td { padding: 4px 6px 4px 0; border-top: 1px solid light-dark(#eee, #333); vertical-align: middle; white-space: nowrap; }
     #keep-alive-table td:first-child { color: var(--muted); font-variant-numeric: tabular-nums; }
-    #keep-alive-table td:nth-child(3) { width: 100%; white-space: normal; min-width: 0; overflow-wrap: anywhere; }
-    #keep-alive-table .url { display: block; font-family: ui-monospace, monospace; font-size: 11px; color: var(--muted); }
+    /* max-width: 0 lets the 100%-wide cell shrink below its content so title and url clip to one line each */
+    /* left padding: breathing room after the toggle, and the editor's focus outline stays inside the clipping box */
+    #keep-alive-table td:nth-child(3) { width: 100%; max-width: 0; overflow: hidden; text-overflow: ellipsis; cursor: text; padding-left: 8px; padding-right: 12px; }
+    /* text and editor share one box (spacer, height, font) so swapping them never changes the row height */
+    #keep-alive-table .url, #keep-alive-table .url-edit {
+      display: block; margin-top: 2px; height: 20px; line-height: 18px;
+      font-family: ui-monospace, monospace; font-size: 11px;
+    }
+    #keep-alive-table .url { overflow: hidden; text-overflow: ellipsis; color: var(--muted); cursor: text; }
+    #keep-alive-table .url:hover { color: inherit; } /* editable: reads as text on hover */
+    /* pulled left by its own padding so the typed text starts where the url text was; the 3px left
+       over from the cell's 8px padding is exactly the focus outline (2px + 1px offset) */
+    #keep-alive-table .url-edit {
+      width: calc(100% + 5px); margin-left: -5px; padding: 0 4px;
+      border: 1px solid var(--border); border-radius: var(--radius-s); background: var(--card-bg); color: inherit;
+    }
     #keep-alive-table .countdown { font-variant-numeric: tabular-nums; }
     #keep-alive-table td:last-child { text-align: right; }
     #keep-alive-table button {
@@ -220,7 +234,7 @@
     .muted { color: var(--muted); font-size: 11px; }
 
     .card.danger-zone { border: 1px solid color-mix(in srgb, var(--danger) 40%, transparent); }
-    #danger, #restore-defaults, #clear-protected {
+    #danger, #restore-defaults, #clear-protected, #clear-keep-alive {
       color: var(--danger);
       border: 1px solid currentColor;
       border-radius: var(--radius-s);
@@ -228,7 +242,7 @@
       padding: 4px 12px;
       transition: background var(--transition);
     }
-    #danger:hover, #restore-defaults:hover, #clear-protected:hover {
+    #danger:hover, #restore-defaults:hover, #clear-protected:hover, #clear-keep-alive:hover {
       background: color-mix(in srgb, var(--danger) 10%, transparent);
     }
     .danger-zone p + button + p { margin-top: 14px; }
@@ -286,8 +300,13 @@
         <tbody id="keep-alive-rows"></tbody>
       </table>
       <div class="row">
-        <input type="text" id="new-keep-alive" placeholder="https://app.example.com/board" />
+        <input type="text" id="new-keep-alive" placeholder="https://app.example.com/board (a #fragment makes the mark exact)" />
         <button id="add-keep-alive">Add</button>
+      </div>
+      <p class="muted">Removes every keep-alive mark, paused ones included. Settings stay unchanged. Any removal (a row's Remove, a menu unmark, Clear all) can be undone, newest first.</p>
+      <div class="row">
+        <button id="clear-keep-alive">Clear all keep-alive marks</button>
+        <button id="restore-keep-alive" hidden>Restore last removal</button>
       </div>
     </div>
   </section>

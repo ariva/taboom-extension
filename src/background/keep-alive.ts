@@ -7,12 +7,12 @@ import {
   isKeptAlive,
   keepAliveKey,
   markKeepAlive,
+  matchesKeepAlive,
   nextReloadAt,
   rearmAllKeepAlive,
   rearmKeepAlive,
-  unmarkKeepAlive,
 } from "../app/keep-alive.ts";
-import { loadState, localStore } from "../app/storage.ts";
+import { loadState, localStore, removeKeepAlive } from "../app/storage.ts";
 import type { KeepAliveTab, Settings } from "../app/types.ts";
 import { enqueueMenuOp } from "./context-menus.ts";
 import { getFeatures } from "./nav-mode.ts";
@@ -68,33 +68,40 @@ export async function keepAlivePass(): Promise<void> {
     // every tab on the page reloads; a mark whose page is closed stays armed
     // (and quiet) until the user removes it in Options
     const targets = tabs.flatMap((tab) =>
-      tab.id !== undefined && keepAliveKey(tab.url) === entry.url ? [tab.id] : [],
+      tab.id !== undefined && matchesKeepAlive(entry.url, tab.url) ? [{ id: tab.id, title: tab.title }] : [],
     );
     await Promise.allSettled(
-      targets.map((tabId) =>
-        chrome.tabs.reload(tabId).catch((error) => console.debug("keep-alive reload failed", tabId, error)),
+      targets.map((tab) =>
+        chrome.tabs.reload(tab.id).catch((error) => console.debug("keep-alive reload failed", tab.id, error)),
       ),
     );
-    next = rearmKeepAlive(next, entry.url, nextReloadAt(entry.minutes, now));
+    // the first open tab names the mark from now on (Settings table, Alive view)
+    next = rearmKeepAlive(next, entry.url, nextReloadAt(entry.minutes, now), targets[0]?.title);
   }
   await localStore.set({ keepAlive: next });
+}
+
+async function markTabs(tabs: chrome.tabs.Tab[]): Promise<boolean> {
+  const [{ settings }, { keepAlive = [] }] = await Promise.all([loadState(), localStore.get("keepAlive")]);
+  const minutes = settings.keepAliveMinutes;
+  const pages = tabs.map((tab) => ({ url: keepAliveKey(tab.url), title: tab.title }));
+  const next = markKeepAlive(keepAlive, pages, minutes, nextReloadAt(minutes, Date.now()));
+  if (!next) {
+    return false;
+  }
+  await localStore.set({ keepAlive: next });
+  return true;
 }
 
 export async function setTabsKeepAlive(tabs: chrome.tabs.Tab[], kept: boolean): Promise<void> {
   if (!(await keepAliveActive())) {
     return;
   }
-  const [{ settings }, { keepAlive = [] }] = await Promise.all([loadState(), localStore.get("keepAlive")]);
-  const next = kept
-    ? markKeepAlive(keepAlive, tabs, settings.keepAliveMinutes, nextReloadAt(settings.keepAliveMinutes, Date.now()))
-    : unmarkKeepAlive(
-        keepAlive,
-        tabs.map((tab) => tab.url),
-      );
-  if (!next) {
+  // unmark goes through the shared writer so the marks land in the restorable trash
+  const changed = kept ? await markTabs(tabs) : await removeKeepAlive(tabs.map((tab) => tab.url));
+  if (!changed) {
     return;
   }
-  await localStore.set({ keepAlive: next });
   await ensureKeepAliveAlarm();
   await syncKeepAliveMenu(tabs.find((tab) => tab.active));
 }

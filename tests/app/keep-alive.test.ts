@@ -9,15 +9,19 @@ import {
   keepAliveKey,
   keepAliveUrlFromInput,
   markKeepAlive,
+  matchesKeepAlive,
   nextReloadAt,
   rearmAllKeepAlive,
+  recordKeepAliveRemoval,
+  restoreKeepAliveRemoval,
   rearmKeepAlive,
   setKeepAliveMinutes,
   setKeepAlivePaused,
+  setKeepAliveUrl,
   unmarkKeepAlive,
 } from "../../src/app/keep-alive.ts";
 import { DEFAULTS } from "../../src/app/core.ts";
-import type { KeepAliveTab } from "../../src/app/types.ts";
+import type { KeepAliveRemoval, KeepAliveTab } from "../../src/app/types.ts";
 
 const NOW = 1_700_000_000_000;
 const MINUTE = 60_000;
@@ -40,9 +44,24 @@ test("Keep alive - Key strips the fragment; empty for unsupported or missing url
   assert.equal(keepAliveKey(undefined), "");
 });
 
-test("Keep alive - isKeptAlive matches by key, so a fragment change is still the same page", () => {
+test("Keep alive - matchesKeepAlive: a fragment-free mark covers every fragment, a mark with one is exact", () => {
+  assert.equal(matchesKeepAlive("https://dash.example.com/board", "https://dash.example.com/board#x"), true);
+  assert.equal(matchesKeepAlive("https://dash.example.com/board", "https://dash.example.com/board"), true);
+  assert.equal(matchesKeepAlive("https://app.example.com/#/dash", "https://app.example.com/#/dash"), true);
+  assert.equal(matchesKeepAlive("https://app.example.com/#/dash", "https://app.example.com/#/mail"), false);
+  assert.equal(matchesKeepAlive("https://app.example.com/#/dash", "https://app.example.com/"), false);
+  assert.equal(matchesKeepAlive("https://dash.example.com/board", "chrome://extensions/"), false);
+  assert.equal(matchesKeepAlive("https://dash.example.com/board", undefined), false);
+});
+
+test("Keep alive - isKeptAlive / keepAliveEntry go through matchesKeepAlive, fragment marks included", () => {
   assert.equal(isKeptAlive(list, "https://dash.example.com/board#x"), true);
   assert.equal(isKeptAlive(list, "https://dash.example.com/other"), false);
+  const hashed: KeepAliveTab = { url: "https://app.example.com/#/dash", title: "Dash", minutes: 5, nextReload: 1 };
+  assert.equal(isKeptAlive([hashed], "https://app.example.com/#/dash"), true);
+  assert.equal(isKeptAlive([hashed], "https://app.example.com/#/mail"), false);
+  assert.equal(keepAliveEntry([hashed], "https://app.example.com/#/dash"), hashed);
+  assert.equal(keepAliveEntry([hashed], "https://app.example.com/"), undefined);
   assert.equal(isKeptAlive(list, undefined), false);
 });
 
@@ -70,13 +89,15 @@ test("Keep alive - nextReloadAt jitters ±55 s around the interval, never under 
 });
 
 test("Keep alive - markKeepAlive adds unknown pages once with the default interval snapshotted; undefined when nothing new", () => {
+  // callers hand in keys (keepAliveKey for tabs, keepAliveUrlFromInput for typed): "" = unsupported
   const next = markKeepAlive(
     list,
     [
-      { url: "https://new.example.com/#top", title: "New" },
-      { url: "https://new.example.com/#bottom", title: "New again" },
+      { url: "https://new.example.com/", title: "New" },
+      { url: "https://new.example.com/", title: "New again" },
+      { url: "https://app.example.com/#/dash", title: "Dash" },
       { url: "https://dash.example.com/board", title: "Board" },
-      { url: "chrome://settings/", title: "Settings" },
+      { url: "", title: "Settings" },
     ],
     5,
     NOW + 5 * MINUTE,
@@ -84,6 +105,7 @@ test("Keep alive - markKeepAlive adds unknown pages once with the default interv
   assert.ok(next);
   assert.deepEqual(next.slice(3), [
     { url: "https://new.example.com/", title: "New", minutes: 5, nextReload: NOW + 5 * MINUTE },
+    { url: "https://app.example.com/#/dash", title: "Dash", minutes: 5, nextReload: NOW + 5 * MINUTE },
   ]);
   assert.equal(markKeepAlive(list, [{ url: "https://dash.example.com/board", title: "Board" }], 5, NOW), undefined);
 });
@@ -95,6 +117,23 @@ test("Keep alive - unmarkKeepAlive drops the pages; undefined when none listed",
     next.map((entry) => entry.url),
     ["https://mail.example.com/", "https://paused.example.com/"],
   );
+  const hashed: KeepAliveTab = { url: "https://app.example.com/#/dash", title: "Dash", minutes: 5, nextReload: 1 };
+  const bare: KeepAliveTab = { url: "https://app.example.com/", title: "App", minutes: 5, nextReload: 1 };
+  assert.deepEqual(
+    unmarkKeepAlive([hashed, bare], ["https://app.example.com/#/dash"]),
+    [bare],
+    "its own url: the hash mark only",
+  );
+  assert.deepEqual(
+    unmarkKeepAlive([hashed, bare], ["https://app.example.com/"]),
+    [hashed],
+    "bare url: the bare mark only",
+  );
+  assert.deepEqual(
+    unmarkKeepAlive([hashed, bare], ["https://app.example.com/#/mail"]),
+    [hashed],
+    "a tab on another hash: the bare mark covers it",
+  );
   assert.equal(unmarkKeepAlive(list, ["https://nope.example.com/"]), undefined);
 });
 
@@ -104,6 +143,14 @@ test("Keep alive - dueKeepAlive returns the entries whose time has come, paused 
     ["https://dash.example.com/board"],
   );
   assert.deepEqual(dueKeepAlive(list, NOW + 2 * MINUTE).length, 2);
+});
+
+test("Keep alive - rearmKeepAlive takes the open tab's title along, so a mark's name catches up with the page", () => {
+  const next = rearmKeepAlive(list, "https://dash.example.com/board", NOW + MINUTE, "Board — 3 new");
+  assert.deepEqual(next[0], { ...list[0], nextReload: NOW + MINUTE, title: "Board — 3 new" });
+  assert.deepEqual(next.slice(1), list.slice(1));
+  assert.equal(rearmKeepAlive(list, "https://dash.example.com/board", NOW, "")[0]?.title, "Board", "empty title: kept");
+  assert.equal(rearmKeepAlive(list, "https://dash.example.com/board", NOW)[0]?.title, "Board", "no title: kept");
 });
 
 test("Keep alive - rearmKeepAlive replaces one entry's next time, others untouched", () => {
@@ -172,7 +219,13 @@ test("Keep alive - formatCountdown shows m:ss until the next reload, 'now' once 
 });
 
 test("Keep alive - keepAliveUrlFromInput: typed address normalized like a tab url; https assumed; junk is empty", () => {
-  assert.equal(keepAliveUrlFromInput(" https://Dash.Example.com/board#tab=2 "), "https://dash.example.com/board");
+  assert.equal(
+    keepAliveUrlFromInput(" https://Dash.Example.com/board#tab=2 "),
+    "https://dash.example.com/board#tab=2",
+    "fragment kept: hash-routed apps",
+  );
+  assert.equal(keepAliveUrlFromInput("https://app.example.com/#/dash"), "https://app.example.com/#/dash");
+  assert.equal(keepAliveUrlFromInput("https://example.com/#"), "https://example.com/", "a lone # is no fragment");
   assert.equal(
     keepAliveUrlFromInput("https://example.com"),
     "https://example.com/",
@@ -184,4 +237,67 @@ test("Keep alive - keepAliveUrlFromInput: typed address normalized like a tab ur
   assert.equal(keepAliveUrlFromInput("   "), "");
   assert.equal(keepAliveUrlFromInput("chrome://extensions"), "", "unsupported scheme");
   assert.equal(keepAliveUrlFromInput("http://"), "", "not an address");
+});
+
+test("Keep alive - trash: a removal is recorded newest last, kept until restored, capped at 50 actions", () => {
+  const first = recordKeepAliveRemoval([], [list[0]!], NOW - 400 * 24 * 60 * MINUTE);
+  const second = recordKeepAliveRemoval(first, [list[1]!, list[2]!], NOW);
+  assert.deepEqual(second, [...first, { at: NOW, marks: [list[1], list[2]] }], "a year-old action is still there");
+  assert.deepEqual(recordKeepAliveRemoval(first, [], NOW), first, "nothing removed: nothing recorded");
+  let many: KeepAliveRemoval[] = [];
+  for (let index = 0; index < 60; index += 1) {
+    many = recordKeepAliveRemoval(many, [{ ...list[0]!, url: `https://n${index}.example.com/` }], NOW + index);
+  }
+  assert.equal(many.length, 50);
+  assert.equal(many[0]?.at, NOW + 10, "oldest actions dropped first");
+});
+
+test("Keep alive - restoreKeepAliveRemoval: newest action back, re-armed from now, pages marked meanwhile skipped; undefined when nothing to restore", () => {
+  const trash = recordKeepAliveRemoval(recordKeepAliveRemoval([], [list[0]!], NOW - MINUTE), [list[1]!, list[2]!], NOW);
+  const restored = restoreKeepAliveRemoval([list[1]!], trash, NOW, () => 0.5);
+  assert.ok(restored);
+  assert.deepEqual(
+    restored.keepAlive,
+    [list[1], { ...list[2], nextReload: NOW + MINUTE }],
+    "Mail already marked again: kept once; Paused back with its flag, timer from now",
+  );
+  assert.deepEqual(
+    restored.keepAliveTrash,
+    [{ at: NOW - MINUTE, marks: [list[0]] }],
+    "only the newest action consumed",
+  );
+  const again = restoreKeepAliveRemoval(restored.keepAlive, restored.keepAliveTrash, NOW, () => 0.5);
+  assert.deepEqual(
+    again?.keepAlive.map((entry) => entry.url),
+    [list[1]!.url, list[2]!.url, list[0]!.url],
+  );
+  assert.deepEqual(again?.keepAliveTrash, []);
+  assert.equal(restoreKeepAliveRemoval(list, [], NOW), undefined, "empty trash");
+});
+
+test("Keep alive - setKeepAliveUrl re-keys one mark, rest untouched; undefined when unknown, empty, same or taken", () => {
+  const next = setKeepAliveUrl(list, "https://dash.example.com/board", "https://dash.example.com/board#/dash");
+  assert.ok(next);
+  assert.deepEqual(
+    next[0],
+    { ...list[0], url: "https://dash.example.com/board#/dash" },
+    "title, timer and interval kept",
+  );
+  assert.deepEqual(next.slice(1), list.slice(1));
+  // a title that was only the hostname (Add row, no tab seen yet) follows the new address
+  const auto: KeepAliveTab = { url: "https://old.example.com/a", title: "old.example.com", minutes: 5, nextReload: 1 };
+  assert.equal(setKeepAliveUrl([auto], auto.url, "https://new.example.com/b#/x")?.[0]?.title, "new.example.com");
+  assert.equal(setKeepAliveUrl([auto], auto.url, "https://old.example.com/b")?.[0]?.title, "old.example.com");
+  assert.equal(setKeepAliveUrl(list, "https://nope.example.com/", "https://x.example.com/"), undefined, "unknown mark");
+  assert.equal(setKeepAliveUrl(list, "https://dash.example.com/board", ""), undefined, "nothing typed");
+  assert.equal(
+    setKeepAliveUrl(list, "https://dash.example.com/board", "https://dash.example.com/board"),
+    undefined,
+    "same",
+  );
+  assert.equal(
+    setKeepAliveUrl(list, "https://dash.example.com/board", "https://mail.example.com/"),
+    undefined,
+    "another mark's url",
+  );
 });

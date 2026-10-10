@@ -2,7 +2,7 @@
 // A mark with an open tab is a Pins-style row (click activates); one without is a
 // muted "not open" row whose click opens the page — a closed or navigated-away tab
 // must not make the mark vanish from the list.
-import { keepAliveKey } from "../../../app/keep-alive.ts";
+import { matchesKeepAlive } from "../../../app/keep-alive.ts";
 import type { KeepAliveTab } from "../../../app/types.ts";
 import { winPop } from "../foundation/elements.ts";
 import type { PanelTab } from "../foundation/state.ts";
@@ -12,7 +12,7 @@ import { fillPinRows } from "./pins.ts";
 
 export function fillAliveRows(marks: KeepAliveTab[], tabs: PanelTab[], maps: WindowMaps): void {
   for (const mark of marks) {
-    const open = tabs.find((tab) => keepAliveKey(tab.url) === mark.url);
+    const open = tabs.find((tab) => matchesKeepAlive(mark.url, tab.url));
     if (open) {
       fillPinRows([open], maps, () => mark.paused ?? false);
       continue;

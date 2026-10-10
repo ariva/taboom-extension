@@ -1,7 +1,14 @@
 import { createStorage } from "../lib/storage.ts";
 import { DEFAULTS } from "./core.ts";
-import { keepAliveEntry, nextReloadAt, setKeepAlivePaused, unmarkKeepAlive } from "./keep-alive.ts";
-import type { AppState, Features, LocalStorageSchema, SessionStorageSchema } from "./types.ts";
+import {
+  keepAliveEntry,
+  nextReloadAt,
+  recordKeepAliveRemoval,
+  restoreKeepAliveRemoval,
+  setKeepAlivePaused,
+  unmarkKeepAlive,
+} from "./keep-alive.ts";
+import type { AppState, Features, KeepAliveTab, LocalStorageSchema, SessionStorageSchema } from "./types.ts";
 
 // the only doors to chrome.storage — keys and value types come from the schemas
 export const localStore = createStorage<LocalStorageSchema>("local");
@@ -57,13 +64,39 @@ export async function pauseKeepAlive(urls: (string | undefined)[], paused: boole
   return true;
 }
 
-// Drop the marks behind these pages (options Remove, side panel mark menu). False when none matched.
-export async function removeKeepAlive(urls: (string | undefined)[]): Promise<boolean> {
-  const { keepAlive = [] } = await localStore.get("keepAlive");
-  const next = unmarkKeepAlive(keepAlive, urls);
-  if (!next) {
+// the one door for dropping marks: what leaves the list lands in the trash, so
+// Settings → Restore can undo any removal (row, menu, worker, Clear all), newest first
+async function writeRemoval(next: (keepAlive: KeepAliveTab[]) => KeepAliveTab[] | undefined): Promise<boolean> {
+  const { keepAlive = [], keepAliveTrash = [] } = await localStore.get(["keepAlive", "keepAliveTrash"]);
+  const remaining = next(keepAlive);
+  if (!remaining) {
     return false;
   }
-  await localStore.set({ keepAlive: next });
+  const removed = keepAlive.filter((entry) => !remaining.includes(entry));
+  await localStore.set({
+    keepAlive: remaining,
+    keepAliveTrash: recordKeepAliveRemoval(keepAliveTrash, removed, Date.now()),
+  });
+  return true;
+}
+
+// Drop the marks behind these pages (options Remove, side panel menus, worker unmark). False when none matched.
+export function removeKeepAlive(urls: (string | undefined)[]): Promise<boolean> {
+  return writeRemoval((keepAlive) => unmarkKeepAlive(keepAlive, urls));
+}
+
+// Options "Clear all". False when the list was already empty.
+export function clearKeepAlive(): Promise<boolean> {
+  return writeRemoval((keepAlive) => (keepAlive.length === 0 ? undefined : []));
+}
+
+// Options "Restore last removal". False when the trash is empty.
+export async function restoreKeepAlive(): Promise<boolean> {
+  const { keepAlive = [], keepAliveTrash = [] } = await localStore.get(["keepAlive", "keepAliveTrash"]);
+  const restored = restoreKeepAliveRemoval(keepAlive, keepAliveTrash, Date.now());
+  if (!restored) {
+    return false;
+  }
+  await localStore.set(restored);
   return true;
 }

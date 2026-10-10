@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
-import type { KeepAliveTab, LocalStorageSchema, ProtectionRule } from "../../../src/app/types.ts";
+import type { KeepAliveRemoval, KeepAliveTab, LocalStorageSchema, ProtectionRule } from "../../../src/app/types.ts";
 import { byId, q, qa } from "../../helpers/dom.ts";
 import { makeChrome, loadPage, tick, RAW_FEATURES, TEST_EXPERIMENTAL, TEST_FEATURES } from "../../helpers/ui.ts";
 
@@ -11,6 +11,7 @@ const stored: Pick<LocalStorageSchema, "settings" | "ui"> &
   Partial<Pick<LocalStorageSchema, "perfMetrics" | "perfSnapshots">> & {
     protectionRules: Omit<ProtectionRule, "createdAt">[];
     keepAlive?: KeepAliveTab[];
+    keepAliveTrash?: KeepAliveRemoval[];
   } = {
   settings: { autoSnoozeEnabled: false, inactivityMinutes: 45 },
   protectionRules: [{ id: "r1", type: "domain", pattern: "*.github.com" }],
@@ -602,8 +603,8 @@ test("UI - Options - Keep-alive add row: url + Add marks a page by hand at the D
   await tick();
   assert.deepEqual(
     (stored.keepAlive ?? []).map(({ url, title, minutes: each }) => ({ url, title, minutes: each })),
-    [{ url: "https://dash.example.com/board", title: "dash.example.com", minutes: 15 }],
-    "normalized url, hostname as title until a tab reports one, the Default value copied",
+    [{ url: "https://dash.example.com/board#tab=2", title: "dash.example.com", minutes: 15 }],
+    "normalized url with its fragment, hostname as title until a tab reports one, the Default value copied",
   );
   assert.ok((stored.keepAlive?.[0]?.nextReload ?? 0) >= now + 15 * 60_000 - 55_000, "armed from now");
   assert.equal(input.value, "", "input cleared");
@@ -611,7 +612,7 @@ test("UI - Options - Keep-alive add row: url + Add marks a page by hand at the D
 
   // same page again: no second entry, no write
   calls.length = 0;
-  input.value = "https://dash.example.com/board";
+  input.value = "https://dash.example.com/board#tab=2";
   add.click();
   await tick();
   await tick();
@@ -619,4 +620,187 @@ test("UI - Options - Keep-alive add row: url + Add marks a page by hand at the D
   assert.ok(!calls.some((c) => c.startsWith("storage.set") && c.includes('"keepAlive"')), "duplicate: no write");
   assert.equal(input.value, "", "input still cleared");
   stored.keepAlive = [];
+});
+
+test("UI - Options - Keep-alive url: click turns it into an input; blur / Enter save the normalized address, Escape cancels", async () => {
+  const { applyExperimental, featureEnabled } = await import("../../../src/app/core.ts");
+  const flagOn = featureEnabled(applyExperimental(RAW_FEATURES, stored.ui?.showExperimental ?? false), "KEEP_ALIVE");
+  if (!flagOn) {
+    return;
+  }
+  stored.keepAlive = [
+    { url: "https://dash.example.com/board", title: "Board", minutes: 25, nextReload: 123 },
+    { url: "https://mail.example.com/", title: "Mail", minutes: 5, nextReload: 1 },
+  ];
+  await chrome.storage.onChanged.fire({ keepAlive: {} }, "local");
+  await tick();
+  await tick();
+  const row = () => qa(byId("keep-alive-rows"), "tr")[0]!;
+  const key = (name: string) => new window.KeyboardEvent("keydown", { key: name, bubbles: true });
+  assert.equal(row().querySelector("input.url-edit"), null, "url shown as text at first");
+  qa(row(), "td")[2]!.click(); // the title text, not the url span: the whole Page cell is the handle
+  const input = q<HTMLInputElement>(row(), "input.url-edit");
+  assert.equal(input.value, "https://dash.example.com/board", "the input starts with the current url");
+  input.click();
+  assert.equal(qa(row(), "input.url-edit").length, 1, "clicking inside the open editor does not stack another");
+
+  // blur commits: normalized, fragment allowed, everything else on the mark kept
+  calls.length = 0;
+  input.value = "Dash.Example.com/board#/dash ";
+  input.dispatchEvent(new window.Event("blur"));
+  await tick();
+  await tick();
+  assert.deepEqual(stored.keepAlive[0], {
+    url: "https://dash.example.com/board#/dash",
+    title: "Board",
+    minutes: 25,
+    nextReload: 123,
+  });
+  assert.equal(q(row(), ".url").textContent, "https://dash.example.com/board#/dash", "row re-rendered as text");
+
+  // Enter commits too
+  q(row(), ".url").click();
+  const second = q<HTMLInputElement>(row(), "input.url-edit");
+  second.value = "https://dash.example.com/board";
+  second.dispatchEvent(key("Enter"));
+  await tick();
+  await tick();
+  assert.equal(stored.keepAlive[0]?.url, "https://dash.example.com/board");
+  assert.equal(q(row(), ".url").textContent, "https://dash.example.com/board");
+
+  // Escape cancels; another mark's url, junk and an unchanged value write nothing
+  for (const [value, how] of [
+    ["https://changed.example.com/", "Escape"],
+    ["https://mail.example.com/", "blur"],
+    ["chrome://extensions", "blur"],
+    ["https://dash.example.com/board", "blur"],
+  ] as const) {
+    q(row(), ".url").click();
+    const editing = q<HTMLInputElement>(row(), "input.url-edit");
+    editing.value = value;
+    calls.length = 0;
+    editing.dispatchEvent(how === "Escape" ? key("Escape") : new window.Event("blur"));
+    await tick();
+    await tick();
+    assert.ok(!calls.some((c) => c.startsWith("storage.set")), `${value} via ${how}: no write`);
+    assert.equal(q(row(), ".url").textContent, "https://dash.example.com/board", `${value} via ${how}: text back`);
+  }
+  stored.keepAlive = [];
+});
+
+test("UI - Options - Clear all keep-alive marks empties the list behind a confirm; no write when already empty", async () => {
+  const { applyExperimental, featureEnabled } = await import("../../../src/app/core.ts");
+  const flagOn = featureEnabled(applyExperimental(RAW_FEATURES, stored.ui?.showExperimental ?? false), "KEEP_ALIVE");
+  if (!flagOn) {
+    return;
+  }
+  stored.keepAlive = [
+    { url: "https://dash.example.com/board", title: "Board", minutes: 25, nextReload: 1 },
+    { url: "https://mail.example.com/", title: "Mail", minutes: 5, paused: true, nextReload: 1 },
+  ];
+  stored.settings = { ...stored.settings, inactivityMinutes: 45 };
+  await chrome.storage.onChanged.fire({ keepAlive: {} }, "local");
+  await tick();
+  await tick();
+  const clear = byId<HTMLButtonElement>("clear-keep-alive");
+  assert.ok(byId("keep-alive-body").contains(clear), "button lives in the keep-alive card, hidden with it");
+  byId("clear-keep-alive").click();
+  await tick();
+  await tick();
+  assert.deepEqual(stored.keepAlive, [], "every mark removed, paused ones too");
+  assert.equal(stored.settings.inactivityMinutes, 45, "settings untouched");
+  assert.match(byId("keep-alive-rows").textContent, /No tabs marked yet/, "table re-rendered");
+
+  calls.length = 0;
+  byId("clear-keep-alive").click();
+  await tick();
+  await tick();
+  assert.ok(!calls.some((c) => c.startsWith("storage.set")), "already empty: no write");
+});
+
+test("UI - Options - Restore last removal: every removal (row, Clear all) is undoable newest first; hover lists the urls", async () => {
+  const { applyExperimental, featureEnabled } = await import("../../../src/app/core.ts");
+  const flagOn = featureEnabled(applyExperimental(RAW_FEATURES, stored.ui?.showExperimental ?? false), "KEEP_ALIVE");
+  if (!flagOn) {
+    return;
+  }
+  const now = Date.now();
+  stored.keepAlive = [
+    { url: "https://dash.example.com/board", title: "Board", minutes: 25, nextReload: now + 60_000 },
+    { url: "https://mail.example.com/", title: "Mail", minutes: 5, paused: true, nextReload: 1 },
+  ];
+  stored.keepAliveTrash = [];
+  await chrome.storage.onChanged.fire({ keepAlive: {} }, "local");
+  await tick();
+  await tick();
+  const restore = byId<HTMLButtonElement>("restore-keep-alive");
+  assert.equal(restore.hidden, true, "nothing removed yet: no button");
+
+  // row Remove → one-mark action
+  q<HTMLButtonElement>(qa(byId("keep-alive-rows"), "tr")[1]!, "button").click();
+  await tick();
+  await tick();
+  assert.equal(restore.hidden, false);
+  assert.equal(restore.textContent, "Restore last removal (1 mark)");
+  assert.equal(restore.title, "Restore:\nhttps://mail.example.com/", "hover says what comes back");
+
+  // Clear all → second action with the remaining mark
+  byId("clear-keep-alive").click();
+  await tick();
+  await tick();
+  assert.equal(stored.keepAlive.length, 0); // not deepEqual([]): that narrows the array to never[]
+  assert.equal(stored.keepAliveTrash.length, 2, "two actions on the stack");
+  assert.equal(restore.textContent, "Restore last removal (1 mark)", "newest action counted");
+
+  restore.click();
+  await tick();
+  await tick();
+  assert.deepEqual(
+    stored.keepAlive.map((entry) => entry.url),
+    ["https://dash.example.com/board"],
+    "Clear all undone first",
+  );
+  assert.ok((stored.keepAlive[0]?.nextReload ?? 0) >= now + 25 * 60_000 - 55_000, "restored mark re-armed from now");
+  assert.equal(restore.hidden, false, "the row removal is still undoable");
+  restore.click();
+  await tick();
+  await tick();
+  assert.deepEqual(
+    stored.keepAlive.map((entry) => [entry.url, entry.paused ?? false]),
+    [
+      ["https://dash.example.com/board", false],
+      ["https://mail.example.com/", true],
+    ],
+    "row removal undone, paused flag kept",
+  );
+  assert.equal(stored.keepAliveTrash.length, 0);
+  assert.equal(restore.hidden, true, "stack empty: button gone");
+  assert.equal(qa(byId("keep-alive-rows"), "tr").length, 2, "table re-rendered");
+
+  // old actions never expire; the tooltip lists at most 10 urls, then an ellipsis line
+  const urls = Array.from({ length: 12 }, (_, index) => `https://n${index}.example.com/`);
+  stored.keepAliveTrash = [
+    {
+      at: now - 400 * 24 * 60 * 60_000,
+      marks: [{ url: "https://x.example.com/", title: "X", minutes: 5, nextReload: 1 }],
+    },
+    { at: now - 60_000, marks: urls.map((url) => ({ url, title: url, minutes: 5, nextReload: 1 })) },
+  ];
+  await chrome.storage.onChanged.fire({ keepAlive: {} }, "local");
+  await tick();
+  await tick();
+  assert.equal(restore.textContent, "Restore last removal (12 marks)", "plural label");
+  assert.equal(
+    restore.title,
+    ["Restore:", ...urls.slice(0, 10), "…"].join("\n"),
+    "first 10 urls, one per line, then …",
+  );
+  stored.keepAliveTrash = [stored.keepAliveTrash[0]!];
+  await chrome.storage.onChanged.fire({ keepAlive: {} }, "local");
+  await tick();
+  await tick();
+  assert.equal(restore.hidden, false, "a year-old action is still restorable");
+  assert.equal(restore.title, "Restore:\nhttps://x.example.com/");
+  stored.keepAlive = [];
+  stored.keepAliveTrash = [];
 });

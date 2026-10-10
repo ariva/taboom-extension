@@ -25,6 +25,12 @@ export interface KeepAliveTab {
   nextReload: number; // ms timestamp the sweep compares against
 }
 
+// one removal action (a row's Remove, a menu unmark, Clear all) — Settings → Restore pops the newest; capped, never expires
+export interface KeepAliveRemoval {
+  at: number; // ms timestamp of the removal
+  marks: KeepAliveTab[];
+}
+
 // "host"  → exact hostname match, e.g. "mail.google.com"
 // "domain"→ "*.github.com" matches github.com and any subdomain
 // "url"   → one exact address, e.g. "https://app.example.com/board?id=1"
@@ -80,6 +86,7 @@ export interface LocalStorageSchema {
   protectionRules: ProtectionRule[];
   ui: Partial<UiPrefs>;
   keepAlive: KeepAliveTab[];
+  keepAliveTrash: KeepAliveRemoval[];
   windowProfiles: WindowProfiles;
   tabHistory: TabHistory;
   perfMetrics: PerfMetrics;
