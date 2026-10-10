@@ -360,10 +360,6 @@
 
   <section class="card">
     <h2>Customization</h2>
-    <label id="showExperimental-label" hidden><input type="checkbox" id="showExperimental" /> Show experimental features</label>
-    <p id="experimental-warning" hidden>⚠ Experimental features enabled — they may change over time and may not be fully polished.</p>
-    <label id="experimental_fuzzySearch-label" hidden><input type="checkbox" id="experimental_fuzzySearch" /> Fuzzy search
-      <span class="muted">(scattered letters match in order — no typo tolerance; best matches on top)</span></label>
     <label id="searchEmptyFilter-label" hidden>When search matches are hidden by the current filter
       <select id="searchEmptyFilter">
         <option value="keep">Keep the current filter</option>
@@ -400,6 +396,11 @@
         <option value="none">Do nothing</option>
       </select>
       <span class="muted">(side panels open in other windows on update or browser restart)</span></label>
+    <!-- experimental switch and its options last: opt-in territory sits under the everyday settings -->
+    <label id="showExperimental-label" hidden><input type="checkbox" id="showExperimental" /> Show experimental features</label>
+    <p id="experimental-warning" hidden>⚠ Experimental features enabled — they may change over time and may not be fully polished.</p>
+    <label id="experimental_fuzzySearch-label" hidden><input type="checkbox" id="experimental_fuzzySearch" /> Fuzzy search
+      <span class="muted">(scattered letters match in order — no typo tolerance; best matches on top)</span></label>
   </section>
 
   <section class="card">
