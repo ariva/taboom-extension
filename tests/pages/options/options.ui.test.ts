@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
-import type { LocalStorageSchema, ProtectionRule } from "../../../src/app/types.ts";
+import type { KeepAliveTab, LocalStorageSchema, ProtectionRule } from "../../../src/app/types.ts";
 import { byId, q, qa } from "../../helpers/dom.ts";
 import { makeChrome, loadPage, tick, RAW_FEATURES, TEST_EXPERIMENTAL, TEST_FEATURES } from "../../helpers/ui.ts";
 
@@ -10,6 +10,7 @@ const calls: string[] = [];
 const stored: Pick<LocalStorageSchema, "settings" | "ui"> &
   Partial<Pick<LocalStorageSchema, "perfMetrics" | "perfSnapshots">> & {
     protectionRules: Omit<ProtectionRule, "createdAt">[];
+    keepAlive?: KeepAliveTab[];
   } = {
   settings: { autoSnoozeEnabled: false, inactivityMinutes: 45 },
   protectionRules: [{ id: "r1", type: "domain", pattern: "*.github.com" }],
@@ -430,4 +431,139 @@ test("UI - Options - Window-names toggle visible only with WINDOW_NAMES; persist
     calls.some((c) => c.startsWith("storage.set") && c.includes('"windowNamesEnabled":false')),
     "preference persisted",
   );
+});
+
+// ---------- keep-it-alive (T-0002) ----------
+
+test("UI - Options - Keep-alive card visible iff KEEP_ALIVE resolves on; enabled by default, body follows the toggle", async () => {
+  const { applyExperimental, featureEnabled } = await import("../../../src/app/core.ts");
+  await chrome.storage.onChanged.fire({ protectionRules: {} }, "local"); // re-render with the ui prior tests left
+  await tick();
+  await tick();
+  const flagOn = featureEnabled(applyExperimental(RAW_FEATURES, stored.ui?.showExperimental ?? false), "KEEP_ALIVE");
+  assert.equal(byId("keep-alive-section").hidden, !flagOn, "card visible iff flag resolves on");
+  if (!flagOn) {
+    return;
+  }
+  const box = byId<HTMLInputElement>("keepAliveEnabled");
+  assert.equal(box.checked, true, "default: on — the experimental opt-in is the only gate");
+  assert.equal(byId("keep-alive-body").hidden, false, "table + default interval shown while on");
+  const minutes = byId<HTMLSelectElement>("keepAliveMinutes");
+  assert.deepEqual(
+    qa<HTMLOptionElement>(minutes, "option").map((option) => option.value),
+    ["1", "5", "10", "15", "20", "25", "30", "45", "60", "90"],
+  );
+  assert.equal(minutes.value, "20", "default interval");
+
+  calls.length = 0;
+  box.checked = false;
+  box.dispatchEvent(new window.Event("change", { bubbles: true }));
+  await tick();
+  await tick();
+  assert.ok(
+    calls.some((c) => c.startsWith("storage.set") && c.includes('"keepAliveEnabled":false')),
+    "setting persisted",
+  );
+  await chrome.storage.onChanged.fire({ settings: {} }, "local");
+  await tick();
+  await tick();
+  assert.equal(byId("keep-alive-body").hidden, true, "body hidden once disabled");
+  box.checked = true;
+  box.dispatchEvent(new window.Event("change", { bubbles: true }));
+  await tick();
+  await tick();
+  await chrome.storage.onChanged.fire({ settings: {} }, "local");
+  await tick();
+  await tick();
+  assert.equal(byId("keep-alive-body").hidden, false, "body back once re-enabled");
+  assert.match(byId("keep-alive-rows").textContent, /No tabs marked yet/);
+
+  minutes.value = "10";
+  minutes.dispatchEvent(new window.Event("change", { bubbles: true }));
+  await tick();
+  assert.ok(
+    calls.some((c) => c.startsWith("storage.set") && c.includes('"keepAliveMinutes":10')),
+    "default interval persisted as a number",
+  );
+});
+
+test("UI - Options - Keep-alive table: per-row pause, interval, countdown and remove", async () => {
+  const { applyExperimental, featureEnabled } = await import("../../../src/app/core.ts");
+  const flagOn = featureEnabled(applyExperimental(RAW_FEATURES, stored.ui?.showExperimental ?? false), "KEEP_ALIVE");
+  if (!flagOn) {
+    return;
+  }
+  const now = Date.now();
+  stored.keepAlive = [
+    { url: "https://dash.example.com/board", title: "Board", minutes: 25, nextReload: now + 5 * 60_000 + 500 },
+    { url: "https://mail.example.com/", title: "Mail", minutes: 5, paused: true, nextReload: 1 },
+  ];
+  await chrome.storage.onChanged.fire({ keepAlive: {} }, "local");
+  await tick();
+  await tick();
+  const rows = qa(byId("keep-alive-rows"), "tr");
+  assert.equal(rows.length, 2);
+  const cells = qa(rows[0]!, "td");
+  assert.equal(cells.length, 6, "number, enable, page, interval, next reload, remove");
+  assert.deepEqual(
+    rows.map((row) => q(row, "td").textContent),
+    ["1", "2"],
+    "rows numbered",
+  );
+  assert.equal(q<HTMLInputElement>(rows[0]!, 'input[type="checkbox"]').checked, true, "running mark: checked");
+  assert.equal(q<HTMLInputElement>(rows[1]!, 'input[type="checkbox"]').checked, false, "paused mark: unchecked");
+  assert.match(cells[2]!.textContent, /Board/);
+  assert.match(cells[2]!.textContent, /dash\.example\.com/);
+  const first = q<HTMLSelectElement>(rows[0]!, "select");
+  const second = q<HTMLSelectElement>(rows[1]!, "select");
+  assert.ok(
+    !qa<HTMLOptionElement>(first, "option").some((option) => option.value === ""),
+    "no Default option: every mark has its own interval",
+  );
+  assert.equal(first.value, "25");
+  assert.equal(second.value, "5");
+  assert.match(q(rows[0]!, ".countdown").textContent, /^[45]:[0-5]\d$/, "time left until the next reload");
+  assert.equal(q(rows[1]!, ".countdown").textContent, "paused");
+  assert.equal(q<HTMLButtonElement>(rows[0]!, "button").textContent, "Remove");
+
+  calls.length = 0;
+  first.value = "45";
+  first.dispatchEvent(new window.Event("change", { bubbles: true }));
+  await tick();
+  await tick();
+  const changed = calls.find((c) => c.startsWith("storage.set") && c.includes('"keepAlive"'));
+  assert.ok(changed, "interval written");
+  assert.equal(stored.keepAlive[0]?.minutes, 45);
+  assert.ok(
+    (stored.keepAlive[0]?.nextReload ?? 0) >= now + 45 * 60_000 - 55_000,
+    "re-armed from now at the new interval",
+  );
+
+  calls.length = 0;
+  const pause = q<HTMLInputElement>(qa(byId("keep-alive-rows"), "tr")[0]!, 'input[type="checkbox"]');
+  pause.checked = false;
+  pause.dispatchEvent(new window.Event("change", { bubbles: true }));
+  await tick();
+  await tick();
+  assert.equal(stored.keepAlive[0]?.paused, true, "unchecked = paused");
+  assert.ok((stored.keepAlive[0]?.nextReload ?? 0) >= now + 45 * 60_000 - 55_000, "pause restarts the schedule");
+  const resume = q<HTMLInputElement>(qa(byId("keep-alive-rows"), "tr")[1]!, 'input[type="checkbox"]');
+  resume.checked = true;
+  resume.dispatchEvent(new window.Event("change", { bubbles: true }));
+  await tick();
+  await tick();
+  assert.ok(!("paused" in (stored.keepAlive[1] ?? {})), "checked = running, key absent");
+  assert.ok((stored.keepAlive[1]?.nextReload ?? 0) >= now + 5 * 60_000 - 55_000, "resume re-arms from now");
+
+  calls.length = 0;
+  q<HTMLButtonElement>(qa(byId("keep-alive-rows"), "tr")[1]!, "button").click();
+  await tick();
+  await tick();
+  assert.deepEqual(
+    stored.keepAlive.map((entry) => entry.url),
+    ["https://dash.example.com/board"],
+    "row removed",
+  );
+  assert.equal(qa(byId("keep-alive-rows"), "tr").length, 1, "table re-rendered");
+  stored.keepAlive = [];
 });

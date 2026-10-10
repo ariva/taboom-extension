@@ -3,6 +3,7 @@
 import { isSupportedUrl, selectAutoSnoozeTargets } from "../app/core.ts";
 import { loadState, sessionStore } from "../app/storage.ts";
 import type { Settings } from "../app/types.ts";
+import { activeKeepAliveList } from "./keep-alive.ts";
 
 const ALARM_NAME = "auto-snooze";
 
@@ -24,7 +25,7 @@ export async function autoSnoozePass(): Promise<void> {
   if (!state.settings.autoSnoozeEnabled) {
     return;
   }
-  const tabs = await chrome.tabs.query({});
+  const [tabs, keepAlive] = await Promise.all([chrome.tabs.query({}), activeKeepAliveList()]);
   // manual wakes reset the inactivity clock (storage.session: survives SW
   // idle-death, gone with the browser session like the tabs themselves)
   const { wakeTimes = {} } = await sessionStore.get("wakeTimes");
@@ -34,7 +35,7 @@ export async function autoSnoozePass(): Promise<void> {
     await sessionStore.set({ wakeTimes: pruned });
   }
   await Promise.allSettled(
-    selectAutoSnoozeTargets(tabs, state.settings, state.protectionRules, Date.now(), pruned).map((tabId) =>
+    selectAutoSnoozeTargets(tabs, state.settings, state.protectionRules, Date.now(), pruned, keepAlive).map((tabId) =>
       chrome.tabs.discard(tabId).catch((error) => console.debug("discard failed", tabId, error)),
     ),
   );

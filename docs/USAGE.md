@@ -71,7 +71,7 @@ Every 5 minutes (configurable) the extension discards tabs that are **all** of:
 - inactive longer than the threshold (default 60 minutes, from Chrome's own `lastAccessed`),
 - not the active tab, not already snoozed,
 - not pinned (default), not playing audio (default),
-- not on a protected site,
+- not on a protected site, not kept alive,
 - a normal `http(s)`/`file` page (Chrome internal pages are never touched).
 
 Additionally, each window keeps at least 2 awake tabs (configurable, 0 = no limit) — oldest eligible tabs are snoozed first, so a window never ends up fully discarded.
@@ -86,9 +86,52 @@ Toggle and tune everything in **Settings** (⚙ in the side panel, or the extens
 
 Rule forms: `mail.google.com` (exact host), `*.github.com` (domain incl. subdomains) or a full address like `https://app.example.com/board` (that one page only — side panel row menu **Protect URL**). **Unprotect** on a tab removes whichever rules cover it. Protect sites that lose state on reload: editors, admin consoles, forms, terminals, conferencing.
 
+## Keeping tabs alive
+
+Some websites have short sessions: a bank, an intranet or an admin console logs you out after a few idle minutes, and a dashboard stops updating once its tab sleeps. Opening the tab later means logging in again or staring at stale numbers. Marking such a tab as *kept alive* reloads it on a timer, so the session is renewed before it expires and the page stays fresh. Protection only stops the snooze; keep-alive also reloads the page.
+
+1. It is on out of the box: **Settings → Keep Tabs Alive → Keep marked tabs alive** (nothing happens until you mark a tab; untick it to switch the whole feature off).
+2. Pick the **Default value** interval (1–90 minutes, default 20). It is copied onto each tab you mark from then on; changing it later leaves existing marks alone.
+3. Mark a tab: right-click the page → **Taboom - Tabs Manager → Keep this tab alive** (a checkbox — click again to unmark), or the side panel row menu → **Keep alive**. The same menu then shows one toggle for the mark's state — **Disable keep alive** (pauses the reloads, the mark stays) or **Enable keep alive** — plus **Remove keep-alive mark**.
+
+Marked pages reload every interval ± 55 seconds (random, so many tabs do not reload at once) and are never auto-snoozed. The Settings table lists every mark, numbered, with a checkbox to pause / resume its reloads (a paused mark stays listed and still counts as kept), its own **Reload each** interval (changing it restarts the timer), a live **Next reload** countdown and a **Remove** button. The quick launch (▦) gains an **Alive** view with one row per mark, in the same order as Settings: click an open one to jump to it; a mark whose page is not open anywhere (tab closed, or it navigated on) is struck through with *not open*; click opens it in a new tab, and its ⋯ / right-click menu offers **Open**, the same Enable / Disable toggle and **Remove keep-alive mark**.
+
+Marks are kept by page address (without `#fragment`), so they survive a browser restart and apply to every tab on that address; a tab that navigates elsewhere is no longer kept. A page with unsaved form data may show Chrome's "Leave site?" prompt on each reload — do not mark those. No extra permission is needed: reloading a tab is free, the timer is the existing `alarms` permission.
+
+### How a mark works, by example
+
+A mark is **not** a tab id and **not** a window: it is the page address with the `#fragment` dropped, plus its own interval, an optional pause and the time of the next reload.
+
+1. **Marking.** Right-click a tab on `https://dash.example.com/board#tab=2` → **Keep this tab alive**. Taboom stores `https://dash.example.com/board` with the current **Default value** (say 20 minutes) and a next reload time 20 minutes ± 55 seconds from now. The tab's id is not stored.
+2. **Reloading.** Every 30 seconds a sweep looks for marks whose time has come and that are not paused. For each one it reloads **every** tab, in every window, whose address (without fragment) matches, then schedules the next reload: interval ± 55 seconds again. Marks whose time has not come are untouched.
+3. **Two tabs, one mark.** The board is open in two windows → both reload together. Close one → the other keeps reloading. Close both → the mark stays in the Settings table and in the Alive view (as *not open*), quietly waiting; open the board again tomorrow and it is kept without re-marking.
+4. **Navigating away.** The board tab goes to `https://news.ycombinator.com/` → that tab is no longer kept (the context-menu checkbox clears); the board mark still exists for any tab that returns to that address.
+5. **Same page or not?** `board#tab=2` and `board#tab=5` are the same mark. `board?view=5` is a different page and needs its own mark (only the fragment is dropped right now (it may change in the future), the query stays).
+6. **Interval per mark.** Default 1 minute, mark the board → the board reloads every minute. Raise the default to 25 → the board stays at 1; the next page you mark gets 25. Change the board's own dropdown to 10 → its timer restarts and the countdown shows about 10:00 +/- 55s.
+7. **Pausing.** Untick the row's checkbox → the sweep skips it and the countdown reads **paused**; the page is still a mark (menu checkbox stays ticked, still never auto-snoozed) but its row loses the **kept alive** badge and the Alive view greys it out with "paused". The side panel row menu (also from the Alive view) shows **Disable keep alive** while running and **Enable keep alive** while paused — never both. Ticking or unticking restarts that mark's timer from now, so a reload that fell due while paused does not fire at once.
+8. **Switching off.** **Keep marked tabs alive** unticked, or an empty table → no timer, no reloads, no menu item. The marks stay in storage; ticking **Keep marked tabs alive** again restarts every mark's timer from now.
+
+The ± 55 seconds is random per reload so that ten dashboards on the same interval do not all reload in the same second.
+
+### Protected vs. kept alive
+
+Both keep automatic snooze away from a page; they differ in what else happens. Pick one; a page can also be both (the side panel row then shows both badges).
+
+| | Protected | Kept alive |
+|---|---|---|
+| Automatic snooze | never | never |
+| Manual snooze (row ⏸, bulk bar) | still works | still works |
+| Reloads the page | no — the page is left exactly as it is | yes, every interval ± 55 s |
+| Matches | site rules: a host, `*.domain`, or one exact address | one exact address (without `#fragment`) |
+| Good for | pages that lose state on reload: editors, forms, terminals, calls | pages that must stay loaded *and* fresh: dashboards, sessions that time out |
+| Row indicator | shield button + green **protected** badge | green **kept alive** badge |
+| Where to manage | Settings → Protected Sites | Settings → Keep Tabs Alive |
+
+Rule of thumb: protect what would break if reloaded; keep alive what would go stale or log you out if it were not.
+
 ## Context menu
 
-Right-click any page → **Taboom - Tabs Manager**: Snooze this tab · Always protect this site · Snooze all inactive tabs.
+Right-click any page → **Taboom - Tabs Manager**: Snooze this tab · Protect site · Keep this tab alive · Snooze all inactive tabs.
 
 ## Privacy
 

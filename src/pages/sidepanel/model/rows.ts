@@ -47,13 +47,20 @@ export interface BulkSummary {
   selectAllTitle: string;
 }
 
-export function badges(tab: Pick<Tab, "discarded" | "pinned" | "audible">, isProtectedTab: boolean): Badge[] {
+export function badges(
+  tab: Pick<Tab, "discarded" | "pinned" | "audible">,
+  isProtectedTab: boolean,
+  isKeptAliveTab = false,
+): Badge[] {
   const list: Badge[] = [];
   if (tab.discarded) {
     list.push(["snoozed", "warn"]);
   }
   if (isProtectedTab) {
     list.push(["protected", "ok"]);
+  }
+  if (isKeptAliveTab) {
+    list.push(["kept alive", "ok"]); // same colour as protected: both mean "auto-snooze leaves this alone"
   }
   if (tab.pinned) {
     list.push(["pinned", ""]);
@@ -117,7 +124,7 @@ export function rowViewModel(
     host,
     hostRanges,
     age: !tab.active && tab.lastAccessed ? formatAge(now - tab.lastAccessed) : null,
-    badges: [...badges(tab, d.protected), ...(urlOnlyMatch ? [["url match", ""] satisfies Badge] : [])],
+    badges: [...badges(tab, d.protected, d.keptAlive), ...(urlOnlyMatch ? [["url match", ""] satisfies Badge] : [])],
     canSnooze: !tab.discarded && isSupportedUrl(tab.url),
     protected: d.protected,
     protectLabel: d.protected ? "Unprotect site" : "Protect site",

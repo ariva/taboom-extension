@@ -303,14 +303,35 @@ test("Model - RowViewModel maps tab state to plain data", () => {
 });
 
 test("Model - Badges order and kinds", () => {
-  const full = badges(tab({ discarded: true, pinned: true, audible: true }), true);
+  const full = badges(tab({ discarded: true, pinned: true, audible: true }), true, true);
   assert.deepEqual(full, [
     ["snoozed", "warn"],
     ["protected", "ok"],
+    ["kept alive", "ok"],
     ["pinned", ""],
     ["🔊", ""],
   ]);
-  assert.deepEqual(badges(tab(), false), []);
+  assert.deepEqual(badges(tab(), false), [], "kept-alive flag defaults to off");
+});
+
+test("Model - DeriveTabs flags kept-alive pages by url without fragment", () => {
+  const tabs = [
+    tab({ url: "https://example.com/page#x" }),
+    tab({ id: 2, url: "https://other.io/" }),
+    tab({ id: 3, url: "https://paused.io/" }),
+  ];
+  const derived = deriveTabs(
+    tabs,
+    [],
+    [
+      { url: "https://example.com/page", title: "P", minutes: 25, nextReload: 0 },
+      { url: "https://paused.io/", title: "Paused", minutes: 25, paused: true, nextReload: 0 },
+    ],
+  );
+  assert.equal(derived.get(1)?.keptAlive, true);
+  assert.equal(derived.get(2)?.keptAlive, false);
+  assert.equal(derived.get(3)?.keptAlive, false, "a paused mark reloads nothing: no badge");
+  assert.equal(deriveTabs(tabs, []).get(1)?.keptAlive, false, "no list = nothing kept");
 });
 
 test("Model - CountsByFilter", () => {

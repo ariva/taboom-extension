@@ -5,6 +5,7 @@ import { IS_DEV } from "../app/env.ts";
 import { loadState, localStore, saveState } from "../app/storage.ts";
 import { openPanelOnActionClick } from "../lib/platform/panel.ts";
 import { createContextMenus } from "./context-menus.ts";
+import { ensureKeepAliveAlarm } from "./keep-alive.ts";
 import { applyAutoDiscardable } from "./protection.ts";
 import { ensureAlarm } from "./snooze.ts";
 import { withHistory } from "./tab-history.ts";
@@ -24,6 +25,7 @@ async function initNow(): Promise<void> {
   const state = await loadState();
   await saveState(state); // persist defaults on first run
   await ensureAlarm(state.settings);
+  await ensureKeepAliveAlarm();
   await applyAutoDiscardable(state.protectionRules);
   await createContextMenus();
   await openPanelOnActionClick();

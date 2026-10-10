@@ -10,6 +10,19 @@ export interface Settings {
   excludePinned: boolean;
   excludeAudible: boolean;
   minAwakePerWindow: number;
+  // keep-it-alive: periodic reload of marked pages (KEEP_ALIVE flag)
+  keepAliveEnabled: boolean;
+  keepAliveMinutes: number; // default reload interval; an entry's own `minutes` overrides it
+}
+
+// one keep-it-alive mark (storage.local.keepAlive[]): keyed by page url without
+// the fragment — tab ids do not survive a browser restart, the address does
+export interface KeepAliveTab {
+  url: string;
+  title: string;
+  minutes: number; // settings.keepAliveMinutes as it was when marked; editable per mark
+  paused?: boolean; // absent = reloads run; the mark stays listed either way
+  nextReload: number; // ms timestamp the sweep compares against
 }
 
 // "host"  → exact hostname match, e.g. "mail.google.com"
@@ -66,6 +79,7 @@ export interface LocalStorageSchema {
   settings: Partial<Settings>;
   protectionRules: ProtectionRule[];
   ui: Partial<UiPrefs>;
+  keepAlive: KeepAliveTab[];
   windowProfiles: WindowProfiles;
   tabHistory: TabHistory;
   perfMetrics: PerfMetrics;

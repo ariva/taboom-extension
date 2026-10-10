@@ -40,6 +40,7 @@ The manifest is code: `src/manifest.ts` exports `manifest(version, target = "chr
 | `lifecycle.ts` | coalesced init pass (`onInstalled` / `onStartup`), update-available note |
 | `snooze.ts` | the alarm, the auto-snooze pass, manual snooze, wake-time recording |
 | `protection.ts` | protection rules → `autoDiscardable`, toggle / bulk protect, protect menu sync |
+| `keep-alive.ts` | keep-it-alive: one 30 s sweep alarm (armed only while enabled and marks exist) reloads due pages and re-arms them with ±55 s jitter; mark / unmark from menu and panel; checkbox menu item sync |
 | `context-menus.ts` | browser context menu items, serialized rebuilds, history menu |
 | `tab-history.ts` | tab activation history (back / forward / jump), persisted stack; `historyStep` serves both the panel's message and the browser-wide keyboard command; jumps start one at a time so Chrome's activation echo of a jump never lands behind the next jump (key auto-repeat) |
 | `window-profiles.ts` | window identity across restarts, names / colors / pins, side-panel port tracking, panels to restore |
@@ -78,7 +79,7 @@ Two things worth knowing before changing this folder:
 
 ## Options page (`src/pages/options/`)
 
-`main.ts` (entry, `render()`), `page-state.ts` (feature flags, render forwarder, saved-flash), `settings-form.ts`, `ui-prefs.ts`, `rules.ts`, `whats-new.ts` (renders `CHANGES.md`), `perf-panel.ts`, `danger-zone.ts`, and the pure `model.ts` (release-notes parsing, perf formatting, zoom presets).
+`main.ts` (entry, `render()`), `page-state.ts` (feature flags, render forwarder, saved-flash), `settings-form.ts`, `ui-prefs.ts`, `rules.ts`, `keep-alive.ts` (Keep Tabs Alive card: numbered marks table with pause checkbox, per-mark interval, 1 s countdown, Remove), `whats-new.ts` (renders `CHANGES.md`), `perf-panel.ts`, `danger-zone.ts`, and the pure `model.ts` (release-notes parsing, perf formatting, zoom presets).
 
 ## Generic library (`src/lib/`)
 
@@ -94,7 +95,7 @@ Two things worth knowing before changing this folder:
 | `ui/toast.ts` | transient message |
 | `dom.ts` | `getElementById<T>`, `closest(eventTarget, selector)`, `mustQuery` |
 
-Taboom binds these in `src/app/`: `messages.ts` (the `Message` union, `MessageResponses`, `send`), `storage.ts` (`localStore`, `sessionStore`, `loadState` / `saveState` with defaults merge), `types.ts` (domain types, `LocalStorageSchema`, `SessionStorageSchema`). The rest of `src/app/` is pure logic: `core.ts` (eligibility, rule matching, search helpers, defaults, feature flags), `window-identity.ts`, `protection-rules.ts`, `env.ts`.
+Taboom binds these in `src/app/`: `messages.ts` (the `Message` union, `MessageResponses`, `send`), `storage.ts` (`localStore`, `sessionStore`, `loadState` / `saveState` with defaults merge), `types.ts` (domain types, `LocalStorageSchema`, `SessionStorageSchema`). The rest of `src/app/` is pure logic: `core.ts` (eligibility, rule matching, search helpers, defaults, feature flags), `keep-alive.ts` (keep-it-alive marks: list edits, jittered reload schedule), `window-identity.ts`, `protection-rules.ts`, `env.ts`.
 
 ## Data flow
 
@@ -189,6 +190,7 @@ Design choices that matter:
 - **`Tab.lastAccessed`** is the inactivity signal — no extension-side activity tracking.
 - **Snoozing the active tab** activates a neighbour first: Chrome refuses to discard the active tab (`src/background/snooze.ts`).
 - **Protection has two effects:** excluded from the auto-snooze pass, and `autoDiscardable: false` on matching tabs (`src/background/protection.ts`).
+- **Keep-it-alive marks are keyed by url** (fragment dropped), not tab id: ids do not survive a restart, and one mark covers every tab on that page. Each mark carries its own `minutes` (the default copied at mark time, so changing the default never silently reschedules old marks), an optional `paused` (absent = running; the mark is still a mark for the menu, the Alive view and snooze exclusion — only the sweep skips it) and its `nextReload`; toggling a mark's pause or re-enabling the feature restarts the schedule from now, so due times that passed meanwhile never fire together; a single 30 s sweep alarm (the MV3 floor) reloads the due ones and re-arms them at `interval ± 55 s`, floored to 30 s — a `periodInMinutes` alarm could not jitter. Kept pages are excluded from auto-snooze (manual snooze still works, as for protected) and carry a "kept alive" row badge (running marks only; paused ones show none, and the Alive view greys them out; that view lists every mark, open or not, striking through the ones with no open tab — `windows-popover/alive.ts`) derived once per refresh in `model/derived.ts`; pause / resume and remove from both pages go through the writers `pauseKeepAlive` / `removeKeepAlive` in `src/app/storage.ts` (a not-open mark has no tab, so its menu — `openMarkMenu` — acts on the url); `autoDiscardable` is left alone because the next reload wakes a discarded tab anyway (`src/background/keep-alive.ts`, `src/app/keep-alive.ts`).
 - **Feature flags** live in `features.json` (`enabled`, optional `experimental`); flag names are a type (`FeatureName` in `src/app/types.ts`), so a misspelled flag does not compile. A missing capability or a disabled flag hides the feature — the test suite runs every flag-dependent test with flags as shipped, with experimental flags on, and with everything off (`vitest.config.ts`).
 
 ## Storage and messages

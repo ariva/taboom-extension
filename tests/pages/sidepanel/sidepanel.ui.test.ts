@@ -6,6 +6,7 @@ import { byId, q, qa } from "../../helpers/dom.ts";
 import { loadPage, makeChrome, RAW_FEATURES, TEST_EXPERIMENTAL, TEST_FEATURES, tick } from "../../helpers/ui.ts";
 
 const AUTO_ALL_ON = TEST_FEATURES.SEARCH_AUTO_SELECT_ALL?.enabled === true;
+const KEEP_ALIVE_ON = TEST_FEATURES.KEEP_ALIVE?.enabled === true;
 
 const NOW = Date.now();
 const tabs: NonNullable<ChromeMockOptions["tabs"]> = [
@@ -810,6 +811,8 @@ test("UI - Sidepanel - Right-click row offers move-to-window menu (selection-awa
       "Unprotect",
       "Pin",
       "Close",
+      // KEEP_ALIVE: the setting defaults to on, so the experimental pass shows the mark item
+      ...(KEEP_ALIVE_ON ? ["Keep alive"] : []),
       "Move tab to ▸",
       "Window #2",
       "New window",
@@ -1661,4 +1664,174 @@ test("UI - Sidepanel - Tab groups: move to group / new group / remove from group
   must(tabs.find((t) => t.id === 1)).groupId = -1; // restore fixture
   await chrome.tabs.onUpdated.fire(1, { groupId: -1 });
   await new Promise((resolve) => setTimeout(resolve, 200));
+});
+
+// ---------- keep-it-alive (T-0002) ----------
+
+test("UI - Sidepanel - KEEP_ALIVE: row menu marks / unmarks the page, quick launch gains an Alive view", {
+  skip: !KEEP_ALIVE_ON,
+}, async () => {
+  const rowOf = (id: number) => q(document, `.row[data-tab-id="${id}"]`);
+  const menu = byId("ctx-menu");
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 200));
+  // setting switched off: no menu item, no view (on is the default)
+  await chrome.storage.local.set({ settings: { keepAliveEnabled: false } });
+  await chrome.storage.onChanged.fire({ settings: {} }, "local");
+  await settle();
+  rowOf(1).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+  assert.ok(!qa(menu, ".ctx-item").some((el) => el.textContent.startsWith("Keep alive")), "item hidden while off");
+
+  await chrome.storage.local.set({ settings: { keepAliveEnabled: true } });
+  await chrome.storage.onChanged.fire({ settings: {} }, "local");
+  await settle();
+  rowOf(1).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+  calls.length = 0;
+  must(qa(menu, ".ctx-item").find((el) => el.textContent === "Keep alive")).click();
+  await tick();
+  assert.ok(calls.includes("sendMessage keep-alive-set"), "worker asked to mark the page");
+
+  // the worker writes the mark; the panel follows storage
+  await chrome.storage.local.set({
+    keepAlive: [{ url: "https://github.com/pr/1", title: "My Pull Request", minutes: 25, nextReload: 1 }],
+  });
+  await chrome.storage.onChanged.fire({ keepAlive: {} }, "local");
+  await settle();
+  assert.ok(
+    qa(rowOf(1), ".badge").some((el) => el.textContent === "kept alive"),
+    "marked row carries a badge like protected rows do",
+  );
+  assert.ok(!qa(rowOf(2), ".badge").some((el) => el.textContent === "kept alive"), "other rows: no badge");
+  rowOf(1).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+  assert.deepEqual(
+    qa(menu, ".ctx-item")
+      .map((el) => el.textContent)
+      .filter((text) => /alive|mark/.test(text)),
+    ["Disable keep alive", "Remove keep-alive mark"],
+    "running mark: one toggle (disable = pause) plus remove, never Enable alongside",
+  );
+  const disableItem = must(qa(menu, ".ctx-item").find((el) => el.textContent === "Disable keep alive"));
+  assert.ok(
+    disableItem.previousElementSibling?.classList.contains("ctx-divider"),
+    "keep-alive items sit in their own section, divider before",
+  );
+  rowOf(2).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+  assert.ok(
+    qa(menu, ".ctx-item").some((el) => el.textContent === "Keep alive"),
+    "other page: mark offered",
+  );
+
+  const winBtn = byId("win-list-btn");
+  winBtn.click();
+  await tick();
+  const pop = byId("windows-pop");
+  const aliveView = must(qa(pop, ".win-view").find((el) => el.textContent.startsWith("Alive")));
+  assert.equal(aliveView.textContent, "Alive (1)");
+  aliveView.click();
+  await tick();
+  const aliveRow = pop.querySelector<HTMLElement>('.win-row[data-tab-id="1"]');
+  assert.ok(aliveRow, "kept tab listed");
+  assert.match(q(aliveRow, ".win-title").textContent, /My Pull Request/);
+  calls.length = 0;
+  aliveRow.click();
+  await tick();
+  await tick();
+  assert.ok(
+    calls.some((c) => c.startsWith("tabs.update 1") && c.includes('"active":true')),
+    "click activates the tab",
+  );
+
+  // a mark whose page is not open anywhere (closed, or the tab navigated on): the Alive
+  // view mirrors the Settings table, so it is still a row — flagged, and click opens it
+  await chrome.storage.local.set({
+    keepAlive: [
+      { url: "https://github.com/pr/1", title: "My Pull Request", minutes: 25, nextReload: 1 },
+      { url: "https://dash.example.com/board", title: "Board", minutes: 5, nextReload: 1 },
+    ],
+  });
+  await chrome.storage.onChanged.fire({ keepAlive: {} }, "local");
+  await settle();
+  winBtn.click();
+  await tick();
+  must(qa(pop, ".win-view").find((el) => el.textContent === "Alive (2)")).click();
+  await tick();
+  const aliveRows = qa(pop, ".win-row");
+  assert.equal(aliveRows.length, 2, "one row per mark, like Settings");
+  const missing = must(aliveRows.find((el) => el.classList.contains("missing")));
+  assert.match(missing.textContent, /Board/);
+  assert.match(missing.textContent, /not open/i);
+  calls.length = 0;
+  missing.click();
+  await tick();
+  assert.ok(
+    calls.some((c) => c.startsWith("tabs.create") && c.includes('"url":"https://dash.example.com/board"')),
+    "click opens the page in a new tab",
+  );
+  // no tab, still a ⋯: the mark menu — open, pause / resume, stop (the popover is
+  // still rendered: happy-dom has no hidePopover, and winBtn would toggle it shut)
+  const missingItem = must(must(qa(pop, ".win-row").find((el) => el.classList.contains("missing"))).parentElement);
+  must(missingItem.querySelector<HTMLButtonElement>(".win-menu-btn")).click();
+  await tick();
+  assert.deepEqual(
+    qa(menu, ".ctx-item").map((el) => el.textContent),
+    ["Open", "Disable keep alive", "Remove keep-alive mark"],
+  );
+  must(qa(menu, ".ctx-item").find((el) => el.textContent === "Remove keep-alive mark")).click();
+  await tick();
+  await tick();
+  const { keepAlive: afterStop = [] } = await chrome.storage.local.get("keepAlive");
+  assert.deepEqual(
+    afterStop.map((entry) => entry.url),
+    ["https://github.com/pr/1"],
+    "mark removed from Settings too",
+  );
+  await chrome.storage.onChanged.fire({ keepAlive: {} }, "local");
+  await settle();
+
+  // paused in Settings: still listed in Alive (it is still a mark) but flagged, badge gone,
+  // and the row menu offers Resume
+  await chrome.storage.local.set({
+    keepAlive: [{ url: "https://github.com/pr/1", title: "My Pull Request", minutes: 25, paused: true, nextReload: 1 }],
+  });
+  await chrome.storage.onChanged.fire({ keepAlive: {} }, "local");
+  await settle();
+  assert.ok(!qa(rowOf(1), ".badge").some((el) => el.textContent === "kept alive"), "paused: badge gone");
+  winBtn.click();
+  await tick();
+  must(qa(pop, ".win-view").find((el) => el.textContent === "Alive (1)")).click();
+  await tick();
+  const pausedRow = must(pop.querySelector<HTMLElement>('.win-row[data-tab-id="1"]'));
+  assert.ok(pausedRow.classList.contains("paused"), "paused row flagged");
+  assert.match(pausedRow.textContent, /paused/i, "paused row says so");
+  pausedRow.dispatchEvent(new window.MouseEvent("contextmenu", { bubbles: true }));
+  await tick();
+  calls.length = 0;
+  assert.deepEqual(
+    qa(menu, ".ctx-item")
+      .map((el) => el.textContent)
+      .filter((text) => /alive|mark/.test(text)),
+    ["Enable keep alive", "Remove keep-alive mark"],
+    "paused mark: Enable replaces Disable",
+  );
+  must(qa(menu, ".ctx-item").find((el) => el.textContent === "Enable keep alive")).click();
+  await tick();
+  await tick();
+  const { keepAlive: resumed = [] } = await chrome.storage.local.get("keepAlive");
+  assert.ok(!("paused" in (resumed[0] ?? {})), "resume: key removed");
+  assert.ok((resumed[0]?.nextReload ?? 0) >= Date.now() + 25 * 60_000 - 55_000 - 1000, "resume re-arms from now");
+  await chrome.storage.onChanged.fire({ keepAlive: {} }, "local");
+  await settle();
+  rowOf(1).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+  assert.ok(
+    qa(menu, ".ctx-item").some((el) => el.textContent === "Disable keep alive"),
+    "running again: Disable offered",
+  );
+
+  // restore fixture: feature off again, no marks, no Alive view
+  await chrome.storage.local.set({ settings: {}, keepAlive: [] });
+  await chrome.storage.onChanged.fire({ settings: {}, keepAlive: {} }, "local");
+  await settle();
+  winBtn.click();
+  await tick();
+  assert.ok(!qa(pop, ".win-view").some((el) => el.textContent.startsWith("Alive")), "view gone");
+  assert.ok(!qa(rowOf(1), ".badge").some((el) => el.textContent === "kept alive"), "badge gone");
 });

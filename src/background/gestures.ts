@@ -2,6 +2,7 @@
 // routed to the feature modules.
 import { isSupportedUrl } from "../app/core.ts";
 import { openPanel } from "../lib/platform/panel.ts";
+import { KEEP_ALIVE_MENU_ID, toggleTabKeepAlive } from "./keep-alive.ts";
 import { toggleSiteProtection } from "./protection.ts";
 import { autoSnoozePass, snoozeTab } from "./snooze.ts";
 import { historyJump, historyStep } from "./tab-history.ts";
@@ -52,6 +53,11 @@ export async function runMenuClick(info: chrome.contextMenus.OnClickData, tab?: 
       break;
     case "snooze-all-inactive":
       await autoSnoozePass();
+      break;
+    case KEEP_ALIVE_MENU_ID:
+      if (tab && isSupportedUrl(tab.url)) {
+        await toggleTabKeepAlive(tab);
+      }
       break;
   }
 }

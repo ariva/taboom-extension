@@ -5,6 +5,7 @@ import type {
   AppState,
   FeatureName,
   Features,
+  KeepAliveTab,
   NavMode,
   PerfMetrics,
   ProtectionRule,
@@ -25,6 +26,8 @@ export const DEFAULTS = {
     excludePinned: true,
     excludeAudible: true,
     minAwakePerWindow: 2,
+    keepAliveEnabled: true, // on as soon as the experimental flag is: nothing happens until a tab is marked
+    keepAliveMinutes: 20,
   },
   protectionRules: [],
   ui: {
@@ -108,6 +111,21 @@ export function isProtected(url: string | undefined, rules: ProtectionRule[]): b
   return rules.some((rule) => matchesUrl(url, rule));
 }
 
+// A keep-it-alive mark follows the page, not the tab: the fragment is dropped
+// so in-page navigation (#section) keeps matching; unsupported urls key to ""
+// and never match. Lives here (not keep-alive.ts) because eligibility needs it.
+export function keepAliveKey(url: string | undefined): string {
+  if (!isSupportedUrl(url)) {
+    return "";
+  }
+  return (url ?? "").split("#")[0] ?? "";
+}
+
+export function isKeptAlive(list: KeepAliveTab[], url: string | undefined): boolean {
+  const key = keepAliveKey(url);
+  return key !== "" && list.some((entry) => entry.url === key);
+}
+
 // wakeTimes: tabId → ms timestamp of a MANUAL wake — a reload of a discarded
 // tab leaves lastAccessed at its pre-snooze value, so without this the next
 // pass would re-snooze the tab the user just woke
@@ -117,6 +135,7 @@ export function isEligibleForAutoSnooze(
   rules: ProtectionRule[],
   now = Date.now(),
   wakeTimes: WakeTimes | null = null,
+  keepAlive: KeepAliveTab[] = [],
 ): boolean {
   if (!tab.id) {
     return false;
@@ -139,6 +158,9 @@ export function isEligibleForAutoSnooze(
   if (isProtected(tab.url, rules)) {
     return false;
   }
+  if (isKeptAlive(keepAlive, tab.url)) {
+    return false; // a reload would wake it anyway — the two features must not fight
+  }
   const lastAccessed = Math.max(tab.lastAccessed ?? now, wakeTimes?.[tab.id] ?? 0);
   return now - lastAccessed >= settings.inactivityMinutes * 60_000;
 }
@@ -152,10 +174,11 @@ export function selectAutoSnoozeTargets(
   rules: ProtectionRule[],
   now = Date.now(),
   wakeTimes: WakeTimes | null = null,
+  keepAlive: KeepAliveTab[] = [],
 ): number[] {
   // type predicate: isEligibleForAutoSnooze rejects tabs without an id
   const eligible = tabs.filter((tab): tab is SnoozeTab & { id: number } =>
-    isEligibleForAutoSnooze(tab, settings, rules, now, wakeTimes),
+    isEligibleForAutoSnooze(tab, settings, rules, now, wakeTimes, keepAlive),
   );
   const minAwake = settings.minAwakePerWindow ?? 0;
   if (minAwake <= 0) {

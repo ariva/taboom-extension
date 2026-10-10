@@ -8,7 +8,7 @@ import { capabilities } from "../../../lib/platform/capabilities.ts";
 import { sortSelect } from "../foundation/elements.ts";
 import { deriveTabs } from "../model/index.ts";
 import { render } from "../foundation/scheduler.ts";
-import { effectiveSort, FLAG_GATED_SORTS, namesActive, state } from "../foundation/state.ts";
+import { effectiveSort, FLAG_GATED_SORTS, keepAliveActive, namesActive, state } from "../foundation/state.ts";
 import type { PanelTab } from "../foundation/state.ts";
 
 type TabGroup = chrome.tabGroups.TabGroup;
@@ -17,16 +17,19 @@ type TabGroup = chrome.tabGroups.TabGroup;
 // (tab/storage/focus changes — incl. renders triggered in OTHER open panels)
 // re-render without a view transition
 export async function refresh(animate = false, preloaded: AppState | null = null): Promise<void> {
-  const [persisted, tabs, win, { windowProfiles = {} }, { windowSessionMap = {} }, groups] = await Promise.all([
-    preloaded ?? loadState(), // startup passes its already-read state — no second read
-    chrome.tabs.query({}),
-    chrome.windows.getLastFocused(),
-    localStore.get("windowProfiles"),
-    sessionStore.get("windowSessionMap"),
-    capabilities.tabGroups ? chrome.tabGroups.query({}).catch(() => []) : [],
-  ]);
+  const [persisted, tabs, win, { windowProfiles = {}, keepAlive = [] }, { windowSessionMap = {} }, groups] =
+    await Promise.all([
+      preloaded ?? loadState(), // startup passes its already-read state — no second read
+      chrome.tabs.query({}),
+      chrome.windows.getLastFocused(),
+      localStore.get(["windowProfiles", "keepAlive"]),
+      sessionStore.get("windowSessionMap"),
+      capabilities.tabGroups ? chrome.tabGroups.query({}).catch(() => []) : [],
+    ]);
   state.tabGroups = new Map(groups.map((group): [number, TabGroup] => [group.id, group]));
   state.rules = persisted.protectionRules;
+  state.keepAlive = keepAlive;
+  state.keepAliveEnabled = persisted.settings.keepAliveEnabled;
   state.ui = persisted.ui;
   document.documentElement.style.fontSize = `${state.ui.fontSize ?? 1}rem`;
   // light-dark() colors resolve via color-scheme, so forcing it flips the palette
@@ -54,7 +57,7 @@ export async function refresh(animate = false, preloaded: AppState | null = null
       state.selected.delete(tabId);
     }
   }
-  state.derived = deriveTabs(tabs, state.rules);
+  state.derived = deriveTabs(tabs, state.rules, keepAliveActive() ? state.keepAlive : []);
   // resolved once per refresh; the keydown handler reads this instead of
   // re-running applyExperimental (a fresh object) on every keypress
   state.features = applyExperimental(state.rawFeatures, state.ui.showExperimental ?? false);

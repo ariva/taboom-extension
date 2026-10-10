@@ -180,6 +180,27 @@
     #rules button:hover { background: var(--hover); }
     #rules button svg { width: 10px; height: 10px; display: block; }
 
+    /* keep-it-alive marks as a table: number, running, page, its interval, countdown, remove */
+    #keep-alive-table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+    #keep-alive-table th { text-align: left; font-weight: 500; color: var(--muted); font-size: 11px; padding: 2px 6px 4px 0; }
+    #keep-alive-table td { padding: 4px 6px 4px 0; border-top: 1px solid light-dark(#eee, #333); vertical-align: middle; white-space: nowrap; }
+    #keep-alive-table td:first-child { color: var(--muted); font-variant-numeric: tabular-nums; }
+    #keep-alive-table td:nth-child(3) { width: 100%; white-space: normal; min-width: 0; overflow-wrap: anywhere; }
+    #keep-alive-table .url { display: block; font-family: ui-monospace, monospace; font-size: 11px; color: var(--muted); }
+    #keep-alive-table .countdown { font-variant-numeric: tabular-nums; }
+    #keep-alive-table td:last-child { text-align: right; }
+    #keep-alive-table button {
+      border: 1px solid light-dark(#ddd, #444);
+      background: none;
+      color: inherit;
+      cursor: pointer;
+      border-radius: 4px;
+      padding: 2px 8px;
+      font-size: 11px;
+      transition: background var(--transition);
+    }
+    #keep-alive-table button:hover { background: var(--hover); }
+
     #links li { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid light-dark(#eee, #333); }
     #links li:last-child { border-bottom: none; }
     #links a { white-space: nowrap; color: var(--accent); }
@@ -251,6 +272,19 @@
     <div class="row">
       <input type="text" id="new-rule" placeholder="*.example.com" />
       <button id="add-rule">Add</button>
+    </div>
+  </section>
+
+  <section class="card" id="keep-alive-section" hidden>
+    <h2>Keep Tabs Alive</h2>
+    <p class="muted">Some sites log you out after a few idle minutes (banking, intranets, admin consoles) and dashboards stop updating once the tab sleeps. Mark such a tab to keep it alive: it reloads on a timer (±55 s), so the session never expires and the data stays fresh, and it is never auto-snoozed. Mark a tab from its right-click menu or the side panel row menu. Pages with unsaved forms may ask "Leave site?" on each reload.</p>
+    <label><input type="checkbox" id="keepAliveEnabled" /> Keep marked tabs alive</label>
+    <div id="keep-alive-body" hidden>
+      <label>Default value <select id="keepAliveMinutes"></select> minutes (copied onto each new mark)</label>
+      <table id="keep-alive-table">
+        <thead><tr><th>#</th><th></th><th>Page</th><th>Reload each (min)</th><th>Next reload</th><th></th></tr></thead>
+        <tbody id="keep-alive-rows"></tbody>
+      </table>
     </div>
   </section>
 

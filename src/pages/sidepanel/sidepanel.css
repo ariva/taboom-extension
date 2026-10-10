@@ -775,6 +775,9 @@ header input[type="checkbox"],
 #windows-pop .win-row:hover { background: var(--badge-bg); }
 #windows-pop .win-row.current { font-weight: 700; color: var(--accent); }
 #windows-pop .win-row.win-new { color: var(--muted); }
+/* Alive view: paused = greyed out (reloads off), not open = struck through (no tab) */
+#windows-pop .win-row.paused .win-title { color: var(--muted); }
+#windows-pop .win-row.missing .win-title { text-decoration: line-through; }
 #windows-pop .win-row.drop-target { border-radius: var(--radius-s); }
 #windows-pop .win-title {
     font-size: 0.85rem;

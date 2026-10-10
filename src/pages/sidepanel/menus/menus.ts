@@ -1,6 +1,8 @@
 // Context menus of the tab list: row menu, tab-group menu, window header menu, and the
 // item builders they share with the windows popover's menus.
-import type { UiPrefs } from "../../../app/types.ts";
+import { keepAliveEntry } from "../../../app/keep-alive.ts";
+import { pauseKeepAlive, removeKeepAlive } from "../../../app/storage.ts";
+import type { KeepAliveTab, UiPrefs } from "../../../app/types.ts";
 import { askDialog } from "../../../lib/ui/ask-dialog.ts";
 import {
   clearCtxMenu,
@@ -15,6 +17,8 @@ import {
   actionIds,
   closeTabs,
   copyUrls,
+  keepAlive,
+  keepAlivePause,
   pinTabs,
   protectTabs,
   protectUrls,
@@ -23,8 +27,8 @@ import {
   wake,
 } from "../ops/actions.ts";
 import { TAB_GROUP_COLORS, WINDOW_DOT_COLORS, windowGroupName, windowMaps } from "../model/index.ts";
-import { render } from "../foundation/scheduler.ts";
-import { namesActive, pinActive, state, tabGroupsActive } from "../foundation/state.ts";
+import { refresh, render } from "../foundation/scheduler.ts";
+import { keepAliveActive, namesActive, pinActive, state, tabGroupsActive } from "../foundation/state.ts";
 import type { PanelTab } from "../foundation/state.ts";
 import { moveTabsToGroup, startRenameTabGroup, ungroupTabs, updateTabGroup } from "../ops/tab-group-ops.ts";
 import { persistUiPrefs } from "../input/toolbar-events.ts";
@@ -72,6 +76,25 @@ export function openRowMenu(event: MouseEvent, tabId: number): void {
   ctxAppend(ctxTitle(ids.length > 1 ? `${ids.length} tabs selected` : clicked?.title || "Tab"), ctxDivider());
   ctxAppend(ctxItem(ids.length > 1 ? `Copy ${ids.length} URLs` : "Copy URL", () => copyUrls(ids)));
   appendCtxActions(ids);
+  if (keepAliveActive()) {
+    ctxAppend(ctxDivider()); // keep-alive is its own section
+    // label reads off the clicked tab; a mixed selection flips to the clicked tab's opposite
+    // one toggle per state: unmarked → Keep, running → Disable (= pause, the mark stays),
+    // paused → Enable. Dropping the mark is its own, separately named action.
+    const mark = keepAliveEntry(state.keepAlive, clicked?.url);
+    const suffix = ids.length > 1 ? ` ${ids.length} tabs` : "";
+    if (!mark) {
+      ctxAppend(ctxItem(`Keep${suffix} alive`, () => keepAlive(ids, true)));
+    } else {
+      const paused = mark.paused ?? false;
+      ctxAppend(
+        ctxItem(paused ? `Enable keep alive${suffix}` : `Disable keep alive${suffix}`, () =>
+          keepAlivePause(ids, !paused),
+        ),
+      );
+      ctxAppend(ctxItem(`Remove keep-alive mark${suffix}`, () => keepAlive(ids, false)));
+    }
+  }
   ctxAppend(ctxDivider());
   const { btn, submenu } = ctxSubmenu(ids.length > 1 ? `Move ${ids.length} tabs to` : "Move tab to");
   ctxAppend(btn, submenu);
@@ -130,6 +153,28 @@ const WINDOW_DOT_COLOR_NAMES = ["Red", "Teal", "Yellow", "Green", "Purple", "Pin
 
 // E: tab-group menu — identity actions on top, Chrome-strip controls, then
 // the usual bulk actions over the group's visible tabs
+// Alive view row for a mark with no open tab: nothing to activate or move, so the
+// menu is the mark itself — open the page, pause / resume, stop keeping it
+export function openMarkMenu(event: MouseEvent, mark: KeepAliveTab): void {
+  clearCtxMenu();
+  ctxAppend(ctxTitle(mark.title || mark.url), ctxDivider());
+  ctxAppend(ctxItem("Open", () => chrome.tabs.create({ url: mark.url })));
+  const paused = mark.paused ?? false;
+  ctxAppend(
+    ctxItem(paused ? "Enable keep alive" : "Disable keep alive", async () => {
+      await pauseKeepAlive([mark.url], !paused);
+      refresh(true);
+    }),
+  );
+  ctxAppend(
+    ctxItem("Remove keep-alive mark", async () => {
+      await removeKeepAlive([mark.url]);
+      refresh(true);
+    }),
+  );
+  showCtxMenu(event);
+}
+
 export function openTabGroupMenu(
   event: MouseEvent,
   groupId: number,

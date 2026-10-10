@@ -11,6 +11,7 @@ import { registerRender, setFeatures } from "./page-state.ts";
 import { initSettingsForm, renderSettings } from "./settings-form.ts";
 import { initUiPrefs, renderUiPrefs } from "./ui-prefs.ts";
 import { initRules, renderRules } from "./rules.ts";
+import { initKeepAlive, renderKeepAlive } from "./keep-alive.ts";
 import { initPerfPanel } from "./perf-panel.ts";
 import { initDangerZone } from "./danger-zone.ts";
 import { initWhatsNew } from "./whats-new.ts";
@@ -24,6 +25,7 @@ async function render() {
   renderSettings(state);
   renderRules(state);
   renderUiPrefs(state);
+  await renderKeepAlive(state);
 
   getElementById("about").textContent = aboutText(getReleaseVersion());
 }
@@ -33,6 +35,7 @@ registerRender(render);
 initSettingsForm();
 initUiPrefs();
 initRules();
+initKeepAlive();
 
 // chrome:// URLs can't be plain hrefs — open via tabs API
 getElementById("links").addEventListener("click", (event) => {
@@ -53,7 +56,7 @@ render();
 // is open — but only re-render for keys this page shows (tabHistory changes on
 // every tab switch and perfMetrics on every measured render; neither is shown)
 chrome.storage.onChanged.addListener((changes) => {
-  if (changes.settings || changes.protectionRules || changes.ui) {
+  if (changes.settings || changes.protectionRules || changes.ui || changes.keepAlive) {
     render();
   }
 });

@@ -1,5 +1,6 @@
 // Windows popover: the shell (view switch, open / close, click-away, right-click), the
-// Windows view and its row menu. Groups and Pins views live in windows-popover-*.ts.
+// Windows view and its row menu. Groups and Pins views live in windows-popover-*.ts;
+// the Alive view (keep-it-alive marks) lives in alive.ts and reuses the Pins rows.
 import { send } from "../../../app/messages.ts";
 import { closest } from "../../../lib/dom.ts";
 import { askDialogContains } from "../../../lib/ui/ask-dialog.ts";
@@ -15,15 +16,17 @@ import {
 } from "../../../lib/ui/context-menu.ts";
 import { inlineEdit } from "../../../lib/ui/inline-edit.ts";
 import { winListBtn, winPop } from "../foundation/elements.ts";
-import { appendWindowIdentityItems, openRowMenu, openTabGroupMenu } from "../menus/menus.ts";
+import { appendWindowIdentityItems, openMarkMenu, openRowMenu, openTabGroupMenu } from "../menus/menus.ts";
 import { windowMaps } from "../model/index.ts";
 import { refresh } from "../foundation/scheduler.ts";
-import { pinActive, state, tabGroupsActive } from "../foundation/state.ts";
+import { keepAliveActive, pinActive, state, tabGroupsActive } from "../foundation/state.ts";
 import { orderedWindowIds, windowLabel } from "../ops/window-ops.ts";
 import { fillGroupRows, registerPopoverRefill, startRenameTabGroupInList } from "./groups.ts";
+import { keepAliveEntry } from "../../../app/keep-alive.ts";
+import { fillAliveRows } from "./alive.ts";
 import { fillPinRows } from "./pins.ts";
 
-type WinPopView = "windows" | "groups" | "pins";
+type WinPopView = "windows" | "groups" | "pins" | "alive";
 let winPopView: WinPopView = "windows"; // reset on ▦ open
 
 // the Groups view sits below this module in the import graph — it refills through this
@@ -83,6 +86,11 @@ export function initWindowsPopover(): void {
       openTabGroupMenu(event, Number(row.dataset.tabGroupId), startRenameTabGroupInList);
     } else if (row.dataset.tabId) {
       openRowMenu(event, Number(row.dataset.tabId));
+    } else if (row.dataset.keepAliveUrl) {
+      const mark = keepAliveEntry(state.keepAlive, row.dataset.keepAliveUrl);
+      if (mark) {
+        openMarkMenu(event, mark);
+      }
     } else if (row.dataset.windowId) {
       openWindowListMenu(event, Number(row.dataset.windowId));
     }
@@ -98,12 +106,14 @@ function fillWindowsPopover(): void {
   const maps = windowMaps(state.allTabs, state.currentWindowId, state.windowMeta);
   const groupList = tabGroupsActive() ? [...state.tabGroups.values()] : [];
   const pinnedTabs = state.allTabs.filter((tab) => tab.pinned);
-  // Pins view exists only while there is something to list; Groups shows even
-  // empty — its "+ New group…" row is where the first group gets created
+  const aliveMarks = keepAliveActive() ? state.keepAlive : [];
+  // Pins and Alive views exist only while there is something to list; Groups shows
+  // even empty — its "+ New group…" row is where the first group gets created
   const views: [view: WinPopView, label: string][] = [
     ["windows", `Windows (${maps.indexes.size})`],
     ...(tabGroupsActive() ? [["groups", `Groups (${groupList.length})`] satisfies [WinPopView, string]] : []),
     ...(pinnedTabs.length > 0 ? [["pins", `Pins (${pinnedTabs.length})`] satisfies [WinPopView, string]] : []),
+    ...(aliveMarks.length > 0 ? [["alive", `Alive (${aliveMarks.length})`] satisfies [WinPopView, string]] : []),
   ];
   if (!views.some(([view]) => view === winPopView)) {
     winPopView = "windows"; // the shown view's last member vanished under us
@@ -155,6 +165,10 @@ function fillWindowsPopover(): void {
   }
   if (winPopView === "pins") {
     fillPinRows(pinnedTabs, maps);
+    return;
+  }
+  if (winPopView === "alive") {
+    fillAliveRows(aliveMarks, state.allTabs, maps);
     return;
   }
 

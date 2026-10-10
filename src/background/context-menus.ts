@@ -1,8 +1,8 @@
 // The page context menu: static items, the "Navigation stack" submenu, and the
 // one queue every menu mutation runs through.
-import { applyExperimental, resolveNavMode } from "../app/core.ts";
+import { applyExperimental, featureEnabled, isKeptAlive, resolveNavMode } from "../app/core.ts";
 import { DEV_PREFIX, getAppName } from "../app/env.ts";
-import { loadState } from "../app/storage.ts";
+import { loadState, localStore } from "../app/storage.ts";
 import { getFeatures } from "./nav-mode.ts";
 import { loadHistory } from "./tab-history.ts";
 
@@ -22,9 +22,38 @@ export function createContextMenus(): Promise<unknown> {
     chrome.contextMenus.create({ id: "root", title: `${DEV_PREFIX}${getAppName()}`, contexts: ["page"] });
     for (const item of MENU_ITEMS) {
       chrome.contextMenus.create({ ...item, parentId: "root", contexts: ["page"] });
+      if (item.id === "protect-this-site") {
+        await createKeepAliveItem();
+      }
     }
     menuDirty = false; // the fresh rebuild below covers any queued history pass
     await rebuildHistoryMenuNow();
+  });
+}
+
+// "Keep this tab alive" checkbox, only while the (experimental) feature is on and
+// enabled in settings; checked state seeded from the active tab — background/keep-alive.ts
+// keeps it in sync afterwards (this module sits below it in the import graph)
+async function createKeepAliveItem(): Promise<void> {
+  const [{ settings, ui }, features] = await Promise.all([loadState(), getFeatures()]);
+  if (
+    !featureEnabled(applyExperimental(features, ui.showExperimental ?? false), "KEEP_ALIVE") ||
+    !settings.keepAliveEnabled
+  ) {
+    return;
+  }
+  const [{ keepAlive = [] }, [active]] = await Promise.all([
+    localStore.get("keepAlive"),
+    chrome.tabs.query({ active: true, lastFocusedWindow: true }),
+  ]);
+  chrome.contextMenus.create({
+    id: "keep-alive-tab",
+    title: "Keep this tab alive",
+    type: "checkbox",
+    checked: isKeptAlive(keepAlive, active?.url),
+    documentUrlPatterns: PAGE_PATTERNS,
+    parentId: "root",
+    contexts: ["page"],
   });
 }
 

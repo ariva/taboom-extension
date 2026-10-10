@@ -25,6 +25,8 @@ export type Message =
   | { type: "window-set-color"; windowId: number; color?: string | null }
   | { type: "tabs-woken"; tabIds: number[] }
   | { type: "window-pin"; windowId: number; pinned?: boolean }
+  // keep-it-alive marks for these tabs' pages (closed ids are skipped)
+  | { type: "keep-alive-set"; tabIds: number[]; kept: boolean }
   | { type: "sidebar-focused" }
   | { type: "sidebar-no-focus" };
 
@@ -54,6 +56,7 @@ export interface MessageResponses {
   "window-set-color": MessageAck;
   "tabs-woken": MessageAck;
   "window-pin": MessageAck;
+  "keep-alive-set": MessageAck;
   "sidebar-focused": MessageAck;
   "sidebar-no-focus": MessageAck;
 }

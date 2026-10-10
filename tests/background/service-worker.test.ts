@@ -3,9 +3,9 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
 import type { Message, MessageError, MessageResponses } from "../../src/app/messages.ts";
-import type { ProtectionRule, Settings } from "../../src/app/types.ts";
+import type { KeepAliveTab, ProtectionRule, Settings } from "../../src/app/types.ts";
 import type { ChromeMockOptions } from "../helpers/chrome-mock.ts";
-import { makeChrome, tick, TEST_FEATURES } from "../helpers/ui.ts";
+import { makeChrome, tick, TEST_EXPERIMENTAL, TEST_FEATURES } from "../helpers/ui.ts";
 
 // flag-dependent tests skip when the EFFECTIVE flags (experimental resolved
 // under TEST_EXPERIMENTAL=1) disable their feature
@@ -18,6 +18,7 @@ const DEFAULT_MODE = resolveNavMode(TEST_FEATURES, {});
 const NAV_ON = DEFAULT_MODE !== "off";
 const TRADITIONAL_DEFAULT = DEFAULT_MODE === "traditional";
 const COMPACT_AVAILABLE = NAV_STACK_ON && TEST_FEATURES.NAVIGATION_COMPACT_STACK?.enabled === true;
+const KEEP_ALIVE_ON = TEST_FEATURES.KEEP_ALIVE?.enabled === true;
 
 const NOW = Date.now();
 const HOUR = 3_600_000;
@@ -76,6 +77,7 @@ const calls: string[] = [];
 const stored: {
   settings: Settings;
   protectionRules: Omit<ProtectionRule, "createdAt">[];
+  keepAlive?: KeepAliveTab[];
   updateAvailable?: string;
 } = {
   settings: {
@@ -85,6 +87,8 @@ const stored: {
     excludePinned: true,
     excludeAudible: true,
     minAwakePerWindow: 0,
+    keepAliveEnabled: true,
+    keepAliveMinutes: 25,
   },
   protectionRules: [{ id: "r1", type: "host", pattern: "mail.google.com" }],
 };
@@ -99,6 +103,9 @@ test("Service Worker - Init: alarm uses configured interval, menus created, prot
   for (const id of ["root", "show-manager", "snooze-this-tab", "protect-this-site", "snooze-all-inactive"]) {
     assert.ok(calls.includes(`contextMenus.create ${id}`), `menu ${id}`);
   }
+  // keep-alive item only with the flag on (settings enable it in the fixture); no marks yet → no sweep alarm
+  assert.equal(calls.includes("contextMenus.create keep-alive-tab"), KEEP_ALIVE_ON, "keep-alive menu item");
+  assert.ok(!calls.some((c) => c.startsWith("alarms.create keep-alive")), "empty list arms nothing");
   // protected mail tab gets autoDiscardable:false; others already true → untouched
   assert.ok(calls.some((c) => c.startsWith("tabs.update 3") && c.includes('"autoDiscardable":false')));
   assert.ok(!calls.some((c) => c.startsWith("tabs.update 2") && c.includes("autoDiscardable")));
@@ -438,7 +445,8 @@ test("Service Worker - Switching to compact dedupes the stack; compact re-pick m
   assert.deepEqual(tabHistory, { stack: [2, 1, 3], cursor: 0 }, "compact: cursor-move, no dupe");
 
   // back to default (traditional) for the remaining tests
-  await chrome.storage.local.set({ ui: {} });
+  // back to the fixture's ui — including the experimental opt-in makeChrome injected
+  await chrome.storage.local.set({ ui: TEST_EXPERIMENTAL ? { showExperimental: true } : {} });
   await chrome.storage.onChanged.fire({ ui: { newValue: {} } }, "local");
   await tick();
 });
@@ -645,4 +653,200 @@ test("Service Worker - TTL sweep keeps customized profiles, drops stale plain on
   delete after["w-stale-colored"];
   delete after["w-stale-pinned"];
   await chrome.storage.local.set({ windowProfiles: after }); // restore fixture
+});
+
+// ---------- keep-it-alive (T-0002) ----------
+
+const MINUTE = 60_000;
+
+test("Service Worker - Keep alive: sweep reloads due, unpaused pages only and re-arms them around their own interval", {
+  skip: !KEEP_ALIVE_ON,
+}, async () => {
+  const before = Date.now();
+  stored.keepAlive = [
+    { url: "https://old.example.com/a", title: "Old A", minutes: 25, nextReload: before - 1 },
+    { url: "https://work.example.com/doc", title: "Doc", minutes: 5, nextReload: before + HOUR },
+    { url: "https://work.example.com/doc#paused", title: "Paused", minutes: 1, paused: true, nextReload: 0 },
+  ];
+  calls.length = 0;
+  await chrome.alarms.onAlarm.fire({ name: "keep-alive" });
+  await tick();
+  await tick();
+  await tick();
+  assert.deepEqual(
+    calls.filter((c) => c.startsWith("tabs.reload")),
+    ["tabs.reload 2"],
+  );
+  const due = stored.keepAlive.find((entry) => entry.url === "https://old.example.com/a");
+  assert.ok(due, "entry kept");
+  assert.ok(due.nextReload >= before + 25 * MINUTE - 55_000, "re-armed no earlier than 25 min - 55 s");
+  assert.ok(due.nextReload <= Date.now() + 25 * MINUTE + 55_000, "re-armed no later than 25 min + 55 s");
+  assert.equal(stored.keepAlive[1]?.nextReload, before + HOUR, "not-due entry untouched");
+  assert.equal(stored.keepAlive[2]?.nextReload, 0, "paused entry neither reloaded nor re-armed");
+});
+
+test("Service Worker - Keep alive: sweep does nothing while the setting is off", { skip: !KEEP_ALIVE_ON }, async () => {
+  stored.keepAlive = [{ url: "https://old.example.com/a", title: "Old A", minutes: 25, nextReload: 0 }];
+  stored.settings.keepAliveEnabled = false;
+  calls.length = 0;
+  await chrome.alarms.onAlarm.fire({ name: "keep-alive" });
+  await tick();
+  await tick();
+  assert.equal(calls.filter((c) => c.startsWith("tabs.reload")).length, 0);
+  stored.settings.keepAliveEnabled = true;
+});
+
+test("Service Worker - Keep alive: auto-snooze pass skips kept pages", { skip: !KEEP_ALIVE_ON }, async () => {
+  stored.keepAlive = [{ url: "https://old.example.com/a", title: "Old A", minutes: 25, nextReload: Date.now() + HOUR }];
+  const tab = tabs.find((t) => t.id === 2);
+  assert.ok(tab);
+  tab.discarded = false;
+  tab.active = false;
+  await chrome.storage.session.set({ wakeTimes: {} });
+  calls.length = 0;
+  await chrome.alarms.onAlarm.fire({ name: "auto-snooze" });
+  await tick();
+  await tick();
+  assert.ok(!calls.includes("tabs.discard 2"), "old but kept alive: not snoozed");
+  stored.keepAlive = [];
+  calls.length = 0;
+  await chrome.alarms.onAlarm.fire({ name: "auto-snooze" });
+  await tick();
+  await tick();
+  assert.ok(calls.includes("tabs.discard 2"), "mark removed: snoozed as before");
+});
+
+test("Service Worker - Keep alive: menu click marks the page and arms the sweep; second click unmarks and clears it", {
+  skip: !KEEP_ALIVE_ON,
+}, async () => {
+  stored.keepAlive = [];
+  calls.length = 0;
+  await chrome.contextMenus.onClicked.fire(
+    { menuItemId: "keep-alive-tab" },
+    tabs.find((t) => t.id === 2),
+  );
+  await tick();
+  await tick();
+  assert.deepEqual(
+    stored.keepAlive.map((entry) => entry.url),
+    ["https://old.example.com/a"],
+  );
+  assert.ok(calls.includes('alarms.create keep-alive {"periodInMinutes":0.5}'), "sweep armed");
+
+  calls.length = 0;
+  await chrome.contextMenus.onClicked.fire(
+    { menuItemId: "keep-alive-tab" },
+    tabs.find((t) => t.id === 2),
+  );
+  await tick();
+  await tick();
+  assert.deepEqual(stored.keepAlive, []);
+  assert.ok(calls.includes("alarms.clear keep-alive"), "empty list: sweep cleared");
+});
+
+test("Service Worker - Keep alive: keep-alive-set message marks and unmarks tabs by id", {
+  skip: !KEEP_ALIVE_ON,
+}, async () => {
+  stored.keepAlive = [];
+  let response = await send({ type: "keep-alive-set", tabIds: [1, 2, 999], kept: true });
+  assert.deepEqual(response, { ok: true });
+  assert.deepEqual(
+    stored.keepAlive.map((entry) => entry.url),
+    ["https://work.example.com/doc", "https://old.example.com/a"],
+    "closed tab 999 ignored",
+  );
+  assert.deepEqual(
+    stored.keepAlive.map((entry) => entry.minutes),
+    [25, 25],
+    "the default interval at mark time is copied onto each mark",
+  );
+  response = await send({ type: "keep-alive-set", tabIds: [2], kept: false });
+  assert.deepEqual(response, { ok: true });
+  assert.deepEqual(
+    stored.keepAlive.map((entry) => entry.url),
+    ["https://work.example.com/doc"],
+  );
+});
+
+test("Service Worker - Keep alive: menu checkbox follows the active tab's mark", { skip: !KEEP_ALIVE_ON }, async () => {
+  stored.keepAlive = [
+    { url: "https://work.example.com/doc", title: "Doc", minutes: 25, nextReload: Date.now() + HOUR },
+  ];
+  calls.length = 0;
+  await chrome.tabs.onActivated.fire({ tabId: 1 });
+  await tick();
+  assert.ok(calls.includes('contextMenus.update keep-alive-tab {"checked":true}'), "marked page: checked");
+  calls.length = 0;
+  await chrome.tabs.onActivated.fire({ tabId: 2 });
+  await tick();
+  assert.ok(calls.includes('contextMenus.update keep-alive-tab {"checked":false}'), "other page: unchecked");
+  // navigating the active tab to a marked page re-syncs too
+  calls.length = 0;
+  await chrome.tabs.onUpdated.fire(
+    2,
+    { url: "https://work.example.com/doc" },
+    { id: 2, active: true, url: "https://work.example.com/doc" },
+  );
+  await tick();
+  assert.ok(calls.includes('contextMenus.update keep-alive-tab {"checked":true}'), "navigation: checked");
+});
+
+test("Service Worker - Keep alive: turning the setting off rebuilds the menu without the item and clears the sweep", {
+  skip: !KEEP_ALIVE_ON,
+}, async () => {
+  stored.keepAlive = [{ url: "https://work.example.com/doc", title: "Doc", minutes: 25, nextReload: 1 }];
+  const oldValue = { ...stored.settings };
+  stored.settings.keepAliveEnabled = false;
+  calls.length = 0;
+  await chrome.storage.onChanged.fire({ settings: { oldValue, newValue: { ...stored.settings } } }, "local");
+  await tick();
+  await tick();
+  assert.ok(calls.includes("contextMenus.removeAll"), "menu rebuilt");
+  assert.ok(!calls.includes("contextMenus.create keep-alive-tab"), "item gone");
+  assert.ok(calls.includes("alarms.clear keep-alive"), "sweep cleared");
+
+  stored.settings.keepAliveEnabled = true;
+  calls.length = 0;
+  await chrome.storage.onChanged.fire(
+    { settings: { oldValue: { ...stored.settings, keepAliveEnabled: false }, newValue: { ...stored.settings } } },
+    "local",
+  );
+  await tick();
+  await tick();
+  assert.ok(calls.includes("contextMenus.create keep-alive-tab"), "item back");
+  assert.ok(
+    (stored.keepAlive[0]?.nextReload ?? 0) >= Date.now() + 25 * MINUTE - 55_000,
+    "re-enabling restarts every mark: a stale due time must not reload everything at once",
+  );
+  assert.ok(calls.includes('alarms.create keep-alive {"periodInMinutes":0.5}'), "sweep re-armed");
+  stored.keepAlive = [];
+});
+
+test("Service Worker - Keep alive: options-page list edits re-arm the sweep through storage.onChanged", {
+  skip: !KEEP_ALIVE_ON,
+}, async () => {
+  stored.keepAlive = [
+    { url: "https://work.example.com/doc", title: "Doc", minutes: 25, nextReload: Date.now() + HOUR },
+  ];
+  calls.length = 0;
+  await chrome.storage.onChanged.fire({ keepAlive: { oldValue: [], newValue: stored.keepAlive } }, "local");
+  await tick();
+  await tick();
+  assert.ok(calls.includes('alarms.create keep-alive {"periodInMinutes":0.5}'));
+  stored.keepAlive = [];
+});
+
+test("Service Worker - KEEP_ALIVE off: sweep alarm and menu click are inert", { skip: KEEP_ALIVE_ON }, async () => {
+  stored.keepAlive = [{ url: "https://old.example.com/a", title: "Old A", minutes: 25, nextReload: 0 }];
+  calls.length = 0;
+  await chrome.alarms.onAlarm.fire({ name: "keep-alive" });
+  await chrome.contextMenus.onClicked.fire(
+    { menuItemId: "keep-alive-tab" },
+    tabs.find((t) => t.id === 2),
+  );
+  await tick();
+  await tick();
+  assert.equal(calls.filter((c) => c.startsWith("tabs.reload")).length, 0);
+  assert.equal(stored.keepAlive.length, 1, "list untouched");
+  stored.keepAlive = [];
 });

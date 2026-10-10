@@ -2,6 +2,7 @@
 // union, delegating to the feature modules.
 import { removeHistoryAt } from "../app/core.ts";
 import type { Message } from "../app/messages.ts";
+import { setTabsKeepAlive } from "./keep-alive.ts";
 import { protectHosts, protectUrls, toggleSiteProtection, unprotectUrls } from "./protection.ts";
 import { autoSnoozePass, recordWakes, snoozeTab } from "./snooze.ts";
 import { historyJump, historyStep, withHistory } from "./tab-history.ts";
@@ -44,6 +45,13 @@ export async function handleMessage(message: Message): Promise<{ protected: bool
     case "window-pin":
       // "pinnedWindow", not "pinned" — the fingerprint already owns that key
       return patchWindowProfiles([message.windowId], { pinnedWindow: message.pinned || undefined });
+    case "keep-alive-set": {
+      const tabs = await Promise.all(message.tabIds.map((tabId) => chrome.tabs.get(tabId).catch(() => null)));
+      return setTabsKeepAlive(
+        tabs.filter((tab): tab is chrome.tabs.Tab => tab !== null),
+        message.kept,
+      );
+    }
     case "sidebar-focused":
     case "sidebar-no-focus":
       return; // acknowledged; no behavior yet — hook points for future focus-aware features

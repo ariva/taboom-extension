@@ -13,6 +13,8 @@ const SETTING_IDS: (keyof Settings)[] = [
   "excludePinned",
   "excludeAudible",
   "minAwakePerWindow",
+  "keepAliveEnabled",
+  "keepAliveMinutes", // a <select>: .value / no .min, which the loops below tolerate
 ];
 
 export function renderSettings(state: AppState): void {

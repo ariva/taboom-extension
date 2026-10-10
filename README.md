@@ -17,6 +17,7 @@ Taboom - Tabs Manager frees memory by snoozing (discarding) tabs you haven't use
 - **Side panel tab manager** — search across title/URL/hostname, filter by Awake / Snoozed / Protected, sort, and bulk snooze/protect/close.
 - **Automatic snooze** — periodically discards tabs inactive past a configurable threshold, skipping pinned, audible, active, and protected tabs.
 - **Site protection** — exclude sites (`mail.google.com`, `*.github.com`) or one exact page (`https://app.example.com/board`) from snoozing, also shielding them from Chrome's own Memory Saver.
+- **Keep tabs alive** — some sites log you out after a few idle minutes, dashboards go stale once the tab sleeps; mark such pages and they reload on a timer (session renewed, data fresh) and are never auto-snoozed.
 - **Context menu and keyboard shortcuts** for quick per-tab actions; `Ctrl+Shift+,` / `Ctrl+Shift+.` step back / forward through the tab history from any tab.
 
 ## Privacy first
@@ -35,8 +36,8 @@ Taboom is a privacy-first extension. It requests the bare minimum Chrome permiss
 | `tabs` | List tabs (title/URL) in the side panel, snooze (discard), activate, and close them |
 | `tabGroups` | Show Chrome tab groups (title, color, collapsed) in the list, rename/recolor/collapse them, move tabs in or out |
 | `storage` | Save your settings and protection rules locally (`chrome.storage.local`) |
-| `alarms` | Run the periodic automatic-snooze check (survives service-worker sleep) |
-| `contextMenus` | Right-click menu: snooze this tab, protect this site |
+| `alarms` | Run the periodic automatic-snooze check and the keep-alive reload sweep (survive service-worker sleep) |
+| `contextMenus` | Right-click menu: snooze this tab, protect this site, keep this tab alive |
 | `sidePanel` | Show the tab manager in Chrome's side panel |
 | `favicon` | Show tab favicons from Chrome's local cache — no request ever goes to the site |
 

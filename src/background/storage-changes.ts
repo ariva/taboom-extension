@@ -1,8 +1,10 @@
 // storage.onChanged reactions: settings / rules / ui / history edits made by
 // the pages re-apply the alarm, protection flags, nav mode and menus.
 import { dedupeHistory } from "../app/core.ts";
+import { DEFAULTS } from "../app/core.ts";
 import type { ProtectionRule, Settings } from "../app/types.ts";
-import { rebuildHistoryMenu } from "./context-menus.ts";
+import { createContextMenus, rebuildHistoryMenu } from "./context-menus.ts";
+import { ensureKeepAliveAlarm, keepAliveSettingChanged, restartKeepAlive, syncKeepAliveMenu } from "./keep-alive.ts";
 import { invalidateNavMode, navMode } from "./nav-mode.ts";
 import { applyAutoDiscardable, syncProtectMenu } from "./protection.ts";
 import { ensureAlarm } from "./snooze.ts";
@@ -31,6 +33,27 @@ export async function onStorageChanged(
     if (oldInterval !== newInterval) {
       await ensureAlarm(changes.settings.newValue as Settings);
     }
+    if (
+      keepAliveSettingChanged(
+        changes.settings.oldValue as Partial<Settings> | undefined,
+        changes.settings.newValue as Partial<Settings> | undefined,
+      )
+    ) {
+      await createContextMenus(); // the checkbox item exists only while enabled
+      const enabled =
+        (changes.settings.newValue as Partial<Settings> | undefined)?.keepAliveEnabled ??
+        DEFAULTS.settings.keepAliveEnabled;
+      if (enabled) {
+        await restartKeepAlive();
+      }
+      await ensureKeepAliveAlarm();
+    }
+  }
+  if (changes.keepAlive) {
+    // options-page edits (remove, interval override) and the panel's marks
+    await ensureKeepAliveAlarm();
+    const [active] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+    await syncKeepAliveMenu(active);
   }
   if (changes.protectionRules) {
     // StorageChange values are `unknown`; "protectionRules" is only ever written as ProtectionRule[]

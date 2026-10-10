@@ -1,7 +1,7 @@
 // The panel's single mutable state, its types, and the small predicates derived
 // from it alone that many features read.
 import { featureEnabled } from "../../../app/core.ts";
-import type { FeatureName, Features, NavMode, ProtectionRule, UiPrefs } from "../../../app/types.ts";
+import type { FeatureName, Features, KeepAliveTab, NavMode, ProtectionRule, UiPrefs } from "../../../app/types.ts";
 import { capabilities } from "../../../lib/platform/capabilities.ts";
 import type { DerivedTabs, SortDir, WindowMetaMap } from "../model/index.ts";
 
@@ -27,6 +27,8 @@ export interface PanelState {
   sortDir: SortDir;
   ui: UiPrefs;
   rules: ProtectionRule[];
+  keepAlive: KeepAliveTab[];
+  keepAliveEnabled: boolean;
   features: Features;
   rawFeatures: Features;
   navMode: NavMode;
@@ -56,6 +58,8 @@ export const state: PanelState = {
   sortDir: "desc", // current sort's direction state (see SORT_DIRECTIONS)
   ui: {} as UiPrefs, // placeholder until init / refresh() assign the persisted prefs
   rules: [],
+  keepAlive: [], // storage.local.keepAlive — marks the Alive view and row menu read
+  keepAliveEnabled: false, // settings.keepAliveEnabled as of the last refresh()
   // placeholder until main.ts assigns the loaded flags right after its top-level await
   // (awaiting them here would queue main.ts's state read behind the fetch);
   // experimental-resolved copy, refreshed in refresh()
@@ -103,6 +107,11 @@ export function nestedTabGroupsActive(): boolean {
 // WINDOW_NAMES resolved flag + user toggle — every naming surface gates on this
 export function namesActive(): boolean {
   return featureEnabled(state.features, "WINDOW_NAMES") && (state.ui.windowNamesEnabled ?? true);
+}
+
+// KEEP_ALIVE resolved flag + the options checkbox — row menu item and Alive view gate on this
+export function keepAliveActive(): boolean {
+  return featureEnabled(state.features, "KEEP_ALIVE") && state.keepAliveEnabled;
 }
 
 // window pinning rides the names feature but has its own kill switch

@@ -1,5 +1,6 @@
 import { createStorage } from "../lib/storage.ts";
 import { DEFAULTS } from "./core.ts";
+import { keepAliveEntry, nextReloadAt, setKeepAlivePaused, unmarkKeepAlive } from "./keep-alive.ts";
 import type { AppState, Features, LocalStorageSchema, SessionStorageSchema } from "./types.ts";
 
 // the only doors to chrome.storage — keys and value types come from the schemas
@@ -35,4 +36,34 @@ export async function loadState(): Promise<AppState> {
 
 export async function saveState(patch: Partial<AppState>): Promise<void> {
   await localStore.set(patch);
+}
+
+// Pause / resume the marks behind these pages (options row checkbox, side panel row
+// menu). Either way the schedule restarts from now. False when nothing changed.
+export async function pauseKeepAlive(urls: (string | undefined)[], paused: boolean): Promise<boolean> {
+  const { keepAlive = [] } = await localStore.get("keepAlive");
+  const now = Date.now();
+  let next: typeof keepAlive | undefined;
+  for (const url of urls) {
+    const entry = keepAliveEntry(next ?? keepAlive, url);
+    if (entry) {
+      next = setKeepAlivePaused(next ?? keepAlive, entry.url, paused, nextReloadAt(entry.minutes, now)) ?? next;
+    }
+  }
+  if (!next) {
+    return false;
+  }
+  await localStore.set({ keepAlive: next });
+  return true;
+}
+
+// Drop the marks behind these pages (options Remove, side panel mark menu). False when none matched.
+export async function removeKeepAlive(urls: (string | undefined)[]): Promise<boolean> {
+  const { keepAlive = [] } = await localStore.get("keepAlive");
+  const next = unmarkKeepAlive(keepAlive, urls);
+  if (!next) {
+    return false;
+  }
+  await localStore.set({ keepAlive: next });
+  return true;
 }

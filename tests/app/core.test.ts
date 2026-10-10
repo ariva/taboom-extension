@@ -418,3 +418,15 @@ test("Auto-snooze - manual wake resets the inactivity clock (wakeTimes)", async 
   );
   assert.deepEqual(selectAutoSnoozeTargets([tab], settings, [], now, { 9: now }), [], "targets respect wake times");
 });
+
+test("Core - Eligibility: keep-it-alive pages are never auto-snoozed", () => {
+  const kept = [{ url: "https://example.com/page", title: "Example", minutes: 25, nextReload: NOW }];
+  assert.equal(isEligibleForAutoSnooze(tab(), settings, [], NOW, null, kept), false, "marked page");
+  assert.equal(
+    isEligibleForAutoSnooze(tab({ url: "https://example.com/page#frag" }), settings, [], NOW, null, kept),
+    false,
+    "fragment variant of the marked page",
+  );
+  assert.equal(isEligibleForAutoSnooze(tab({ url: "https://example.com/other" }), settings, [], NOW, null, kept), true);
+  assert.deepEqual(selectAutoSnoozeTargets([tab()], settings, [], NOW, null, kept), [], "targets skip marked pages");
+});

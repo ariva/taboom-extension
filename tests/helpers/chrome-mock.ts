@@ -211,6 +211,10 @@ export function makeChrome<
     alarms: {
       create: async (name: string, info: chrome.alarms.AlarmCreateInfo) =>
         calls.push(`alarms.create ${name} ${JSON.stringify(info)}`),
+      clear: async (name?: string) => {
+        calls.push(`alarms.clear ${name}`);
+        return true;
+      },
       onAlarm: makeEvent<typeof chrome.alarms.onAlarm>(),
     },
     commands: { onCommand: makeEvent<typeof chrome.commands.onCommand>() },

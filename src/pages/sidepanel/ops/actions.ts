@@ -2,6 +2,7 @@
 // the tabs it acted on from the selection and refreshes the panel. copyUrls is the
 // exception: it touches no tab, so the selection stays.
 import { send } from "../../../app/messages.ts";
+import { pauseKeepAlive } from "../../../app/storage.ts";
 import { toast } from "../../../lib/ui/toast.ts";
 import { refresh } from "../foundation/scheduler.ts";
 import { state } from "../foundation/state.ts";
@@ -96,6 +97,18 @@ export async function protectUrls(tabIds: number[]): Promise<void> {
 export async function unprotectTabs(tabIds: number[]): Promise<void> {
   await send({ type: "unprotect-urls", urls: urlsOf(state.allTabs, tabIds) });
   unselect(tabIds);
+  refresh(true);
+}
+
+// keep-it-alive marks follow the page (by url), so the selection stays — nothing was consumed
+export async function keepAlive(tabIds: number[], kept: boolean): Promise<void> {
+  await send({ type: "keep-alive-set", tabIds, kept });
+  refresh(true);
+}
+
+// pause / resume: a storage write the worker follows (alarm, menu checkbox) like an options edit
+export async function keepAlivePause(tabIds: number[], paused: boolean): Promise<void> {
+  await pauseKeepAlive(urlsOf(state.allTabs, tabIds), paused);
   refresh(true);
 }
 
