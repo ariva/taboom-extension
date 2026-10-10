@@ -277,7 +277,7 @@
 
   <section class="card" id="keep-alive-section" hidden>
     <h2>Keep Tabs Alive</h2>
-    <p class="muted">Some sites log you out after a few idle minutes (banking, intranets, admin consoles) and dashboards stop updating once the tab sleeps. Mark such a tab to keep it alive: it reloads on a timer (±55 s), so the session never expires and the data stays fresh, and it is never auto-snoozed. Mark a tab from its right-click menu or the side panel row menu. Pages with unsaved forms may ask "Leave site?" on each reload.</p>
+    <p class="muted">Some sites log you out after a few idle minutes (banking, intranets, admin consoles) and dashboards stop updating once the tab sleeps. Mark such a tab to keep it alive: it reloads on a timer (±55 s), so the session never expires and the data stays fresh, and it is never auto-snoozed. Mark a tab from its right-click menu or the side panel row menu, or add an address below. Pages with unsaved forms may ask "Leave site?" on each reload.</p>
     <label><input type="checkbox" id="keepAliveEnabled" /> Keep marked tabs alive</label>
     <div id="keep-alive-body" hidden>
       <label>Default value <select id="keepAliveMinutes"></select> minutes (copied onto each new mark)</label>
@@ -285,6 +285,10 @@
         <thead><tr><th>#</th><th></th><th>Page</th><th>Reload each (min)</th><th>Next reload</th><th></th></tr></thead>
         <tbody id="keep-alive-rows"></tbody>
       </table>
+      <div class="row">
+        <input type="text" id="new-keep-alive" placeholder="https://app.example.com/board" />
+        <button id="add-keep-alive">Add</button>
+      </div>
     </div>
   </section>
 

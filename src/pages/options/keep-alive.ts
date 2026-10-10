@@ -1,10 +1,17 @@
-// Keep-tabs-alive card: the default-interval dropdown and the table of marks —
+// Keep-tabs-alive card: the default-interval dropdown, the table of marks —
 // numbered, each with its pause checkbox, own interval, a live countdown to the
-// next reload and Remove. The enable checkbox and default interval are
+// next reload and Remove — and an Add row for a page that is not open. The enable checkbox and default interval are
 // settings — settings-form.ts persists them; this module only shows / hides.
-import { applyExperimental, featureEnabled } from "../../app/core.ts";
-import { formatCountdown, KEEP_ALIVE_MINUTES, nextReloadAt, setKeepAliveMinutes } from "../../app/keep-alive.ts";
-import { localStore, pauseKeepAlive, removeKeepAlive } from "../../app/storage.ts";
+import { applyExperimental, featureEnabled, hostnameOf } from "../../app/core.ts";
+import {
+  formatCountdown,
+  KEEP_ALIVE_MINUTES,
+  keepAliveUrlFromInput,
+  markKeepAlive,
+  nextReloadAt,
+  setKeepAliveMinutes,
+} from "../../app/keep-alive.ts";
+import { loadState, localStore, pauseKeepAlive, removeKeepAlive } from "../../app/storage.ts";
 import type { AppState, KeepAliveTab } from "../../app/types.ts";
 import { getElementById } from "../../lib/dom.ts";
 import { flashSaved, getFeatures, render } from "./page-state.ts";
@@ -115,8 +122,24 @@ function tickCountdowns(): void {
   }
 }
 
+// Add row: a page not open anywhere (or a future one) marked by typing its address;
+// the mark takes the Default value like a menu mark would, and the hostname
+// stands in for the title no tab has reported yet. Junk stays in the input.
+async function addTypedMark(): Promise<void> {
+  const input = getElementById<HTMLInputElement>("new-keep-alive");
+  const url = keepAliveUrlFromInput(input.value);
+  if (url === "") {
+    return;
+  }
+  const [{ settings }, { keepAlive = [] }] = await Promise.all([loadState(), localStore.get("keepAlive")]);
+  const minutes = settings.keepAliveMinutes;
+  await save(markKeepAlive(keepAlive, [{ url, title: hostnameOf(url) }], minutes, nextReloadAt(minutes, Date.now())));
+  input.value = "";
+}
+
 export function initKeepAlive(): void {
   // the default-interval choices are static — filled once, before the first render sets the value
   minuteOptions(getElementById<HTMLSelectElement>("keepAliveMinutes"));
+  getElementById("add-keep-alive").addEventListener("click", addTypedMark);
   setInterval(tickCountdowns, 1000);
 }

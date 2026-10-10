@@ -22,6 +22,21 @@ export function keepAliveEntry(list: KeepAliveTab[], url: string | undefined): K
   return key === "" ? undefined : list.find((entry) => entry.url === key);
 }
 
+// a typed address (options "Add") made into the key a tab on that page would get:
+// URL() normalizes as Chrome reports tab urls (lowercased host, trailing slash),
+// a bare host gets https — "" when it is not a supported address
+export function keepAliveUrlFromInput(text: string): string {
+  const trimmed = text.trim();
+  if (trimmed === "") {
+    return "";
+  }
+  try {
+    return keepAliveKey(new URL(trimmed.includes("://") ? trimmed : `https://${trimmed}`).href);
+  } catch {
+    return "";
+  }
+}
+
 // interval ± 55 s, uniformly random per fire; `random` injectable for tests
 export function nextReloadAt(minutes: number, now: number, random: () => number = Math.random): number {
   const gap = minutes * 60_000 + (random() * 2 - 1) * JITTER_MS;

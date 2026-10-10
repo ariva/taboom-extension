@@ -7,6 +7,7 @@ import {
   KEEP_ALIVE_MINUTES,
   keepAliveEntry,
   keepAliveKey,
+  keepAliveUrlFromInput,
   markKeepAlive,
   nextReloadAt,
   rearmAllKeepAlive,
@@ -168,4 +169,19 @@ test("Keep alive - formatCountdown shows m:ss until the next reload, 'now' once 
   assert.equal(formatCountdown(NOW + 999, NOW), "0:01", "rounded up: never shows 0:00 while still pending");
   assert.equal(formatCountdown(NOW, NOW), "now");
   assert.equal(formatCountdown(NOW - 1, NOW), "now");
+});
+
+test("Keep alive - keepAliveUrlFromInput: typed address normalized like a tab url; https assumed; junk is empty", () => {
+  assert.equal(keepAliveUrlFromInput(" https://Dash.Example.com/board#tab=2 "), "https://dash.example.com/board");
+  assert.equal(
+    keepAliveUrlFromInput("https://example.com"),
+    "https://example.com/",
+    "trailing slash as Chrome reports it",
+  );
+  assert.equal(keepAliveUrlFromInput("app.example.com/board?id=1"), "https://app.example.com/board?id=1");
+  assert.equal(keepAliveUrlFromInput("file:///home/me/report.html"), "file:///home/me/report.html");
+  assert.equal(keepAliveUrlFromInput(""), "");
+  assert.equal(keepAliveUrlFromInput("   "), "");
+  assert.equal(keepAliveUrlFromInput("chrome://extensions"), "", "unsupported scheme");
+  assert.equal(keepAliveUrlFromInput("http://"), "", "not an address");
 });

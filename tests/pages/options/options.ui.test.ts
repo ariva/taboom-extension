@@ -567,3 +567,56 @@ test("UI - Options - Keep-alive table: per-row pause, interval, countdown and re
   assert.equal(qa(byId("keep-alive-rows"), "tr").length, 1, "table re-rendered");
   stored.keepAlive = [];
 });
+
+test("UI - Options - Keep-alive add row: url + Add marks a page by hand at the Default value, like protected sites", async () => {
+  const { applyExperimental, featureEnabled } = await import("../../../src/app/core.ts");
+  const flagOn = featureEnabled(applyExperimental(RAW_FEATURES, stored.ui?.showExperimental ?? false), "KEEP_ALIVE");
+  if (!flagOn) {
+    return;
+  }
+  stored.keepAlive = [];
+  stored.settings = { ...stored.settings, keepAliveMinutes: 15 };
+  await chrome.storage.onChanged.fire({ settings: {}, keepAlive: {} }, "local");
+  await tick();
+  await tick();
+  const input = byId<HTMLInputElement>("new-keep-alive");
+  const add = byId<HTMLButtonElement>("add-keep-alive");
+  assert.ok(
+    byId("keep-alive-table").compareDocumentPosition(add) & 4, // DOCUMENT_POSITION_FOLLOWING; happy-dom has no Node global
+    "add row sits under the table",
+  );
+
+  // junk: nothing written, input kept for correction
+  calls.length = 0;
+  input.value = "chrome://extensions";
+  add.click();
+  await tick();
+  await tick();
+  assert.ok(!calls.some((c) => c.startsWith("storage.set") && c.includes('"keepAlive"')), "unsupported url: no write");
+  assert.equal(input.value, "chrome://extensions");
+
+  const now = Date.now();
+  input.value = "Dash.Example.com/board#tab=2";
+  add.click();
+  await tick();
+  await tick();
+  assert.deepEqual(
+    (stored.keepAlive ?? []).map(({ url, title, minutes: each }) => ({ url, title, minutes: each })),
+    [{ url: "https://dash.example.com/board", title: "dash.example.com", minutes: 15 }],
+    "normalized url, hostname as title until a tab reports one, the Default value copied",
+  );
+  assert.ok((stored.keepAlive?.[0]?.nextReload ?? 0) >= now + 15 * 60_000 - 55_000, "armed from now");
+  assert.equal(input.value, "", "input cleared");
+  assert.equal(qa(byId("keep-alive-rows"), "tr").length, 1, "table shows the new mark");
+
+  // same page again: no second entry, no write
+  calls.length = 0;
+  input.value = "https://dash.example.com/board";
+  add.click();
+  await tick();
+  await tick();
+  assert.equal(stored.keepAlive?.length, 1, "duplicate ignored");
+  assert.ok(!calls.some((c) => c.startsWith("storage.set") && c.includes('"keepAlive"')), "duplicate: no write");
+  assert.equal(input.value, "", "input still cleared");
+  stored.keepAlive = [];
+});
