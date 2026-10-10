@@ -1,5 +1,25 @@
 # CHANGES
 
+## v1.0.3 — 2026-10-10
+
+### Summary
+Keep tabs alive feature, editable protected sites and side panel history-scroll fix
+
+### New Features
+- Keep tabs alive — mark pages to reload every N minutes and skip auto-snooze, managed from settings, side panel and page context menu (ce01d44)
+- Restrict keep-alive marking to a single tab so one right-click cannot mark a whole selection for periodic reloads (9ca2c41)
+- Options - keep-alive: add url input with Add button (d5161c7)
+- Protected sites: remove all with restore last removal, click-to-edit patterns, and a shared undo stack with keep-alive plus a clear-restore-data button (cf4167e)
+
+### Fixes
+- Side panel menu changes for keep-alive items (627c53a)
+- Sidepanel not scrolling to the tab activated by Ctrl+Shift+,/. and docs consolidate README and USAGE screenshots under docs/assets (d980785)
+
+### Other
+- Features in keep-alive: clear all + restore last removal, click-to-edit mark address, fragment-exact matching, sweep title refresh, and wider options page (9520a94)
+- Move the experimental switch and its options to the end of the Customization card (d68ca9d)
+- Consolidate public/icons and dev-assets into one icons/ folder (521e569)
+
 ## v1.0.2 — 2026-10-07
 
 ### Summary
