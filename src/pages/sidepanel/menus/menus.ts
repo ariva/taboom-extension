@@ -76,23 +76,19 @@ export function openRowMenu(event: MouseEvent, tabId: number): void {
   ctxAppend(ctxTitle(ids.length > 1 ? `${ids.length} tabs selected` : clicked?.title || "Tab"), ctxDivider());
   ctxAppend(ctxItem(ids.length > 1 ? `Copy ${ids.length} URLs` : "Copy URL", () => copyUrls(ids)));
   appendCtxActions(ids);
-  if (keepAliveActive()) {
+  // single tab only: one right-click over a big selection must never mark hundreds
+  // of pages for periodic reloads (bulk unmark goes through Settings)
+  if (keepAliveActive() && ids.length === 1) {
     ctxAppend(ctxDivider()); // keep-alive is its own section
-    // label reads off the clicked tab; a mixed selection flips to the clicked tab's opposite
     // one toggle per state: unmarked → Keep, running → Disable (= pause, the mark stays),
     // paused → Enable. Dropping the mark is its own, separately named action.
     const mark = keepAliveEntry(state.keepAlive, clicked?.url);
-    const suffix = ids.length > 1 ? ` ${ids.length} tabs` : "";
     if (!mark) {
-      ctxAppend(ctxItem(`Keep${suffix} alive`, () => keepAlive(ids, true)));
+      ctxAppend(ctxItem("Keep alive", () => keepAlive(ids, true)));
     } else {
       const paused = mark.paused ?? false;
-      ctxAppend(
-        ctxItem(paused ? `Enable keep alive${suffix}` : `Disable keep alive${suffix}`, () =>
-          keepAlivePause(ids, !paused),
-        ),
-      );
-      ctxAppend(ctxItem(`Remove keep-alive mark${suffix}`, () => keepAlive(ids, false)));
+      ctxAppend(ctxItem(paused ? "Enable keep alive" : "Disable keep alive", () => keepAlivePause(ids, !paused)));
+      ctxAppend(ctxItem("Remove keep-alive mark", () => keepAlive(ids, false)));
     }
   }
   ctxAppend(ctxDivider());

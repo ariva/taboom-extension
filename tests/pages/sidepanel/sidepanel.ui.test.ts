@@ -1720,6 +1720,26 @@ test("UI - Sidepanel - KEEP_ALIVE: row menu marks / unmarks the page, quick laun
     "other page: mark offered",
   );
 
+  // multi-selection: no keep-alive items at all — one right-click over a 1000-tab
+  // selection must not be able to mark every page for periodic reloads
+  const selectAll = byId<HTMLInputElement>("select-all");
+  selectAll.checked = true;
+  selectAll.dispatchEvent(new window.Event("change", { bubbles: true }));
+  rowOf(1).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+  assert.ok(
+    qa(menu, ".ctx-item").some((el) => el.textContent === "Copy 3 URLs"),
+    "menu is the selection menu",
+  );
+  assert.deepEqual(
+    qa(menu, ".ctx-item")
+      .map((el) => el.textContent)
+      .filter((text) => /alive|mark/.test(text)),
+    [],
+    "selection menu offers no keep-alive action, marked or not",
+  );
+  selectAll.checked = false;
+  selectAll.dispatchEvent(new window.Event("change", { bubbles: true }));
+
   const winBtn = byId("win-list-btn");
   winBtn.click();
   await tick();
