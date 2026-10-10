@@ -1706,10 +1706,10 @@ test("UI - Sidepanel - KEEP_ALIVE: row menu marks / unmarks the page, quick laun
     qa(menu, ".ctx-item")
       .map((el) => el.textContent)
       .filter((text) => /alive|mark/.test(text)),
-    ["Disable keep alive", "Remove keep-alive mark"],
+    ["Pause keep-alive", "Remove from keep-alive"],
     "running mark: one toggle (disable = pause) plus remove, never Enable alongside",
   );
-  const disableItem = must(qa(menu, ".ctx-item").find((el) => el.textContent === "Disable keep alive"));
+  const disableItem = must(qa(menu, ".ctx-item").find((el) => el.textContent === "Pause keep-alive"));
   assert.ok(
     disableItem.previousElementSibling?.classList.contains("ctx-divider"),
     "keep-alive items sit in their own section, divider before",
@@ -1793,9 +1793,9 @@ test("UI - Sidepanel - KEEP_ALIVE: row menu marks / unmarks the page, quick laun
   await tick();
   assert.deepEqual(
     qa(menu, ".ctx-item").map((el) => el.textContent),
-    ["Open", "Disable keep alive", "Remove keep-alive mark"],
+    ["Open", "Pause keep-alive", "Remove from keep-alive"],
   );
-  must(qa(menu, ".ctx-item").find((el) => el.textContent === "Remove keep-alive mark")).click();
+  must(qa(menu, ".ctx-item").find((el) => el.textContent === "Remove from keep-alive")).click();
   await tick();
   await tick();
   const { keepAlive: afterStop = [] } = await chrome.storage.local.get("keepAlive");
@@ -1829,10 +1829,10 @@ test("UI - Sidepanel - KEEP_ALIVE: row menu marks / unmarks the page, quick laun
     qa(menu, ".ctx-item")
       .map((el) => el.textContent)
       .filter((text) => /alive|mark/.test(text)),
-    ["Enable keep alive", "Remove keep-alive mark"],
+    ["Resume keep-alive", "Remove from keep-alive"],
     "paused mark: Enable replaces Disable",
   );
-  must(qa(menu, ".ctx-item").find((el) => el.textContent === "Enable keep alive")).click();
+  must(qa(menu, ".ctx-item").find((el) => el.textContent === "Resume keep-alive")).click();
   await tick();
   await tick();
   const { keepAlive: resumed = [] } = await chrome.storage.local.get("keepAlive");
@@ -1842,7 +1842,7 @@ test("UI - Sidepanel - KEEP_ALIVE: row menu marks / unmarks the page, quick laun
   await settle();
   rowOf(1).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
   assert.ok(
-    qa(menu, ".ctx-item").some((el) => el.textContent === "Disable keep alive"),
+    qa(menu, ".ctx-item").some((el) => el.textContent === "Pause keep-alive"),
     "running again: Disable offered",
   );
 

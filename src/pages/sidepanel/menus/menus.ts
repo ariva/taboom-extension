@@ -87,8 +87,8 @@ export function openRowMenu(event: MouseEvent, tabId: number): void {
       ctxAppend(ctxItem("Keep alive", () => keepAlive(ids, true)));
     } else {
       const paused = mark.paused ?? false;
-      ctxAppend(ctxItem(paused ? "Enable keep alive" : "Disable keep alive", () => keepAlivePause(ids, !paused)));
-      ctxAppend(ctxItem("Remove keep-alive mark", () => keepAlive(ids, false)));
+      ctxAppend(ctxItem(paused ? "Resume keep-alive" : "Pause keep-alive", () => keepAlivePause(ids, !paused)));
+      ctxAppend(ctxItem("Remove from keep-alive", () => keepAlive(ids, false)));
     }
   }
   ctxAppend(ctxDivider());
@@ -157,13 +157,13 @@ export function openMarkMenu(event: MouseEvent, mark: KeepAliveTab): void {
   ctxAppend(ctxItem("Open", () => chrome.tabs.create({ url: mark.url })));
   const paused = mark.paused ?? false;
   ctxAppend(
-    ctxItem(paused ? "Enable keep alive" : "Disable keep alive", async () => {
+    ctxItem(paused ? "Resume keep-alive" : "Pause keep-alive", async () => {
       await pauseKeepAlive([mark.url], !paused);
       refresh(true);
     }),
   );
   ctxAppend(
-    ctxItem("Remove keep-alive mark", async () => {
+    ctxItem("Remove from keep-alive", async () => {
       await removeKeepAlive([mark.url]);
       refresh(true);
     }),
