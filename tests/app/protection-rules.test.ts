@@ -1,7 +1,14 @@
 // Pure rule-list edits behind toggle / protect / unprotect (src/app/protection-rules.ts).
 import assert from "node:assert/strict";
 import { test } from "vitest";
-import { addHostRules, addUrlRules, removeRulesFor, toggleHostRule } from "../../src/app/protection-rules.ts";
+import {
+  addHostRules,
+  addUrlRules,
+  removeRulesFor,
+  restoreRuleRemoval,
+  setRulePattern,
+} from "../../src/app/protection-rules.ts";
+import { recordRemoval } from "../../src/app/removal-trash.ts";
 import type { ProtectionRule } from "../../src/app/types.ts";
 
 const rule = (id: string, pattern: string): ProtectionRule => ({
@@ -11,41 +18,12 @@ const rule = (id: string, pattern: string): ProtectionRule => ({
   createdAt: 0,
 });
 
-test("Core - ToggleHostRule: an uncovered host gains one host rule and reports protected", () => {
-  const current = [rule("r1", "mail.google.com")];
-  const toggled = toggleHostRule(current, "https://work.example.com/dash");
-  assert.equal(toggled.protected, true);
-  assert.deepEqual(
-    toggled.rules.map((r) => r.pattern),
-    ["mail.google.com", "work.example.com"],
-  );
-  assert.equal(toggled.rules[1]?.type, "host");
-  assert.equal(current.length, 1, "input untouched");
-});
-
-test("Core - ToggleHostRule: a covered host loses every rule covering it, wildcard included", () => {
-  const current = [rule("r1", "docs.github.com"), rule("r2", "*.github.com"), rule("r3", "other.com")];
-  const toggled = toggleHostRule(current, "https://docs.github.com/en");
-  assert.equal(toggled.protected, false);
-  assert.deepEqual(
-    toggled.rules.map((r) => r.id),
-    ["r3"],
-  );
-});
-
 test("Core - AddHostRules: skips blank, already covered and repeated hosts", () => {
   const rules = addHostRules([rule("r1", "*.github.com")], ["", "docs.github.com", "a.com", "a.com", "b.com"]);
   assert.deepEqual(
     rules.map((r) => r.pattern),
     ["*.github.com", "a.com", "b.com"],
   );
-});
-
-test("Core - ToggleHostRule: a url-protected page toggles its url rule off, adds nothing", () => {
-  const current = [rule("r1", "https://a.com/page")];
-  const toggled = toggleHostRule(current, "https://a.com/page");
-  assert.equal(toggled.protected, false);
-  assert.deepEqual(toggled.rules, []);
 });
 
 test("Core - AddUrlRules: skips blank, unsupported and repeated urls; a protected host does not block", () => {
@@ -74,4 +52,33 @@ test("Core - RemoveRulesFor: drops host rules covering a url and url rules equal
     ["r3", "r5"],
   );
   assert.deepEqual(removeRulesFor(current, []), current);
+});
+
+test("Core - RestoreRuleRemoval: the newest removal's rules come back unless the pattern exists again; undefined when empty", () => {
+  const github: ProtectionRule = { id: "g", type: "domain", pattern: "*.github.com", createdAt: 1 };
+  const mail: ProtectionRule = { id: "m", type: "host", pattern: "mail.google.com", createdAt: 1 };
+  const board: ProtectionRule = { id: "b", type: "url", pattern: "https://a.com/board", createdAt: 1 };
+  const trash = recordRemoval(recordRemoval<ProtectionRule>([], [github], 1), [mail, board], 2);
+  const again: ProtectionRule = { id: "m2", type: "host", pattern: "mail.google.com", createdAt: 3 };
+  const restored = restoreRuleRemoval([again], trash);
+  assert.ok(restored);
+  assert.deepEqual(
+    restored.protectionRules,
+    [again, board],
+    "mail re-added meanwhile keeps the new rule; board back as it was",
+  );
+  assert.deepEqual(restored.protectionTrash, [{ at: 1, items: [github] }], "only the newest action consumed");
+  assert.equal(restoreRuleRemoval([], []), undefined);
+});
+
+test("Core - SetRulePattern: re-keys one rule through makeRule (type follows), id and createdAt kept; undefined when unknown, blank, same or taken", () => {
+  const github: ProtectionRule = { id: "g", type: "domain", pattern: "*.github.com", createdAt: 1 };
+  const mail: ProtectionRule = { id: "m", type: "host", pattern: "mail.google.com", createdAt: 2 };
+  const next = setRulePattern([github, mail], "m", " https://Mail.Google.com/inbox ");
+  assert.deepEqual(next, [github, { id: "m", type: "url", pattern: "https://mail.google.com/inbox", createdAt: 2 }]);
+  assert.deepEqual(setRulePattern([github, mail], "g", "*.Example.ORG")?.[0], { ...github, pattern: "*.example.org" });
+  assert.equal(setRulePattern([github, mail], "nope", "x.com"), undefined, "unknown rule");
+  assert.equal(setRulePattern([github, mail], "m", "   "), undefined, "blank");
+  assert.equal(setRulePattern([github, mail], "m", "mail.google.com"), undefined, "same pattern");
+  assert.equal(setRulePattern([github, mail], "m", "*.GitHub.com"), undefined, "another rule's pattern");
 });

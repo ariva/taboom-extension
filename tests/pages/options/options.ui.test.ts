@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
-import type { KeepAliveRemoval, KeepAliveTab, LocalStorageSchema, ProtectionRule } from "../../../src/app/types.ts";
+import type { KeepAliveTab, LocalStorageSchema, ProtectionRule, Removal } from "../../../src/app/types.ts";
 import { byId, q, qa } from "../../helpers/dom.ts";
 import { makeChrome, loadPage, tick, RAW_FEATURES, TEST_EXPERIMENTAL, TEST_FEATURES } from "../../helpers/ui.ts";
 
@@ -11,7 +11,8 @@ const stored: Pick<LocalStorageSchema, "settings" | "ui"> &
   Partial<Pick<LocalStorageSchema, "perfMetrics" | "perfSnapshots">> & {
     protectionRules: Omit<ProtectionRule, "createdAt">[];
     keepAlive?: KeepAliveTab[];
-    keepAliveTrash?: KeepAliveRemoval[];
+    keepAliveTrash?: Removal<KeepAliveTab>[];
+    protectionTrash?: Removal<Omit<ProtectionRule, "createdAt">>[];
   } = {
   settings: { autoSnoozeEnabled: false, inactivityMinutes: 45 },
   protectionRules: [{ id: "r1", type: "domain", pattern: "*.github.com" }],
@@ -39,15 +40,78 @@ test("UI - Options - Stored theme forced onto the page", () => {
 test("UI - Options - Protection rules render as removable entries", async () => {
   const li = q(document, "#rules li");
   assert.match(li.textContent, /\*\.github\.com/);
-  calls.length = 0;
+  stored.protectionTrash = [];
   q(li, "button").click();
   await tick();
   await tick();
-  assert.ok(
-    calls.some((c) => c.startsWith("storage.set") && !c.includes("github")),
-    "rule removed via saveState",
-  );
+  assert.deepEqual(stored.protectionRules, [], "rule removed");
   assert.match(q(document, "#rules li").textContent, /No protected sites yet/);
+  assert.deepEqual(
+    stored.protectionTrash.map((action) => action.items.map((rule) => rule.pattern)),
+    [["*.github.com"]],
+    "the chip's ✕ is a restorable removal",
+  );
+  stored.protectionTrash = [];
+  await chrome.storage.onChanged.fire({ protectionRules: {} }, "local");
+  await tick();
+  await tick();
+});
+
+test("UI - Options - Protected site chip: click the pattern to edit it in place; blur / Enter save, Escape cancels", async () => {
+  stored.protectionRules = [
+    { id: "r1", type: "domain", pattern: "*.github.com" },
+    { id: "r2", type: "host", pattern: "mail.google.com" },
+  ];
+  await chrome.storage.onChanged.fire({ protectionRules: {} }, "local");
+  await tick();
+  await tick();
+  const chip = () => qa(document, "#rules li")[0]!;
+  const key = (name: string) => new window.KeyboardEvent("keydown", { key: name, bubbles: true });
+  assert.equal(chip().querySelector("input"), null, "pattern shown as text at first");
+  q(chip(), "span").click();
+  const input = q<HTMLInputElement>(chip(), "input.rename-input");
+  assert.equal(input.value, "*.github.com");
+  assert.equal(qa(chip(), "button").length, 1, "the ✕ stays while editing");
+
+  input.value = " https://App.Example.com/board ";
+  input.dispatchEvent(new window.Event("blur"));
+  await tick();
+  await tick();
+  assert.deepEqual(
+    stored.protectionRules[0],
+    { id: "r1", type: "url", pattern: "https://app.example.com/board" },
+    "normalized through makeRule, id kept, type follows",
+  );
+  assert.equal(q(chip(), "span").textContent, "https://app.example.com/board", "chip re-rendered as text");
+
+  q(chip(), "span").click();
+  const second = q<HTMLInputElement>(chip(), "input.rename-input");
+  second.value = "*.github.com";
+  second.dispatchEvent(key("Enter"));
+  await tick();
+  await tick();
+  assert.equal(stored.protectionRules[0]?.pattern, "*.github.com", "Enter saves");
+
+  for (const [value, how] of [
+    ["changed.example.com", "Escape"],
+    ["mail.google.com", "blur"],
+    ["   ", "blur"],
+    ["*.github.com", "blur"],
+  ] as const) {
+    q(chip(), "span").click();
+    const editing = q<HTMLInputElement>(chip(), "input.rename-input");
+    editing.value = value;
+    calls.length = 0;
+    editing.dispatchEvent(how === "Escape" ? key("Escape") : new window.Event("blur"));
+    await tick();
+    await tick();
+    assert.ok(!calls.some((c) => c.startsWith("storage.set")), `${value} via ${how}: no write`);
+    assert.equal(q(chip(), "span").textContent, "*.github.com", `${value} via ${how}: text back`);
+  }
+  stored.protectionRules = []; // as the removal test above left it — the add test expects its rule first
+  await chrome.storage.onChanged.fire({ protectionRules: {} }, "local");
+  await tick();
+  await tick();
 });
 
 test("UI - Options - Adding a rule saves it and clears the input", async () => {
@@ -230,13 +294,121 @@ test("UI - Options - Restore defaults resets settings/ui but keeps protected sit
   );
 });
 
-test("UI - Options - Clear protected sites empties rules but keeps settings", async () => {
+test("UI - Options - Delete restore data: disabled while both undo stacks are empty, otherwise clears them without a prompt", async () => {
+  const button = byId<HTMLButtonElement>("delete-restore-data");
+  assert.ok(button.closest("section")?.contains(byId("danger")), "lives in the Data card");
+  stored.keepAliveTrash = [];
+  stored.protectionTrash = [];
+  await chrome.storage.onChanged.fire({ protectionRules: {} }, "local");
+  await tick();
+  await tick();
+  assert.equal(button.disabled, true, "nothing to forget: disabled");
+
+  stored.protectionTrash = [{ at: 1, items: [{ id: "x", type: "host", pattern: "x.example.com" }] }];
+  stored.keepAliveTrash = [
+    { at: 1, items: [{ url: "https://x.example.com/", title: "X", minutes: 5, nextReload: 1 }] },
+  ];
+  await chrome.storage.onChanged.fire({ protectionRules: {} }, "local");
+  await tick();
+  await tick();
+  assert.equal(button.disabled, false, "something to forget: enabled");
+  assert.equal(byId("restore-protected").hidden, false);
+
+  // `as`: the harness installs confirm on globalThis (helpers/ui.ts); the page must not call it here
+  const globals = globalThis as { confirm: () => boolean };
+  const confirmBefore = globals.confirm;
+  let prompted = false;
+  globals.confirm = () => {
+    prompted = true;
+    return false;
+  };
+  button.click();
+  await tick();
+  await tick();
+  globals.confirm = confirmBefore;
+  assert.equal(prompted, false, "no confirm dialog");
+  assert.deepEqual(stored.protectionTrash, []);
+  assert.deepEqual(stored.keepAliveTrash, []);
+  assert.equal(button.disabled, true, "disabled again");
+  assert.equal(byId("restore-protected").hidden, true, "restore buttons gone with the data");
+
+  calls.length = 0;
+  button.click();
+  await tick();
+  assert.ok(!calls.some((c) => c.startsWith("storage.set")), "disabled: no write");
+});
+
+test("UI - Options - Clear protected sites empties rules but keeps settings; Restore brings removals back newest first", async () => {
   stored.settings.inactivityMinutes = 45;
+  stored.protectionRules = [
+    { id: "r1", type: "domain", pattern: "*.github.com" },
+    { id: "r2", type: "host", pattern: "mail.google.com" },
+  ];
+  stored.protectionTrash = [];
+  await chrome.storage.onChanged.fire({ protectionRules: {} }, "local");
+  await tick();
+  await tick();
+  const restore = byId<HTMLButtonElement>("restore-protected");
+  assert.equal(restore.hidden, true, "nothing removed yet: no button");
+  assert.ok(
+    byId("clear-protected").closest("section")?.contains(byId("rules")),
+    "Clear all lives in the Protected Sites card",
+  );
+
+  q(qa(document, "#rules li")[1]!, "button").click(); // mail chip ✕
+  await tick();
+  await tick();
+  assert.equal(restore.hidden, false);
+  assert.equal(restore.textContent, "Restore last removal (1 site)");
+  assert.equal(restore.title, "Restore:\nmail.google.com");
+
   byId("clear-protected").click();
   await tick();
   await tick();
-  assert.deepEqual(stored.protectionRules, [], "all rules removed");
+  assert.equal(stored.protectionRules.length, 0, "all rules removed"); // not deepEqual([]): narrows to never[]
   assert.equal(stored.settings.inactivityMinutes, 45, "settings untouched");
+  assert.equal(stored.protectionTrash.length, 2, "two actions on the stack");
+  assert.equal(restore.textContent, "Restore last removal (1 site)", "newest action counted");
+
+  calls.length = 0;
+  byId("clear-protected").click();
+  await tick();
+  await tick();
+  assert.ok(!calls.some((c) => c.startsWith("storage.set")), "already empty: no write");
+
+  restore.click();
+  await tick();
+  await tick();
+  assert.deepEqual(
+    stored.protectionRules.map((rule) => rule.pattern),
+    ["*.github.com"],
+    "Clear all undone first",
+  );
+  restore.click();
+  await tick();
+  await tick();
+  assert.deepEqual(
+    stored.protectionRules.map((rule) => rule.pattern),
+    ["*.github.com", "mail.google.com"],
+  );
+  assert.equal(restore.hidden, true, "stack empty: button gone");
+  assert.equal(qa(document, "#rules li").length, 2, "chips re-rendered");
+
+  // a many-rule action: tooltip lists 10 patterns then an ellipsis line
+  const patterns = Array.from({ length: 12 }, (_, index) => `s${index}.example.com`);
+  stored.protectionTrash = [
+    { at: 1, items: patterns.map((pattern, index) => ({ id: `p${index}`, type: "host", pattern })) },
+  ];
+  await chrome.storage.onChanged.fire({ protectionRules: {} }, "local");
+  await tick();
+  await tick();
+  assert.equal(restore.textContent, "Restore last removal (12 sites)");
+  assert.equal(restore.title, ["Restore:", ...patterns.slice(0, 10), "…"].join("\n"));
+  stored.protectionTrash = [];
+  stored.protectionRules = [{ id: "r1", type: "domain", pattern: "*.github.com" }];
+  await chrome.storage.onChanged.fire({ protectionRules: {} }, "local");
+  await tick();
+  await tick();
 });
 
 test("UI - Options - Dropdown shows the effective mode when the stored one is flag-disabled", async () => {
@@ -637,12 +809,12 @@ test("UI - Options - Keep-alive url: click turns it into an input; blur / Enter 
   await tick();
   const row = () => qa(byId("keep-alive-rows"), "tr")[0]!;
   const key = (name: string) => new window.KeyboardEvent("keydown", { key: name, bubbles: true });
-  assert.equal(row().querySelector("input.url-edit"), null, "url shown as text at first");
+  assert.equal(row().querySelector("input.rename-input"), null, "url shown as text at first");
   qa(row(), "td")[2]!.click(); // the title text, not the url span: the whole Page cell is the handle
-  const input = q<HTMLInputElement>(row(), "input.url-edit");
+  const input = q<HTMLInputElement>(row(), "input.rename-input");
   assert.equal(input.value, "https://dash.example.com/board", "the input starts with the current url");
   input.click();
-  assert.equal(qa(row(), "input.url-edit").length, 1, "clicking inside the open editor does not stack another");
+  assert.equal(qa(row(), "input.rename-input").length, 1, "clicking inside the open editor does not stack another");
 
   // blur commits: normalized, fragment allowed, everything else on the mark kept
   calls.length = 0;
@@ -660,7 +832,7 @@ test("UI - Options - Keep-alive url: click turns it into an input; blur / Enter 
 
   // Enter commits too
   q(row(), ".url").click();
-  const second = q<HTMLInputElement>(row(), "input.url-edit");
+  const second = q<HTMLInputElement>(row(), "input.rename-input");
   second.value = "https://dash.example.com/board";
   second.dispatchEvent(key("Enter"));
   await tick();
@@ -676,7 +848,7 @@ test("UI - Options - Keep-alive url: click turns it into an input; blur / Enter 
     ["https://dash.example.com/board", "blur"],
   ] as const) {
     q(row(), ".url").click();
-    const editing = q<HTMLInputElement>(row(), "input.url-edit");
+    const editing = q<HTMLInputElement>(row(), "input.rename-input");
     editing.value = value;
     calls.length = 0;
     editing.dispatchEvent(how === "Escape" ? key("Escape") : new window.Event("blur"));
@@ -782,9 +954,9 @@ test("UI - Options - Restore last removal: every removal (row, Clear all) is und
   stored.keepAliveTrash = [
     {
       at: now - 400 * 24 * 60 * 60_000,
-      marks: [{ url: "https://x.example.com/", title: "X", minutes: 5, nextReload: 1 }],
+      items: [{ url: "https://x.example.com/", title: "X", minutes: 5, nextReload: 1 }],
     },
-    { at: now - 60_000, marks: urls.map((url) => ({ url, title: url, minutes: 5, nextReload: 1 })) },
+    { at: now - 60_000, items: urls.map((url) => ({ url, title: url, minutes: 5, nextReload: 1 })) },
   ];
   await chrome.storage.onChanged.fire({ keepAlive: {} }, "local");
   await tick();

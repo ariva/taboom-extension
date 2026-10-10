@@ -2,6 +2,7 @@
 // list edits, and the reload schedule. No DOM, no chrome.* — the worker, the
 // options page and the side panel all go through here.
 import { hostnameOf, isKeptAlive, isSupportedUrl, keepAliveKey, matchesKeepAlive } from "./core.ts";
+import { popRemoval } from "./removal-trash.ts";
 import type { KeepAliveRemoval, KeepAliveTab } from "./types.ts";
 
 // the matching half lives in core.ts (auto-snooze eligibility reads it); re-exported
@@ -149,22 +150,7 @@ export function formatCountdown(nextReload: number, now: number): string {
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 }
 
-// ---------- removal trash: every removal is undoable from Settings, newest first ----------
-
-// ponytail: a flat cap bounds storage.local; per-mark dedupe if anyone fills 50 actions
-const TRASH_LIMIT = 50;
-
-// newest last; actions stay until restored or pushed out by the cap
-export function recordKeepAliveRemoval(
-  trash: KeepAliveRemoval[],
-  marks: KeepAliveTab[],
-  now: number,
-): KeepAliveRemoval[] {
-  if (marks.length === 0) {
-    return trash;
-  }
-  return [...trash, { at: now, marks }].slice(-TRASH_LIMIT);
-}
+// ---------- removal trash (src/app/removal-trash.ts holds the stack) ----------
 
 // the newest action back into the list: a page marked again meanwhile keeps its current mark,
 // the others return as they were (paused flag included) with a fresh timer so a restore after
@@ -175,13 +161,13 @@ export function restoreKeepAliveRemoval(
   now: number,
   random?: () => number,
 ): { keepAlive: KeepAliveTab[]; keepAliveTrash: KeepAliveRemoval[] } | undefined {
-  const newest = trash.at(-1);
-  if (!newest) {
+  const popped = popRemoval(trash);
+  if (!popped) {
     return undefined;
   }
   const known = new Set(list.map((entry) => entry.url));
-  const returning = newest.marks
+  const returning = popped.newest.items
     .filter((entry) => !known.has(entry.url))
     .map((entry) => ({ ...entry, nextReload: nextReloadAt(entry.minutes, now, random) }));
-  return { keepAlive: [...list, ...returning], keepAliveTrash: trash.slice(0, -1) };
+  return { keepAlive: [...list, ...returning], keepAliveTrash: popped.rest };
 }

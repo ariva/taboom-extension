@@ -1,8 +1,8 @@
 // Site protection: rule edits, the autoDiscardable flag on tabs, and the
 // protect menu item's title.
 import { hostnameOf, isProtected, isSupportedUrl } from "../app/core.ts";
-import { addHostRules, addUrlRules, removeRulesFor, toggleHostRule } from "../app/protection-rules.ts";
-import { loadState, saveState } from "../app/storage.ts";
+import { addHostRules, addUrlRules, removeRulesFor } from "../app/protection-rules.ts";
+import { dropProtectionRules, loadState, saveState } from "../app/storage.ts";
 import type { ProtectionRule } from "../app/types.ts";
 import { enqueueMenuOp } from "./context-menus.ts";
 
@@ -23,15 +23,22 @@ export async function applyAutoDiscardable(rules: ProtectionRule[]): Promise<voi
   );
 }
 
+// page already covered (by a host, domain or url rule) → every rule covering it goes
+// (through the trash writer, so it is restorable); otherwise one new host rule
 export async function toggleSiteProtection(tab: chrome.tabs.Tab): Promise<{ protected: boolean }> {
-  if (!tab.url || !hostnameOf(tab.url)) {
+  const url = tab.url;
+  if (!url || !hostnameOf(url)) {
     return { protected: false };
   }
   const state = await loadState();
-  const toggled = toggleHostRule(state.protectionRules, tab.url);
-  await saveState({ protectionRules: toggled.rules });
-  await applyAutoDiscardable(toggled.rules);
-  return { protected: toggled.protected };
+  if (isProtected(url, state.protectionRules)) {
+    await applyAutoDiscardable(await dropProtectionRules((rules) => removeRulesFor(rules, [url])));
+    return { protected: false };
+  }
+  const rules = addHostRules(state.protectionRules, [hostnameOf(url)]);
+  await saveState({ protectionRules: rules });
+  await applyAutoDiscardable(rules);
+  return { protected: true };
 }
 
 export async function protectHosts(hosts: string[]): Promise<void> {
@@ -50,10 +57,7 @@ export async function protectUrls(urls: string[]): Promise<void> {
 
 // drops host rules covering the pages as well as exact url rules for them
 export async function unprotectUrls(urls: string[]): Promise<void> {
-  const state = await loadState();
-  const rules = removeRulesFor(state.protectionRules, urls);
-  await saveState({ protectionRules: rules });
-  await applyAutoDiscardable(rules);
+  await applyAutoDiscardable(await dropProtectionRules((rules) => removeRulesFor(rules, urls)));
 }
 
 // Keep the protect menu item's title matching the active tab's protection state.

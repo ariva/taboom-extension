@@ -1,25 +1,8 @@
 // Edits to the protection rule list: what toggling / protecting / unprotecting
 // hosts does to the rules. Pure — the service worker persists the result.
-import { hostnameOf, isSupportedUrl, isUrlRule, makeRule, matchesRule, matchesUrl } from "./core.ts";
-import type { ProtectionRule } from "./types.ts";
-
-// page already covered (by a host, domain or url rule) → every rule covering it
-// goes away; otherwise one new host rule for its hostname
-export function toggleHostRule(
-  current: ProtectionRule[],
-  url: string,
-): { rules: ProtectionRule[]; protected: boolean } {
-  const existing = current.filter((rule) => matchesUrl(url, rule));
-  let rules: ProtectionRule[];
-  if (existing.length > 0) {
-    const removeIds = new Set(existing.map((rule) => rule.id));
-    rules = current.filter((rule) => !removeIds.has(rule.id));
-  } else {
-    // makeRule is null only for a blank pattern — callers pass a url with a hostname
-    rules = [...current, makeRule(hostnameOf(url))!];
-  }
-  return { rules, protected: existing.length === 0 };
-}
+import { isSupportedUrl, isUrlRule, makeRule, matchesRule, matchesUrl } from "./core.ts";
+import { popRemoval } from "./removal-trash.ts";
+import type { ProtectionRule, Removal } from "./types.ts";
 
 // one rule per host that no rule covers yet (blank hosts skipped)
 export function addHostRules(current: ProtectionRule[], hosts: string[]): ProtectionRule[] {
@@ -51,9 +34,43 @@ export function addUrlRules(current: ProtectionRule[], urls: string[]): Protecti
   return rules;
 }
 
-// removes every rule covering any of the urls — same removal semantics as
-// toggleHostRule (a wildcard rule covering the host goes away with it, so
-// does the exact url rule)
+// removes every rule covering any of the urls — the menu's "Remove site protection"
+// and the panel's Unprotect alike (a wildcard rule covering the host goes away with
+// it, so does the exact url rule)
 export function removeRulesFor(current: ProtectionRule[], urls: string[]): ProtectionRule[] {
   return current.filter((rule) => !urls.some((url) => url && matchesUrl(url, rule)));
+}
+
+// Settings → Restore: the newest removal's rules back, except a pattern that exists
+// again (re-protected meanwhile) — the current rule wins. undefined when nothing to restore
+export function restoreRuleRemoval(
+  rules: ProtectionRule[],
+  trash: Removal<ProtectionRule>[],
+): { protectionRules: ProtectionRule[]; protectionTrash: Removal<ProtectionRule>[] } | undefined {
+  const popped = popRemoval(trash);
+  if (!popped) {
+    return undefined;
+  }
+  const patterns = new Set(rules.map((rule) => rule.pattern));
+  const returning = popped.newest.items.filter((rule) => !patterns.has(rule.pattern));
+  return { protectionRules: [...rules, ...returning], protectionTrash: popped.rest };
+}
+
+// Settings chip edit: the rule keeps its id and createdAt, pattern and type come from
+// makeRule (so "https://…" turns a host rule into a url rule). undefined when the rule
+// is unknown, the text is blank, the pattern is unchanged or another rule has it
+export function setRulePattern(rules: ProtectionRule[], id: string, text: string): ProtectionRule[] | undefined {
+  const rule = rules.find((candidate) => candidate.id === id);
+  const made = makeRule(text);
+  if (
+    !rule ||
+    !made ||
+    made.pattern === rule.pattern ||
+    rules.some((candidate) => candidate.pattern === made.pattern)
+  ) {
+    return undefined;
+  }
+  return rules.map((candidate) =>
+    candidate === rule ? { ...rule, type: made.type, pattern: made.pattern } : candidate,
+  );
 }

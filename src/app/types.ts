@@ -25,11 +25,13 @@ export interface KeepAliveTab {
   nextReload: number; // ms timestamp the sweep compares against
 }
 
-// one removal action (a row's Remove, a menu unmark, Clear all) — Settings → Restore pops the newest; capped, never expires
-export interface KeepAliveRemoval {
+// one undoable removal from a list (keep-alive marks, protection rules): Settings → Restore
+// pops the newest; the stack is capped, never expires — src/app/removal-trash.ts
+export interface Removal<T> {
   at: number; // ms timestamp of the removal
-  marks: KeepAliveTab[];
+  items: T[];
 }
+export type KeepAliveRemoval = Removal<KeepAliveTab>;
 
 // "host"  → exact hostname match, e.g. "mail.google.com"
 // "domain"→ "*.github.com" matches github.com and any subdomain
@@ -84,6 +86,7 @@ export interface LocalStorageSchema {
   // settings / ui may lack keys added after they were written — loadState() merges DEFAULTS in
   settings: Partial<Settings>;
   protectionRules: ProtectionRule[];
+  protectionTrash: Removal<ProtectionRule>[];
   ui: Partial<UiPrefs>;
   keepAlive: KeepAliveTab[];
   keepAliveTrash: KeepAliveRemoval[];

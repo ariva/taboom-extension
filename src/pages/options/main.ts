@@ -13,7 +13,7 @@ import { initUiPrefs, renderUiPrefs } from "./ui-prefs.ts";
 import { initRules, renderRules } from "./rules.ts";
 import { initKeepAlive, renderKeepAlive } from "./keep-alive.ts";
 import { initPerfPanel } from "./perf-panel.ts";
-import { initDangerZone } from "./danger-zone.ts";
+import { initDangerZone, renderDangerZone } from "./danger-zone.ts";
 import { initWhatsNew } from "./whats-new.ts";
 
 markDevPage();
@@ -23,9 +23,10 @@ setFeatures(FEATURES);
 async function render() {
   const state = await loadState();
   renderSettings(state);
-  renderRules(state);
+  await renderRules(state);
   renderUiPrefs(state);
   await renderKeepAlive(state);
+  await renderDangerZone();
 
   getElementById("about").textContent = aboutText(getReleaseVersion());
 }

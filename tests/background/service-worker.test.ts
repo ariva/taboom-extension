@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
 import type { Message, MessageError, MessageResponses } from "../../src/app/messages.ts";
-import type { KeepAliveRemoval, KeepAliveTab, ProtectionRule, Settings } from "../../src/app/types.ts";
+import type { KeepAliveTab, ProtectionRule, Removal, Settings } from "../../src/app/types.ts";
 import type { ChromeMockOptions } from "../helpers/chrome-mock.ts";
 import { makeChrome, tick, TEST_EXPERIMENTAL, TEST_FEATURES } from "../helpers/ui.ts";
 
@@ -78,7 +78,8 @@ const stored: {
   settings: Settings;
   protectionRules: Omit<ProtectionRule, "createdAt">[];
   keepAlive?: KeepAliveTab[];
-  keepAliveTrash?: KeepAliveRemoval[];
+  keepAliveTrash?: Removal<KeepAliveTab>[];
+  protectionTrash?: Removal<ProtectionRule>[];
   updateAvailable?: string;
 } = {
   settings: {
@@ -196,9 +197,15 @@ test("Service Worker - Toggle-site-protection adds then removes a rule and reapp
   assert.ok(stored.protectionRules.some((r) => r.pattern === "work.example.com"));
   assert.ok(calls.some((c) => c.startsWith("tabs.update 1") && c.includes('"autoDiscardable":false')));
 
+  stored.protectionTrash = [];
   response = await send({ type: "toggle-site-protection", tabId: 1 });
   assert.deepEqual(response, { protected: false });
   assert.ok(!stored.protectionRules.some((r) => r.pattern === "work.example.com"));
+  assert.deepEqual(
+    stored.protectionTrash.map((action) => action.items.map((rule) => rule.pattern)),
+    [["work.example.com"]],
+    "menu unprotect kept for Settings → Restore",
+  );
 });
 
 test("Service Worker - Protect-hosts skips hosts already covered by a rule", async () => {
@@ -213,10 +220,19 @@ test("Service Worker - Protect-urls adds exact rules, unprotect-urls removes the
   let patterns = stored.protectionRules.map((r) => r.pattern);
   assert.ok(patterns.includes("https://app.example.net/board"), "url rule added");
   assert.ok(patterns.includes("https://mail.google.com/inbox"), "url rule added even though the host is protected");
+  stored.protectionTrash = [];
   await send({ type: "unprotect-urls", urls: ["https://app.example.net/board", "https://mail.google.com/x"] });
   patterns = stored.protectionRules.map((r) => r.pattern);
   assert.ok(!patterns.includes("https://app.example.net/board"), "url rule removed");
   assert.ok(!patterns.includes("mail.google.com"), "host rule covering the url removed");
+  assert.deepEqual(
+    stored.protectionTrash
+      .at(-1)
+      ?.items.map((rule) => rule.pattern)
+      .sort(),
+    ["https://app.example.net/board", "mail.google.com"],
+    "both dropped rules in one restorable action",
+  );
   stored.protectionRules.push({ id: "r1", type: "host", pattern: "mail.google.com" }); // restore fixture
 });
 
@@ -769,7 +785,7 @@ test("Service Worker - Keep alive: menu click marks the page and arms the sweep;
   assert.deepEqual(stored.keepAlive, []);
   assert.ok(calls.includes("alarms.clear keep-alive"), "empty list: sweep cleared");
   assert.deepEqual(
-    stored.keepAliveTrash?.at(-1)?.marks.map((entry) => entry.url),
+    stored.keepAliveTrash?.at(-1)?.items.map((entry) => entry.url),
     ["https://old.example.com/a"],
     "menu unmark recorded for Restore too",
   );
@@ -799,7 +815,7 @@ test("Service Worker - Keep alive: keep-alive-set message marks and unmarks tabs
     ["https://work.example.com/doc"],
   );
   assert.deepEqual(
-    stored.keepAliveTrash.map((action) => action.marks.map((entry) => entry.url)),
+    stored.keepAliveTrash.map((action) => action.items.map((entry) => entry.url)),
     [["https://old.example.com/a"]],
     "the removed mark is kept for Settings → Restore",
   );

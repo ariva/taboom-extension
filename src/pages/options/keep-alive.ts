@@ -1,6 +1,6 @@
 // Keep-tabs-alive card: the default-interval dropdown, the table of marks —
 // numbered, each with its pause checkbox, own interval, a live countdown to the
-// next reload and Remove — an Add row for a page that is not open, Clear all and Restore last removal. The enable checkbox and default interval are
+// next reload and Remove — an Add row for a page that is not open, Remove all and Restore last removal. The enable checkbox and default interval are
 // settings — settings-form.ts persists them; this module only shows / hides.
 import { applyExperimental, featureEnabled, hostnameOf } from "../../app/core.ts";
 import {
@@ -20,8 +20,10 @@ import {
   removeKeepAlive,
   restoreKeepAlive,
 } from "../../app/storage.ts";
+import { popRemoval } from "../../app/removal-trash.ts";
 import type { AppState, KeepAliveRemoval, KeepAliveTab } from "../../app/types.ts";
 import { getElementById } from "../../lib/dom.ts";
+import { inlineEdit } from "../../lib/ui/inline-edit.ts";
 import { flashSaved, getFeatures, render } from "./page-state.ts";
 
 function option(value: number): HTMLOptionElement {
@@ -64,16 +66,16 @@ export async function renderKeepAlive(state: AppState): Promise<void> {
 }
 
 // "Restore last removal (N marks)" — only while an action exists; hovering lists what
-// comes back, capped so a Clear all of hundreds does not become a screen-high tooltip
+// comes back, capped so a Remove all of hundreds does not become a screen-high tooltip
 const TOOLTIP_URLS = 10;
 function renderRestore(trash: KeepAliveRemoval[]): void {
   const button = getElementById<HTMLButtonElement>("restore-keep-alive");
-  const newest = trash.at(-1);
+  const newest = popRemoval(trash)?.newest;
   button.hidden = !newest;
   if (newest) {
-    const count = newest.marks.length;
+    const count = newest.items.length;
     button.textContent = `Restore last removal (${count} mark${count === 1 ? "" : "s"})`;
-    const urls = newest.marks.slice(0, TOOLTIP_URLS).map((entry) => entry.url);
+    const urls = newest.items.slice(0, TOOLTIP_URLS).map((entry) => entry.url);
     button.title = ["Restore:", ...urls, ...(count > TOOLTIP_URLS ? ["…"] : [])].join("\n");
   }
 }
@@ -95,9 +97,9 @@ function cell(...children: (Node | string)[]): HTMLTableCellElement {
 }
 
 // the Page cell (title + address) is editable in place — click anywhere in it and the
-// address becomes an input: the only way to add a fragment to a mark made from a tab.
-// Blur / Enter commit, Escape cancels; the row is rebuilt either way so an ignored
-// value snaps back to the stored url
+// address becomes an input (lib/ui/inline-edit): the only way to add a fragment to a
+// mark made from a tab. Blur / Enter commit, Escape cancels; the table re-renders
+// either way so an ignored value snaps back to the stored url
 function pageCell(list: KeepAliveTab[], entry: KeepAliveTab): HTMLTableCellElement {
   const url = document.createElement("span");
   url.className = "url";
@@ -105,37 +107,21 @@ function pageCell(list: KeepAliveTab[], entry: KeepAliveTab): HTMLTableCellEleme
   const page = cell(entry.title, url);
   page.title = `${entry.url}\nClick to edit the address`; // the cell clips long addresses to one line
   page.addEventListener("click", () => {
-    if (page.querySelector(".url-edit")) {
+    if (page.querySelector(".rename-input")) {
       return; // a click inside the open editor
     }
-    const input = document.createElement("input");
-    input.type = "text";
-    input.className = "url-edit";
-    input.value = entry.url;
-    let done = false; // Enter blurs too — commit once
-    const finish = (value: string) => {
-      if (done) {
-        return;
-      }
-      done = true;
-      const next = setKeepAliveUrl(list, entry.url, keepAliveUrlFromInput(value));
-      if (next) {
-        save(next);
-      } else {
-        render();
-      }
-    };
-    input.addEventListener("blur", () => finish(input.value));
-    input.addEventListener("keydown", (event) => {
-      if (event.key === "Enter") {
-        finish(input.value);
-      } else if (event.key === "Escape") {
-        finish(entry.url);
-      }
+    inlineEdit(url, {
+      initial: entry.url,
+      placeholder: "https://app.example.com/board",
+      commit: async (value) => {
+        const next = setKeepAliveUrl(list, entry.url, keepAliveUrlFromInput(value));
+        if (next) {
+          await localStore.set({ keepAlive: next });
+          flashSaved();
+        }
+      },
+      finish: render,
     });
-    url.replaceWith(input);
-    input.focus();
-    input.select();
   });
   return page;
 }

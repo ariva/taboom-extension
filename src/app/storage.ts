@@ -3,12 +3,20 @@ import { DEFAULTS } from "./core.ts";
 import {
   keepAliveEntry,
   nextReloadAt,
-  recordKeepAliveRemoval,
   restoreKeepAliveRemoval,
   setKeepAlivePaused,
   unmarkKeepAlive,
 } from "./keep-alive.ts";
-import type { AppState, Features, KeepAliveTab, LocalStorageSchema, SessionStorageSchema } from "./types.ts";
+import { restoreRuleRemoval } from "./protection-rules.ts";
+import { recordRemoval } from "./removal-trash.ts";
+import type {
+  AppState,
+  Features,
+  KeepAliveTab,
+  LocalStorageSchema,
+  ProtectionRule,
+  SessionStorageSchema,
+} from "./types.ts";
 
 // the only doors to chrome.storage — keys and value types come from the schemas
 export const localStore = createStorage<LocalStorageSchema>("local");
@@ -75,7 +83,7 @@ async function writeRemoval(next: (keepAlive: KeepAliveTab[]) => KeepAliveTab[] 
   const removed = keepAlive.filter((entry) => !remaining.includes(entry));
   await localStore.set({
     keepAlive: remaining,
-    keepAliveTrash: recordKeepAliveRemoval(keepAliveTrash, removed, Date.now()),
+    keepAliveTrash: recordRemoval(keepAliveTrash, removed, Date.now()),
   });
   return true;
 }
@@ -94,6 +102,36 @@ export function clearKeepAlive(): Promise<boolean> {
 export async function restoreKeepAlive(): Promise<boolean> {
   const { keepAlive = [], keepAliveTrash = [] } = await localStore.get(["keepAlive", "keepAliveTrash"]);
   const restored = restoreKeepAliveRemoval(keepAlive, keepAliveTrash, Date.now());
+  if (!restored) {
+    return false;
+  }
+  await localStore.set(restored);
+  return true;
+}
+
+// The one door for dropping protection rules (chip ✕, Clear all, menu "Remove site
+// protection", panel Unprotect): what leaves the list lands in the trash for Settings →
+// Restore. Resolves to the rules now in force so the worker can reapply tab flags.
+export async function dropProtectionRules(
+  keep: (rules: ProtectionRule[]) => ProtectionRule[],
+): Promise<ProtectionRule[]> {
+  const { protectionRules = [], protectionTrash = [] } = await localStore.get(["protectionRules", "protectionTrash"]);
+  const remaining = keep(protectionRules);
+  const removed = protectionRules.filter((rule) => !remaining.includes(rule));
+  if (removed.length === 0) {
+    return protectionRules;
+  }
+  await localStore.set({
+    protectionRules: remaining,
+    protectionTrash: recordRemoval(protectionTrash, removed, Date.now()),
+  });
+  return remaining;
+}
+
+// Options "Restore last removal" (Protected Sites). False when the trash is empty.
+export async function restoreProtectionRules(): Promise<boolean> {
+  const { protectionRules = [], protectionTrash = [] } = await localStore.get(["protectionRules", "protectionTrash"]);
+  const restored = restoreRuleRemoval(protectionRules, protectionTrash);
   if (!restored) {
     return false;
   }

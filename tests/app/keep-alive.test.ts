@@ -12,7 +12,6 @@ import {
   matchesKeepAlive,
   nextReloadAt,
   rearmAllKeepAlive,
-  recordKeepAliveRemoval,
   restoreKeepAliveRemoval,
   rearmKeepAlive,
   setKeepAliveMinutes,
@@ -21,7 +20,8 @@ import {
   unmarkKeepAlive,
 } from "../../src/app/keep-alive.ts";
 import { DEFAULTS } from "../../src/app/core.ts";
-import type { KeepAliveRemoval, KeepAliveTab } from "../../src/app/types.ts";
+import { recordRemoval } from "../../src/app/removal-trash.ts";
+import type { KeepAliveTab } from "../../src/app/types.ts";
 
 const NOW = 1_700_000_000_000;
 const MINUTE = 60_000;
@@ -239,21 +239,8 @@ test("Keep alive - keepAliveUrlFromInput: typed address normalized like a tab ur
   assert.equal(keepAliveUrlFromInput("http://"), "", "not an address");
 });
 
-test("Keep alive - trash: a removal is recorded newest last, kept until restored, capped at 50 actions", () => {
-  const first = recordKeepAliveRemoval([], [list[0]!], NOW - 400 * 24 * 60 * MINUTE);
-  const second = recordKeepAliveRemoval(first, [list[1]!, list[2]!], NOW);
-  assert.deepEqual(second, [...first, { at: NOW, marks: [list[1], list[2]] }], "a year-old action is still there");
-  assert.deepEqual(recordKeepAliveRemoval(first, [], NOW), first, "nothing removed: nothing recorded");
-  let many: KeepAliveRemoval[] = [];
-  for (let index = 0; index < 60; index += 1) {
-    many = recordKeepAliveRemoval(many, [{ ...list[0]!, url: `https://n${index}.example.com/` }], NOW + index);
-  }
-  assert.equal(many.length, 50);
-  assert.equal(many[0]?.at, NOW + 10, "oldest actions dropped first");
-});
-
 test("Keep alive - restoreKeepAliveRemoval: newest action back, re-armed from now, pages marked meanwhile skipped; undefined when nothing to restore", () => {
-  const trash = recordKeepAliveRemoval(recordKeepAliveRemoval([], [list[0]!], NOW - MINUTE), [list[1]!, list[2]!], NOW);
+  const trash = recordRemoval(recordRemoval<KeepAliveTab>([], [list[0]!], NOW - MINUTE), [list[1]!, list[2]!], NOW);
   const restored = restoreKeepAliveRemoval([list[1]!], trash, NOW, () => 0.5);
   assert.ok(restored);
   assert.deepEqual(
@@ -263,7 +250,7 @@ test("Keep alive - restoreKeepAliveRemoval: newest action back, re-armed from no
   );
   assert.deepEqual(
     restored.keepAliveTrash,
-    [{ at: NOW - MINUTE, marks: [list[0]] }],
+    [{ at: NOW - MINUTE, items: [list[0]] }],
     "only the newest action consumed",
   );
   const again = restoreKeepAliveRemoval(restored.keepAlive, restored.keepAliveTrash, NOW, () => 0.5);
