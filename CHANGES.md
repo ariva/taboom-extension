@@ -1,5 +1,15 @@
 # CHANGES
 
+## v1.0.4 — 2026-10-11
+
+### Summary
+Duplicate tab cleanup, quick-actions menu and per-mark keep-alive reload targets
+
+### New Features
+- Replace the side panel gear with a ☰ quick-actions menu (Open Settings, Cleanup Duplicates) that closes other popups (1b86e0f)
+- Add duplicate cleanup functionality and Dupes view to the quick launch window (2856259)
+- Keep-alive reloads one tab per mark (pinned first, else first found) with a per-mark Tabs dropdown for reloading all (1e34e55)
+
 ## v1.0.3 — 2026-10-10
 
 ### Summary
