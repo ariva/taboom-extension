@@ -56,6 +56,17 @@ Panel position (left or right) is a global Chrome setting: `chrome://settings/ap
 
 Keyboard: `/` focus search · `↑`/`↓` move selection · `Enter` activate · `Esc` clear search.
 
+### Duplicates (experimental)
+
+Enable **Settings → Show experimental features**. The quick launch (▦) then gains a **Dupes (N)** view whenever some page is open more than once — N counts pages, not tabs (hover the tab for the long name). Same page = same address without its `#fragment` (the query string counts). One row per page: title, `3 tabs · 2 windows`, a checkbox in front (all ticked when the view opens; hover a row for the per-window breakdown). Click a row to jump to the copy that would be kept. Above the rows, **All** ticks or unticks every page, and two buttons act on the ticked pages, each showing how many tabs it would close:
+
+- **There can be only one** — one copy of each page survives across all windows, the rest close.
+- **Cleanup each window** — one copy survives in every window; a window holding a single copy is untouched.
+
+Which copy survives, in order: a pinned one, a kept-alive page, the tab in front of you, the active tab of its window, an awake one over a snoozed one, the most recently used, otherwise the first found. Pinned copies are never closed, even when they are not the keeper. **New Tab** pages (`chrome://newtab`, `about:blank` and friends) form one row and always keep one per window, whichever button you press. The row's ⋯ menu runs either cleanup for that page alone.
+
+A confirmation lists how many tabs close and names any window that would close with them (its only tabs were duplicates). There is no undo inside Taboom; Chrome's `Ctrl+Shift+T` reopens closed tabs.
+
 Tab history works from any tab, no panel needed: `Ctrl+Shift+,` back · `Ctrl+Shift+.` forward (`Cmd` on Mac). Same trail as the panel's ◀ ▶ buttons and the History context menu. When the active tab changes outside the panel (these shortcuts, Ctrl+Tab, a click in the tab strip), the open panel scrolls just enough to show the new current row.
 
 ### Changing the key bindings

@@ -741,8 +741,9 @@ header input[type="checkbox"],
   transition: background var(--transition);
 }
 #windows-pop .win-close:hover { background: var(--badge-bg); }
-/* view switcher: Windows | Groups | Pins (only when there is something to switch to) */
-#windows-pop .win-views { display: flex; gap: 0.25rem; min-width: 0; }
+/* view switcher: Windows | Groups | Pins | Alive | Dupes (only when there is something
+   to switch to); wraps onto a second line in a narrow side panel instead of running past Close */
+#windows-pop .win-views { display: flex; flex: 1 1 auto; flex-wrap: wrap; gap: 0.25rem; min-width: 0; }
 #windows-pop .win-view {
   border: none;
   background: none;
@@ -775,6 +776,40 @@ header input[type="checkbox"],
 #windows-pop .win-row:hover { background: var(--badge-bg); }
 #windows-pop .win-row.current { font-weight: 700; color: var(--accent); }
 #windows-pop .win-row.win-new { color: var(--muted); }
+/* Duplicates view: tick-all + the two cleanups above the rows, a checkbox before each row.
+   One line: "All" left, buttons right. Too narrow: wrap-reverse puts the overflow line ABOVE,
+   so the buttons come first and "All" ends up on the last row; narrower still, the buttons
+   themselves go one per line */
+#windows-pop .dup-tools {
+  display: flex;
+  flex-wrap: wrap-reverse;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0 0.5rem 0.375rem;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 0.375rem;
+}
+#windows-pop .dup-tools label { display: flex; align-items: center; gap: 0.25rem; margin-right: auto; white-space: nowrap; }
+/* gap: rows close together when stacked, clear air between the two when side by side */
+#windows-pop .dup-actions { display: flex; flex: 1 1 auto; flex-wrap: wrap; gap: 0.375rem 0.5rem; min-width: 0; }
+/* filled like the pressed filter chips: they are the view's two actions, not labels */
+#windows-pop .dup-action {
+  flex: 0 1 auto; /* sized to the text plus room on both sides, not stretched */
+  border: 1px solid var(--border);
+  border-radius: var(--radius-s);
+  background: var(--badge-bg);
+  color: inherit;
+  padding: 0.25rem 0.75rem;
+  font: inherit;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition);
+}
+#windows-pop .dup-action:hover:not(:disabled) { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+#windows-pop .dup-action:disabled { background: none; color: var(--muted); cursor: default; }
+#windows-pop .win-check { flex: none; margin: 0 0 0 0.375rem; }
+#windows-pop .win-item.unticked .win-title { color: var(--muted); }
 /* Alive view: paused = greyed out (reloads off), not open = struck through (no tab) */
 #windows-pop .win-row.paused .win-title { color: var(--muted); }
 #windows-pop .win-row.missing .win-title { text-decoration: line-through; }

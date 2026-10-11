@@ -17,6 +17,7 @@ Taboom - Tabs Manager frees memory by snoozing (discarding) tabs you haven't use
 - **Side panel tab manager** — search across title/URL/hostname, filter by Awake / Snoozed / Protected, sort, and bulk snooze/protect/close.
 - **Automatic snooze** — periodically discards tabs inactive past a configurable threshold, skipping pinned, audible, active, and protected tabs.
 - **Site protection** — exclude sites (`mail.google.com`, `*.github.com`) or one exact page (`https://app.example.com/board`) from snoozing, also shielding them from Chrome's own Memory Saver.
+- **Duplicates cleanup** (experimental) — the quick launch lists every page open more than once; keep one copy across all windows or one per window, pinned copies and one New Tab per window always stay.
 - **Keep tabs alive** — some sites log you out after a few idle minutes, dashboards go stale once the tab sleeps; mark such pages and they reload on a timer (session renewed, data fresh) and are never auto-snoozed.
 - **Context menu and keyboard shortcuts** for quick per-tab actions; `Ctrl+Shift+,` / `Ctrl+Shift+.` step back / forward through the tab history from any tab.
 

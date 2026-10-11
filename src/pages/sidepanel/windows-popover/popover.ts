@@ -19,14 +19,16 @@ import { winListBtn, winPop } from "../foundation/elements.ts";
 import { appendWindowIdentityItems, openMarkMenu, openRowMenu, openTabGroupMenu } from "../menus/menus.ts";
 import { windowMaps } from "../model/index.ts";
 import { refresh } from "../foundation/scheduler.ts";
-import { keepAliveActive, pinActive, state, tabGroupsActive } from "../foundation/state.ts";
+import { duplicatesActive, keepAliveActive, pinActive, state, tabGroupsActive } from "../foundation/state.ts";
 import { orderedWindowIds, windowLabel } from "../ops/window-ops.ts";
 import { fillGroupRows, registerPopoverRefill, startRenameTabGroupInList } from "./groups.ts";
+import { duplicateSets } from "../../../app/duplicates.ts";
 import { keepAliveEntry } from "../../../app/keep-alive.ts";
 import { fillAliveRows } from "./alive.ts";
+import { fillDuplicateRows, openDuplicateMenuForKey, resetDuplicateSelection } from "./duplicates.ts";
 import { fillPinRows } from "./pins.ts";
 
-type WinPopView = "windows" | "groups" | "pins" | "alive";
+type WinPopView = "windows" | "groups" | "pins" | "alive" | "duplicates";
 let winPopView: WinPopView = "windows"; // reset on ▦ open
 
 // the Groups view sits below this module in the import graph — it refills through this
@@ -39,6 +41,7 @@ export function initWindowsPopover(): void {
   // top layer and would render underneath it).
   winListBtn.addEventListener("click", () => {
     winPopView = "windows"; // every open starts on the Windows list
+    resetDuplicateSelection(); // every open starts with every duplicate row ticked
     // fresh open: re-derive the size lock from the Windows list
     winPop.style.minWidth = "";
     winPop.style.minHeight = "";
@@ -91,6 +94,8 @@ export function initWindowsPopover(): void {
       if (mark) {
         openMarkMenu(event, mark);
       }
+    } else if (row.dataset.duplicateKey) {
+      openDuplicateMenuForKey(event, row.dataset.duplicateKey);
     } else if (row.dataset.windowId) {
       openWindowListMenu(event, Number(row.dataset.windowId));
     }
@@ -107,13 +112,15 @@ function fillWindowsPopover(): void {
   const groupList = tabGroupsActive() ? [...state.tabGroups.values()] : [];
   const pinnedTabs = state.allTabs.filter((tab) => tab.pinned);
   const aliveMarks = keepAliveActive() ? state.keepAlive : [];
-  // Pins and Alive views exist only while there is something to list; Groups shows
-  // even empty — its "+ New group…" row is where the first group gets created
+  const dupSets = duplicatesActive() ? duplicateSets(state.allTabs) : [];
+  // Pins, Alive and Duplicates views exist only while there is something to list; Groups
+  // shows even empty — its "+ New group…" row is where the first group gets created
   const views: [view: WinPopView, label: string][] = [
     ["windows", `Windows (${maps.indexes.size})`],
     ...(tabGroupsActive() ? [["groups", `Groups (${groupList.length})`] satisfies [WinPopView, string]] : []),
     ...(pinnedTabs.length > 0 ? [["pins", `Pins (${pinnedTabs.length})`] satisfies [WinPopView, string]] : []),
     ...(aliveMarks.length > 0 ? [["alive", `Alive (${aliveMarks.length})`] satisfies [WinPopView, string]] : []),
+    ...(dupSets.length > 0 ? [["duplicates", `Dupes (${dupSets.length})`] satisfies [WinPopView, string]] : []),
   ];
   if (!views.some(([view]) => view === winPopView)) {
     winPopView = "windows"; // the shown view's last member vanished under us
@@ -136,6 +143,9 @@ function fillWindowsPopover(): void {
       btn.type = "button";
       btn.className = view === winPopView ? "win-view on" : "win-view";
       btn.textContent = label;
+      if (view === "duplicates") {
+        btn.title = "Duplicates: pages open more than once"; // the short label earns a tooltip
+      }
       // no focus steal: a rename input must not blur (= commit) on the press, and
       // a refill mid-press would detach this button and swallow the click
       btn.addEventListener("mousedown", (event) => event.preventDefault());
@@ -169,6 +179,10 @@ function fillWindowsPopover(): void {
   }
   if (winPopView === "alive") {
     fillAliveRows(aliveMarks, state.allTabs, maps);
+    return;
+  }
+  if (winPopView === "duplicates") {
+    fillDuplicateRows(dupSets, fillWindowsPopover);
     return;
   }
 

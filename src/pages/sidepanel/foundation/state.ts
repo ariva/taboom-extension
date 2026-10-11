@@ -115,6 +115,11 @@ export function keepAliveActive(): boolean {
 }
 
 // window pinning rides the names feature but has its own kill switch
+// the Duplicates view of the quick launch
+export function duplicatesActive(): boolean {
+  return featureEnabled(state.features, "DUPLICATES");
+}
+
 export function pinActive(): boolean {
   return namesActive() && featureEnabled(state.features, "WINDOW_PIN");
 }

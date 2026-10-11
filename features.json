@@ -18,5 +18,6 @@
   "SEARCH_AUTO_SELECT_ALL": { "enabled": true },
   "OPTION_COLLAPSABLE_CHANGE_LOG_ITEMS": { "enabled": false },
   "FUZZY_SEARCH": { "enabled": false, "experimental": true },
-  "KEEP_ALIVE": { "enabled": true, "experimental": false }
+  "KEEP_ALIVE": { "enabled": true, "experimental": false },
+  "DUPLICATES": { "enabled": true, "experimental": false }
 }

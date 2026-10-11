@@ -59,9 +59,12 @@ export async function wake(tabIds: number[]): Promise<void> {
   refresh(true);
 }
 
-export async function closeTabs(tabIds: number[]): Promise<void> {
+// confirmMessage: a caller that knows the consequences (Duplicates view: windows that
+// close with their last tab) spells them out and is always asked, even for one tab
+export async function closeTabs(tabIds: number[], confirmMessage?: string): Promise<void> {
   // Native confirm for multi-close; upgrade to undo snackbar if it annoys
-  if (tabIds.length > 1 && !confirm(`Close ${tabIds.length} tabs?`)) {
+  const message = confirmMessage ?? (tabIds.length > 1 ? `Close ${tabIds.length} tabs?` : null);
+  if (message !== null && !confirm(message)) {
     return;
   }
   try {

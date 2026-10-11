@@ -7,6 +7,7 @@ import { loadPage, makeChrome, RAW_FEATURES, TEST_EXPERIMENTAL, TEST_FEATURES, t
 
 const AUTO_ALL_ON = TEST_FEATURES.SEARCH_AUTO_SELECT_ALL?.enabled === true;
 const KEEP_ALIVE_ON = TEST_FEATURES.KEEP_ALIVE?.enabled === true;
+const DUPLICATES_ON = TEST_FEATURES.DUPLICATES?.enabled === true;
 
 const NOW = Date.now();
 const tabs: NonNullable<ChromeMockOptions["tabs"]> = [
@@ -1854,4 +1855,119 @@ test("UI - Sidepanel - KEEP_ALIVE: row menu marks / unmarks the page, quick laun
   await tick();
   assert.ok(!qa(pop, ".win-view").some((el) => el.textContent.startsWith("Alive")), "view gone");
   assert.ok(!qa(rowOf(1), ".badge").some((el) => el.textContent === "kept alive"), "badge gone");
+});
+
+test("UI - Sidepanel - DUPLICATES: quick launch lists pages open twice, ticks drive the two cleanups, New Tab keeps one per window", {
+  skip: !DUPLICATES_ON,
+}, async () => {
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 200));
+  // earlier tests leave blank tabs behind (new-group flows create one): park them so the
+  // New Tab set below is exactly the four pushed here
+  const stray = tabs.filter((t) => /^(chrome:\/\/newtab|about:blank)/.test(t.url ?? ""));
+  for (const t of stray) {
+    tabs.splice(tabs.indexOf(t), 1);
+  }
+  const base = { active: false, discarded: false, pinned: false, audible: false, lastAccessed: NOW - 1000 };
+  const extra: typeof tabs = [
+    { ...base, id: 10, windowId: 1, index: 2, url: "https://github.com/pr/1#files", title: "My Pull Request" },
+    { ...base, id: 11, windowId: 2, index: 1, url: "https://github.com/pr/1", title: "My Pull Request" },
+    { ...base, id: 12, windowId: 1, index: 3, url: "chrome://newtab/", title: "New Tab" },
+    { ...base, id: 13, windowId: 1, index: 4, url: "chrome://newtab/", title: "New Tab" },
+    { ...base, id: 14, windowId: 2, index: 2, url: "about:blank", title: "" },
+    { ...base, id: 15, windowId: 2, index: 3, url: "chrome://newtab/", title: "New Tab" },
+  ];
+  tabs.push(...extra);
+  await chrome.tabs.onActivated.fire({});
+  await settle();
+
+  const winBtn = byId("win-list-btn");
+  winBtn.click();
+  await tick();
+  const pop = byId("windows-pop");
+  const view = must(qa(pop, ".win-view").find((el) => el.textContent.startsWith("Dupes")));
+  assert.equal(view.textContent, "Dupes (2)", "two pages open more than once; count = pages, not tabs");
+  assert.equal(view.title, "Duplicates: pages open more than once", "short label, full word in the tooltip");
+  view.click();
+  await tick();
+  const rows = () => qa(pop, ".win-item");
+  assert.equal(rows().length, 2);
+  assert.deepEqual(
+    rows().map((item) => [q(item, ".win-title").textContent, q(item, ".win-stats").textContent]),
+    [
+      ["My Pull Request", "3 tabs · 2 windows"],
+      ["New Tab", "4 tabs · 2 windows"],
+    ],
+  );
+  assert.ok(
+    rows().every((item) => q<HTMLInputElement>(item, ".win-check").checked),
+    "every row ticked on open",
+  );
+  const actions = () => qa<HTMLButtonElement>(pop, ".dup-action").map((el) => el.textContent);
+  // one: PR keeps tab 1 (active in the current window) → 10, 11 go; New Tab keeps one per
+  // window either way → 13, 15 go. per-window: PR window 1 keeps 1 → 10; window 2 has one copy
+  assert.deepEqual(actions(), ["There can be only one (4)", "Cleanup each window (3)"]);
+
+  // untick the PR row: counts follow, the All box turns indeterminate
+  const prCheck = q<HTMLInputElement>(rows()[0]!, ".win-check");
+  prCheck.checked = false;
+  prCheck.dispatchEvent(new window.Event("change", { bubbles: true }));
+  await tick();
+  assert.deepEqual(actions(), ["There can be only one (2)", "Cleanup each window (2)"]);
+  assert.equal(q<HTMLInputElement>(pop, ".dup-all").indeterminate, true);
+  assert.ok(rows()[0]!.classList.contains("unticked"));
+
+  // All off → nothing to do, buttons disabled; All on → everything back
+  const all = q<HTMLInputElement>(pop, ".dup-all");
+  all.checked = false;
+  all.dispatchEvent(new window.Event("change", { bubbles: true }));
+  await tick();
+  assert.ok(
+    qa<HTMLButtonElement>(pop, ".dup-action").every((el) => el.disabled),
+    "nothing ticked: disabled",
+  );
+  q<HTMLInputElement>(pop, ".dup-all").checked = true;
+  q<HTMLInputElement>(pop, ".dup-all").dispatchEvent(new window.Event("change", { bubbles: true }));
+  await tick();
+  assert.deepEqual(actions(), ["There can be only one (4)", "Cleanup each window (3)"]);
+
+  // row click goes to the copy that stays (tab 1, active in the current window)
+  calls.length = 0;
+  q(rows()[0]!, ".win-row").click();
+  await tick();
+  await tick();
+  assert.ok(
+    calls.some((c) => c.startsWith("tabs.update 1 ") && c.includes('"active":true')),
+    "keeper activated",
+  );
+
+  // the cleanup asks first (confirm is stubbed to true), then closes exactly the extras
+  winBtn.click();
+  await tick();
+  must(qa(pop, ".win-view").find((el) => el.textContent.startsWith("Dupes"))).click();
+  await tick();
+  const asked: string[] = [];
+  const realConfirm = globalThis.confirm;
+  globalThis.confirm = (message?: string) => {
+    asked.push(message ?? "");
+    return true;
+  };
+  calls.length = 0;
+  must(
+    qa<HTMLButtonElement>(pop, ".dup-action").find((el) => el.textContent.startsWith("There can be only one")),
+  ).click();
+  await tick();
+  await tick();
+  globalThis.confirm = realConfirm;
+  assert.equal(asked.length, 1);
+  assert.match(asked[0]!, /^Close 4 duplicate tabs\?\n/);
+  assert.match(asked[0]!, /Ctrl\+Shift\+T/);
+  assert.ok(!/will close/.test(asked[0]!), "no window loses its last tab here");
+  assert.ok(calls.includes("tabs.remove 10,11,13,15"), `extras closed, keepers stay: ${calls.join(" | ")}`);
+
+  // restore fixture
+  tabs.splice(tabs.indexOf(extra[0]!), extra.length);
+  tabs.push(...stray);
+  await chrome.tabs.onActivated.fire({});
+  await settle();
+  pop.hidePopover?.();
 });
