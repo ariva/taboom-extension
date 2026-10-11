@@ -1857,6 +1857,87 @@ test("UI - Sidepanel - KEEP_ALIVE: row menu marks / unmarks the page, quick laun
   assert.ok(!qa(rowOf(1), ".badge").some((el) => el.textContent === "kept alive"), "badge gone");
 });
 
+test("UI - Sidepanel - Quick actions (☰): Open Settings opens the options page; Cleanup Duplicates only with the flag", async () => {
+  const menu = byId("ctx-menu");
+  calls.length = 0;
+  byId("quick-actions-btn").click();
+  await tick();
+  const labels = qa(menu, ".ctx-item").map((el) => el.textContent);
+  assert.equal(labels[0], "Open Settings");
+  assert.equal(
+    labels.some((text) => text.startsWith("Cleanup Duplicates")),
+    DUPLICATES_ON,
+    "cleanup item iff flag on",
+  );
+  assert.ok(q(menu, ".ctx-item svg"), "items carry an icon");
+  assert.equal(q(menu, ".ctx-close").textContent, "Close", "text Close like the quick launch, not the corner X");
+
+  // one popup at a time: an open quick launch / history list is hidden when ☰ opens
+  document.body.click(); // close the menu
+  await tick();
+  // happy-dom lacks the popover API (earlier tests may have stubbed it per element):
+  // stub the two elements directly and record who was told to hide
+  const hiddenPopovers: string[] = [];
+  const popups = [byId("windows-pop"), byId("history-pop")] as unknown as (HTMLElement & {
+    hidePopover?: () => void;
+  })[];
+  const realHides = popups.map((el) => Object.getOwnPropertyDescriptor(el, "hidePopover"));
+  for (const el of popups) {
+    el.hidePopover = () => {
+      hiddenPopovers.push(el.id);
+    };
+  }
+  byId("quick-actions-btn").click();
+  await tick();
+  const restorePopups = () =>
+    popups.forEach((el, index) => {
+      const own = realHides[index];
+      if (own) {
+        Object.defineProperty(el, "hidePopover", own);
+      } else {
+        Reflect.deleteProperty(el, "hidePopover"); // back to the (absent) prototype method
+      }
+    });
+  restorePopups();
+  assert.deepEqual(hiddenPopovers, ["windows-pop", "history-pop"], "quick launch and history list told to hide");
+
+  // a right-click on a list row also closes the quick launch (its own rows keep theirs)
+  document.body.click();
+  await tick();
+  hiddenPopovers.length = 0;
+  const winPopEl = popups[0]!;
+  winPopEl.hidePopover = () => {
+    hiddenPopovers.push(winPopEl.id);
+  };
+  q(document, '.row[data-tab-id="1"]').dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+  await tick();
+  restorePopups();
+  assert.deepEqual(hiddenPopovers, ["windows-pop"], "quick launch told to hide on a list row menu");
+  assert.equal(menu.hidden, false, "row menu open");
+  document.body.click();
+  await tick();
+
+  byId("quick-actions-btn").click();
+  await tick();
+  must(qa(menu, ".ctx-item").find((el) => el.textContent === "Open Settings")).click();
+  await tick();
+  assert.ok(calls.includes("openOptionsPage"), "options page opened");
+  assert.equal(menu.hidden, true, "menu closed after the action");
+  if (DUPLICATES_ON) {
+    byId("quick-actions-btn").click();
+    await tick();
+    const cleanup = must(
+      qa<HTMLButtonElement>(menu, ".ctx-item").find((el) => el.textContent.startsWith("Cleanup Duplicates")),
+    );
+    assert.equal(cleanup.disabled, true, "nothing duplicated in the fixture: disabled");
+    assert.equal(cleanup.textContent, "Cleanup Duplicates", "no count while there is nothing to close");
+    byId("quick-actions-btn").click(); // toggle: a second click re-opens the fresh menu
+    await tick();
+    document.body.click();
+    await tick();
+  }
+});
+
 test("UI - Sidepanel - DUPLICATES: quick launch lists pages open twice, ticks drive the two cleanups, New Tab keeps one per window", {
   skip: !DUPLICATES_ON,
 }, async () => {
@@ -1963,6 +2044,29 @@ test("UI - Sidepanel - DUPLICATES: quick launch lists pages open twice, ticks dr
   assert.match(asked[0]!, /Ctrl\+Shift\+T/);
   assert.ok(!/will close/.test(asked[0]!), "no window loses its last tab here");
   assert.ok(calls.includes("tabs.remove 10,11,13,15"), `extras closed, keepers stay: ${calls.join(" | ")}`);
+
+  // the ☰ quick action runs the same "There can be only one" over every duplicated page
+  pop.hidePopover?.();
+  const menu = byId("ctx-menu");
+  byId("quick-actions-btn").click();
+  await tick();
+  const quick = must(
+    qa<HTMLButtonElement>(menu, ".ctx-item").find((el) => el.textContent.startsWith("Cleanup Duplicates")),
+  );
+  assert.equal(quick.textContent, "Cleanup Duplicates (4)", "count = tabs the cleanup closes");
+  assert.equal(quick.disabled, false);
+  asked.length = 0;
+  calls.length = 0;
+  globalThis.confirm = (message?: string) => {
+    asked.push(message ?? "");
+    return true;
+  };
+  quick.click();
+  await tick();
+  await tick();
+  globalThis.confirm = realConfirm;
+  assert.match(asked[0] ?? "", /^Close 4 duplicate tabs\?/);
+  assert.ok(calls.includes("tabs.remove 10,11,13,15"), `quick action closes the same extras: ${calls.join(" | ")}`);
 
   // restore fixture
   tabs.splice(tabs.indexOf(extra[0]!), extra.length);

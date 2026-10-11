@@ -2,7 +2,7 @@
 // an open menu when the list scrolls.
 import { closest } from "../../../lib/dom.ts";
 import { hideCtxMenu } from "../../../lib/ui/context-menu.ts";
-import { listEl } from "../foundation/elements.ts";
+import { listEl, winPop } from "../foundation/elements.ts";
 import { hideHoverTip } from "../render/hover-tip.ts";
 import { openRowMenu, openTabGroupMenu, openWindowHeaderMenu } from "./menus.ts";
 
@@ -19,6 +19,11 @@ export function initListContextMenu(): void {
     }
     event.preventDefault();
     hideHoverTip();
+    // one popup at a time: a list menu belongs to the list, not to an open quick launch
+    // (its own rows open their menus over it — popover.ts, untouched here)
+    try {
+      winPop.hidePopover?.();
+    } catch {} // already hidden
     if (tgHeader) {
       openTabGroupMenu(event, Number(tgHeader.dataset.tabGroupId));
     } else if (header?.dataset.windowId) {

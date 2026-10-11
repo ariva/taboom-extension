@@ -60,13 +60,13 @@ The worker is stateless across suspensions: everything is recoverable from stora
 | `foundation/` | `state.ts` (the `PanelState` singleton and state-derived predicates), `elements.ts` (static DOM references), `scheduler.ts` (render / refresh registry), `perf.ts` |
 | `model/` | pure view models — `index.ts` is the barrel over `derived.ts`, `search.ts`, `filters.ts`, `groups.ts`, `windows.ts`, `rows.ts`; plus `sort-direction.ts`, `window-order.ts`, `tab-hosts.ts` |
 | `render/` | `data.ts` (tabs, groups, stored state, window meta → `state`), `sorting.ts`, `render.ts`, `headers.ts`, `row.ts`, `hover-tip.ts` |
-| `ops/` | `actions.ts` (activate, snooze, wake, close, pin, protect domain / url, copy urls), `window-ops.ts`, `tab-group-ops.ts` |
-| `menus/` | `menus.ts` (row / window / tab-group menus), `list-context-menu.ts` |
+| `ops/` | `actions.ts` (activate, snooze, wake, close, pin, protect domain / url, copy urls), `window-ops.ts`, `tab-group-ops.ts`, `duplicate-ops.ts` (the confirmed duplicate cleanups, shared by the Dupes view and the ☰ menu) |
+| `menus/` | `menus.ts` (row / window / tab-group menus), `list-context-menu.ts`, `quick-actions-menu.ts` (titlebar ☰: Open Settings, Cleanup Duplicates) |
 | `windows-popover/` | `popover.ts` (shell + Windows view), `groups.ts` (Groups view, new group, drag reorder), `pins.ts`, `alive.ts` (keep-alive marks), `duplicates.ts` (Duplicates view: tick rows, two cleanups) |
 | `dnd/` | `tab-dnd.ts`, `drop-target.ts`, and the pure `dnd-model.ts` (`dropSpecFor`, `reorderedGroupTitles`) |
 | `history/` | `history-nav.ts` (back / forward buttons, history popover, long-press) |
 | `banners/` | `update-banner.ts`, `restore-banner.ts` |
-| `input/` | `list-events.ts`, `toolbar-events.ts`, `keyboard-nav.ts`, `global-keys.ts` (capture-phase Esc), `live-updates.ts` (chrome tab / storage events → debounced refresh) |
+| `input/` | `list-events.ts`, `toolbar-events.ts`, `quick-actions.ts` (☰ button; its own file because `menus.ts` imports `toolbar-events.ts`), `keyboard-nav.ts`, `global-keys.ts` (capture-phase Esc), `live-updates.ts` (chrome tab / storage events → debounced refresh) |
 
 Dependency direction: `foundation` ← `model` ← `ops` ← `menus` ← `windows-popover` / `dnd` / `input` ← `main.ts`.
 

@@ -272,6 +272,7 @@ main.compact .row.in-group { padding: 0.1875rem 0.5rem 0.1875rem 1.5625rem; }
 .icon-btn:disabled:hover { background: none; }
 
 .icon-btn svg, .row .actions button svg { width: 0.875rem; height: 0.875rem; display: block; }
+#quick-actions-btn svg { width: 1.125rem; height: 1.125rem; } /* three thin lines read small at 14 px */
 
 footer {
   display: flex;
@@ -528,6 +529,18 @@ header input[type="checkbox"],
   display: inline-flex;
 }
 #ctx-menu .ctx-close svg { width: 0.625rem; height: 0.625rem; }
+/* text variant (quick actions): the same bordered Close as the quick launch's head */
+#ctx-menu .ctx-close-text {
+  top: 0.25rem;
+  right: 0.25rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-s);
+  padding: 0.125rem 0.625rem;
+  font: inherit;
+  font-size: 0.75rem;
+  color: inherit;
+  transition: background var(--transition);
+}
 #ctx-menu .ctx-close:hover { background: var(--badge-bg); color: inherit; }
 
 #ctx-menu .ctx-divider { border-top: 1px solid var(--border); margin: 0.25rem 0; }
@@ -557,6 +570,14 @@ header input[type="checkbox"],
 /* --hover is near-invisible on card-bg — same stronger tone as #history-pop */
 #ctx-menu .ctx-item:hover,
 #ctx-menu .ctx-item:focus-visible { background: var(--badge-bg); }
+/* quick-actions items: icon + label on one line */
+#ctx-menu .ctx-icon-item { display: flex; align-items: center; gap: 0.625rem; padding: 0.4375rem 0.75rem; min-width: 17.5rem; } /* ~25 % wider than its text asks for */
+#ctx-menu .ctx-icon-item svg { width: 0.75rem; height: 0.75rem; flex: none; }
+/* air after the last action and along the right edge, like a small panel */
+#ctx-menu .ctx-icon-item { margin-right: 0.375rem; }
+#ctx-menu .ctx-icon-item:last-child { margin-bottom: 0.5rem; }
+#ctx-menu .ctx-item:disabled { opacity: 0.4; cursor: default; }
+#ctx-menu .ctx-item:disabled:hover { background: none; }
 /* color swatches: .win-dot sizes via flex parents elsewhere — a plain button
    is not one, so make the row flex and the dot bigger for a real target */
 #ctx-menu .ctx-item .win-dot {
@@ -736,7 +757,7 @@ header input[type="checkbox"],
   border-radius: var(--radius-s);
   background: none;
   padding: 0.125rem 0.625rem;
-  font-size: 0.85rem;
+  font-size: 0.75rem;
   cursor: pointer;
   transition: background var(--transition);
 }

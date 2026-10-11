@@ -14,7 +14,7 @@ ddPop.setAttribute("popover", "manual"); // top layer; own dismiss handling
 document.body.append(ddPop);
 let ddFor: HTMLSelectElement | null = null;
 
-function closeDropdown(): void {
+export function closeDropdown(): void {
   ddFor = null;
   ddPop.hidden = true;
   try {

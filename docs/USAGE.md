@@ -52,6 +52,7 @@ Panel position (left or right) is a global Chrome setting: `chrome://settings/ap
 - **Visual states** — each window's active tab has an accent left edge + bold title; snoozed tabs are dimmed with a ⏸ title prefix and `SNOOZED` badge.
 - **Hover actions** — ⏸ snooze, 🛡 protect/unprotect site, ✕ close.
 - **Checkboxes** — select several tabs, then bulk Snooze / Protect / Close from the bottom bar. Closing more than one tab asks for confirmation.
+- **Quick actions (☰)** — top-right menu (opening it closes any other popup: quick launch, history list, a dropdown): **Open Settings**, and with experimental features on **Cleanup Duplicates (N)**, which runs *There can be only one* over every duplicated page at once (N = tabs it would close; greyed out when nothing is duplicated; confirmed first).
 - **Select all** — checkbox left of the scope selector selects/unselects every tab currently shown (i.e. matching the active search and filter). Search first, select all, then bulk-act.
 
 Keyboard: `/` focus search · `↑`/`↓` move selection · `Enter` activate · `Esc` clear search.
@@ -63,7 +64,7 @@ Enable **Settings → Show experimental features**. The quick launch (▦) then 
 - **There can be only one** — one copy of each page survives across all windows, the rest close.
 - **Cleanup each window** — one copy survives in every window; a window holding a single copy is untouched.
 
-Which copy survives, in order: a pinned one, a kept-alive page, the tab in front of you, the active tab of its window, an awake one over a snoozed one, the most recently used, otherwise the first found. Pinned copies are never closed, even when they are not the keeper. **New Tab** pages (`chrome://newtab`, `about:blank` and friends) form one row and always keep one per window, whichever button you press. The row's ⋯ menu runs either cleanup for that page alone.
+Which copy survives, in order: a pinned one, a kept-alive page, the tab in front of you, the active tab of its window, an awake one over a snoozed one, the most recently used, otherwise the first found. Pinned copies are never closed, even when they are not the keeper. **New Tab** pages (`chrome://newtab`, `about:blank` and friends) form one row and always keep one per window, whichever button you press. The row's ⋯ menu runs either cleanup for that page alone. The titlebar's ☰ → **Cleanup Duplicates (N)** is the shortcut: *There can be only one* over every duplicated page, no view, no ticking.
 
 A confirmation lists how many tabs close and names any window that would close with them (its only tabs were duplicates). There is no undo inside Taboom; Chrome's `Ctrl+Shift+T` reopens closed tabs.
 
@@ -87,7 +88,7 @@ Every 5 minutes (configurable) the extension discards tabs that are **all** of:
 
 Additionally, each window keeps at least 2 awake tabs (configurable, 0 = no limit) — oldest eligible tabs are snoozed first, so a window never ends up fully discarded.
 
-Toggle and tune everything in **Settings** (⚙ in the side panel, or the extension's Options page).
+Toggle and tune everything in **Settings** (side panel ☰ → **Open Settings**, or the extension's Options page).
 
 ## Protecting sites
 

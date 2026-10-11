@@ -24,6 +24,7 @@ import { render as renderImpl } from "./render/render.ts";
 import { initListEvents } from "./input/list-events.ts";
 import { initBulkButtons } from "./input/toolbar-events.ts";
 import { initKeyboardNav } from "./input/keyboard-nav.ts";
+import { initQuickActions } from "./input/quick-actions.ts";
 import { initialDirFor } from "./render/sorting.ts";
 import "./input/live-updates.ts";
 // The feature modules register nothing when evaluated: each wires its listeners in an
@@ -74,6 +75,7 @@ initGlobalKeys();
 // wired here, at their original spot in the listener order (toolbar-events.ts, keyboard-nav.ts)
 initBulkButtons();
 initKeyboardNav();
+initQuickActions();
 
 // ---------- init ----------
 

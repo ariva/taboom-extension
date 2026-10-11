@@ -4,8 +4,6 @@
 // window" keeps one per window. Which copy survives is decided in app/duplicates.ts.
 import {
   type CleanupMode,
-  closingWindows,
-  type DuplicateSet,
   duplicateSets,
   duplicatesToClose,
   NEW_TAB_KEY,
@@ -13,11 +11,10 @@ import {
 } from "../../../app/duplicates.ts";
 import { clearCtxMenu, ctxAppend, ctxDivider, ctxItem, ctxTitle, showCtxMenu } from "../../../lib/ui/context-menu.ts";
 import { winPop } from "../foundation/elements.ts";
-import { type PanelTab, state } from "../foundation/state.ts";
-import { activate, closeTabs } from "../ops/actions.ts";
+import { state } from "../foundation/state.ts";
+import { activate } from "../ops/actions.ts";
+import { cleanupDuplicates as cleanup, type DupSet, keeperContext as context } from "../ops/duplicate-ops.ts";
 import { windowLabel } from "../ops/window-ops.ts";
-
-type DupSet = DuplicateSet<PanelTab>;
 
 // keys the user unticked; the popover shell clears it on every open
 const unticked = new Set<string>();
@@ -26,24 +23,7 @@ export function resetDuplicateSelection(): void {
   unticked.clear();
 }
 
-const context = () => ({ currentWindowId: state.currentWindowId, keepAlive: state.keepAlive });
-
 const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ? "" : "s"}`;
-
-async function cleanup(sets: DupSet[], mode: CleanupMode): Promise<void> {
-  const ids = sets.flatMap((set) => duplicatesToClose(set, mode, context()).map((tab) => tab.id));
-  if (ids.length === 0) {
-    return;
-  }
-  const message = [
-    `Close ${plural(ids.length, "duplicate tab")}?`,
-    ...closingWindows(state.allTabs, ids).map(
-      (windowId) => `${windowLabel(windowId)} will close — every tab in it is a duplicate.`,
-    ),
-    "Chrome's Ctrl+Shift+T reopens closed tabs.",
-  ].join("\n");
-  await closeTabs(ids, message);
-}
 
 function openDuplicateMenu(event: MouseEvent, set: DupSet): void {
   clearCtxMenu();

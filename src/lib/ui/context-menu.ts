@@ -129,14 +129,21 @@ export function ctxDivider(): HTMLDivElement {
   return divider;
 }
 
-export function showCtxMenu(event: MouseEvent): void {
-  // every menu build ends here — stamp an X in the top-right corner
+// `at`: the pointer event, or a plain {clientX, clientY} for a menu anchored to a button.
+// `closeLabel`: a text button ("Close") instead of the corner X — for menus that behave
+// like a small panel rather than a right-click menu
+export function showCtxMenu(at: Pick<MouseEvent, "clientX" | "clientY">, closeLabel?: string): void {
+  // every menu build ends here — stamp the close control in the top-right corner
   const close = document.createElement("button");
   close.type = "button";
-  close.className = "ctx-close";
+  close.className = closeLabel ? "ctx-close ctx-close-text" : "ctx-close";
   close.title = close.ariaLabel = "Close menu";
-  close.innerHTML =
-    '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg>';
+  if (closeLabel) {
+    close.textContent = closeLabel;
+  } else {
+    close.innerHTML =
+      '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg>';
+  }
   close.addEventListener("click", hideCtxMenu);
   ctxMenu.prepend(close);
   ctxMenu.hidden = false;
@@ -145,8 +152,8 @@ export function showCtxMenu(event: MouseEvent): void {
   } catch {
     // already open / no popover API (tests) — visible via hidden=false anyway
   }
-  ctxMenu.style.left = `${Math.max(0, Math.min(event.clientX, window.innerWidth - ctxMenu.offsetWidth - 4))}px`;
-  ctxMenu.style.top = `${Math.max(0, Math.min(event.clientY, window.innerHeight - ctxMenu.offsetHeight - 4))}px`;
+  ctxMenu.style.left = `${Math.max(0, Math.min(at.clientX, window.innerWidth - ctxMenu.offsetWidth - 4))}px`;
+  ctxMenu.style.top = `${Math.max(0, Math.min(at.clientY, window.innerHeight - ctxMenu.offsetHeight - 4))}px`;
 }
 
 // cursor wandering back up to the plain actions folds the Move-to dropdown

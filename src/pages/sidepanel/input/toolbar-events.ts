@@ -172,10 +172,6 @@ selectAllBox.addEventListener("change", () => {
   render(false);
 });
 
-getElementById("settings-btn").addEventListener("click", () => {
-  chrome.runtime.openOptionsPage();
-});
-
 // main.ts wires the buttons at boot, at their original spot in the listener order
 export function initBulkButtons(): void {
   getElementById("bulk-snooze").addEventListener("click", () => snooze([...state.selected]));
