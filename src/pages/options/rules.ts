@@ -31,11 +31,18 @@ export async function renderRules(state: AppState): Promise<void> {
 // the pattern is editable in place (click → input, lib/ui/inline-edit): blur / Enter
 // commit through makeRule, Escape cancels; the list re-renders either way so an
 // ignored value snaps back
+// what the pattern covers, for the chip's tooltip (the chip itself clips long patterns)
+const RULE_KIND: Record<ProtectionRule["type"], string> = {
+  host: "Exact host",
+  domain: "Domain and its subdomains",
+  url: "Exact page",
+};
+
 function ruleChip(rules: ProtectionRule[], rule: ProtectionRule): HTMLLIElement {
   const li = document.createElement("li");
   const span = document.createElement("span");
   span.textContent = rule.pattern;
-  span.title = "Click to edit";
+  span.title = `${RULE_KIND[rule.type]}: ${rule.pattern}\nClick to edit the pattern`;
   span.addEventListener("click", () => {
     // freeze the chip at its current width (0 in the DOM-less tests: skip) so the editor
     // fills the text's slot instead of resizing the chip; the re-render on finish drops it

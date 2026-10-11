@@ -68,6 +68,15 @@ test("UI - Options - Protected site chip: click the pattern to edit it in place;
   const chip = () => qa(document, "#rules li")[0]!;
   const key = (name: string) => new window.KeyboardEvent("keydown", { key: name, bubbles: true });
   assert.equal(chip().querySelector("input"), null, "pattern shown as text at first");
+  assert.equal(
+    q(chip(), "span").title,
+    "Domain and its subdomains: *.github.com\nClick to edit the pattern",
+    "tooltip names the kind and the full pattern, like a keep-alive row",
+  );
+  assert.equal(
+    q(qa(document, "#rules li")[1]!, "span").title,
+    "Exact host: mail.google.com\nClick to edit the pattern",
+  );
   q(chip(), "span").click();
   const input = q<HTMLInputElement>(chip(), "input.rename-input");
   assert.equal(input.value, "*.github.com");
