@@ -7,6 +7,7 @@ import {
   KEEP_ALIVE_MINUTES,
   keepAliveEntry,
   keepAliveKey,
+  keepAliveTargets,
   keepAliveUrlFromInput,
   markKeepAlive,
   matchesKeepAlive,
@@ -16,6 +17,7 @@ import {
   rearmKeepAlive,
   setKeepAliveMinutes,
   setKeepAlivePaused,
+  setKeepAliveReloadAll,
   setKeepAliveUrl,
   unmarkKeepAlive,
 } from "../../src/app/keep-alive.ts";
@@ -35,6 +37,37 @@ const list: KeepAliveTab[] = [
 test("Keep alive - Interval choices match the options dropdown, the default among them", () => {
   assert.deepEqual([...KEEP_ALIVE_MINUTES], [1, 5, 10, 15, 20, 25, 30, 45, 60, 90]);
   assert.ok((KEEP_ALIVE_MINUTES as readonly number[]).includes(DEFAULTS.settings.keepAliveMinutes));
+});
+
+test("Keep alive - Targets: one tab per mark (pinned first, else first in query order) unless reloadAll", () => {
+  const tabs = [
+    { id: 1, pinned: false, url: "https://dash.example.com/board#a" },
+    { id: 2, pinned: false, url: "https://other.example.com/" },
+    { id: 3, pinned: true, url: "https://dash.example.com/board" },
+    { id: 4, pinned: false, url: "https://dash.example.com/board#b" },
+    { id: undefined, pinned: true, url: "https://dash.example.com/board" },
+  ];
+  const mark = "https://dash.example.com/board";
+  assert.deepEqual(
+    keepAliveTargets(tabs, mark, false).map((tab) => tab.id),
+    [3],
+    "pinned match wins over an earlier one",
+  );
+  assert.deepEqual(
+    keepAliveTargets(
+      tabs.filter((tab) => !tab.pinned),
+      mark,
+      false,
+    ).map((tab) => tab.id),
+    [1],
+    "no pinned match: first in query order",
+  );
+  assert.deepEqual(
+    keepAliveTargets(tabs, mark, true).map((tab) => tab.id),
+    [1, 3, 4],
+    "reloadAll: every match, query order",
+  );
+  assert.equal(keepAliveTargets(tabs, "https://none.example.com/", false).length, 0);
 });
 
 test("Keep alive - Key strips the fragment; empty for unsupported or missing urls", () => {
@@ -157,6 +190,18 @@ test("Keep alive - rearmKeepAlive replaces one entry's next time, others untouch
   const next = rearmKeepAlive(list, "https://dash.example.com/board", NOW + 9);
   assert.equal(next[0]?.nextReload, NOW + 9);
   assert.equal(next[1], list[1], "untouched entry keeps its identity");
+});
+
+test("Keep alive - setKeepAliveReloadAll sets / drops the key; undefined when unchanged or unknown", () => {
+  const all = setKeepAliveReloadAll(list, "https://mail.example.com/", true);
+  assert.ok(all);
+  assert.equal(all[1]?.reloadAll, true);
+  assert.equal(all[0], list[0], "other entries untouched");
+  const back = setKeepAliveReloadAll(all, "https://mail.example.com/", false);
+  assert.ok(back);
+  assert.ok(!("reloadAll" in (back[1] ?? {})), "default = key absent");
+  assert.equal(setKeepAliveReloadAll(list, "https://mail.example.com/", false), undefined, "same value = no write");
+  assert.equal(setKeepAliveReloadAll(list, "https://nope.example.com/", true), undefined, "unknown url = no write");
 });
 
 test("Keep alive - setKeepAliveMinutes changes the interval and re-arms from now; undefined when unchanged or unknown", () => {

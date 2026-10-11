@@ -10,6 +10,7 @@ import {
   markKeepAlive,
   nextReloadAt,
   setKeepAliveMinutes,
+  setKeepAliveReloadAll,
   setKeepAliveUrl,
 } from "../../app/keep-alive.ts";
 import {
@@ -32,6 +33,11 @@ function option(value: number): HTMLOptionElement {
   return element;
 }
 
+const TAB_CHOICES = [
+  ["one", "One tab"],
+  ["all", "All tabs"],
+] as const;
+
 function minuteOptions(select: HTMLSelectElement): void {
   for (const minutes of KEEP_ALIVE_MINUTES) {
     select.append(option(minutes));
@@ -53,7 +59,7 @@ export async function renderKeepAlive(state: AppState): Promise<void> {
   if (keepAlive.length === 0) {
     const cell = document.createElement("td");
     cell.className = "muted";
-    cell.colSpan = 6;
+    cell.colSpan = 7;
     cell.textContent = "No tabs marked yet.";
     const empty = document.createElement("tr");
     empty.append(cell);
@@ -146,6 +152,21 @@ function keepAliveRow(list: KeepAliveTab[], entry: KeepAliveTab, number: number)
     save(setKeepAliveMinutes(list, entry.url, minutes, nextReloadAt(minutes, Date.now())));
   });
 
+  // which open tabs the reload hits: one (pinned first, else the first found) or all
+  const tabsSelect = document.createElement("select");
+  for (const [value, label] of TAB_CHOICES) {
+    const choice = document.createElement("option"); // not `new Option()`: happy-dom lacks the constructor
+    choice.value = value;
+    choice.textContent = label;
+    tabsSelect.append(choice);
+  }
+  tabsSelect.value = entry.reloadAll ? "all" : "one";
+  tabsSelect.title =
+    "One tab: the pinned one, else the first found across windows. All tabs: every open tab on this page";
+  tabsSelect.addEventListener("change", () => {
+    save(setKeepAliveReloadAll(list, entry.url, tabsSelect.value === "all"));
+  });
+
   const countdown = document.createElement("span");
   countdown.className = "countdown";
   countdown.dataset.nextReload = entry.paused ? "" : String(entry.nextReload);
@@ -161,7 +182,15 @@ function keepAliveRow(list: KeepAliveTab[], entry: KeepAliveTab, number: number)
   });
 
   const row = document.createElement("tr");
-  row.append(cell(String(number)), cell(running), pageCell(list, entry), cell(select), cell(countdown), cell(remove));
+  row.append(
+    cell(String(number)),
+    cell(running),
+    pageCell(list, entry),
+    cell(select),
+    cell(tabsSelect),
+    cell(countdown),
+    cell(remove),
+  );
   return row;
 }
 

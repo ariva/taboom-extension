@@ -727,6 +727,60 @@ test("Service Worker - Keep alive: a mark typed with a fragment reloads that exa
   tab.url = original;
 });
 
+test("Service Worker - Keep alive: one tab per mark — the pinned one, else the first found; reloadAll marks hit every tab", {
+  skip: !KEEP_ALIVE_ON,
+}, async () => {
+  // a second window with the same page open twice, one of them pinned
+  const extra: typeof tabs = [
+    { ...tabs[1], id: 20, windowId: 2, pinned: false, title: "Old A (window 2)" },
+    { ...tabs[1], id: 21, windowId: 2, pinned: true, title: "Old A (pinned)" },
+  ];
+  tabs.push(...extra);
+  stored.keepAlive = [{ url: "https://old.example.com/a", title: "stale", minutes: 25, nextReload: 0 }];
+  calls.length = 0;
+  await chrome.alarms.onAlarm.fire({ name: "keep-alive" });
+  await tick();
+  await tick();
+  await tick();
+  assert.deepEqual(
+    calls.filter((c) => c.startsWith("tabs.reload")),
+    ["tabs.reload 21"],
+    "pinned tab only",
+  );
+  assert.equal(stored.keepAlive[0]?.title, "Old A (pinned)", "title from the reloaded tab");
+
+  const pinned = tabs.find((t) => t.id === 21);
+  assert.ok(pinned);
+  pinned.pinned = false;
+  stored.keepAlive = [{ url: "https://old.example.com/a", title: "stale", minutes: 25, nextReload: 0 }];
+  calls.length = 0;
+  await chrome.alarms.onAlarm.fire({ name: "keep-alive" });
+  await tick();
+  await tick();
+  await tick();
+  assert.deepEqual(
+    calls.filter((c) => c.startsWith("tabs.reload")),
+    ["tabs.reload 2"],
+    "no pinned: first in query order",
+  );
+
+  stored.keepAlive = [
+    { url: "https://old.example.com/a", title: "stale", minutes: 25, nextReload: 0, reloadAll: true },
+  ];
+  calls.length = 0;
+  await chrome.alarms.onAlarm.fire({ name: "keep-alive" });
+  await tick();
+  await tick();
+  await tick();
+  assert.deepEqual(
+    calls.filter((c) => c.startsWith("tabs.reload")),
+    ["tabs.reload 2", "tabs.reload 20", "tabs.reload 21"],
+    "reload all: every match",
+  );
+  tabs.splice(tabs.indexOf(extra[0] as (typeof tabs)[number]), 2);
+  stored.keepAlive = [];
+});
+
 test("Service Worker - Keep alive: sweep does nothing while the setting is off", { skip: !KEEP_ALIVE_ON }, async () => {
   stored.keepAlive = [{ url: "https://old.example.com/a", title: "Old A", minutes: 25, nextReload: 0 }];
   stored.settings.keepAliveEnabled = false;

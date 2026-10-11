@@ -80,6 +80,23 @@ export function unmarkKeepAlive(list: KeepAliveTab[], urls: (string | undefined)
   return dropped.size === 0 ? undefined : list.filter((entry) => !dropped.has(entry));
 }
 
+// The tabs a due mark reloads. One per mark by default — a page open twice shares one
+// session, and reloading both doubles the traffic and the "Leave site?" prompts: the
+// pinned one (the user's "keep this" tab), else the first in tabs.query order (window
+// order, then tab index). A mark set to reloadAll (its Tabs dropdown) hits every match.
+export function keepAliveTargets<T extends { id?: number; pinned?: boolean; url?: string }>(
+  tabs: T[],
+  markUrl: string,
+  reloadAll: boolean,
+): T[] {
+  const matches = tabs.filter((tab) => tab.id !== undefined && matchesKeepAlive(markUrl, tab.url));
+  if (reloadAll) {
+    return matches;
+  }
+  const first = matches.find((tab) => tab.pinned) ?? matches[0];
+  return first ? [first] : [];
+}
+
 export function dueKeepAlive(list: KeepAliveTab[], now: number): KeepAliveTab[] {
   return list.filter((entry) => !entry.paused && entry.nextReload <= now);
 }
@@ -102,6 +119,21 @@ export function setKeepAliveMinutes(
     return undefined;
   }
   return list.map((candidate) => (candidate === entry ? { ...entry, minutes, nextReload } : candidate));
+}
+
+// the row's Tabs dropdown; the key is absent for the default so stored marks stay minimal
+export function setKeepAliveReloadAll(
+  list: KeepAliveTab[],
+  url: string,
+  reloadAll: boolean,
+): KeepAliveTab[] | undefined {
+  const entry = list.find((candidate) => candidate.url === url);
+  if (!entry || (entry.reloadAll ?? false) === reloadAll) {
+    return undefined;
+  }
+  const { reloadAll: _previous, ...one } = entry;
+  const next = reloadAll ? { ...entry, reloadAll: true } : one;
+  return list.map((candidate) => (candidate === entry ? next : candidate));
 }
 
 // options url edit (click the address): the mark is re-keyed, title / interval / timer

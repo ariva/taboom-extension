@@ -627,7 +627,6 @@ test("UI - Options - Keep-alive card visible iff KEEP_ALIVE resolves on; enabled
     ["1", "5", "10", "15", "20", "25", "30", "45", "60", "90"],
   );
   assert.equal(minutes.value, "20", "default interval");
-
   calls.length = 0;
   box.checked = false;
   box.dispatchEvent(new window.Event("change", { bubbles: true }));
@@ -669,7 +668,7 @@ test("UI - Options - Keep-alive table: per-row pause, interval, countdown and re
   const now = Date.now();
   stored.keepAlive = [
     { url: "https://dash.example.com/board", title: "Board", minutes: 25, nextReload: now + 5 * 60_000 + 500 },
-    { url: "https://mail.example.com/", title: "Mail", minutes: 5, paused: true, nextReload: 1 },
+    { url: "https://mail.example.com/", title: "Mail", minutes: 5, paused: true, nextReload: 1, reloadAll: true },
   ];
   await chrome.storage.onChanged.fire({ keepAlive: {} }, "local");
   await tick();
@@ -677,7 +676,25 @@ test("UI - Options - Keep-alive table: per-row pause, interval, countdown and re
   const rows = qa(byId("keep-alive-rows"), "tr");
   assert.equal(rows.length, 2);
   const cells = qa(rows[0]!, "td");
-  assert.equal(cells.length, 6, "number, enable, page, interval, next reload, remove");
+  assert.equal(cells.length, 7, "number, enable, page, interval, tabs, next reload, remove");
+  const tabsOf = (row: Element) => qa<HTMLSelectElement>(row, "select")[1]!;
+  assert.equal(tabsOf(rows[0]!).value, "one", "default: one tab per reload");
+  assert.equal(tabsOf(rows[1]!).value, "all", "reloadAll mark shows All tabs");
+  assert.deepEqual(
+    qa<HTMLOptionElement>(tabsOf(rows[0]!), "option").map((option) => option.textContent),
+    ["One tab", "All tabs"],
+  );
+  tabsOf(rows[0]!).value = "all";
+  tabsOf(rows[0]!).dispatchEvent(new window.Event("change", { bubbles: true }));
+  await tick();
+  await tick();
+  assert.equal(stored.keepAlive[0]?.reloadAll, true, "All tabs written on the mark");
+  const mailTabs = tabsOf(qa(byId("keep-alive-rows"), "tr")[1]!);
+  mailTabs.value = "one";
+  mailTabs.dispatchEvent(new window.Event("change", { bubbles: true }));
+  await tick();
+  await tick();
+  assert.ok(!("reloadAll" in (stored.keepAlive[1] ?? {})), "One tab = key absent");
   assert.deepEqual(
     rows.map((row) => q(row, "td").textContent),
     ["1", "2"],

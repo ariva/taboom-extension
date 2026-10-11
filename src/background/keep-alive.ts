@@ -6,8 +6,8 @@ import {
   dueKeepAlive,
   isKeptAlive,
   keepAliveKey,
+  keepAliveTargets,
   markKeepAlive,
-  matchesKeepAlive,
   nextReloadAt,
   rearmAllKeepAlive,
   rearmKeepAlive,
@@ -65,17 +65,15 @@ export async function keepAlivePass(): Promise<void> {
   const tabs = await chrome.tabs.query({});
   let next = list;
   for (const entry of due) {
-    // every tab on the page reloads; a mark whose page is closed stays armed
-    // (and quiet) until the user removes it in Options
-    const targets = tabs.flatMap((tab) =>
-      tab.id !== undefined && matchesKeepAlive(entry.url, tab.url) ? [{ id: tab.id, title: tab.title }] : [],
-    );
+    // a mark whose page is closed stays armed (and quiet) until the user removes it in Options
+    const targets = keepAliveTargets(tabs, entry.url, entry.reloadAll ?? false);
     await Promise.allSettled(
       targets.map((tab) =>
-        chrome.tabs.reload(tab.id).catch((error) => console.debug("keep-alive reload failed", tab.id, error)),
+        // id checked by keepAliveTargets; ?? keeps the type honest without a cast
+        chrome.tabs.reload(tab.id ?? -1).catch((error) => console.debug("keep-alive reload failed", tab.id, error)),
       ),
     );
-    // the first open tab names the mark from now on (Settings table, Alive view)
+    // the reloaded tab names the mark from now on (Settings table, Alive view)
     next = rearmKeepAlive(next, entry.url, nextReloadAt(entry.minutes, now), targets[0]?.title);
   }
   await localStore.set({ keepAlive: next });

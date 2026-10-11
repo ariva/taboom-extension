@@ -22,6 +22,7 @@ export interface KeepAliveTab {
   title: string;
   minutes: number; // settings.keepAliveMinutes as it was when marked; editable per mark
   paused?: boolean; // absent = reloads run; the mark stays listed either way
+  reloadAll?: boolean; // absent = one tab per reload (pinned first, else first found); true = every open tab on the page
   nextReload: number; // ms timestamp the sweep compares against
 }
 
