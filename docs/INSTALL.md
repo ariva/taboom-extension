@@ -68,7 +68,7 @@ Chrome may refuse the suggested key if another extension already claims it — a
 ## Packing a zip (optional)
 
 ```bash
-just build    # release checks + dist/taboom-tabs-manager.zip (readable, unminified — the store upload)
+just build    # release checks + dist/taboom-tabs-manager-v<version>.zip (readable, unminified — the store upload)
 ```
 
 Needs, on top of the requirements above: [`jq`](https://jqlang.github.io/jq/), `zip`, `unzip`, `git`, and Playwright's Chromium (`npx playwright install chromium`). What the release checks are, every other build command, and the optional minified build are described in [BUILD.md](BUILD.md).

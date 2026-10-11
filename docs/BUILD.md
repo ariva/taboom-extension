@@ -14,8 +14,8 @@ Every command goes through [`just`](https://github.com/casey/just) — run `just
 | `just test`, `just test-enabled`, `just test-experimental`, `just test-disabled`, `just test-watch` | The unit + UI tier, whole or one flag scenario, or re-running on save. | See [TESTING.md](TESTING.md). |
 | `just test-browser` | Real-browser tier (headless Chromium). | Anything about focus, clicks, popovers, dialogs, drag & drop. |
 | `just test-e2e` | Builds `dist/prod`, then runs the Playwright tests against the real extension. | Anything that depends on what Chrome really does. |
-| `just build` | The release: every check below, then `dist/taboom-tabs-manager.zip`. | Producing the store upload. |
-| `just build minify=true` | Same release gate, minified output: `dist/taboom-tabs-manager-min.zip`. | Only if you want the smaller zip — see [Minified build](#minified-build). |
+| `just build` | The release: every check below, then `dist/taboom-tabs-manager-v<version>.zip` (version from `package.json`). | Producing the store upload. |
+| `just build minify=true` | Same release gate, minified output: `dist/taboom-tabs-manager-v<version>-min.zip`. | Only if you want the smaller zip — see [Minified build](#minified-build). |
 | `just lint`, `just typecheck`, `just format` | The pieces of `check` on their own; `format` applies Biome's formatting and safe fixes. | |
 | `just clean` | Removes `dist/`. | |
 
@@ -57,7 +57,7 @@ Type errors appear in the same terminal but never block the rebuild — Vite onl
 2. `scripts/validate_hashes.sh` — every commit hash mentioned in `CHANGES.md` exists in git history.
 3. `scripts/validate_code.sh` — `just check`.
 4. `just test-browser`.
-5. `scripts/pack.sh` — production build into `dist/prod`, zipped to `dist/taboom-tabs-manager.zip`.
+5. `scripts/pack.sh` — production build into `dist/prod`, zipped to `dist/taboom-tabs-manager-v<version>.zip`.
 6. `npx playwright test` — the e2e tests, against the `dist/prod` that was just packed.
 
 Inside step 3, the test suite also pins what ships: the zip's file list and manifest, no dev or tooling files, no dev-loop or network code, no source maps.
@@ -70,7 +70,7 @@ To cut a release: bump `version` in `package.json`, write the `CHANGES.md` entry
 just build minify=true     # or: just build true
 ```
 
-Same gate, same checks, but Vite minifies JavaScript and CSS and the zip is named `dist/taboom-tabs-manager-min.zip`. Without the gate: `MINIFY=1 scripts/pack.sh`. The default build — and the store upload — stays unminified.
+Same gate, same checks, but Vite minifies JavaScript and CSS and the zip is named `dist/taboom-tabs-manager-v<version>-min.zip`. Without the gate: `MINIFY=1 scripts/pack.sh`. The default build — and the store upload — stays unminified.
 
 What minifying changes (measured at v1.0.0):
 
@@ -79,7 +79,7 @@ What minifying changes (measured at v1.0.0):
 | `sidepanel/index.js` | 95,578 bytes, 2,704 lines | 54,270 bytes, 3 lines |
 | `background/service-worker.js` | 22,991 bytes | 12,568 bytes |
 | `assets/sidepanel.css` | 24,094 bytes | 15,709 bytes |
-| whole zip | 65,049 bytes | 51,218 bytes (`taboom-tabs-manager-min.zip`) |
+| whole zip | 65,049 bytes | 51,218 bytes (`taboom-tabs-manager-v<version>-min.zip`) |
 
 What it does not change is speed. Side panel start-up in real Chromium with 40 open tabs, from navigation to the first tab row on screen, 50 runs per build after warm-up:
 
