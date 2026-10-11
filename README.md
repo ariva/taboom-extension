@@ -50,6 +50,7 @@ Side panel:
 
 <p>
   <img src="docs/assets/sidemenu_quicklaunch.png" alt="Side panel - Quick Launch" width="360">
+  <img src="docs/assets/quick_actions.png" alt="Side panel - Quick actions menu" width="360">
   <img src="docs/assets/sidemenu.png" alt="Side panel" width="360">
 </p>
 
