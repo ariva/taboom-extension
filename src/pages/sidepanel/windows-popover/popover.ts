@@ -40,7 +40,7 @@ export function initWindowsPopover(): void {
   // opens the window menu (popover closes first: the ctx menu is not in the
   // top layer and would render underneath it).
   winListBtn.addEventListener("click", () => {
-    winPopView = "windows"; // every open starts on the Windows list
+    winPopView = "windows"; // every open starts on the first view (Windows while there are 2+)
     resetDuplicateSelection(); // every open starts with every duplicate row ticked
     // fresh open: re-derive the size lock from the Windows list
     winPop.style.minWidth = "";
@@ -102,38 +102,60 @@ export function initWindowsPopover(): void {
   });
 }
 
+// the popover's contents and the views they earn: a view exists only while it has
+// something to switch between or act on — Windows with a second window, Groups with a
+// group (the first one comes from the row menu's "Move to group ▸ New group…"), the rest
+// with a member. Empty = nothing to launch (the ▦ button is disabled then).
+function quickLaunchViews() {
+  const maps = windowMaps(state.allTabs, state.currentWindowId, state.windowMeta);
+  const groupList = tabGroupsActive() ? [...state.tabGroups.values()] : [];
+  const pinnedTabs = state.allTabs.filter((tab) => tab.pinned);
+  const aliveMarks = keepAliveActive() ? state.keepAlive : [];
+  const dupSets = duplicatesActive() ? duplicateSets(state.allTabs) : [];
+  const windowsView: [WinPopView, string] = ["windows", `Windows (${maps.indexes.size})`];
+  const views: [view: WinPopView, label: string][] = [
+    ...(maps.indexes.size > 1 ? [windowsView] : []),
+    ...(groupList.length > 0 ? [["groups", `Groups (${groupList.length})`] satisfies [WinPopView, string]] : []),
+    ...(pinnedTabs.length > 0 ? [["pins", `Pins (${pinnedTabs.length})`] satisfies [WinPopView, string]] : []),
+    ...(aliveMarks.length > 0 ? [["alive", `Alive (${aliveMarks.length})`] satisfies [WinPopView, string]] : []),
+    ...(dupSets.length > 0 ? [["duplicates", `Dupes (${dupSets.length})`] satisfies [WinPopView, string]] : []),
+  ];
+  return { maps, groupList, pinnedTabs, aliveMarks, dupSets, windowsView, views };
+}
+
+// every render: the ▦ button is live only while the popover would have a view to show
+export function syncQuickLaunchButton(): void {
+  const empty = quickLaunchViews().views.length === 0;
+  winListBtn.disabled = empty;
+  winListBtn.title = empty
+    ? "Nothing to list: one window, no groups, pinned tabs, kept-alive or duplicated pages"
+    : "Windows list";
+}
+
 function fillWindowsPopover(): void {
   // anchored under the titlebar, right-aligned with the buttons
   const anchor = winListBtn.getBoundingClientRect();
   winPop.style.top = `${anchor.bottom + 4}px`;
   winPop.style.right = "0.5rem";
   winPop.style.left = "auto";
-  const maps = windowMaps(state.allTabs, state.currentWindowId, state.windowMeta);
-  const groupList = tabGroupsActive() ? [...state.tabGroups.values()] : [];
-  const pinnedTabs = state.allTabs.filter((tab) => tab.pinned);
-  const aliveMarks = keepAliveActive() ? state.keepAlive : [];
-  const dupSets = duplicatesActive() ? duplicateSets(state.allTabs) : [];
-  // Pins, Alive and Duplicates views exist only while there is something to list; Groups
-  // shows even empty — its "+ New group…" row is where the first group gets created
-  const views: [view: WinPopView, label: string][] = [
-    ["windows", `Windows (${maps.indexes.size})`],
-    ...(tabGroupsActive() ? [["groups", `Groups (${groupList.length})`] satisfies [WinPopView, string]] : []),
-    ...(pinnedTabs.length > 0 ? [["pins", `Pins (${pinnedTabs.length})`] satisfies [WinPopView, string]] : []),
-    ...(aliveMarks.length > 0 ? [["alive", `Alive (${aliveMarks.length})`] satisfies [WinPopView, string]] : []),
-    ...(dupSets.length > 0 ? [["duplicates", `Dupes (${dupSets.length})`] satisfies [WinPopView, string]] : []),
-  ];
+  const { maps, groupList, pinnedTabs, aliveMarks, dupSets, windowsView, views } = quickLaunchViews();
+  // an open popover whose last member just vanished still shows something: the Windows list
+  const [firstView = windowsView] = views;
+  if (views.length === 0) {
+    views.push(windowsView);
+  }
   if (!views.some(([view]) => view === winPopView)) {
-    winPopView = "windows"; // the shown view's last member vanished under us
+    winPopView = firstView[0]; // fresh open, or the shown view's last member vanished under us
   }
   winPop.textContent = "";
 
   const head = document.createElement("div");
   head.className = "win-head";
   if (views.length === 1) {
-    // only Windows: a plain heading, nothing to switch to
+    // one view: a plain heading, nothing to switch to
     const heading = document.createElement("span");
     heading.className = "muted";
-    heading.textContent = views[0]![1]; // views always starts with the Windows entry
+    heading.textContent = firstView[1];
     head.append(heading);
   } else {
     const bar = document.createElement("span");

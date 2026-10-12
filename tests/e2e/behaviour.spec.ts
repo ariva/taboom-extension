@@ -110,21 +110,30 @@ test("moving a pinned tab to a new window from the row menu keeps it pinned", as
 });
 
 test("quick launch creates a real, named tab group and lists it", async ({ context, extensionId, serviceWorker }) => {
+  // the Groups view exists only once a group does — seed the first one outside the UI
+  await serviceWorker.evaluate(async () => {
+    const [tab] = await chrome.tabs.query({});
+    const groupId = await chrome.tabs.group({ tabIds: [tab?.id ?? -1] });
+    await chrome.tabGroups.update(groupId, { title: "first" });
+  });
   const panel = await openPanel(context, extensionId);
   await panel.locator("#win-list-btn").click();
-  await panel.locator("#windows-pop .win-view", { hasText: "Groups" }).click();
+  // one window, one group: Groups is the only view, so it is a heading and already open
+  await expect(panel.locator("#windows-pop .win-head .muted")).toHaveText("Groups (1)");
   await panel.locator("#windows-pop .win-row.win-new").click();
   await panel.locator("#windows-pop .rename-input").fill("reading");
   await panel.keyboard.press("Enter");
 
   await expect
-    .poll(() => serviceWorker.evaluate(async () => (await chrome.tabGroups.query({})).map((group) => group.title)))
-    .toEqual(["reading"]);
+    .poll(() =>
+      serviceWorker.evaluate(async () => (await chrome.tabGroups.query({})).map((group) => group.title).sort()),
+    )
+    .toEqual(["first", "reading"]);
   // the mock never adds a created group to its list — only real Chrome can show this row
-  await expect(panel.locator("#windows-pop .win-row[data-tab-group-id] .win-title")).toHaveText(["reading"]);
+  await expect(panel.locator("#windows-pop .win-row[data-tab-group-id] .win-title")).toContainText(["reading"]);
   await expect(panel.locator("#windows-pop")).toBeVisible(); // stays open after the commit
   const grouped = await serviceWorker.evaluate(async () => {
-    const [group] = await chrome.tabGroups.query({});
+    const [group] = await chrome.tabGroups.query({ title: "reading" });
     return (await chrome.tabs.query({ groupId: group?.id })).length;
   });
   expect(grouped).toBe(1); // exactly the fresh New Tab — no existing tab was pulled in

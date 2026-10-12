@@ -62,7 +62,7 @@ The worker is stateless across suspensions: everything is recoverable from stora
 | `render/` | `data.ts` (tabs, groups, stored state, window meta → `state`), `sorting.ts`, `render.ts`, `headers.ts`, `row.ts`, `hover-tip.ts` |
 | `ops/` | `actions.ts` (activate, snooze, wake, close, pin, protect domain / url, copy urls), `window-ops.ts`, `tab-group-ops.ts`, `duplicate-ops.ts` (the confirmed duplicate cleanups, shared by the Dupes view and the ☰ menu) |
 | `menus/` | `menus.ts` (row / window / tab-group menus), `list-context-menu.ts`, `quick-actions-menu.ts` (titlebar ☰: Open Settings, Cleanup Duplicates) |
-| `windows-popover/` | `popover.ts` (shell + Windows view), `groups.ts` (Groups view, new group, drag reorder), `pins.ts`, `alive.ts` (keep-alive marks), `duplicates.ts` (Duplicates view: tick rows, two cleanups) |
+| `windows-popover/` | `popover.ts` (shell + Windows view; a view is offered only while it has something — Windows needs 2+ windows, Groups 1+ group, the rest 1+ member — else the popover opens on the first one left; no view at all = `syncQuickLaunchButton` disables ▦ on every render), `groups.ts` (Groups view, new group, drag reorder), `pins.ts`, `alive.ts` (keep-alive marks), `duplicates.ts` (Duplicates view: tick rows, two cleanups) |
 | `dnd/` | `tab-dnd.ts`, `drop-target.ts`, and the pure `dnd-model.ts` (`dropSpecFor`, `reorderedGroupTitles`) |
 | `history/` | `history-nav.ts` (back / forward buttons, history popover, long-press) |
 | `banners/` | `update-banner.ts`, `restore-banner.ts` |

@@ -1237,7 +1237,7 @@ test("UI - Sidepanel - WINDOW_NAMES: named headers, custom dots, overview list, 
   assert.ok(header2.querySelector(".group-menu-btn"), "⋯ window-actions button present");
 
   // windows popover (S2): button visible, rows with stats; click focuses
-  const winBtn = byId("win-list-btn");
+  const winBtn = byId<HTMLButtonElement>("win-list-btn");
   assert.equal(winBtn.hidden, false, "windows-list button visible with the flag on");
   winBtn.click(); // fills the popover (popovertarget handles show/hide natively)
   await tick();
@@ -1543,19 +1543,46 @@ test("UI - Sidepanel - WINDOW_NAMES: named headers, custom dots, overview list, 
   groups.pop(); // restore fixture
   await chrome.tabGroups.update(7, { title: "work" });
 
-  // Groups view stays reachable with no groups at all — the first one is created there
+  // no groups: no Groups view (the first group comes from the row menu's "Move to group ▸ New group…")
   const savedGroups = groups.splice(0);
   await chrome.tabs.onActivated.fire({});
   await new Promise((resolve) => setTimeout(resolve, 200));
   winBtn.click();
   await tick();
-  assert.ok(
-    qa(pop, ".win-view").some((el) => el.textContent === "Groups (0)"),
-    "Groups view offered with zero groups",
+  assert.deepEqual(
+    qa(pop, ".win-view").map((el) => el.textContent),
+    ["Windows (3)", "Pins (1)"],
+    "Groups view gone with zero groups",
   );
+  // one window: nothing to switch between windows — no Windows view, the popover opens on what is left
+  const savedWindowIds = tabs.map((tab) => tab.windowId);
+  for (const tab of tabs) {
+    tab.windowId = 1;
+  }
+  await chrome.tabs.onActivated.fire({});
+  await new Promise((resolve) => setTimeout(resolve, 200));
+  winBtn.click();
+  await tick();
+  assert.deepEqual(qa(pop, ".win-view").length, 0, "a single view is a heading, not a switcher");
+  assert.equal(q(pop, ".win-head .muted").textContent, "Pins (1)", "opens on the only view left");
+  assert.ok(pop.querySelector('.win-row[data-tab-id="3"]'), "the pinned tab is listed");
+  assert.equal(winBtn.disabled, false, "button live while a view exists");
+  // nothing to list at all: the ▦ button is disabled, its tooltip says why
+  const pinnedTab = must(tabs.find((tab) => tab.id === 3));
+  pinnedTab.pinned = false;
+  await chrome.tabs.onActivated.fire({});
+  await new Promise((resolve) => setTimeout(resolve, 200));
+  assert.equal(winBtn.disabled, true, "button disabled with one window and nothing else");
+  assert.match(winBtn.title, /nothing to list/i);
+  pinnedTab.pinned = true;
+  tabs.forEach((tab, i) => {
+    tab.windowId = savedWindowIds[i] ?? 1;
+  });
   groups.push(...savedGroups);
   await chrome.tabs.onActivated.fire({});
   await new Promise((resolve) => setTimeout(resolve, 200));
+  assert.equal(winBtn.disabled, false, "button back once there is something to list");
+  assert.equal(winBtn.title, "Windows list");
   winBtn.click();
   await tick();
 

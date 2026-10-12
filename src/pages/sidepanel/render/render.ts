@@ -25,7 +25,7 @@ import { effectiveCollapsed, GROUPINGS, renderSortDirButton } from "./sorting.ts
 import type { PanelRun } from "./sorting.ts";
 import { activeCollapsedSet, effectiveSort, nestedTabGroupsActive, state } from "../foundation/state.ts";
 import type { GroupKey } from "../foundation/state.ts";
-import { refillWindowsPopoverIfOpen } from "../windows-popover/popover.ts";
+import { refillWindowsPopoverIfOpen, syncQuickLaunchButton } from "../windows-popover/popover.ts";
 
 type Tab = chrome.tabs.Tab;
 
@@ -191,6 +191,7 @@ function renderNowImpl(): void {
     listEl.querySelector(".row.current")?.scrollIntoView({ block: "nearest" });
   }
   renderBulkBar();
+  syncQuickLaunchButton();
   refillWindowsPopoverIfOpen();
 }
 
