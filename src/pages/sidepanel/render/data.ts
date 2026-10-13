@@ -3,12 +3,21 @@
 import { applyExperimental, featureEnabled, resolveColorScheme, resolveNavMode } from "../../../app/core.ts";
 import { loadState, localStore, sessionStore } from "../../../app/storage.ts";
 import type { AppState } from "../../../app/types.ts";
-import { getElementById } from "../../../lib/dom.ts";
+import { parkedPanelTabs } from "../../../app/parked.ts";
+import { getElementById, mustQuery } from "../../../lib/dom.ts";
 import { capabilities } from "../../../lib/platform/capabilities.ts";
-import { sortSelect } from "../foundation/elements.ts";
+import { filterBar, scopeSelect, sortSelect } from "../foundation/elements.ts";
 import { deriveTabs } from "../model/index.ts";
 import { render } from "../foundation/scheduler.ts";
-import { effectiveSort, FLAG_GATED_SORTS, keepAliveActive, namesActive, state } from "../foundation/state.ts";
+import {
+  effectiveSort,
+  FLAG_GATED_SORTS,
+  keepAliveActive,
+  namesActive,
+  parkedActive,
+  parkedScope,
+  state,
+} from "../foundation/state.ts";
 import type { PanelTab } from "../foundation/state.ts";
 
 type TabGroup = chrome.tabGroups.TabGroup;
@@ -17,16 +26,24 @@ type TabGroup = chrome.tabGroups.TabGroup;
 // (tab/storage/focus changes — incl. renders triggered in OTHER open panels)
 // re-render without a view transition
 export async function refresh(animate = false, preloaded: AppState | null = null): Promise<void> {
-  const [persisted, tabs, win, { windowProfiles = {}, keepAlive = [] }, { windowSessionMap = {} }, groups] =
-    await Promise.all([
-      preloaded ?? loadState(), // startup passes its already-read state — no second read
-      chrome.tabs.query({}),
-      chrome.windows.getLastFocused(),
-      localStore.get(["windowProfiles", "keepAlive"]),
-      sessionStore.get("windowSessionMap"),
-      capabilities.tabGroups ? chrome.tabGroups.query({}).catch(() => []) : [],
-    ]);
+  const [
+    persisted,
+    tabs,
+    win,
+    { windowProfiles = {}, keepAlive = [], parkedWindows = [], parkedTrash = [] },
+    { windowSessionMap = {} },
+    groups,
+  ] = await Promise.all([
+    preloaded ?? loadState(), // startup passes its already-read state — no second read
+    chrome.tabs.query({}),
+    chrome.windows.getLastFocused(),
+    localStore.get(["windowProfiles", "keepAlive", "parkedWindows", "parkedTrash"]),
+    sessionStore.get("windowSessionMap"),
+    capabilities.tabGroups ? chrome.tabGroups.query({}).catch(() => []) : [],
+  ]);
   state.tabGroups = new Map(groups.map((group): [number, TabGroup] => [group.id, group]));
+  state.parked = parkedWindows;
+  state.parkedTrashCount = parkedTrash.length;
   state.rules = persisted.protectionRules;
   state.keepAlive = keepAlive;
   state.keepAliveEnabled = persisted.settings.keepAliveEnabled;
@@ -49,15 +66,6 @@ export async function refresh(animate = false, preloaded: AppState | null = null
     state.revealCurrent = true;
   }
   state.allTabs = tabs as PanelTab[]; // chrome.tabs.query: every tab has an id — see PanelTab
-  // tabs closed outside the panel (or id-swapped by discard) leave stale ids
-  // in the selection — prune so counts and select-all stay truthful
-  const liveIds = new Set(tabs.map((tab) => tab.id));
-  for (const tabId of [...state.selected]) {
-    if (!liveIds.has(tabId)) {
-      state.selected.delete(tabId);
-    }
-  }
-  state.derived = deriveTabs(tabs, state.rules, keepAliveActive() ? state.keepAlive : []);
   // resolved once per refresh; the keydown handler reads this instead of
   // re-running applyExperimental (a fresh object) on every keypress
   state.features = applyExperimental(state.rawFeatures, state.ui.showExperimental ?? false);
@@ -76,6 +84,35 @@ export async function refresh(animate = false, preloaded: AppState | null = null
       }
     }
   }
+  state.liveTabs = state.allTabs;
+  state.liveTabGroups = state.tabGroups;
+  state.liveWindowMeta = state.windowMeta;
+  // Parked windows scope: the list shows the snapshots as rows (negative ids, one synthetic
+  // window per parked window) — search, filters, sorts and headers work unchanged on them
+  // static markup: the scope <select> has the parked-windows option
+  mustQuery<HTMLOptionElement>(scopeSelect, 'option[value="parked-windows"]').hidden = !parkedActive();
+  if (parkedScope()) {
+    const panel = parkedPanelTabs(state.parked);
+    state.allTabs = panel.tabs;
+    state.tabGroups = panel.groups;
+    state.windowMeta = panel.meta;
+    if (state.filter === "awake" || state.filter === "snoozed") {
+      state.filter = "all"; // nothing parked is awake or snoozed; not persisted — the user did not choose it
+    }
+  }
+  for (const name of ["awake", "snoozed"]) {
+    // static markup: both chips exist in #filters
+    mustQuery(filterBar, `button[data-filter="${name}"]`).hidden = parkedScope();
+  }
+  // tabs closed outside the panel (or id-swapped by discard) leave stale ids
+  // in the selection — prune so counts and select-all stay truthful
+  const shownIds = new Set(state.allTabs.map((tab) => tab.id));
+  for (const tabId of [...state.selected]) {
+    if (!shownIds.has(tabId)) {
+      state.selected.delete(tabId);
+    }
+  }
+  state.derived = deriveTabs(state.allTabs, state.rules, keepAliveActive() ? state.keepAlive : []);
   // flag turned off mid-navigation: drop the cursor so no stale outline lingers
   if (!featureEnabled(state.features, "SIDEBAR_KEYBOARD_NAVIGATION")) {
     state.cursor = -1;

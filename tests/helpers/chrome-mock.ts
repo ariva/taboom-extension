@@ -78,6 +78,7 @@ export function makeChrome<
     stored.ui = { ...(typeof ui === "object" ? ui : {}), showExperimental: true };
   }
   let nextTabId = 1000;
+  let nextWindowId = 900;
   return {
     tabs: {
       query: async (opts: chrome.tabs.QueryInfo = {}) => {
@@ -121,7 +122,15 @@ export function makeChrome<
       },
       create: async (opts: chrome.tabs.CreateProperties = {}) => {
         calls.push(`tabs.create ${JSON.stringify(opts)}`);
-        const tab = { id: nextTabId++, active: !!opts.active, windowId: opts.windowId, url: "chrome://newtab/" };
+        const tab = {
+          id: nextTabId++,
+          active: !!opts.active,
+          windowId: opts.windowId,
+          url: opts.url ?? "chrome://newtab/",
+          pinned: !!opts.pinned,
+          groupId: -1,
+          index: tabs.filter((t) => t.windowId === opts.windowId).length,
+        };
         tabs.push(tab);
         return tab;
       },
@@ -145,6 +154,7 @@ export function makeChrome<
       onReplaced: makeEvent<typeof chrome.tabs.onReplaced>(),
       group: async ({ tabIds, groupId }: chrome.tabs.GroupOptions) => {
         calls.push(`tabs.group ${list<number>(tabIds ?? [])} ${groupId ?? "new"}`);
+        // every new group is 900 (the group itself is NOT added to `groups` — only real Chrome lists it)
         const gid = groupId ?? 900;
         for (const id of list<number>(tabIds ?? [])) {
           const tab = tabs.find((t) => t.id === id);
@@ -165,7 +175,15 @@ export function makeChrome<
       },
     },
     tabGroups: {
-      query: async () => groups.map((g) => ({ ...g })),
+      query: async (info: chrome.tabGroups.QueryInfo = {}) =>
+        groups.filter((g) => info.windowId == null || g.windowId === info.windowId).map((g) => ({ ...g })),
+      get: async (groupId: number) => {
+        const group = groups.find((g) => g.id === groupId);
+        if (!group) {
+          throw new Error(`no group ${groupId}`);
+        }
+        return { ...group };
+      },
       update: async (groupId: number, props: chrome.tabGroups.UpdateProperties) => {
         calls.push(`tabGroups.update ${groupId} ${JSON.stringify(props)}`);
         const group = groups.find((g) => g.id === groupId);
@@ -196,15 +214,38 @@ export function makeChrome<
       update: async (id: number) => calls.push(`windows.update ${id}`),
       create: async (opts: chrome.windows.CreateData = {}) => {
         calls.push(`windows.create ${JSON.stringify(opts)}`);
-        const win = { id: 900 };
+        const win: { id: number; tabs: Partial<chrome.tabs.Tab>[] } = { id: nextWindowId++, tabs: [] };
         if (opts.tabId != null) {
           const tab = tabs.find((t) => t.id === opts.tabId);
           if (tab) {
             tab.pinned = false; // like Chrome: a cross-window move unpins
             tab.windowId = win.id;
+            win.tabs.push(tab);
           }
         }
+        // like Chrome: a window created around urls opens one tab per url, in order
+        for (const [index, url] of list(opts.url ?? []).entries()) {
+          const tab = {
+            id: nextTabId++,
+            active: index === 0,
+            windowId: win.id,
+            url,
+            pinned: false,
+            groupId: -1,
+            index,
+          };
+          tabs.push(tab);
+          win.tabs.push(tab);
+        }
         return win;
+      },
+      remove: async (id: number) => {
+        calls.push(`windows.remove ${id}`);
+        for (let i = tabs.length - 1; i >= 0; i--) {
+          if (tabs[i]?.windowId === id) {
+            tabs.splice(i, 1);
+          }
+        }
       },
       onFocusChanged: makeEvent<typeof chrome.windows.onFocusChanged>(),
     },

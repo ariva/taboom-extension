@@ -50,7 +50,8 @@ function renderRowImpl(tab: Tab, vm: RowViewModel): HTMLElement {
   row.className = vm.classes.join(" ");
   row.style.viewTransitionName = vm.viewTransitionName;
   row.dataset.tabId = String(tab.id);
-  row.draggable = true; // drag onto another window's rows/header to move
+  const parked = vm.classes.includes("parked");
+  row.draggable = !parked; // drag onto another window's rows/header to move (a parked row moves through its menu)
   if (tab.url) {
     row.dataset.tip = tab.url; // full URL in the hover tip (titles ellipsize)
   }
@@ -116,6 +117,10 @@ function renderRowImpl(tab: Tab, vm: RowViewModel): HTMLElement {
     meta.append(badge);
   }
 
+  if (parked) {
+    mustQuery(row, ".actions").remove(); // not a tab: nothing to snooze, protect or close
+    return row;
+  }
   if (!vm.canSnooze) {
     mustQuery(row, '[data-action="snooze"]').remove();
   }

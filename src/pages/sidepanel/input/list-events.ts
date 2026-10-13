@@ -1,5 +1,7 @@
 // Click delegation for the tab list: row checkbox, row action buttons, row activation.
 import { send } from "../../../app/messages.ts";
+import { parkedRef } from "../../../app/parked.ts";
+import { openParkedTabMenu } from "../menus/parked-menus.ts";
 import { activate, closeTabs, snooze } from "../ops/actions.ts";
 import { listEl } from "../foundation/elements.ts";
 import { hideHoverTip } from "../render/hover-tip.ts";
@@ -40,7 +42,9 @@ export function initListEvents(): void {
         return;
     }
     const tab = state.allTabs.find((t) => t.id === tabId);
-    if (tab) {
+    if (tab && parkedRef(tabId)) {
+      openParkedTabMenu(event, tabId); // a parked row: move / open / remove instead of activate
+    } else if (tab) {
       activate(tab);
     }
   });

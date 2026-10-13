@@ -38,7 +38,7 @@ export function fillGroupRows(groupList: TabGroup[]): void {
     (a, b) => rank(a) - rank(b) || (a.title || "").localeCompare(b.title || "", undefined, { sensitivity: "base" }),
   );
   for (const group of sorted) {
-    const tabs = state.allTabs
+    const tabs = state.liveTabs
       .filter((tab) => tab.groupId === group.id)
       .sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
     const row = document.createElement("button");
@@ -134,7 +134,7 @@ export function startRenameTabGroupInList(groupId: number): void {
     return;
   }
   inlineEdit(title, {
-    initial: state.tabGroups.get(groupId)?.title ?? "",
+    initial: state.liveTabGroups.get(groupId)?.title ?? "",
     placeholder: "Group name",
     commit: (title) => commitTabGroupTitle(groupId, title),
     finish: () => {
@@ -180,7 +180,7 @@ export function initGroupReorder(): void {
         ids,
         draggedGroupId!, // groupRowUnder only returns a row while a group drag is tracked
         Number(row.dataset.tabGroupId),
-        state.tabGroups,
+        state.liveTabGroups,
         state.ui.quickLaunchGroupOrder ?? [],
       );
       state.ui = { ...state.ui, quickLaunchGroupOrder };

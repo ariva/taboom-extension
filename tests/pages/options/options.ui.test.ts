@@ -13,6 +13,7 @@ const stored: Pick<LocalStorageSchema, "settings" | "ui"> &
     keepAlive?: KeepAliveTab[];
     keepAliveTrash?: Removal<KeepAliveTab>[];
     protectionTrash?: Removal<Omit<ProtectionRule, "createdAt">>[];
+    parkedTrash?: LocalStorageSchema["parkedTrash"];
   } = {
   settings: { autoSnoozeEnabled: false, inactivityMinutes: 45 },
   protectionRules: [{ id: "r1", type: "domain", pattern: "*.github.com" }],
@@ -308,10 +309,33 @@ test("UI - Options - Delete restore data: disabled while both undo stacks are em
   assert.ok(button.closest("section")?.contains(byId("danger")), "lives in the Data card");
   stored.keepAliveTrash = [];
   stored.protectionTrash = [];
+  stored.parkedTrash = [];
   await chrome.storage.onChanged.fire({ protectionRules: {} }, "local");
   await tick();
   await tick();
   assert.equal(button.disabled, true, "nothing to forget: disabled");
+
+  // a removed parked window alone enables it, and goes with the rest
+  stored.parkedTrash = [
+    { at: 1, items: [{ id: "p1", parkedAt: 1, tabs: [{ url: "https://p.example.com/", title: "P" }], groups: [] }] },
+  ];
+  await chrome.storage.onChanged.fire({ protectionRules: {} }, "local");
+  await tick();
+  await tick();
+  assert.equal(button.disabled, false, "removed parked data counts as restore data");
+  // the side panel's Undo remove empties that trash: the page follows the storage event alone
+  stored.parkedTrash = [];
+  await chrome.storage.onChanged.fire({ parkedTrash: { newValue: [] } }, "local");
+  await tick();
+  await tick();
+  assert.equal(button.disabled, true, "re-rendered on a trash-only change");
+  stored.parkedTrash = [
+    { at: 1, items: [{ id: "p1", parkedAt: 1, tabs: [{ url: "https://p.example.com/", title: "P" }], groups: [] }] },
+  ];
+  await chrome.storage.onChanged.fire({ parkedTrash: { newValue: stored.parkedTrash } }, "local");
+  await tick();
+  await tick();
+  assert.equal(button.disabled, false);
 
   stored.protectionTrash = [{ at: 1, items: [{ id: "x", type: "host", pattern: "x.example.com" }] }];
   stored.keepAliveTrash = [
@@ -338,6 +362,7 @@ test("UI - Options - Delete restore data: disabled while both undo stacks are em
   assert.equal(prompted, false, "no confirm dialog");
   assert.deepEqual(stored.protectionTrash, []);
   assert.deepEqual(stored.keepAliveTrash, []);
+  assert.deepEqual(stored.parkedTrash, []);
   assert.equal(button.disabled, true, "disabled again");
   assert.equal(byId("restore-protected").hidden, true, "restore buttons gone with the data");
 
@@ -1001,4 +1026,20 @@ test("UI - Options - Restore last removal: every removal (row, Clear all) is und
   assert.equal(restore.title, "Restore:\nhttps://x.example.com/");
   stored.keepAlive = [];
   stored.keepAliveTrash = [];
+});
+
+test("UI - Options - PARKED_WINDOWS: 'Ask before parking' checkbox follows the flag and persists settings.askBeforePark", async () => {
+  const { applyExperimental, featureEnabled } = await import("../../../src/app/core.ts");
+  const effective = applyExperimental(RAW_FEATURES, stored.ui?.showExperimental ?? false);
+  const flagOn = featureEnabled(effective, "PARKED_WINDOWS");
+  assert.equal(byId("askBeforePark-label").hidden, !flagOn, "visible iff the flag resolves on");
+  const box = byId<HTMLInputElement>("askBeforePark");
+  assert.equal(box.checked, true, "default: ask");
+  box.checked = false;
+  box.dispatchEvent(new window.Event("change", { bubbles: true }));
+  await tick();
+  assert.ok(calls.some((c) => c.startsWith("storage.set") && c.includes('"askBeforePark":false')));
+  box.checked = true;
+  box.dispatchEvent(new window.Event("change", { bubbles: true }));
+  await tick();
 });

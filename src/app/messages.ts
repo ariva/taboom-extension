@@ -28,7 +28,22 @@ export type Message =
   // keep-it-alive marks for these tabs' pages (closed ids are skipped)
   | { type: "keep-alive-set"; tabIds: number[]; kept: boolean }
   | { type: "sidebar-focused" }
-  | { type: "sidebar-no-focus" };
+  | { type: "sidebar-no-focus" }
+  // PARKED_WINDOWS: snapshot + close; rebuild (new window, or appended into one); open picked parked tabs
+  | { type: "park-window"; windowId: number }
+  | { type: "restore-parked"; id: string; intoWindowId?: number }
+  // asGroup: the picked tabs form one parked group — recreate it (title / color) around them
+  | {
+      type: "move-parked-tabs";
+      id: string;
+      indexes: number[];
+      target: ParkedTarget;
+      keep: boolean;
+      asGroup?: boolean;
+    };
+
+// where moved parked tabs open: a live window (null = a new one) or a live tab group
+export type ParkedTarget = { windowId: number | null } | { groupId: number };
 
 export type MessageType = Message["type"];
 
@@ -59,6 +74,9 @@ export interface MessageResponses {
   "keep-alive-set": MessageAck;
   "sidebar-focused": MessageAck;
   "sidebar-no-focus": MessageAck;
+  "park-window": MessageAck;
+  "restore-parked": MessageAck;
+  "move-parked-tabs": MessageAck;
 }
 
 // resolves with the handler's answer, a MessageError when it threw, or

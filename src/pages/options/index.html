@@ -389,6 +389,7 @@
       <span class="muted">(prev/next buttons in side panel, History in context menu)</span></label>
     <label><input type="checkbox" id="hideUpdateBanner" /> Hide new-version update banner</label>
     <label id="windowNamesEnabled-label" hidden><input type="checkbox" id="windowNamesEnabled" /> Window names <span class="muted">(name/color windows from the side panel window header)</span></label>
+    <label id="askBeforePark-label" hidden><input type="checkbox" id="askBeforePark" /> Ask before parking a window <span class="muted">(the park dialog's "Don't ask again" turns this off)</span></label>
     <label>On extension update
       <select id="onExtensionUpdate">
         <!-- "auto" hidden: sidePanel.open() needs a user gesture a fresh panel lacks — needs SW-side trigger first -->
@@ -417,7 +418,7 @@
 
   <section class="card danger-zone">
     <h2>Data</h2>
-    <p class="muted">Forgets every undoable removal (protected sites and keep-alive marks): the Restore buttons go away. Disabled when there is nothing to forget.</p>
+    <p class="muted">Forgets every undoable removal (protected sites, keep-alive marks, removed parked windows): the Restore / Undo buttons go away. Disabled when there is nothing to forget.</p>
     <button id="delete-restore-data">Clear restore data</button>
     <p class="muted">Restores all settings and appearance to their defaults. Protected sites stay unchanged.</p>
     <button id="restore-defaults">Restore default settings</button>

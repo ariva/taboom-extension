@@ -20,6 +20,7 @@ export interface RowContext {
   indexes: Map<number, number>;
   queryTokens?: string[];
   fuzzy?: boolean;
+  parked?: boolean; // the row is a parked snapshot, not a live tab
 }
 
 export interface RowViewModel {
@@ -71,9 +72,12 @@ export function badges(
   return list;
 }
 
-export function emptyMessage(query: string, filter: string): string {
+export function emptyMessage(query: string, filter: string, parked = false): string {
   if (query) {
     return "No tabs match — press Esc to clear the search.";
+  }
+  if (parked) {
+    return "No parked windows. Park one from a window header's ⋯ menu.";
   }
   if (filter === "snoozed") {
     return "Nothing snoozed yet. Hover a tab and use the pause button.";
@@ -98,6 +102,7 @@ export function rowViewModel(
     indexes,
     queryTokens = [],
     fuzzy = false,
+    parked = false,
   }: RowContext,
 ): RowViewModel {
   const d = derived.get(tab.id)!; // derived is built from the same tabs (deriveTabs, once per refresh)
@@ -115,6 +120,7 @@ export function rowViewModel(
       tab.discarded && "snoozed",
       tab.active && "active-tab",
       tab.active && tab.windowId === currentWindowId && "current",
+      parked && "parked",
     ].filter((name): name is string => Boolean(name)),
     viewTransitionName: `tab-${tab.id}`,
     checked: selected.has(tab.id),
@@ -124,8 +130,12 @@ export function rowViewModel(
     host,
     hostRanges,
     age: !tab.active && tab.lastAccessed ? formatAge(now - tab.lastAccessed) : null,
-    badges: [...badges(tab, d.protected, d.keptAlive), ...(urlOnlyMatch ? [["url match", ""] satisfies Badge] : [])],
-    canSnooze: !tab.discarded && isSupportedUrl(tab.url),
+    badges: [
+      ...(parked ? [["parked", ""] satisfies Badge] : []),
+      ...badges(tab, d.protected, d.keptAlive),
+      ...(urlOnlyMatch ? [["url match", ""] satisfies Badge] : []),
+    ],
+    canSnooze: !parked && !tab.discarded && isSupportedUrl(tab.url),
     protected: d.protected,
     protectLabel: d.protected ? "Unprotect site" : "Protect site",
     dot:

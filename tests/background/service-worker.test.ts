@@ -91,6 +91,7 @@ const stored: {
     minAwakePerWindow: 0,
     keepAliveEnabled: true,
     keepAliveMinutes: 25,
+    askBeforePark: true,
   },
   protectionRules: [{ id: "r1", type: "host", pattern: "mail.google.com" }],
 };

@@ -13,6 +13,7 @@ export interface Settings {
   // keep-it-alive: periodic reload of marked pages (KEEP_ALIVE flag)
   keepAliveEnabled: boolean;
   keepAliveMinutes: number; // default reload interval; an entry's own `minutes` overrides it
+  askBeforePark: boolean; // PARKED_WINDOWS: confirm "Park window…" (the dialog's "Don't ask again" clears it)
 }
 
 // one keep-it-alive mark (storage.local.keepAlive[]): keyed by page url without
@@ -33,6 +34,35 @@ export interface Removal<T> {
   items: T[];
 }
 export type KeepAliveRemoval = Removal<KeepAliveTab>;
+
+// ---------- parked windows (storage.local.parkedWindows[]) ----------
+// A parked window is a closed window kept as data: its tabs in strip order, its tab
+// groups and its identity (name / color / pin), enough to rebuild it. Tabs carry no ids —
+// only addresses survive a close.
+
+export interface ParkedTab {
+  url: string;
+  title: string;
+  pinned?: boolean; // absent = not pinned
+  active?: boolean; // absent = not the window's active tab
+  group?: number; // index into ParkedWindow.groups; absent = ungrouped
+}
+
+export interface ParkedGroup {
+  title: string;
+  color: string; // chrome.tabGroups color name
+  collapsed?: boolean; // absent = expanded
+}
+
+export interface ParkedWindow {
+  id: string; // our own id — the chrome window id dies with the window
+  parkedAt: number; // ms timestamp
+  name?: string; // custom window name as it was (WINDOW_NAMES)
+  color?: string;
+  pinnedWindow?: boolean;
+  tabs: ParkedTab[];
+  groups: ParkedGroup[];
+}
 
 // "host"  → exact hostname match, e.g. "mail.google.com"
 // "domain"→ "*.github.com" matches github.com and any subdomain
@@ -91,6 +121,8 @@ export interface LocalStorageSchema {
   ui: Partial<UiPrefs>;
   keepAlive: KeepAliveTab[];
   keepAliveTrash: KeepAliveRemoval[];
+  parkedWindows: ParkedWindow[];
+  parkedTrash: Removal<ParkedWindow>[]; // forgotten parked windows, newest last — Restore last removal
   windowProfiles: WindowProfiles;
   tabHistory: TabHistory;
   perfMetrics: PerfMetrics;

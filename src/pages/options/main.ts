@@ -57,7 +57,10 @@ render();
 // is open — but only re-render for keys this page shows (tabHistory changes on
 // every tab switch and perfMetrics on every measured render; neither is shown)
 chrome.storage.onChanged.addListener((changes) => {
-  if (changes.settings || changes.protectionRules || changes.ui || changes.keepAlive) {
+  // the three undo stacks drive the Restore buttons and "Clear restore data" — an undo or
+  // a removal made in the side panel (parked windows, keep-alive, unprotect) must show here too
+  const shown = ["settings", "protectionRules", "ui", "keepAlive", "keepAliveTrash", "protectionTrash", "parkedTrash"];
+  if (shown.some((key) => key in changes)) {
     render();
   }
 });

@@ -24,6 +24,7 @@ export function renderUiPrefs(state: AppState): void {
   const appliedFeatures = applyExperimental(FEATURES, state.ui.showExperimental ?? false);
   getElementById("historyNav-label").hidden = !featureEnabled(appliedFeatures, "OPTIONS_NAVIGATION_STACK");
   getElementById("windowNamesEnabled-label").hidden = !featureEnabled(appliedFeatures, "WINDOW_NAMES");
+  getElementById("askBeforePark-label").hidden = !featureEnabled(appliedFeatures, "PARKED_WINDOWS");
   // The dropdown shows the EFFECTIVE mode, not the raw stored value: a stored
   // mode whose flag got disabled falls back (traditional ↔ compact, disabled
   // when neither is available). The stored preference itself is NOT rewritten,

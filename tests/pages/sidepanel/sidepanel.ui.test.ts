@@ -8,6 +8,7 @@ import { loadPage, makeChrome, RAW_FEATURES, TEST_EXPERIMENTAL, TEST_FEATURES, t
 const AUTO_ALL_ON = TEST_FEATURES.SEARCH_AUTO_SELECT_ALL?.enabled === true;
 const KEEP_ALIVE_ON = TEST_FEATURES.KEEP_ALIVE?.enabled === true;
 const DUPLICATES_ON = TEST_FEATURES.DUPLICATES?.enabled === true;
+const PARKED_ON = TEST_FEATURES.PARKED_WINDOWS?.enabled === true;
 
 const NOW = Date.now();
 const tabs: NonNullable<ChromeMockOptions["tabs"]> = [
@@ -112,7 +113,11 @@ test("UI - Sidepanel - Toolbar selects open the custom dropdown, not the native 
   assert.equal(down.defaultPrevented, true, "native popup suppressed");
   assert.equal(dd.hidden, false, "custom list opens");
   const items = qa(dd, ".dd-item").map((el) => el.textContent);
-  assert.deepEqual(items, ["All windows", "Current window"], "scope options listed");
+  assert.deepEqual(
+    items,
+    ["All windows", "Current window", ...(PARKED_ON ? ["Parked windows"] : [])],
+    "scope options listed",
+  );
   assert.ok(q(dd, ".dd-item.current").textContent === "All windows", "current value marked");
 
   // picking an option updates the select and fires its change handler
@@ -1065,6 +1070,7 @@ test("UI - Sidepanel - Window header right-click: window-wide actions + Change o
             "Auto",
           ]
         : []),
+      ...(PARKED_ON ? ["Park window…"] : []),
       "Snooze 2 tabs",
       "Wake 2 tabs",
       "Protect domain 2 tabs",
@@ -1291,6 +1297,7 @@ test("UI - Sidepanel - WINDOW_NAMES: named headers, custom dots, overview list, 
       "Gray",
       "Gold",
       "Auto",
+      ...(PARKED_ON ? ["Park window…"] : []),
     ],
     "only rename/color/focus — no bulk actions, no Tabs Order",
   );
@@ -2101,4 +2108,290 @@ test("UI - Sidepanel - DUPLICATES: quick launch lists pages open twice, ticks dr
   await chrome.tabs.onActivated.fire({});
   await settle();
   pop.hidePopover?.();
+});
+
+test("UI - Sidepanel - WINDOW_NAMES: the lone window header of the Current window scope keeps its ⋯ menu", {
+  skip: !(TEST_FEATURES.WINDOW_NAMES?.enabled === true),
+}, async () => {
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 200));
+  const sort = byId<HTMLSelectElement>("sort");
+  const scope = byId<HTMLSelectElement>("scope");
+  sort.value = "window";
+  sort.dispatchEvent(new window.Event("change", { bubbles: true }));
+  scope.value = "current-window";
+  scope.dispatchEvent(new window.Event("change", { bubbles: true }));
+  await settle();
+  const headers = qa(document, ".group-header");
+  assert.equal(headers.length, 1, "one window group");
+  const header = must(headers[0]);
+  assert.ok(header.classList.contains("static"), "nothing to fold");
+  assert.ok(header.querySelector(".group-menu-btn"), "…but the window menu is reachable");
+  const ctx = byId("ctx-menu");
+  q(header, ".group-menu-btn").click();
+  assert.ok(
+    qa(ctx, ".ctx-item").some((el) => el.textContent === "Rename window…"),
+    "window menu opened",
+  );
+  document.body.click();
+  scope.value = "all-windows";
+  scope.dispatchEvent(new window.Event("change", { bubbles: true }));
+  sort.value = "recent";
+  sort.dispatchEvent(new window.Event("change", { bubbles: true }));
+  await settle();
+});
+
+test("UI - Sidepanel - PARKED_WINDOWS: Park window… asks first; the Parked windows scope lists snapshots with their own menus", {
+  skip: !PARKED_ON,
+}, async () => {
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 200));
+  const scope = byId<HTMLSelectElement>("scope");
+  const setScope = async (value: string) => {
+    scope.value = value;
+    scope.dispatchEvent(new window.Event("change", { bubbles: true }));
+    await settle();
+  };
+  const ctx = byId("ctx-menu");
+  const items = () => qa<HTMLButtonElement>(ctx, ".ctx-item").map((el) => el.textContent);
+
+  // Park window… on a live window header: the custom dialog names the destination
+  const sort = byId<HTMLSelectElement>("sort");
+  sort.value = "window";
+  sort.dispatchEvent(new window.Event("change", { bubbles: true }));
+  await settle();
+  const header2 = q(document, '.group-header[data-window-id="2"]');
+  header2.dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+  must(qa(ctx, ".ctx-item").find((el) => el.textContent === "Park window…")).click();
+  await tick();
+  await tick();
+  const ask = byId<HTMLDialogElement>("ask-dialog");
+  assert.equal(ask.open, true, "asks before parking");
+  assert.match(
+    document.documentElement.getAttribute("style") ?? "",
+    /--header-h:\s*\d+px/,
+    "dialog anchors under the header",
+  );
+  assert.match(q(ask, ".ask-message").textContent, /Park Window #2\?/);
+  assert.match(q(ask, ".ask-message").textContent, /under Parked windows/, "says where the window goes");
+  assert.equal(q(ask, ".ask-ok").textContent, "Park");
+  const dontAsk = q<HTMLInputElement>(ask, ".ask-check");
+  assert.ok(dontAsk, "Don't ask again offered");
+  q(ask, ".ask-cancel").click();
+  await tick();
+  assert.ok(!calls.some((c) => c === "sendMessage park-window"), "Cancel parks nothing");
+  // again, OK with Don't ask again ticked: the worker gets the message, the setting flips
+  calls.length = 0;
+  header2.dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+  must(qa(ctx, ".ctx-item").find((el) => el.textContent === "Park window…")).click();
+  await tick();
+  await tick();
+  q<HTMLInputElement>(ask, ".ask-check").checked = true;
+  q(ask, ".ask-ok").click();
+  await tick();
+  await tick();
+  assert.ok(calls.includes("sendMessage park-window"), "worker parks the window");
+  assert.ok(
+    calls.some((c) => c.startsWith("storage.set") && c.includes('"askBeforePark":false')),
+    "Don't ask again persisted",
+  );
+  await chrome.storage.local.set({ settings: { askBeforePark: true } }); // back for later tests
+
+  // the Parked windows scope: two snapshots as rows, grouped by parked window
+  const NOWISH = Date.now();
+  await chrome.storage.local.set({
+    parkedWindows: [
+      {
+        id: "p1",
+        parkedAt: NOWISH - 60_000,
+        name: "Research",
+        tabs: [
+          { url: "https://docs.example.com/guide", title: "Guide", pinned: true },
+          { url: "https://mail.google.com/inbox", title: "Mail copy", active: true, group: 0 },
+        ],
+        groups: [{ title: "work", color: "blue" }],
+      },
+      { id: "p2", parkedAt: NOWISH - 120_000, tabs: [{ url: "https://news.example.com/", title: "News" }], groups: [] },
+    ],
+    parkedTrash: [],
+  });
+  await setScope("parked-windows");
+  const rows = () => qa(document, ".row");
+  assert.equal(rows().length, 3, "three parked tabs listed");
+  assert.ok(
+    rows().every((row) => row.classList.contains("parked") && !row.querySelector(".actions")),
+    "parked rows: no hover actions",
+  );
+  assert.ok(
+    rows().every((row) => row.draggable === false),
+    "parked rows are not draggable",
+  );
+  assert.ok(qa(document, ".badge").some((badge) => badge.textContent === "parked"));
+  assert.ok(
+    qa(document, ".badge").some((badge) => badge.textContent === "protected"),
+    "protection rules still apply by url",
+  );
+  // window grouping orders headers by label (no current window here): "Parked …" before "Research"
+  const labels = qa(document, ".group-header .group-label").map((el) => el.textContent);
+  assert.equal(labels.length, 2);
+  assert.match(must(labels[0]), /^Parked /, "unnamed: parked date");
+  assert.equal(labels[1], "Research");
+  assert.equal(q(document, '#filters [data-filter="awake"]').hidden, true, "Awake / Snoozed chips make no sense here");
+  assert.equal(q(document, '#filters [data-filter="snoozed"]').hidden, true);
+  assert.equal(byId("bulk-close").hidden, true, "bulk tab actions hidden for parked rows");
+  // search works over parked tabs
+  const search = byId<HTMLInputElement>("search");
+  search.value = "news";
+  search.dispatchEvent(new window.Event("input", { bubbles: true }));
+  assert.equal(rows().length, 1);
+  assert.match(q(document, ".row .title").textContent, /News/);
+  search.value = "";
+  search.dispatchEvent(new window.Event("input", { bubbles: true }));
+  assert.equal(rows().length, 3);
+
+  // a parked row's click = its menu: move / open into live windows, remove
+  calls.length = 0;
+  q(must(rows()[0]), ".title").click();
+  await tick();
+  assert.deepEqual(items().slice(0, 2), ["Copy URL", "Move parked tab to ▸"]);
+  assert.ok(items().includes("Open parked tab in ▸"), "copy variant offered");
+  assert.ok(items().includes("Remove parked tab"));
+  assert.ok(items().includes("Window Current #1"), "live windows are the targets");
+  assert.ok(items().includes("New window"));
+  must(qa(ctx, ".ctx-item").find((el) => el.textContent === "Window #2")).click();
+  await tick();
+  await tick();
+  assert.ok(calls.includes("sendMessage move-parked-tabs"), "worker opens the tab there");
+  assert.ok(!calls.some((c) => c.startsWith("tabs.update") || c.startsWith("windows.update")), "nothing activated");
+
+  // parked tab-group header: group actions in parked terms, no snooze / ungroup (nested
+  // group headers exist only with the "Same as window" tab order — earlier tests left "recent")
+  const uiBefore = (await chrome.storage.local.get("ui")).ui ?? {};
+  await chrome.storage.local.set({ ui: { ...uiBefore, groupByWindowTabsOrder: "same-as-window" } });
+  await chrome.storage.onChanged.fire({ ui: { newValue: {} } }, "local");
+  await settle();
+  const groupHeader = must(qa(document, ".tabgroup-header").find((el) => q(el, ".tg-title").textContent === "work"));
+  groupHeader.dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+  assert.deepEqual(items().slice(0, 2), ["Rename group…", "Move group (1 tab) to ▸"]);
+  assert.ok(items().includes("Open group (1 tab) in ▸"));
+  assert.ok(items().includes("Remove parked group"));
+  assert.ok(!items().some((label) => /Snooze|Ungroup|Collapse in tab strip/.test(label)), "no live-group actions");
+  calls.length = 0;
+  must(qa(ctx, ".ctx-item").find((el) => el.textContent === "New window")).click();
+  await tick();
+  await tick();
+  assert.ok(calls.includes("sendMessage move-parked-tabs"), "the group moves as one");
+  // Remove parked group → trash; the toolbar's Undo remove brings it back into Research
+  assert.equal(byId("parked-undo").hidden, true, "nothing removed yet");
+  must(qa(document, ".tabgroup-header").find((el) => q(el, ".tg-title").textContent === "work")).dispatchEvent(
+    new window.Event("contextmenu", { bubbles: true }),
+  );
+  must(qa(ctx, ".ctx-item").find((el) => el.textContent === "Remove parked group")).click();
+  await settle();
+  assert.equal(qa(document, ".row").length, 2, "the group's tab is gone");
+  assert.equal(byId("parked-undo").hidden, false);
+  assert.equal(byId("parked-undo").textContent, "Undo remove (1)");
+  byId("parked-undo").click();
+  await settle();
+  assert.equal(qa(document, ".row").length, 3, "back");
+  assert.ok(
+    qa(document, ".tabgroup-header").some((el) => q(el, ".tg-title").textContent === "work"),
+    "…as the same group in the same parked window",
+  );
+  assert.equal(byId("parked-undo").hidden, true);
+  // bulk bar over ticked parked rows: the four tab actions hide, the count and ✕ stay
+  for (const id of ["bulk-snooze", "bulk-wake", "bulk-protect", "bulk-close"]) {
+    assert.equal(byId(id).hidden, true, `${id} hidden for parked rows`);
+  }
+  const newsRow = must(qa(document, ".row").find((row) => q(row, ".title").textContent.includes("News")));
+  q<HTMLInputElement>(newsRow, "input").click(); // a click toggles the box and selects the row
+  await tick();
+  assert.equal(byId("bulk-count").textContent, "1 selected");
+  assert.equal(byId<HTMLButtonElement>("bulk-clear").disabled, false);
+  byId("bulk-clear").click();
+  await tick();
+
+  // parked window header menu: restore, restore into this window, remove (+ undo)
+  const findHeaderP1 = () =>
+    must(qa(document, ".group-header").find((el) => q(el, ".group-label").textContent === "Research"));
+  let headerP1 = findHeaderP1();
+  assert.ok(headerP1.querySelector(".group-menu-btn"), "⋯ on a parked header even without window names");
+  // a lone parked window keeps its fold arrow and ⋯ (a live lone window has neither)
+  await chrome.storage.local.set({
+    parkedWindows: [
+      { id: "p9", parkedAt: NOWISH, tabs: [{ url: "https://lone.example.com/", title: "Lone" }], groups: [] },
+    ],
+  });
+  await chrome.storage.onChanged.fire({ parkedWindows: {} }, "local");
+  await settle();
+  const lone = q(document, ".group-header");
+  assert.ok(!lone.classList.contains("static"), "a lone parked window still folds");
+  assert.ok(lone.querySelector(".fold-arrow"), "collapse arrow shown");
+  assert.ok(lone.querySelector(".group-menu-btn"), "and the parked menu is reachable");
+  assert.equal(byId("collapse-all").hidden, false, "fold-all toggle offered too");
+  lone.click();
+  await tick();
+  assert.equal(qa(document, ".row").length, 0, "folded: rows hidden");
+  q(document, ".group-header").click();
+  await tick();
+  assert.equal(qa(document, ".row").length, 1, "unfolded again");
+  await chrome.storage.local.set({
+    parkedWindows: [
+      {
+        id: "p1",
+        parkedAt: NOWISH - 60_000,
+        name: "Research",
+        tabs: [
+          { url: "https://docs.example.com/guide", title: "Guide", pinned: true },
+          { url: "https://mail.google.com/inbox", title: "Mail copy", active: true, group: 0 },
+        ],
+        groups: [{ title: "work", color: "blue" }],
+      },
+      { id: "p2", parkedAt: NOWISH - 120_000, tabs: [{ url: "https://news.example.com/", title: "News" }], groups: [] },
+    ],
+  });
+  await chrome.storage.onChanged.fire({ parkedWindows: {} }, "local");
+  await settle();
+  headerP1 = findHeaderP1(); // re-rendered: the earlier node is detached
+  headerP1.dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+  assert.deepEqual(items(), ["Restore window", "Restore into this window", "Rename window…", "Remove parked window"]);
+  calls.length = 0;
+  must(qa(ctx, ".ctx-item").find((el) => el.textContent === "Restore window")).click();
+  await tick();
+  await tick();
+  assert.ok(calls.includes("sendMessage restore-parked"));
+  headerP1.dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+  must(qa(ctx, ".ctx-item").find((el) => el.textContent === "Remove parked window")).click();
+  await settle();
+  const stored = await chrome.storage.local.get(["parkedWindows", "parkedTrash"]);
+  assert.deepEqual(
+    stored.parkedWindows?.map((parked) => parked.id),
+    ["p2"],
+    "forgotten",
+  );
+  assert.equal(stored.parkedTrash?.length, 1, "…into the trash");
+  assert.equal(qa(document, ".row").length, 1);
+  // undo from the ☰ quick actions
+  byId("quick-actions-btn").click();
+  await tick();
+  must(qa(ctx, ".ctx-item").find((el) => el.textContent === "Undo last remove in Parked windows")).click();
+  await settle();
+  assert.deepEqual(
+    (await chrome.storage.local.get("parkedWindows")).parkedWindows?.map((parked) => parked.id),
+    ["p2", "p1"],
+    "back, newest removal first",
+  );
+  assert.equal(qa(document, ".row").length, 3);
+
+  // leaving the scope: live tabs again, chips back, bulk bar as before
+  await chrome.storage.local.set({ ui: uiBefore });
+  await chrome.storage.onChanged.fire({ ui: { newValue: {} } }, "local");
+  await setScope("all-windows");
+  assert.ok(qa(document, ".row").every((row) => !row.classList.contains("parked")));
+  assert.equal(q(document, '#filters [data-filter="awake"]').hidden, false);
+  assert.equal(byId("bulk-snooze").hidden, false);
+  assert.equal(byId("bulk-close").hidden, false);
+  assert.equal(byId("parked-undo").hidden, true);
+  await chrome.storage.local.set({ parkedWindows: [], parkedTrash: [] });
+  sort.value = "recent";
+  sort.dispatchEvent(new window.Event("change", { bubbles: true }));
+  await settle();
 });

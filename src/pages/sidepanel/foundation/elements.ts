@@ -12,6 +12,7 @@ export const bulkBar = getElementById("bulk-bar");
 export const bulkCount = getElementById("bulk-count");
 export const selectAllBox = getElementById("select-all");
 export const collapseAllBtn = getElementById("collapse-all");
+export const parkedUndoBtn = getElementById("parked-undo");
 export const sortDirBtn = getElementById("sort-dir");
 export const winListBtn = getElementById("win-list-btn");
 export const winPop = getElementById("windows-pop");

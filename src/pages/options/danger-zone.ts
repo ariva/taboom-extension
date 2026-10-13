@@ -9,15 +9,20 @@ import { applyTheme } from "./ui-prefs.ts";
 
 // "Delete restore data" only makes sense while an undo stack has something in it
 export async function renderDangerZone(): Promise<void> {
-  const { keepAliveTrash = [], protectionTrash = [] } = await localStore.get(["keepAliveTrash", "protectionTrash"]);
+  const {
+    keepAliveTrash = [],
+    protectionTrash = [],
+    parkedTrash = [],
+  } = await localStore.get(["keepAliveTrash", "protectionTrash", "parkedTrash"]);
   getElementById<HTMLButtonElement>("delete-restore-data").disabled =
-    keepAliveTrash.length === 0 && protectionTrash.length === 0;
+    keepAliveTrash.length === 0 && protectionTrash.length === 0 && parkedTrash.length === 0;
 }
 
 export function initDangerZone(): void {
   // no confirm: the data is only undo history, and the button is dead while there is none
   getElementById("delete-restore-data").addEventListener("click", async () => {
-    await localStore.set({ keepAliveTrash: [], protectionTrash: [] });
+    // every undo stack at once — removed parked windows / groups / tabs included
+    await localStore.set({ keepAliveTrash: [], protectionTrash: [], parkedTrash: [] });
     flashSaved();
     render(); // only trash keys changed — the storage listener does not re-render for those
   });

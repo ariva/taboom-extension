@@ -7,6 +7,14 @@ import {
   setKeepAlivePaused,
   unmarkKeepAlive,
 } from "./keep-alive.ts";
+import {
+  removedParkedSlice,
+  removeParkedTabs,
+  removeParkedWindow,
+  renameParkedGroup,
+  renameParkedWindow,
+  restoreParkedRemoval,
+} from "./parked.ts";
 import { restoreRuleRemoval } from "./protection-rules.ts";
 import { recordRemoval } from "./removal-trash.ts";
 import type {
@@ -14,6 +22,7 @@ import type {
   Features,
   KeepAliveTab,
   LocalStorageSchema,
+  ParkedWindow,
   ProtectionRule,
   SessionStorageSchema,
 } from "./types.ts";
@@ -132,6 +141,85 @@ export async function dropProtectionRules(
 export async function restoreProtectionRules(): Promise<boolean> {
   const { protectionRules = [], protectionTrash = [] } = await localStore.get(["protectionRules", "protectionTrash"]);
   const restored = restoreRuleRemoval(protectionRules, protectionTrash);
+  if (!restored) {
+    return false;
+  }
+  await localStore.set(restored);
+  return true;
+}
+
+// ---------- parked windows: the only writers of storage.local.parkedWindows ----------
+
+// the worker's park step, after the snapshot and before the window closes
+export async function addParkedWindow(parked: ParkedWindow): Promise<void> {
+  const { parkedWindows = [] } = await localStore.get("parkedWindows");
+  await localStore.set({ parkedWindows: [...parkedWindows, parked] });
+}
+
+// one read-edit-write for every list edit; false when the edit changed nothing
+async function editParked(edit: (list: ParkedWindow[]) => ParkedWindow[] | undefined): Promise<boolean> {
+  const { parkedWindows = [] } = await localStore.get("parkedWindows");
+  const next = edit(parkedWindows);
+  if (!next) {
+    return false;
+  }
+  await localStore.set({ parkedWindows: next });
+  return true;
+}
+
+export function renameParked(id: string, name: string): Promise<boolean> {
+  return editParked((list) => renameParkedWindow(list, id, name));
+}
+
+export function renameParkedGroupTitle(id: string, groupIndex: number, title: string): Promise<boolean> {
+  return editParked((list) => renameParkedGroup(list, id, groupIndex, title));
+}
+
+// tabs moved into a live window (or forgotten one by one) leave the snapshot — not a removal, no trash
+export function dropParkedTabs(id: string, indexes: number[]): Promise<boolean> {
+  return editParked((list) => removeParkedTabs(list, id, indexes));
+}
+
+// Remove parked tab / group: the removed slice lands in the trash as its own entry, so Restore
+// last removed can put it back into its window. False when nothing matched.
+export async function removeParkedTabsToTrash(id: string, indexes: number[]): Promise<boolean> {
+  const { parkedWindows = [], parkedTrash = [] } = await localStore.get(["parkedWindows", "parkedTrash"]);
+  const parked = parkedWindows.find((entry) => entry.id === id);
+  const slice = parked ? removedParkedSlice(parked, indexes) : undefined;
+  const remaining = slice ? removeParkedTabs(parkedWindows, id, indexes) : undefined;
+  if (!slice || !remaining) {
+    return false;
+  }
+  await localStore.set({ parkedWindows: remaining, parkedTrash: recordRemoval(parkedTrash, [slice], Date.now()) });
+  return true;
+}
+
+// Restore: the window comes back to life, so the entry simply goes (parking again recreates it)
+export async function takeParkedWindow(id: string): Promise<ParkedWindow | undefined> {
+  const { parkedWindows = [] } = await localStore.get("parkedWindows");
+  const parked = parkedWindows.find((entry) => entry.id === id);
+  if (!parked) {
+    return undefined;
+  }
+  await localStore.set({ parkedWindows: parkedWindows.filter((entry) => entry !== parked) });
+  return parked;
+}
+
+// Remove parked window: the one door that drops one on purpose — it lands in the trash for Undo remove
+export async function forgetParkedWindow(id: string): Promise<boolean> {
+  const { parkedWindows = [], parkedTrash = [] } = await localStore.get(["parkedWindows", "parkedTrash"]);
+  const remaining = removeParkedWindow(parkedWindows, id);
+  if (!remaining) {
+    return false;
+  }
+  const removed = parkedWindows.filter((parked) => !remaining.includes(parked));
+  await localStore.set({ parkedWindows: remaining, parkedTrash: recordRemoval(parkedTrash, removed, Date.now()) });
+  return true;
+}
+
+export async function restoreParkedWindows(): Promise<boolean> {
+  const { parkedWindows = [], parkedTrash = [] } = await localStore.get(["parkedWindows", "parkedTrash"]);
+  const restored = restoreParkedRemoval(parkedWindows, parkedTrash);
   if (!restored) {
     return false;
   }

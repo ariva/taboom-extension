@@ -14,7 +14,7 @@ test("Sidepanel - Elements - Every shared reference resolves in index.html", () 
     .filter(([, el]) => !el)
     .map(([name]) => name);
   assert.deepEqual(missing, []);
-  assert.equal(Object.keys(elements).length, 12);
+  assert.equal(Object.keys(elements).length, 13);
 });
 
 test("Sidepanel - Elements - The two toolbar selects really are <select>s", () => {

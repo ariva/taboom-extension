@@ -3,8 +3,9 @@
 // elsewhere, so the svg is prepended here.
 import { duplicatesToClose } from "../../../app/duplicates.ts";
 import { clearCtxMenu, ctxAppend, ctxDivider, ctxItem, ctxTitle, showCtxMenu } from "../../../lib/ui/context-menu.ts";
-import { duplicatesActive } from "../foundation/state.ts";
+import { duplicatesActive, parkedActive, state } from "../foundation/state.ts";
 import { allDuplicateSets, cleanupAllDuplicates, keeperContext } from "../ops/duplicate-ops.ts";
+import { restoreLastForgotten } from "../ops/parked-ops.ts";
 
 const GEAR =
   '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>';
@@ -12,6 +13,8 @@ const GEAR =
 // (2..22) like the gear so the two icons read the same size at the same box
 const DUPES =
   '<rect x="10" y="10" width="12" height="12" rx="2"/><path d="M16 10V4a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h6"/><path d="M13.5 13.5l5 5M18.5 13.5l-5 5"/>';
+// an undo arrow: bring a forgotten parked window back
+const UNDO = '<path d="M3 7v6h6"/><path d="M3 13a9 9 0 1 0 3-7.7L3 7"/>';
 
 function iconItem(icon: string, label: string, run: () => void): HTMLButtonElement {
   const item = ctxItem(label, run);
@@ -46,6 +49,11 @@ export function openQuickActionsMenu(at: Pick<MouseEvent, "clientX" | "clientY">
       count > 0
         ? "There can be only one: keep one copy of every duplicated page, close the rest (New Tab: one per window; pinned copies stay)"
         : "No page is open more than once";
+    ctxAppend(item);
+  }
+  if (parkedActive() && state.parkedTrashCount > 0) {
+    const item = iconItem(UNDO, "Undo last remove in Parked windows", restoreLastForgotten);
+    item.title = "The last parked window, group or tab you removed comes back";
     ctxAppend(item);
   }
   showCtxMenu(at, "Close"); // a small panel, not a right-click menu: text Close like the quick launch

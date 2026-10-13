@@ -13,7 +13,7 @@ type Tab = chrome.tabs.Tab;
 // The view fields below stay `string`: they arrive unvalidated from the DOM and
 // storage (see UiPrefs), and unknown values simply fall through the switches.
 export type FilterName = "all" | "awake" | "snoozed" | "protected";
-export type ScopeName = "all-windows" | "current-window";
+export type ScopeName = "all-windows" | "current-window" | "parked-windows";
 export type SortName =
   | "recent"
   | "oldest"

@@ -3,6 +3,7 @@
 import { removeHistoryAt } from "../app/core.ts";
 import type { Message } from "../app/messages.ts";
 import { setTabsKeepAlive } from "./keep-alive.ts";
+import { moveParkedTabs, parkWindow, restoreParked } from "./parked.ts";
 import { protectHosts, protectUrls, toggleSiteProtection, unprotectUrls } from "./protection.ts";
 import { autoSnoozePass, recordWakes, snoozeTab } from "./snooze.ts";
 import { historyJump, historyStep, withHistory } from "./tab-history.ts";
@@ -55,6 +56,12 @@ export async function handleMessage(message: Message): Promise<{ protected: bool
     case "sidebar-focused":
     case "sidebar-no-focus":
       return; // acknowledged; no behavior yet — hook points for future focus-aware features
+    case "park-window":
+      return parkWindow(message.windowId);
+    case "restore-parked":
+      return restoreParked(message.id, message.intoWindowId);
+    case "move-parked-tabs":
+      return moveParkedTabs(message.id, message.indexes, message.target, message.keep, message.asGroup ?? false);
     default:
       // every Message member is handled above, so `message` is `never` here — but
       // senders are untyped JS, so an unknown type can still arrive at runtime

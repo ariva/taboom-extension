@@ -28,6 +28,7 @@ export const DEFAULTS = {
     minAwakePerWindow: 2,
     keepAliveEnabled: true, // on as soon as the experimental flag is: nothing happens until a tab is marked
     keepAliveMinutes: 20,
+    askBeforePark: true, // the park dialog's "Don't ask again" flips it; Settings turns it back on
   },
   protectionRules: [],
   ui: {

@@ -1,7 +1,15 @@
 // The panel's single mutable state, its types, and the small predicates derived
 // from it alone that many features read.
 import { featureEnabled } from "../../../app/core.ts";
-import type { FeatureName, Features, KeepAliveTab, NavMode, ProtectionRule, UiPrefs } from "../../../app/types.ts";
+import type {
+  FeatureName,
+  Features,
+  KeepAliveTab,
+  NavMode,
+  ParkedWindow,
+  ProtectionRule,
+  UiPrefs,
+} from "../../../app/types.ts";
 import { capabilities } from "../../../lib/platform/capabilities.ts";
 import type { DerivedTabs, SortDir, WindowMetaMap } from "../model/index.ts";
 
@@ -47,6 +55,14 @@ export interface PanelState {
   pendingScroll: number | null;
   windowMeta: WindowMetaMap;
   tabGroups: Map<number, TabGroup>;
+  // PARKED_WINDOWS: in the Parked windows scope allTabs / tabGroups / windowMeta hold the
+  // parked snapshot as synthetic rows (negative ids) — these keep the live ones for the
+  // surfaces that must stay live there (quick launch, duplicates, move targets)
+  liveTabs: PanelTab[];
+  liveTabGroups: Map<number, TabGroup>;
+  liveWindowMeta: WindowMetaMap;
+  parked: ParkedWindow[];
+  parkedTrashCount: number;
 }
 
 // the single mutable state of the panel — handlers write here, render reads
@@ -91,6 +107,11 @@ export const state: PanelState = {
   pendingScroll: null, // scrollTop to apply after the next render (filter/search switches)
   windowMeta: new Map(), // windowId → { name, color } from windowProfiles (WINDOW_NAMES)
   tabGroups: new Map(), // groupId → { title, color, collapsed } from chrome.tabGroups
+  liveTabs: [],
+  liveTabGroups: new Map(),
+  liveWindowMeta: new Map(),
+  parked: [], // storage.local.parkedWindows
+  parkedTrashCount: 0, // forgotten parked windows waiting in parkedTrash
 };
 
 // TAB_GROUPS flag + API present (permission granted, Chrome supports it)
@@ -122,6 +143,16 @@ export function duplicatesActive(): boolean {
 
 export function pinActive(): boolean {
   return namesActive() && featureEnabled(state.features, "WINDOW_PIN");
+}
+
+// PARKED_WINDOWS resolved flag — Park window… items, the Parked windows scope, the Settings checkbox
+export function parkedActive(): boolean {
+  return featureEnabled(state.features, "PARKED_WINDOWS");
+}
+
+// the list shows parked snapshots instead of live tabs
+export function parkedScope(): boolean {
+  return parkedActive() && state.scope === "parked-windows";
 }
 
 // sorts that only exist while their feature flag is on (option hidden + a

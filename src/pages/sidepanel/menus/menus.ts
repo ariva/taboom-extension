@@ -1,6 +1,7 @@
 // Context menus of the tab list: row menu, tab-group menu, window header menu, and the
 // item builders they share with the windows popover's menus.
 import { keepAliveEntry } from "../../../app/keep-alive.ts";
+import { parkedGroupRef, parkedRef } from "../../../app/parked.ts";
 import { pauseKeepAlive, removeKeepAlive } from "../../../app/storage.ts";
 import type { KeepAliveTab, UiPrefs } from "../../../app/types.ts";
 import { askDialog } from "../../../lib/ui/ask-dialog.ts";
@@ -28,10 +29,12 @@ import {
 } from "../ops/actions.ts";
 import { TAB_GROUP_COLORS, WINDOW_DOT_COLORS, windowGroupName, windowMaps } from "../model/index.ts";
 import { refresh, render } from "../foundation/scheduler.ts";
-import { keepAliveActive, namesActive, pinActive, state, tabGroupsActive } from "../foundation/state.ts";
+import { keepAliveActive, namesActive, parkedActive, pinActive, state, tabGroupsActive } from "../foundation/state.ts";
 import type { PanelTab } from "../foundation/state.ts";
 import { moveTabsToGroup, startRenameTabGroup, ungroupTabs, updateTabGroup } from "../ops/tab-group-ops.ts";
 import { persistUiPrefs } from "../input/toolbar-events.ts";
+import { parkWindowPrompt } from "../ops/parked-ops.ts";
+import { openParkedGroupMenu, openParkedTabMenu, openParkedWindowMenu } from "./parked-menus.ts";
 import {
   moveTabsToWindow,
   orderedWindowIds,
@@ -68,6 +71,10 @@ function appendCtxActions(ids: number[], alwaysCount = false): void {
 }
 
 export function openRowMenu(event: MouseEvent, tabId: number): void {
+  if (parkedRef(tabId)) {
+    openParkedTabMenu(event, tabId); // Parked windows scope: a snapshot row, not a tab
+    return;
+  }
   const ids = actionIds(tabId);
   const sourceWindows = new Set(ids.map((id) => state.allTabs.find((tab) => tab.id === id)?.windowId));
   const maps = windowMaps(state.allTabs, state.currentWindowId, state.windowMeta);
@@ -176,6 +183,10 @@ export function openTabGroupMenu(
   groupId: number,
   startRename: (groupId: number) => void = startRenameTabGroup,
 ): void {
+  if (parkedGroupRef(groupId)) {
+    openParkedGroupMenu(event, groupId); // Parked windows scope: a snapshot's group, not a Chrome group
+    return;
+  }
   const group = state.tabGroups.get(groupId);
   if (!group) {
     return;
@@ -250,6 +261,10 @@ export function appendWindowIdentityItems(
 // visible tab when nothing in it is selected — plus a "Change order" dropdown
 // driving ui.groupByWindowTabsOrder (current one marked)
 export function openWindowHeaderMenu(event: MouseEvent, windowId: number): void {
+  if (parkedRef(windowId)) {
+    openParkedWindowMenu(event, windowId); // Parked windows scope: the header is a parked window
+    return;
+  }
   const windowTabs = state.fullVisible.filter((tab) => tab.windowId === windowId);
   const selectedHere = windowTabs.filter((tab) => state.selected.has(tab.id));
   const ids = (selectedHere.length > 0 ? selectedHere : windowTabs).map((tab) => tab.id);
@@ -270,6 +285,13 @@ export function openWindowHeaderMenu(event: MouseEvent, windowId: number): void 
     // "Rename window…" + "Window color ▸" (palette swatches + Auto)
     appendWindowIdentityItems(windowId);
     ctxAppend(ctxDivider());
+  }
+  if (parkedActive()) {
+    // "Park window…" — snapshot + close, confirmed; the window reappears under Parked windows
+    ctxAppend(
+      ctxItem("Park window…", () => parkWindowPrompt(windowId)),
+      ctxDivider(),
+    );
   }
 
   // "Snooze / Wake / Protect / Unprotect / Close" — the five bulk-bar actions

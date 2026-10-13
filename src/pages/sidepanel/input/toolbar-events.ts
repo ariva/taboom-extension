@@ -5,6 +5,7 @@ import { featureEnabled } from "../../../app/core.ts";
 import { saveState } from "../../../app/storage.ts";
 import { closest, getElementById } from "../../../lib/dom.ts";
 import { closeTabs, protectTabs, snooze, wake } from "../ops/actions.ts";
+import { restoreLastForgotten } from "../ops/parked-ops.ts";
 import {
   filterBar,
   listEl,
@@ -16,10 +17,10 @@ import {
 } from "../foundation/elements.ts";
 import { countsByFilter, searchCandidates } from "../model/index.ts";
 import type { FilterName } from "../model/index.ts";
-import { render } from "../foundation/scheduler.ts";
+import { refresh, render } from "../foundation/scheduler.ts";
 import { canonicalDir, SORT_DIRECTIONS } from "../model/sort-direction.ts";
 import { initialDirFor } from "../render/sorting.ts";
-import { effectiveSort, state } from "../foundation/state.ts";
+import { effectiveSort, parkedActive, state } from "../foundation/state.ts";
 
 // Scroll positions are remembered per filter — in two separate worlds, so they
 // can't clobber each other: scrollByFilter holds normal-browsing positions
@@ -89,9 +90,17 @@ function resetScrollPositions(): void {
 }
 
 scopeSelect.addEventListener("change", () => {
+  const wasParked = parkedActive() && state.scope === "parked-windows";
   state.scope = scopeSelect.value;
   resetScrollPositions();
   persistUiPrefs();
+  // the parked scope lists a different data set (refresh swaps it in / out); the other two
+  // only filter the live list
+  if (wasParked || (parkedActive() && state.scope === "parked-windows")) {
+    state.selected.clear(); // ids of one set mean nothing in the other
+    refresh(!state.query);
+    return;
+  }
   render(!state.query);
 });
 
@@ -178,6 +187,7 @@ export function initBulkButtons(): void {
   getElementById("bulk-wake").addEventListener("click", () => wake([...state.selected]));
   getElementById("bulk-protect").addEventListener("click", () => protectTabs([...state.selected]));
   getElementById("bulk-close").addEventListener("click", () => closeTabs([...state.selected]));
+  getElementById("parked-undo").addEventListener("click", restoreLastForgotten); // Parked windows scope only
 }
 
 getElementById("bulk-clear").addEventListener("click", () => {

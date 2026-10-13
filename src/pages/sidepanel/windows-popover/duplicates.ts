@@ -42,7 +42,7 @@ function openDuplicateMenu(event: MouseEvent, set: DupSet): void {
 
 // right-click on a row (popover.ts): the row only carries the key
 export function openDuplicateMenuForKey(event: MouseEvent, key: string): void {
-  const set = duplicateSets(state.allTabs).find((candidate) => candidate.key === key);
+  const set = duplicateSets(state.liveTabs).find((candidate) => candidate.key === key);
   if (set) {
     openDuplicateMenu(event, set);
   }

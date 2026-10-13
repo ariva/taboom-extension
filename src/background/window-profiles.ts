@@ -129,6 +129,17 @@ async function patchWindowProfilesNow(windowIds: number[], patch: Partial<Window
   }
 }
 
+// the identity bits (name / color / pin) of a live window, if it has a profile yet
+export async function windowProfileOf(windowId: number): Promise<WindowProfile | undefined> {
+  const { windowSessionMap = {} } = await sessionStore.get("windowSessionMap");
+  const logicalId = windowSessionMap[windowId];
+  if (!logicalId) {
+    return undefined;
+  }
+  const { windowProfiles = {} } = await localStore.get("windowProfiles");
+  return windowProfiles[logicalId];
+}
+
 // Which windows to offer a panel restore for (see windowsToRestore).
 // Runs an immediate profile refresh first so restart recovery has happened.
 export async function panelsToRestore(excludeWindowId: number): Promise<{ windows: number[] }> {

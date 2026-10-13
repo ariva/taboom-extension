@@ -11,7 +11,9 @@ import { orderWindowIds } from "../model/window-order.ts";
 
 // display name of a window (custom name or "Window #N") for menu headers
 export function windowLabel(windowId: number): string {
-  const maps = windowMaps(state.allTabs, state.currentWindowId, state.windowMeta);
+  // live sets on purpose: in the Parked windows scope allTabs holds snapshots, and this label
+  // names live windows (quick launch rows, park prompt, move targets)
+  const maps = windowMaps(state.liveTabs, state.currentWindowId, state.liveWindowMeta);
   return windowGroupName(windowId, {
     currentWindowId: state.currentWindowId,
     indexes: maps.indexes,
@@ -22,14 +24,14 @@ export function windowLabel(windowId: number): string {
 // the list order of window-order.ts over the panel state (pins rank only while pinActive())
 export function orderedWindowIds(maps: WindowMaps): number[] {
   const pinnedIds = new Set(
-    pinActive() ? [...maps.indexes.keys()].filter((windowId) => state.windowMeta.get(windowId)?.pinnedWindow) : [],
+    pinActive() ? [...maps.indexes.keys()].filter((windowId) => state.liveWindowMeta.get(windowId)?.pinnedWindow) : [],
   );
   return orderWindowIds(maps, state.currentWindowId, pinnedIds);
 }
 
 export async function moveTabsToWindow(tabIds: number[], windowId: number | null, index = -1): Promise<void> {
   // Chrome unpins a tab that changes window — remember the pins, restore after
-  const pinnedIds = state.allTabs
+  const pinnedIds = state.liveTabs
     .filter((tab) => tab.pinned && tabIds.includes(tab.id) && tab.windowId !== windowId)
     .map((tab) => tab.id);
   if (windowId == null) {
@@ -65,7 +67,7 @@ export function startRenameWindow(windowId: number): void {
     return;
   }
   inlineEdit(label, {
-    initial: state.windowMeta.get(windowId)?.name ?? "",
+    initial: state.liveWindowMeta.get(windowId)?.name ?? "",
     placeholder: "Window name",
     // empty commits too — it clears the name back to the default label
     commit: (name) => send({ type: "window-rename", windowId, name }).catch(() => {}),

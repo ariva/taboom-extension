@@ -19,7 +19,15 @@ import { winListBtn, winPop } from "../foundation/elements.ts";
 import { appendWindowIdentityItems, openMarkMenu, openRowMenu, openTabGroupMenu } from "../menus/menus.ts";
 import { windowMaps } from "../model/index.ts";
 import { refresh } from "../foundation/scheduler.ts";
-import { duplicatesActive, keepAliveActive, pinActive, state, tabGroupsActive } from "../foundation/state.ts";
+import {
+  duplicatesActive,
+  keepAliveActive,
+  parkedActive,
+  pinActive,
+  state,
+  tabGroupsActive,
+} from "../foundation/state.ts";
+import { parkWindowPrompt } from "../ops/parked-ops.ts";
 import { orderedWindowIds, windowLabel } from "../ops/window-ops.ts";
 import { fillGroupRows, registerPopoverRefill, startRenameTabGroupInList } from "./groups.ts";
 import { duplicateSets } from "../../../app/duplicates.ts";
@@ -107,11 +115,12 @@ export function initWindowsPopover(): void {
 // group (the first one comes from the row menu's "Move to group ▸ New group…"), the rest
 // with a member. Empty = nothing to launch (the ▦ button is disabled then).
 function quickLaunchViews() {
-  const maps = windowMaps(state.allTabs, state.currentWindowId, state.windowMeta);
-  const groupList = tabGroupsActive() ? [...state.tabGroups.values()] : [];
-  const pinnedTabs = state.allTabs.filter((tab) => tab.pinned);
+  // live sets: in the Parked windows scope state.allTabs holds snapshots, the quick launch stays live
+  const maps = windowMaps(state.liveTabs, state.currentWindowId, state.liveWindowMeta);
+  const groupList = tabGroupsActive() ? [...state.liveTabGroups.values()] : [];
+  const pinnedTabs = state.liveTabs.filter((tab) => tab.pinned);
   const aliveMarks = keepAliveActive() ? state.keepAlive : [];
-  const dupSets = duplicatesActive() ? duplicateSets(state.allTabs) : [];
+  const dupSets = duplicatesActive() ? duplicateSets(state.liveTabs) : [];
   const windowsView: [WinPopView, string] = ["windows", `Windows (${maps.indexes.size})`];
   const views: [view: WinPopView, label: string][] = [
     ...(maps.indexes.size > 1 ? [windowsView] : []),
@@ -200,7 +209,7 @@ function fillWindowsPopover(): void {
     return;
   }
   if (winPopView === "alive") {
-    fillAliveRows(aliveMarks, state.allTabs, maps);
+    fillAliveRows(aliveMarks, state.liveTabs, maps);
     return;
   }
   if (winPopView === "duplicates") {
@@ -209,7 +218,7 @@ function fillWindowsPopover(): void {
   }
 
   for (const windowId of orderedWindowIds(maps)) {
-    const tabs = state.allTabs.filter((tab) => tab.windowId === windowId);
+    const tabs = state.liveTabs.filter((tab) => tab.windowId === windowId);
     const snoozed = tabs.filter((tab) => tab.discarded).length;
     const awake = tabs.length - snoozed; // filter-chip terminology: awake = not snoozed
     const row = document.createElement("button");
@@ -228,7 +237,7 @@ function fillWindowsPopover(): void {
     name.className = "win-title";
     name.textContent = windowLabel(windowId);
     let pin: HTMLSpanElement | null = null;
-    if (pinActive() && state.windowMeta.get(windowId)?.pinnedWindow) {
+    if (pinActive() && state.liveWindowMeta.get(windowId)?.pinnedWindow) {
       pin = document.createElement("span");
       pin.className = "win-pin";
       pin.textContent = "📌";
@@ -295,7 +304,7 @@ function startRenameWindowInList(windowId: number): void {
     return;
   }
   inlineEdit(title, {
-    initial: state.windowMeta.get(windowId)?.name ?? "",
+    initial: state.liveWindowMeta.get(windowId)?.name ?? "",
     placeholder: "Window name",
     commit: (name) => send({ type: "window-rename", windowId, name }).catch(() => {}),
     finish: () => {
@@ -314,5 +323,8 @@ function openWindowListMenu(event: MouseEvent, windowId: number): void {
     ctxAppend(ctxItem("Focus window", () => chrome.windows.update(windowId, { focused: true })));
   }
   appendWindowIdentityItems(windowId, startRenameWindowInList);
+  if (parkedActive()) {
+    ctxAppend(ctxItem("Park window…", () => parkWindowPrompt(windowId)));
+  }
   showCtxMenu(event);
 }

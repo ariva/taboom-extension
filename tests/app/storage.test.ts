@@ -39,3 +39,93 @@ test("Core - Storage - LoadState on empty storage returns full defaults; saveSta
   assert.equal(reloaded.ui.fontSize, 1.3);
   assert.equal(reloaded.ui.theme, DEFAULTS.ui.theme, "untouched prefs keep defaults");
 });
+
+test("Core - Storage - Parked windows: add, rename, drop tabs, take, forget to trash, restore last removal", async () => {
+  const stored: Partial<LocalStorageSchema> = {};
+  const calls: string[] = [];
+  Object.assign(globalThis, { chrome: makeChrome({ stored, calls }) });
+  const {
+    addParkedWindow,
+    dropParkedTabs,
+    forgetParkedWindow,
+    renameParked,
+    renameParkedGroupTitle,
+    removeParkedTabsToTrash,
+    restoreParkedWindows,
+    takeParkedWindow,
+  } = await import("../../src/app/storage.ts");
+  const one = {
+    id: "p1",
+    parkedAt: 1,
+    tabs: [
+      { url: "https://a.example.com/", title: "A" },
+      { url: "https://b.example.com/", title: "B" },
+    ],
+    groups: [],
+  };
+  const two = {
+    id: "p2",
+    parkedAt: 2,
+    tabs: [{ url: "https://c.example.com/", title: "C", group: 0 }],
+    groups: [{ title: "g", color: "blue" }],
+  };
+  await addParkedWindow(one);
+  await addParkedWindow(two);
+  assert.deepEqual(
+    stored.parkedWindows?.map((parked) => parked.id),
+    ["p1", "p2"],
+  );
+
+  assert.equal(await renameParked("p1", "Work"), true);
+  assert.equal(stored.parkedWindows?.[0]?.name, "Work");
+  assert.equal(await renameParked("p1", "Work"), false, "same name = no write");
+  assert.equal(await renameParkedGroupTitle("p2", 0, "later"), true);
+  assert.equal(stored.parkedWindows?.[1]?.groups[0]?.title, "later");
+  assert.equal(await renameParkedGroupTitle("p2", 3, "x"), false);
+
+  assert.equal(await removeParkedTabsToTrash("p1", [1]), true);
+  assert.deepEqual(
+    stored.parkedWindows?.[0]?.tabs.map((tab) => tab.title),
+    ["A"],
+  );
+  assert.deepEqual(
+    stored.parkedTrash?.at(-1)?.items[0]?.tabs.map((tab) => tab.title),
+    ["B"],
+    "removed tab kept",
+  );
+  assert.equal(await removeParkedTabsToTrash("p1", [9]), false);
+  assert.equal(await restoreParkedWindows(), true);
+  assert.deepEqual(
+    stored.parkedWindows?.[0]?.tabs.map((tab) => tab.title),
+    ["A", "B"],
+    "…and back in its window",
+  );
+  assert.equal(await dropParkedTabs("p1", [1]), true);
+  assert.deepEqual(
+    stored.parkedWindows?.[0]?.tabs.map((tab) => tab.title),
+    ["A"],
+  );
+  assert.equal(await dropParkedTabs("p1", [7]), false);
+  assert.equal(await dropParkedTabs("p2", [0]), true, "last tab out = window out");
+  assert.deepEqual(
+    stored.parkedWindows?.map((parked) => parked.id),
+    ["p1"],
+  );
+  assert.deepEqual(stored.parkedTrash ?? [], [], "moving tabs out is not a removal");
+
+  assert.equal(await forgetParkedWindow("p1"), true);
+  assert.equal(stored.parkedWindows?.length, 0); // not deepEqual([]): that narrows the fixture to never[]
+  assert.equal(stored.parkedTrash?.length, 1);
+  assert.equal(await forgetParkedWindow("p1"), false);
+  assert.equal(await restoreParkedWindows(), true);
+  assert.deepEqual(
+    stored.parkedWindows?.map((parked) => parked.id),
+    ["p1"],
+  );
+  assert.deepEqual(stored.parkedTrash, []);
+  assert.equal(await restoreParkedWindows(), false, "empty trash");
+
+  assert.equal((await takeParkedWindow("p1"))?.name, "Work", "take = remove without trash (restore)");
+  assert.equal(stored.parkedWindows?.length, 0);
+  assert.equal(await takeParkedWindow("p1"), undefined);
+});

@@ -29,6 +29,8 @@ export interface AskDialogOptions {
   input?: { initial?: string; placeholder?: string } | null;
   okLabel?: string;
   cancelLabel?: string;
+  // a checkbox under the message ("Don't ask again"); its state reaches the caller on OK only
+  checkbox?: { label: string; onConfirm: (checked: boolean) => void } | null;
 }
 
 export function askDialog({
@@ -36,6 +38,7 @@ export function askDialog({
   input = null,
   okLabel = "OK",
   cancelLabel = "Cancel",
+  checkbox = null,
 }: AskDialogOptions): Promise<string | true | null> {
   return new Promise((resolve) => {
     let result: string | true | null = null;
@@ -43,10 +46,22 @@ export function askDialog({
     text.className = "ask-message";
     text.textContent = message;
     const field = input ? document.createElement("input") : null;
+    const check = checkbox ? document.createElement("input") : null;
     const confirm = () => {
       result = field ? field.value : true;
+      if (check) {
+        checkbox?.onConfirm(check.checked);
+      }
       askEl.close();
     };
+    let checkLabel: HTMLLabelElement | null = null;
+    if (check) {
+      check.type = "checkbox";
+      check.className = "ask-check";
+      checkLabel = document.createElement("label");
+      checkLabel.className = "ask-check-label";
+      checkLabel.append(check, checkbox?.label ?? "");
+    }
     if (field) {
       field.className = "ask-input";
       field.value = input?.initial ?? "";
@@ -70,7 +85,7 @@ export function askDialog({
     const actions = document.createElement("div");
     actions.className = "ask-actions";
     actions.append(cancel, ok);
-    askEl.replaceChildren(text, ...(field ? [field] : []), actions);
+    askEl.replaceChildren(text, ...(field ? [field] : []), ...(checkLabel ? [checkLabel] : []), actions);
     // every exit — OK, Cancel, Esc, backdrop — funnels through the close event
     askEl.addEventListener("close", () => resolve(result), { once: true });
     askEl.showModal();

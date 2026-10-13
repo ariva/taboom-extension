@@ -140,8 +140,8 @@ test("UI - Sidepanel Sort - Group by window: current window first, headers with 
   search.dispatchEvent(new window.Event("input", { bubbles: true }));
   assert.deepEqual(
     qa(document, ".group-header").map((el) => el.textContent),
-    ["Window Current #11/3"],
-    "single matching group: static header, no fold arrow",
+    [`Window Current #11/3${dots}`],
+    "single matching group: static header, no fold arrow (the ⋯ window menu stays)",
   );
   search.value = "";
   search.dispatchEvent(new window.Event("input", { bubbles: true }));

@@ -15,6 +15,7 @@ const SETTING_IDS: (keyof Settings)[] = [
   "minAwakePerWindow",
   "keepAliveEnabled",
   "keepAliveMinutes", // a <select>: .value / no .min, which the loops below tolerate
+  "askBeforePark",
 ];
 
 export function renderSettings(state: AppState): void {

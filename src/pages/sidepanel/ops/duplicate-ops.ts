@@ -26,7 +26,7 @@ export async function cleanupDuplicates(sets: DupSet[], mode: CleanupMode): Prom
   }
   const message = [
     `Close ${plural(ids.length, "duplicate tab")}?`,
-    ...closingWindows(state.allTabs, ids).map(
+    ...closingWindows(state.liveTabs, ids).map(
       (windowId) => `${windowLabel(windowId)} will close — every tab in it is a duplicate.`,
     ),
     "Chrome's Ctrl+Shift+T reopens closed tabs.",
@@ -36,7 +36,7 @@ export async function cleanupDuplicates(sets: DupSet[], mode: CleanupMode): Prom
 
 // the quick action: every duplicated page, one survivor each (New Tab: one per window)
 export function allDuplicateSets(): DupSet[] {
-  return duplicatesActive() ? duplicateSets(state.allTabs) : [];
+  return duplicatesActive() ? duplicateSets(state.liveTabs) : [];
 }
 
 export function cleanupAllDuplicates(): Promise<void> {

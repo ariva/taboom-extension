@@ -210,22 +210,29 @@ export function renderGroupHeader(
     `${tabGroupId != null && tabGroupId !== -1 ? `Group "${name}"` : name}\n` +
     `${selectedCount}/${count} selected tabs\n` +
     `${count}/${total} visible tabs`;
+  // ⋯ opens the same menu as header right-click — a visible, keyboard-reachable
+  // trigger (hover/focus-only via CSS). A window header gets it with names on (a lone window
+  // too — "Current window" scope shows exactly one, and its menu is where Park / rename live);
+  // a parked window (negative key) always — its menu (restore / remove) is the only way to act on it
+  const parked = Number(groupKey) < 0;
+  const windowMenu = noun === "window" && (namesActive() || parked);
+  const menuBtn = document.createElement("button");
+  menuBtn.className = "group-menu-btn";
+  menuBtn.title = menuBtn.ariaLabel = "Window actions";
+  menuBtn.textContent = "⋯";
+  menuBtn.addEventListener("click", (event) => {
+    event.stopPropagation(); // header click = collapse
+    onMenu(event, Number(groupKey));
+  });
   if (!collapsible) {
     header.classList.add("static");
     header.dataset.tip = info;
+    if (windowMenu) {
+      header.append(menuBtn);
+    }
     return header;
   }
-  // ⋯ opens the same menu as header right-click — a visible, keyboard-reachable
-  // trigger (hover/focus-only via CSS)
-  if (noun === "window" && namesActive()) {
-    const menuBtn = document.createElement("button");
-    menuBtn.className = "group-menu-btn";
-    menuBtn.title = menuBtn.ariaLabel = "Window actions";
-    menuBtn.textContent = "⋯";
-    menuBtn.addEventListener("click", (event) => {
-      event.stopPropagation(); // header click = collapse
-      onMenu(event, Number(groupKey));
-    });
+  if (windowMenu) {
     header.append(menuBtn);
   }
   // collapse chevron right-aligned (accordion layout) — far from the

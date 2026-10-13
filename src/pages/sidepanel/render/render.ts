@@ -3,7 +3,15 @@
 // (row-height feedback, fold-all button, bulk bar).
 import { FOLD_ICONS } from "../../../lib/dom.ts";
 import { hideCtxMenu } from "../../../lib/ui/context-menu.ts";
-import { bulkBar, bulkCount, collapseAllBtn, filterBar, listEl, selectAllBox } from "../foundation/elements.ts";
+import {
+  bulkBar,
+  bulkCount,
+  collapseAllBtn,
+  filterBar,
+  listEl,
+  parkedUndoBtn,
+  selectAllBox,
+} from "../foundation/elements.ts";
 import { openWindowHeaderMenu } from "../menus/menus.ts";
 import {
   bulkSummary,
@@ -23,7 +31,7 @@ import { renderGroupHeader, renderMembersWithTabGroupRuns } from "./headers.ts";
 import { renderRow } from "./row.ts";
 import { effectiveCollapsed, GROUPINGS, renderSortDirButton } from "./sorting.ts";
 import type { PanelRun } from "./sorting.ts";
-import { activeCollapsedSet, effectiveSort, nestedTabGroupsActive, state } from "../foundation/state.ts";
+import { activeCollapsedSet, effectiveSort, nestedTabGroupsActive, parkedScope, state } from "../foundation/state.ts";
 import type { GroupKey } from "../foundation/state.ts";
 import { refillWindowsPopoverIfOpen, syncQuickLaunchButton } from "../windows-popover/popover.ts";
 
@@ -81,7 +89,7 @@ function renderNowImpl(): void {
   if (state.fullVisible.length === 0) {
     const empty = document.createElement("div");
     empty.className = "empty";
-    empty.textContent = emptyMessage(state.query, state.filter);
+    empty.textContent = emptyMessage(state.query, state.filter, parkedScope());
     frag.append(empty);
   }
 
@@ -101,6 +109,7 @@ function renderNowImpl(): void {
       indexes: maps.indexes,
       queryTokens,
       fuzzy: fuzzyActive(state),
+      parked: parkedScope(),
     });
 
   let foldableGroups: PanelRun[] = [];
@@ -110,7 +119,9 @@ function renderNowImpl(): void {
   if (grouping) {
     const collapsed = effectiveCollapsed();
     const groups: PanelRun[] = groupTabs(state.fullVisible, grouping.key);
-    const collapsible = groups.length > 1; // lone group: nothing to fold away
+    // lone group: nothing to fold away — except a parked window, whose header is the thing
+    // the user acts on (fold it to get its rows out of the way, the ⋯ stays)
+    const collapsible = groups.length > 1 || parkedScope();
     anythingToFold = collapsible;
     if (collapsible) {
       foldableGroups = groups;
@@ -170,6 +181,7 @@ function renderNowImpl(): void {
   }
   listEl.replaceChildren(frag);
   syncRowHeight();
+  syncHeaderHeight();
   renderCollapseAllButton(foldableGroups, anythingToFold);
   renderSortDirButton(grouping, anythingToFold);
 
@@ -191,6 +203,9 @@ function renderNowImpl(): void {
     listEl.querySelector(".row.current")?.scrollIntoView({ block: "nearest" });
   }
   renderBulkBar();
+  // Parked windows scope: the newest Remove (window, group or tab) can be undone right here
+  parkedUndoBtn.hidden = !(parkedScope() && state.parkedTrashCount > 0);
+  parkedUndoBtn.textContent = `Undo remove (${state.parkedTrashCount})`;
   syncQuickLaunchButton();
   refillWindowsPopoverIfOpen();
 }
@@ -200,6 +215,17 @@ function renderNowImpl(): void {
 // it and the true height (fonts per OS, fontSize/density settings) makes a
 // restored scrollTop land rows off the saved position. Runs BEFORE the
 // pendingScroll restore so the restore maps through corrected heights.
+// the ask dialog sits right under the header (banners and the fuzzy label change its height)
+let lastHeaderHeight = -1; // -1: the first measurement always writes (a 0 px header in tests included)
+function syncHeaderHeight(): void {
+  // static markup: the panel has one <header>
+  const height = document.querySelector("header")!.getBoundingClientRect().height;
+  if (height !== lastHeaderHeight) {
+    lastHeaderHeight = height;
+    document.documentElement.style.setProperty("--header-h", `${height}px`);
+  }
+}
+
 let lastRowHeight = 0;
 function syncRowHeight(): void {
   const row = listEl.querySelector<HTMLElement>(".row");
@@ -256,6 +282,12 @@ function renderBulkBar(): void {
   // bar is always visible; empty selection disables the actions instead
   for (const button of bulkBar.querySelectorAll("button")) {
     button.disabled = summary.hidden;
+  }
+  // Parked rows are not tabs: the four tab actions hide; the count and the ✕ stay, the
+  // ticked rows act through the row menu (Move / Open / Remove over the selection)
+  for (const id of ["bulk-snooze", "bulk-wake", "bulk-protect", "bulk-close"]) {
+    // static markup: the four buttons live in #bulk-bar
+    bulkBar.querySelector<HTMLElement>(`#${id}`)!.hidden = parkedScope();
   }
   bulkCount.textContent = summary.text;
   selectAllBox.checked = summary.allChecked;

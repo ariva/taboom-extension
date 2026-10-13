@@ -2,6 +2,7 @@
 // the tabs it acted on from the selection and refreshes the panel. copyUrls is the
 // exception: it touches no tab, so the selection stays.
 import { send } from "../../../app/messages.ts";
+import { parkedRef } from "../../../app/parked.ts";
 import { pauseKeepAlive } from "../../../app/storage.ts";
 import { toast } from "../../../lib/ui/toast.ts";
 import { refresh } from "../foundation/scheduler.ts";
@@ -17,6 +18,9 @@ export function actionIds(tabId: number): number[] {
 // ---------- actions ----------
 
 export async function activate(tab: PanelTab): Promise<void> {
+  if (parkedRef(tab.id)) {
+    return; // a parked snapshot has no window to focus (row click / Enter: the menu is the way in)
+  }
   await chrome.windows.update(tab.windowId, { focused: true });
   await chrome.tabs.update(tab.id, { active: true });
   state.followCurrent = true;
