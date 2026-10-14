@@ -27,9 +27,11 @@ export function initDangerZone(): void {
     render(); // only trash keys changed — the storage listener does not re-render for those
   });
 
-  // resets settings + appearance only — protected sites deliberately untouched
+  // resets settings + appearance only — rules, keep-alive marks and parked windows deliberately untouched
   getElementById("restore-defaults").addEventListener("click", async () => {
-    if (!confirm("Restore all settings to their defaults? Protected sites are kept.")) {
+    if (
+      !confirm("Restore all settings to their defaults? Protected sites, keep-alive marks and parked windows are kept.")
+    ) {
       return;
     }
     await saveState(structuredClone({ settings: DEFAULTS.settings, ui: DEFAULTS.ui }));
@@ -39,7 +41,7 @@ export function initDangerZone(): void {
   });
 
   getElementById("danger").addEventListener("click", async () => {
-    if (!confirm("Delete all Taboom settings and protection rules?")) {
+    if (!confirm("Delete all Taboom data — settings, protected sites, keep-alive marks and parked windows?")) {
       return;
     }
     await chrome.storage.local.clear();

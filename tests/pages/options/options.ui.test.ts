@@ -14,6 +14,7 @@ const stored: Pick<LocalStorageSchema, "settings" | "ui"> &
     keepAliveTrash?: Removal<KeepAliveTab>[];
     protectionTrash?: Removal<Omit<ProtectionRule, "createdAt">>[];
     parkedTrash?: LocalStorageSchema["parkedTrash"];
+    parkedWindows?: LocalStorageSchema["parkedWindows"];
   } = {
   settings: { autoSnoozeEnabled: false, inactivityMinutes: 45 },
   protectionRules: [{ id: "r1", type: "domain", pattern: "*.github.com" }],
@@ -292,10 +293,12 @@ test("UI - Options - Show performance stores a timestamped snapshot; reset clear
   assert.equal(byId("perf-out").textContent, "");
 });
 
-test("UI - Options - Restore defaults resets settings/ui but keeps protected sites", async () => {
+test("UI - Options - Restore defaults resets settings/ui but keeps protected sites, keep-alive marks and parked windows", async () => {
   stored.settings = { autoSnoozeEnabled: false, inactivityMinutes: 45 };
   stored.ui = { fontSize: 1.2, theme: "light" };
   stored.protectionRules = [{ id: "r1", type: "domain", pattern: "*.github.com" }];
+  stored.keepAlive = [{ url: "https://keep.example.com/", title: "Keep", minutes: 5, nextReload: 1 }];
+  stored.parkedWindows = [{ id: "p1", parkedAt: 1, tabs: [{ url: "https://p.example.com/", title: "P" }], groups: [] }];
   byId("restore-defaults").click();
   await tick();
   await tick();
@@ -307,6 +310,15 @@ test("UI - Options - Restore defaults resets settings/ui but keeps protected sit
     [{ id: "r1", type: "domain", pattern: "*.github.com" }],
     "protected sites untouched",
   );
+  assert.equal(stored.keepAlive?.length, 1, "keep-alive marks untouched");
+  assert.equal(stored.parkedWindows?.length, 1, "parked windows untouched");
+  assert.match(
+    byId("restore-defaults").previousElementSibling?.textContent ?? "",
+    /Protected sites, keep-alive marks and parked windows stay unchanged/,
+    "card says what is kept",
+  );
+  stored.keepAlive = [];
+  stored.parkedWindows = [];
 });
 
 test("UI - Options - Delete restore data: disabled while both undo stacks are empty, otherwise clears them without a prompt", async () => {
