@@ -282,56 +282,6 @@
   <h1>Taboom Settings</h1>
 
   <section class="card">
-    <h2>Automatic Snooze</h2>
-    <label><input type="checkbox" id="autoSnoozeEnabled" /> Automatically snooze inactive tabs</label>
-    <label>Inactive for <input type="number" id="inactivityMinutes" min="1" /> minutes</label>
-    <label>Check every <input type="number" id="checkIntervalMinutes" min="1" /> minutes</label>
-    <label><input type="checkbox" id="excludePinned" /> Never auto-snooze pinned tabs</label>
-    <label><input type="checkbox" id="excludeAudible" /> Never auto-snooze tabs playing audio</label>
-    <label>Keep at least <input type="number" id="minAwakePerWindow" min="0" /> awake tabs per window <span class="muted">(0 = no limit)</span></label>
-    <p class="muted">Active, protected, and already-snoozed tabs are always excluded.</p>
-  </section>
-
-  <section class="card">
-    <h2>Protected Sites</h2>
-    <p class="muted">Exact host (<code>mail.google.com</code>), domain with subdomains (<code>*.github.com</code>) or one exact page (<code>https://app.example.com/board</code>).</p>
-    <ul id="rules"></ul>
-    <div class="row">
-      <input type="text" id="new-rule" placeholder="*.example.com" />
-      <button id="add-rule">Add</button>
-    </div>
-    <hr class="card-divider" />
-    <p class="muted">Removes every protected site. Settings stay unchanged. Any removal (a chip's ✕, an unprotect from the side panel or page menu, Remove all) can be undone, newest first.</p>
-    <div class="row">
-      <button id="clear-protected">Remove all protected sites</button>
-      <button id="restore-protected" hidden>Restore last removal</button>
-    </div>
-  </section>
-
-  <section class="card" id="keep-alive-section" hidden>
-    <h2>Keep Tabs Alive</h2>
-    <p class="muted">Some sites log you out after a few idle minutes (banking, intranets, admin consoles) and dashboards stop updating once the tab sleeps. Mark such a tab to keep it alive: it reloads on a timer (±55 s), so the session never expires and the data stays fresh, and it is never auto-snoozed. Mark a tab from its right-click menu or the side panel row menu, or add an address below. Pages with unsaved forms may ask "Leave site?" on each reload.</p>
-    <label><input type="checkbox" id="keepAliveEnabled" /> Keep marked tabs alive</label>
-    <div id="keep-alive-body" hidden>
-      <label>Default value <select id="keepAliveMinutes"></select> minutes (copied onto each new mark)</label>
-      <table id="keep-alive-table">
-        <thead><tr><th>#</th><th></th><th>Page</th><th>Reload each (min)</th><th>Tabs</th><th>Next reload</th><th></th></tr></thead>
-        <tbody id="keep-alive-rows"></tbody>
-      </table>
-      <div class="row">
-        <input type="text" id="new-keep-alive" placeholder="https://app.example.com/board (a #fragment makes the mark exact)" />
-        <button id="add-keep-alive">Add</button>
-      </div>
-      <hr class="card-divider" />
-      <p class="muted">Removes every keep-alive mark, paused ones included. Settings stay unchanged. Any removal (a row's Remove, a menu unmark, Remove all) can be undone, newest first.</p>
-      <div class="row">
-        <button id="clear-keep-alive">Remove all keep-alive marks</button>
-        <button id="restore-keep-alive" hidden>Restore last removal</button>
-      </div>
-    </div>
-  </section>
-
-  <section class="card">
     <h2>Interface</h2>
     <!-- for= so a click on the text focuses the dropdown, not the first button -->
     <label for="fontSize">Side panel zoom
@@ -359,7 +309,18 @@
   </section>
 
   <section class="card">
-    <h2>Customization</h2>
+    <h2>Automatic Snooze</h2>
+    <label><input type="checkbox" id="autoSnoozeEnabled" /> Automatically snooze inactive tabs</label>
+    <label>Inactive for <input type="number" id="inactivityMinutes" min="1" /> minutes</label>
+    <label>Check every <input type="number" id="checkIntervalMinutes" min="1" /> minutes</label>
+    <label><input type="checkbox" id="excludePinned" /> Never auto-snooze pinned tabs</label>
+    <label><input type="checkbox" id="excludeAudible" /> Never auto-snooze tabs playing audio</label>
+    <label>Keep at least <input type="number" id="minAwakePerWindow" min="0" /> awake tabs per window <span class="muted">(0 = no limit)</span></label>
+    <p class="muted">Active, protected, and already-snoozed tabs are always excluded.</p>
+  </section>
+
+  <section class="card">
+    <h2>Customizations</h2>
     <label id="searchEmptyFilter-label" hidden>When search matches are hidden by the current filter
       <select id="searchEmptyFilter">
         <option value="keep">Keep the current filter</option>
@@ -402,6 +363,45 @@
     <p id="experimental-warning" hidden>⚠ Experimental features enabled — they may change over time and may not be fully polished.</p>
     <label id="experimental_fuzzySearch-label" hidden><input type="checkbox" id="experimental_fuzzySearch" /> Fuzzy search
       <span class="muted">(scattered letters match in order — no typo tolerance; best matches on top)</span></label>
+  </section>
+
+  <section class="card">
+    <h2>Protected Sites</h2>
+    <p class="muted">Exact host (<code>mail.google.com</code>), domain with subdomains (<code>*.github.com</code>) or one exact page (<code>https://app.example.com/board</code>).</p>
+    <ul id="rules"></ul>
+    <div class="row">
+      <input type="text" id="new-rule" placeholder="*.example.com" />
+      <button id="add-rule">Add</button>
+    </div>
+    <hr class="card-divider" />
+    <p class="muted">Removes every protected site. Settings stay unchanged. Any removal (a chip's ✕, an unprotect from the side panel or page menu, Remove all) can be undone, newest first.</p>
+    <div class="row">
+      <button id="clear-protected">Remove all protected sites</button>
+      <button id="restore-protected" hidden>Restore last removal</button>
+    </div>
+  </section>
+
+  <section class="card" id="keep-alive-section" hidden>
+    <h2>Keep Tabs Alive</h2>
+    <p class="muted">Some sites log you out after a few idle minutes (banking, intranets, admin consoles) and dashboards stop updating once the tab sleeps. Mark such a tab to keep it alive: it reloads on a timer (±55 s), so the session never expires and the data stays fresh, and it is never auto-snoozed. Mark a tab from its right-click menu or the side panel row menu, or add an address below. Pages with unsaved forms may ask "Leave site?" on each reload.</p>
+    <label><input type="checkbox" id="keepAliveEnabled" /> Keep marked tabs alive</label>
+    <div id="keep-alive-body" hidden>
+      <label>Default value <select id="keepAliveMinutes"></select> minutes (copied onto each new mark)</label>
+      <table id="keep-alive-table">
+        <thead><tr><th>#</th><th></th><th>Page</th><th>Reload each (min)</th><th>Tabs</th><th>Next reload</th><th></th></tr></thead>
+        <tbody id="keep-alive-rows"></tbody>
+      </table>
+      <div class="row">
+        <input type="text" id="new-keep-alive" placeholder="https://app.example.com/board (a #fragment makes the mark exact)" />
+        <button id="add-keep-alive">Add</button>
+      </div>
+      <hr class="card-divider" />
+      <p class="muted">Removes every keep-alive mark, paused ones included. Settings stay unchanged. Any removal (a row's Remove, a menu unmark, Remove all) can be undone, newest first.</p>
+      <div class="row">
+        <button id="clear-keep-alive">Remove all keep-alive marks</button>
+        <button id="restore-keep-alive" hidden>Restore last removal</button>
+      </div>
+    </div>
   </section>
 
   <section class="card">
