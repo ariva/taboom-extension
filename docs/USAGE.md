@@ -47,7 +47,7 @@ Panel position (left or right) is a global Chrome setting: `chrome://settings/ap
 
 - **Search** — focused on open; matches title, URL, and hostname; multiple words all must match (`github rust`).
 - **Filters** — All / Awake / Snoozed / Protected, with live counts.
-- **Scope & sort** — current window, all windows or **Parked windows** (see below); recent / oldest / title / domain.
+- **Scope & sort** — **All open windows**, **Current window** or **Parked windows** (see below); recent / oldest / title / domain.
 - **Row click** — focuses the window and activates the tab (snoozed tabs reload).
 - **Visual states** — each window's active tab has an accent left edge + bold title; snoozed tabs are dimmed with a ⏸ title prefix and `SNOOZED` badge.
 - **Hover actions** — ⏸ snooze, 🛡 protect/unprotect site, ✕ close.

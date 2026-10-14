@@ -115,10 +115,10 @@ test("UI - Sidepanel - Toolbar selects open the custom dropdown, not the native 
   const items = qa(dd, ".dd-item").map((el) => el.textContent);
   assert.deepEqual(
     items,
-    ["All windows", "Current window", ...(PARKED_ON ? ["Parked windows"] : [])],
+    ["All open windows", "Current window", ...(PARKED_ON ? ["Parked windows"] : [])],
     "scope options listed",
   );
-  assert.ok(q(dd, ".dd-item.current").textContent === "All windows", "current value marked");
+  assert.ok(q(dd, ".dd-item.current").textContent === "All open windows", "current value marked");
 
   // picking an option updates the select and fires its change handler
   must(qa(dd, ".dd-item").find((el) => el.textContent === "Current window")).click();
@@ -128,7 +128,7 @@ test("UI - Sidepanel - Toolbar selects open the custom dropdown, not the native 
 
   // restore
   scope.dispatchEvent(new window.Event("mousedown", { bubbles: true, cancelable: true }));
-  must(qa(dd, ".dd-item").find((el) => el.textContent === "All windows")).click();
+  must(qa(dd, ".dd-item").find((el) => el.textContent === "All open windows")).click();
   assert.equal(scope.value, "all-windows");
   await tick();
 
