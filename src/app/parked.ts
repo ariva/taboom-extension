@@ -180,6 +180,24 @@ function mergeParked(existing: ParkedWindow, slice: ParkedWindow): ParkedWindow 
   };
 }
 
+// live tabs moved into a parked window: appended ungrouped; the pin survives (restore
+// re-pins), the active flag does not — the window already has its active tab
+export function addParkedTabs(list: ParkedWindow[], id: string, tabs: ParkedTab[]): ParkedWindow[] | undefined {
+  if (tabs.length === 0) {
+    return undefined;
+  }
+  return patchParked(list, id, (parked) => ({
+    ...parked,
+    tabs: [...parked.tabs, ...tabs.map(({ active: _active, group: _group, ...rest }) => rest)],
+  }));
+}
+
+// indexes into the list, newest parked first — the order the quick launch and the move
+// targets show them in
+export function parkedNewestFirst(list: ParkedWindow[]): number[] {
+  return list.map((_parked, index) => index).sort((a, b) => (list[b]?.parkedAt ?? 0) - (list[a]?.parkedAt ?? 0));
+}
+
 // empty name = back to the "Parked <date>" label
 export function renameParkedWindow(list: ParkedWindow[], id: string, name: string): ParkedWindow[] | undefined {
   const trimmed = name.trim();

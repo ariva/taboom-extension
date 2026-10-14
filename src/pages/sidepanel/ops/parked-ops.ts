@@ -6,6 +6,7 @@ import type { ParkedTarget } from "../../../app/messages.ts";
 import { send } from "../../../app/messages.ts";
 import { parkedGroupRef, parkedRef, parkedWindowLabel } from "../../../app/parked.ts";
 import {
+  appendParkedTabs,
   forgetParkedWindow,
   loadState,
   renameParked,
@@ -14,13 +15,15 @@ import {
   restoreParkedWindows,
   saveState,
 } from "../../../app/storage.ts";
-import type { ParkedWindow } from "../../../app/types.ts";
+import type { ParkedTab, ParkedWindow } from "../../../app/types.ts";
+import { closingWindows } from "../../../app/duplicates.ts";
 import { askDialog } from "../../../lib/ui/ask-dialog.ts";
 import { inlineEdit } from "../../../lib/ui/inline-edit.ts";
 import { toast } from "../../../lib/ui/toast.ts";
 import { listEl } from "../foundation/elements.ts";
 import { refresh } from "../foundation/scheduler.ts";
 import { state } from "../foundation/state.ts";
+import { closeTabs } from "./actions.ts";
 import { windowLabel } from "./window-ops.ts";
 
 // the parked window a synthetic window id (or any of its row ids) stands for
@@ -90,6 +93,28 @@ export async function restoreParkedPrompt(syntheticWindowId: number): Promise<bo
   }
   await restoreParked(syntheticWindowId, false);
   return true;
+}
+
+// Move tab to ▸ Parked: live tabs join a parked window's snapshot and close. The snapshot
+// is written before the close (like Park); a window losing its last tab is named first.
+export async function moveTabsToParked(tabIds: number[], parked: ParkedWindow): Promise<void> {
+  const ids = new Set(tabIds);
+  const tabs: ParkedTab[] = state.liveTabs.flatMap((tab) => {
+    const url = tab.url || tab.pendingUrl;
+    return ids.has(tab.id) && url ? [{ url, title: tab.title || url, ...(tab.pinned ? { pinned: true } : {}) }] : [];
+  });
+  if (tabs.length === 0) {
+    return;
+  }
+  const closing = closingWindows(state.liveTabs, tabIds);
+  const message =
+    tabs.length > 1 || closing.length > 0
+      ? [
+          `Move ${tabs.length} tab${tabs.length === 1 ? "" : "s"} to ${parkedWindowLabel(parked)}?`,
+          ...closing.map((windowId) => `${windowLabel(windowId)} will close — every tab in it moves.`),
+        ].join("\n")
+      : undefined;
+  await closeTabs(tabIds, message, () => appendParkedTabs(parked.id, tabs));
 }
 
 // row ids → their parked window id + tab indexes (a selection may span parked windows)

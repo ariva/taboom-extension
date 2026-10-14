@@ -2502,3 +2502,59 @@ test("UI - Sidepanel - PARKED_WINDOWS: the quick launch Windows view lists parke
   await chrome.storage.onChanged.fire({ parkedWindows: {} }, "local");
   await settle();
 });
+
+test("UI - Sidepanel - PARKED_WINDOWS: Move tab to ▸ offers the parked windows; the tab joins the snapshot and closes", {
+  skip: !PARKED_ON,
+}, async () => {
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 200));
+  const NOWISH = Date.now();
+  await chrome.storage.local.set({
+    parkedWindows: [
+      { id: "p2", parkedAt: NOWISH - 120_000, tabs: [{ url: "https://news.example.com/", title: "News" }], groups: [] },
+      {
+        id: "p1",
+        parkedAt: NOWISH - 60_000,
+        name: "Research",
+        tabs: [{ url: "https://docs.example.com/guide", title: "Guide" }],
+        groups: [],
+      },
+    ],
+    parkedTrash: [],
+  });
+  await chrome.storage.onChanged.fire({ parkedWindows: {} }, "local");
+  await settle();
+  const menu = byId("ctx-menu");
+  const row = q(document, '.row[data-tab-id="1"]');
+  row.dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+  const submenu = q(menu, ".ctx-submenu");
+  assert.ok(submenu.querySelector(".ctx-divider"), "a divider separates the parked targets");
+  assert.equal(q(submenu, ".ctx-title").textContent, "Parked:");
+  const parkedItems = qa(submenu, ".ctx-item")
+    .map((el) => el.textContent)
+    .slice(-2);
+  assert.deepEqual(
+    parkedItems,
+    ["Research", `Parked ${new Date(NOWISH - 120_000).toLocaleString()}`],
+    "newest first, after New window",
+  );
+  calls.length = 0;
+  must(qa(submenu, ".ctx-item").find((el) => el.textContent === "Research")).click();
+  await settle();
+  const stored = (await chrome.storage.local.get("parkedWindows")).parkedWindows;
+  assert.deepEqual(
+    stored?.find((parked) => parked.id === "p1")?.tabs,
+    [
+      { url: "https://docs.example.com/guide", title: "Guide" },
+      { url: "https://github.com/pr/1", title: "My Pull Request" },
+    ],
+    "the live tab is appended to the snapshot",
+  );
+  assert.ok(
+    calls.some((c) => c.startsWith("tabs.remove 1")),
+    "…and closed",
+  );
+  assert.equal(menu.hidden, true);
+  await chrome.storage.local.set({ parkedWindows: [], parkedTrash: [] });
+  await chrome.storage.onChanged.fire({ parkedWindows: {} }, "local");
+  await settle();
+});

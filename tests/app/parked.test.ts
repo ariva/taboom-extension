@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
 import {
+  addParkedTabs,
   parkedGroupRef,
+  parkedNewestFirst,
   parkedPanelTabs,
   parkedRef,
   renameParkedGroup,
@@ -219,4 +221,26 @@ test("Parked - panel tabs: synthetic negative ids per window / tab / group, roun
   assert.match(meta.get(e.windowId)?.name ?? "", /^Parked /);
   assert.equal(a.index, 0);
   assert.equal(b.index, 1);
+});
+
+test("Parked - add tabs: live tabs appended ungrouped (pins kept, active dropped); undefined when unknown or nothing to add", () => {
+  const added = addParkedTabs([parked, other], "p1", [
+    { url: "https://x.example.com/", title: "X", pinned: true, active: true },
+    { url: "https://y.example.com/", title: "Y" },
+  ]);
+  assert.deepEqual(added?.[0]?.tabs.slice(-2), [
+    { url: "https://x.example.com/", title: "X", pinned: true },
+    { url: "https://y.example.com/", title: "Y" },
+  ]);
+  assert.equal(added?.[0]?.groups, parked.groups, "groups untouched");
+  assert.equal(added?.[1], other, "other windows keep identity");
+  assert.equal(addParkedTabs([parked], "nope", [{ url: "https://x.example.com/", title: "X" }]), undefined);
+  assert.equal(addParkedTabs([parked], "p1", []), undefined);
+});
+
+test("Parked - newest first: indexes into the list by parkedAt, descending", () => {
+  const older = { ...other, id: "p0", parkedAt: NOW - 5 };
+  const newest = { ...other, id: "p3", parkedAt: NOW + 5 };
+  assert.deepEqual(parkedNewestFirst([older, parked, newest]), [2, 1, 0]);
+  assert.deepEqual(parkedNewestFirst([]), []);
 });

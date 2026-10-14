@@ -1,7 +1,7 @@
 // Parked rows of the quick launch's Windows view: under the live windows, one row per
 // parked window (newest first) — click restores it (confirmed), ⋯ / right-click opens the
 // parked window menu, whose Rename edits the row in place.
-import { parkedWindowId, parkedWindowLabel } from "../../../app/parked.ts";
+import { parkedNewestFirst, parkedWindowId, parkedWindowLabel } from "../../../app/parked.ts";
 import { renameParked } from "../../../app/storage.ts";
 import { inlineEdit } from "../../../lib/ui/inline-edit.ts";
 import { winPop } from "../foundation/elements.ts";
@@ -9,11 +9,9 @@ import { refresh } from "../foundation/scheduler.ts";
 import { state } from "../foundation/state.ts";
 import { parkedOf, restoreParkedPrompt } from "../ops/parked-ops.ts";
 
-// parked windows, newest first, with the synthetic id their menu / rename works on
-export function parkedRowsNewestFirst(): { id: number; count: number }[] {
-  return state.parked
-    .map((parked, index) => ({ id: parkedWindowId(index), count: parked.tabs.length, parkedAt: parked.parkedAt }))
-    .sort((a, b) => b.parkedAt - a.parkedAt);
+// parked windows, newest first, as the synthetic ids their menu / rename works on
+export function parkedRowsNewestFirst(): number[] {
+  return parkedNewestFirst(state.parked).map(parkedWindowId);
 }
 
 export function fillParkedRows(onMenu: (event: MouseEvent, windowId: number) => void): void {
@@ -25,7 +23,7 @@ export function fillParkedRows(onMenu: (event: MouseEvent, windowId: number) => 
   heading.className = "win-section muted";
   heading.textContent = `Parked (${rows.length})`;
   winPop.append(heading);
-  for (const { id } of rows) {
+  for (const id of rows) {
     const parked = parkedOf(id);
     if (!parked) {
       continue;

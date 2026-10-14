@@ -47,20 +47,20 @@ Panel position (left or right) is a global Chrome setting: `chrome://settings/ap
 
 - **Search** — focused on open; matches title, URL, and hostname; multiple words all must match (`github rust`).
 - **Filters** — All / Awake / Snoozed / Protected, with live counts.
-- **Scope & sort** — current window vs all windows (with experimental features on, also **Parked windows**, see below); recent / oldest / title / domain.
+- **Scope & sort** — current window, all windows or **Parked windows** (see below); recent / oldest / title / domain.
 - **Row click** — focuses the window and activates the tab (snoozed tabs reload).
 - **Visual states** — each window's active tab has an accent left edge + bold title; snoozed tabs are dimmed with a ⏸ title prefix and `SNOOZED` badge.
 - **Hover actions** — ⏸ snooze, 🛡 protect/unprotect site, ✕ close.
 - **Checkboxes** — select several tabs, then bulk Snooze / Protect / Close from the bottom bar. Closing more than one tab asks for confirmation.
 - **Quick launch (▦)** — a popover with one view per thing worth switching between, each a tab with its count: **Windows** (only with two or more windows, or a parked one), **Groups** (only once a group exists — the first one comes from a row's **Move to group ▸ New group…**; the view's own **+ New group…** row adds more), **Pins**, **Alive** and **Dupes** (only while they have members). A single view shows as a heading; with nothing at all (one window, nothing else) the ▦ button is greyed out.
-- **Quick actions (☰)** — top-right menu (opening it closes any other popup: quick launch, history list, a dropdown): **Open Settings**, and with experimental features on **Cleanup Duplicates (N)**, which runs *There can be only one* over every duplicated page at once (N = tabs it would close; greyed out when nothing is duplicated; confirmed first).
+- **Quick actions (☰)** — top-right menu (opening it closes any other popup: quick launch, history list, a dropdown): **Open Settings**, **Cleanup Duplicates (N)**, which runs *There can be only one* over every duplicated page at once (N = tabs it would close; greyed out when nothing is duplicated; confirmed first), and **Undo last remove in Parked windows**.
 - **Select all** — checkbox left of the scope selector selects/unselects every tab currently shown (i.e. matching the active search and filter). Search first, select all, then bulk-act.
 
 Keyboard: `/` focus search · `↑`/`↓` move selection · `Enter` activate · `Esc` clear search.
 
-### Duplicates (experimental)
+### Duplicates
 
-Enable **Settings → Show experimental features**. The quick launch (▦) then gains a **Dupes (N)** view whenever some page is open more than once — N counts pages, not tabs (hover the tab for the long name). Same page = same address without its `#fragment` (the query string counts). One row per page: title, `3 tabs · 2 windows`, a checkbox in front (all ticked when the view opens; hover a row for the per-window breakdown). Click a row to jump to the copy that would be kept. Above the rows, **All** ticks or unticks every page, and two buttons act on the ticked pages, each showing how many tabs it would close:
+The quick launch (▦) gains a **Dupes (N)** view whenever some page is open more than once — N counts pages, not tabs (hover the tab for the long name). Same page = same address without its `#fragment` (the query string counts). One row per page: title, `3 tabs · 2 windows`, a checkbox in front (all ticked when the view opens; hover a row for the per-window breakdown). Click a row to jump to the copy that would be kept. Above the rows, **All** ticks or unticks every page, and two buttons act on the ticked pages, each showing how many tabs it would close:
 
 - **There can be only one** — one copy of each page survives across all windows, the rest close.
 - **Cleanup each window** — one copy survives in every window; a window holding a single copy is untouched.
@@ -71,14 +71,15 @@ A confirmation lists how many tabs close and names any window that would close w
 
 Tab history works from any tab, no panel needed: `Ctrl+Shift+,` back · `Ctrl+Shift+.` forward (`Cmd` on Mac). Same trail as the panel's ◀ ▶ buttons and the History context menu. When the active tab changes outside the panel (these shortcuts, Ctrl+Tab, a click in the tab strip), the open panel scrolls just enough to show the new current row.
 
-### Parked windows (experimental)
+### Parked windows
 
-Enable **Settings → Show experimental features**. A window you do not need right now but do not want to lose can be **parked**: Taboom saves its tabs (order, pinned tabs, tab groups with their names and colors, which tab was active) and its own name, color and pin, then closes it. Nothing is loaded while it is parked — no memory, no reloads.
+A window you do not need right now but do not want to lose can be **parked**: Taboom saves its tabs (order, pinned tabs, tab groups with their names and colors, which tab was active) and its own name, color and pin, then closes it. Nothing is loaded while it is parked — no memory, no reloads.
 
 - **Park** — the window header's ⋯ / right-click menu (Group by window) or the quick launch's window row menu → **Park window…**. A dialog asks first and says where the window goes; tick **Don't ask again** to skip it from then on (**Settings → Ask before parking a window** turns the question back on). The only open window cannot be parked — closing it would close Chrome.
 - **Find them** — the scope selector gains **Parked windows**. The quick launch (▦) **Windows** view also lists them under a **Parked (N)** heading below the open windows, newest first, with a grey dot, `N tabs · M groups · parked <date>` and the tab titles on hover; its label counts both kinds together: *Windows (3)* for two open and one parked. Click a parked row to restore it as a new window (asked first); its ⋯ / right-click menu is the parked window menu below plus **Show in Parked windows**, which switches to the scope. **Rename window…** there edits the row in place. Each parked window is a group of rows with a `parked` badge; search, the sorts and groupings, and the **Protected** chip work on them like on live tabs (Awake / Snoozed hide: nothing parked is either). The window header shows the window's name, or *Parked <date>* when it had none; rename it from its menu.
 - **Restore** — the parked window header's ⋯ (always there, even for a single parked window — which also keeps its collapse arrow) / right-click menu: **Restore window** rebuilds it as a new window with everything above (name, color and pin included); **Restore into this window** appends its tabs to the window you are in instead (groups recreated there). Either way the entry leaves Parked windows; park again if you change your mind. Restored tabs load when Chrome opens them — the page content itself was never stored.
 - **Single tabs** — click a parked row (or right-click it) for its menu: **Move parked tab to ▸** a live window or a new one (**Move … to group ▸** for a tab group) opens it there and drops it from the parked window; **Open parked tab in ▸** opens a copy and keeps it parked; **Remove parked tab** drops it without opening. Tick several rows to act on them at once; a parked window whose last tab leaves disappears.
+- **Into a parked window** — a live tab's **Move tab to ▸** submenu ends with a **Parked:** section listing the parked windows (newest first): pick one and the tab (or the ticked selection) is appended to that snapshot and closed, its pin kept. Several tabs, or a window that would close with its last tab, are confirmed first.
 - **Groups** — a parked tab group's header (right-click) has its own menu: **Rename group…**, **Move group to ▸** / **Open group in ▸** a window (the tabs arrive as a Chrome group with the same name and color) and **Remove parked group**.
 - **Remove** — **Remove parked window / group / tab** drops it without opening anything. Every removal can be undone, newest first: the **Undo remove (N)** button in the toolbar while you are in the Parked windows scope, **Undo last remove** in the parked window menu, and **Undo last remove in Parked windows** in the ☰ quick actions menu (works from any scope, also when nothing is parked any more). A removed group or tab goes back into its parked window (or stands on its own if that window is gone).
 - **Several at once** — tick parked rows, then open any ticked row's menu: Move / Open / Remove act on the whole selection. The bottom bar only counts them there (its tab actions are hidden).

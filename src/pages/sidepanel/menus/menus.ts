@@ -1,7 +1,7 @@
 // Context menus of the tab list: row menu, tab-group menu, window header menu, and the
 // item builders they share with the windows popover's menus.
 import { keepAliveEntry } from "../../../app/keep-alive.ts";
-import { parkedGroupRef, parkedRef } from "../../../app/parked.ts";
+import { parkedGroupRef, parkedNewestFirst, parkedRef, parkedWindowLabel } from "../../../app/parked.ts";
 import { pauseKeepAlive, removeKeepAlive } from "../../../app/storage.ts";
 import type { KeepAliveTab, UiPrefs } from "../../../app/types.ts";
 import { askDialog } from "../../../lib/ui/ask-dialog.ts";
@@ -33,7 +33,7 @@ import { keepAliveActive, namesActive, parkedActive, pinActive, state, tabGroups
 import type { PanelTab } from "../foundation/state.ts";
 import { moveTabsToGroup, startRenameTabGroup, ungroupTabs, updateTabGroup } from "../ops/tab-group-ops.ts";
 import { persistUiPrefs } from "../input/toolbar-events.ts";
-import { parkWindowPrompt } from "../ops/parked-ops.ts";
+import { moveTabsToParked, parkWindowPrompt } from "../ops/parked-ops.ts";
 import { openParkedGroupMenu, openParkedTabMenu, openParkedWindowMenu } from "./parked-menus.ts";
 import {
   moveTabsToWindow,
@@ -115,6 +115,16 @@ export function openRowMenu(event: MouseEvent, tabId: number): void {
     submenu.append(ctxItem(name, () => moveTabsToWindow(ids, windowId)));
   }
   submenu.append(ctxItem("New window", () => moveTabsToWindow(ids, null)));
+  // parked windows as targets: the tab closes and waits in that snapshot
+  if (parkedActive() && state.parked.length > 0) {
+    submenu.append(ctxDivider(), ctxTitle("Parked:"));
+    for (const index of parkedNewestFirst(state.parked)) {
+      const parked = state.parked[index];
+      if (parked) {
+        submenu.append(ctxItem(parkedWindowLabel(parked), () => moveTabsToParked(ids, parked)));
+      }
+    }
+  }
   if (tabGroupsActive()) {
     const groupMenu = ctxSubmenu(ids.length > 1 ? `Move ${ids.length} tabs to group` : "Move to group");
     ctxAppend(groupMenu.btn, groupMenu.submenu);

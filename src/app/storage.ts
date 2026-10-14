@@ -8,6 +8,7 @@ import {
   unmarkKeepAlive,
 } from "./keep-alive.ts";
 import {
+  addParkedTabs,
   removedParkedSlice,
   removeParkedTabs,
   removeParkedWindow,
@@ -22,6 +23,7 @@ import type {
   Features,
   KeepAliveTab,
   LocalStorageSchema,
+  ParkedTab,
   ParkedWindow,
   ProtectionRule,
   SessionStorageSchema,
@@ -173,6 +175,11 @@ export function renameParked(id: string, name: string): Promise<boolean> {
 
 export function renameParkedGroupTitle(id: string, groupIndex: number, title: string): Promise<boolean> {
   return editParked((list) => renameParkedGroup(list, id, groupIndex, title));
+}
+
+// live tabs moved into a parked window (Move tab to ▸ Parked:) — written before they close
+export function appendParkedTabs(id: string, tabs: ParkedTab[]): Promise<boolean> {
+  return editParked((list) => addParkedTabs(list, id, tabs));
 }
 
 // tabs moved into a live window (or forgotten one by one) leave the snapshot — not a removal, no trash

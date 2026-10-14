@@ -64,13 +64,20 @@ export async function wake(tabIds: number[]): Promise<void> {
 }
 
 // confirmMessage: a caller that knows the consequences (Duplicates view: windows that
-// close with their last tab) spells them out and is always asked, even for one tab
-export async function closeTabs(tabIds: number[], confirmMessage?: string): Promise<void> {
+// close with their last tab) spells them out and is always asked, even for one tab.
+// beforeClose: work that must land before the tabs go (a parked snapshot of them) — after
+// the confirm, so a Cancel leaves nothing behind
+export async function closeTabs(
+  tabIds: number[],
+  confirmMessage?: string,
+  beforeClose?: () => Promise<unknown>,
+): Promise<void> {
   // Native confirm for multi-close; upgrade to undo snackbar if it annoys
   const message = confirmMessage ?? (tabIds.length > 1 ? `Close ${tabIds.length} tabs?` : null);
   if (message !== null && !confirm(message)) {
     return;
   }
+  await beforeClose?.();
   try {
     await chrome.tabs.remove(tabIds);
   } catch (error) {
