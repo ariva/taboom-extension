@@ -32,6 +32,11 @@ test("UI - Options - Renders stored settings into inputs", () => {
   assert.equal(byId<HTMLSelectElement>("density").value, "compact");
   assert.equal(byId<HTMLSelectElement>("theme").value, "light");
   assert.match(byId("about").textContent, /0\.0\.0-test/);
+  assert.match(
+    byId("page-title").textContent,
+    /Taboom Extension v0\.0\.0-test Settings$/,
+    "heading carries the version",
+  );
 });
 
 test("UI - Options - Stored theme forced onto the page", () => {

@@ -361,6 +361,7 @@ test("Model - BulkSummary states: none, partial, all selected", () => {
 const {
   FONT_SIZE_STEPS,
   aboutText,
+  settingsTitle,
   clampFontSize,
   clampedNumber,
   hasRule,
@@ -380,6 +381,7 @@ test("Model - Options - Clamps, rule lookup, about text", () => {
   assert.equal(hasRule([{ pattern: "*.a.com" }], "*.a.com"), true);
   assert.equal(hasRule([{ pattern: "*.a.com" }], "a.com"), false);
   assert.equal(aboutText("1.2.3"), "Taboom 1.2.3");
+  assert.equal(settingsTitle("1.2.3"), "Taboom Extension v1.2.3 Settings");
 });
 
 test("Model - Options - Zoom steps walk the presets and snap in-between values", () => {

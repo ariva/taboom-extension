@@ -4,7 +4,7 @@
 import { loadFeatures, loadState } from "../../app/storage.ts";
 import { getReleaseVersion, markDevPage } from "../../app/env.ts";
 import { closest, getElementById } from "../../lib/dom.ts";
-import { aboutText } from "./model.ts";
+import { aboutText, settingsTitle } from "./model.ts";
 import { registerRender, setFeatures } from "./page-state.ts";
 // The feature modules register nothing when evaluated: each wires its listeners in an
 // init*() called below, so their import order does not matter.
@@ -16,6 +16,8 @@ import { initPerfPanel } from "./perf-panel.ts";
 import { initDangerZone, renderDangerZone } from "./danger-zone.ts";
 import { initWhatsNew } from "./whats-new.ts";
 
+// before markDevPage: the dev prefix goes in front of the final heading
+getElementById("page-title").textContent = settingsTitle(getReleaseVersion());
 markDevPage();
 const FEATURES = await loadFeatures();
 setFeatures(FEATURES);

@@ -40,6 +40,11 @@ export function aboutText(version: string): string {
   return `Taboom ${version}`;
 }
 
+// page heading: the version up top, so a screenshot or a bug report names it
+export function settingsTitle(version: string): string {
+  return `Taboom Extension v${version} Settings`;
+}
+
 // snapshots [{at, metrics}] → text blocks, newest first, timestamp header per block
 export function snapshotBlocks(snapshots: PerfSnapshot[]): string[] {
   return [...snapshots]
