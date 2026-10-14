@@ -2395,3 +2395,110 @@ test("UI - Sidepanel - PARKED_WINDOWS: Park window… asks first; the Parked win
   sort.dispatchEvent(new window.Event("change", { bubbles: true }));
   await settle();
 });
+
+test("UI - Sidepanel - PARKED_WINDOWS: the quick launch Windows view lists parked windows (confirmed restore, own menu, rename in place)", {
+  skip: !PARKED_ON,
+}, async () => {
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 200));
+  const NOWISH = Date.now();
+  await chrome.storage.local.set({
+    parkedWindows: [
+      { id: "p2", parkedAt: NOWISH - 120_000, tabs: [{ url: "https://news.example.com/", title: "News" }], groups: [] },
+      {
+        id: "p1",
+        parkedAt: NOWISH - 60_000,
+        name: "Research",
+        tabs: [
+          { url: "https://docs.example.com/guide", title: "Guide", pinned: true },
+          { url: "https://mail.google.com/inbox", title: "Mail copy", active: true, group: 0 },
+        ],
+        groups: [{ title: "work", color: "blue" }],
+      },
+    ],
+    parkedTrash: [],
+  });
+  await chrome.storage.onChanged.fire({ parkedWindows: {} }, "local");
+  await settle();
+  byId<HTMLButtonElement>("win-list-btn").click();
+  await tick();
+  const pop = byId("windows-pop");
+  const live = qa(pop, ".win-row:not(.parked)").length; // 2 or 3, depending on the tests run before
+  assert.equal(q(pop, ".win-view.on").textContent, `Windows (${live + 2})`, "label counts live + parked");
+  assert.equal(q(pop, ".win-section").textContent, "Parked (2)", "parked rows under their own heading");
+  const parkedRows = () => qa(pop, ".win-row.parked");
+  assert.deepEqual(
+    parkedRows().map((el) => q(el, ".win-title").textContent),
+    ["Research", `Parked ${new Date(NOWISH - 120_000).toLocaleString()}`],
+    "newest parked first, after the live rows",
+  );
+  assert.equal(qa(pop, ".win-row").length, live + 2, "live rows first, then the parked ones");
+  assert.match(q(must(parkedRows()[0]), ".win-stats").textContent, /^2 tabs · 1 group · parked /);
+  assert.match(must(parkedRows()[0]).title, /Guide\nMail copy/, "tooltip lists the parked tabs");
+
+  // click = restore as a new window, confirmed first
+  calls.length = 0;
+  must(parkedRows()[0]).click();
+  await tick();
+  await tick();
+  const ask = byId<HTMLDialogElement>("ask-dialog");
+  assert.equal(ask.open, true, "asks before restoring");
+  assert.match(q(ask, ".ask-message").textContent, /^Restore Research\?/);
+  assert.match(q(ask, ".ask-message").textContent, /2 tabs open in a new window/);
+  assert.equal(q(ask, ".ask-ok").textContent, "Restore");
+  q(ask, ".ask-cancel").click();
+  await tick();
+  assert.ok(!calls.includes("sendMessage restore-parked"), "Cancel restores nothing");
+  must(parkedRows()[0]).click();
+  await tick();
+  await tick();
+  q(ask, ".ask-ok").click();
+  await tick();
+  await tick();
+  assert.ok(calls.includes("sendMessage restore-parked"), "OK hands the restore to the worker");
+
+  // right-click = the parked window menu, plus a jump to the scope
+  const ctx = byId("ctx-menu");
+  const items = () => qa<HTMLButtonElement>(ctx, ".ctx-item").map((el) => el.textContent);
+  must(parkedRows()[1]).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+  assert.deepEqual(items(), [
+    "Restore window",
+    "Restore into this window",
+    "Rename window…",
+    "Show in Parked windows",
+    "Remove parked window",
+  ]);
+  q(ctx, ".ctx-close").click();
+  // ⋯ beside the row opens the same menu
+  const menuBtns = qa(pop, ".win-menu-btn");
+  assert.equal(menuBtns.length, live + 2, "one ⋯ per row, parked rows included");
+  must(menuBtns[live]).click();
+  await tick();
+  assert.equal(q(ctx, ".ctx-title").textContent, "Research");
+  // Rename in place, inside the popover
+  must(qa(ctx, ".ctx-item").find((el) => el.textContent === "Rename window…")).click();
+  await tick();
+  const input = q<HTMLInputElement>(pop, ".rename-input");
+  input.value = "Reading";
+  input.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+  await settle();
+  const stored = (await chrome.storage.local.get("parkedWindows")).parkedWindows;
+  assert.equal(stored?.find((parked) => parked.id === "p1")?.name, "Reading", "name lands in the snapshot");
+  assert.ok(
+    parkedRows().some((el) => q(el, ".win-title").textContent === "Reading"),
+    "popover shows the new name in place",
+  );
+  // Show in Parked windows switches the scope
+  must(parkedRows()[0]).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+  must(qa(ctx, ".ctx-item").find((el) => el.textContent === "Show in Parked windows")).click();
+  await settle();
+  const scope = byId<HTMLSelectElement>("scope");
+  assert.equal(scope.value, "parked-windows");
+  assert.ok(qa(document, ".row").length > 0 && qa(document, ".row").every((row) => row.classList.contains("parked")));
+
+  scope.value = "all-windows";
+  scope.dispatchEvent(new window.Event("change", { bubbles: true }));
+  await settle();
+  await chrome.storage.local.set({ parkedWindows: [], parkedTrash: [] });
+  await chrome.storage.onChanged.fire({ parkedWindows: {} }, "local");
+  await settle();
+});

@@ -815,6 +815,9 @@ header input[type="checkbox"],
 #windows-pop .win-row:hover { background: var(--badge-bg); }
 #windows-pop .win-row.current { font-weight: 700; color: var(--accent); }
 #windows-pop .win-row.win-new { color: var(--muted); }
+/* Windows view: parked windows under the live ones, behind a small heading; grey dot = not open */
+#windows-pop .win-section { padding: 0.375rem 0.5rem 0.125rem; border-top: 1px solid var(--border); margin-top: 0.25rem; }
+#windows-pop .win-row.parked .win-dot { background: var(--muted); }
 /* Duplicates view: tick-all + the two cleanups above the rows, a checkbox before each row.
    One line: "All" left, buttons right. Too narrow: wrap-reverse puts the overflow line ABOVE,
    so the buttons come first and "All" ends up on the last row; narrower still, the buttons

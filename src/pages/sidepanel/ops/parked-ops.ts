@@ -4,7 +4,7 @@
 // edits go through the storage writers.
 import type { ParkedTarget } from "../../../app/messages.ts";
 import { send } from "../../../app/messages.ts";
-import { parkedGroupRef, parkedRef } from "../../../app/parked.ts";
+import { parkedGroupRef, parkedRef, parkedWindowLabel } from "../../../app/parked.ts";
 import {
   forgetParkedWindow,
   loadState,
@@ -70,6 +70,26 @@ export async function restoreParked(syntheticWindowId: number, intoCurrentWindow
   const into = intoCurrentWindow && state.currentWindowId != null ? { intoWindowId: state.currentWindowId } : {};
   await send({ type: "restore-parked", id: parked.id, ...into }).catch(() => {});
   refresh(true);
+}
+
+// the quick launch's parked row click: a plain click restores a whole window, so it asks
+// first (the list's menu items are deliberate picks and do not). True when the restore ran.
+export async function restoreParkedPrompt(syntheticWindowId: number): Promise<boolean> {
+  const parked = parkedOf(syntheticWindowId);
+  if (!parked) {
+    return false;
+  }
+  const count = parked.tabs.length;
+  const ok = await askDialog({
+    message:
+      `Restore ${parkedWindowLabel(parked)}?\n` + `Its ${count} tab${count === 1 ? "" : "s"} open in a new window.`,
+    okLabel: "Restore",
+  });
+  if (!ok) {
+    return false;
+  }
+  await restoreParked(syntheticWindowId, false);
+  return true;
 }
 
 // row ids → their parked window id + tab indexes (a selection may span parked windows)

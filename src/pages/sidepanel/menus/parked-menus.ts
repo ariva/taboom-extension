@@ -28,7 +28,14 @@ import {
 } from "../ops/parked-ops.ts";
 import { orderedWindowIds } from "../ops/window-ops.ts";
 
-export function openParkedWindowMenu(event: MouseEvent, windowId: number): void {
+// the quick launch opens the same menu from its parked rows: rename edits the row there,
+// not a list header, and "Show in Parked windows" jumps to the scope
+export interface ParkedMenuHost {
+  rename: (windowId: number) => void;
+  showInList: () => void;
+}
+
+export function openParkedWindowMenu(event: MouseEvent, windowId: number, host?: ParkedMenuHost): void {
   const parked = parkedOf(windowId);
   if (!parked) {
     return;
@@ -38,7 +45,8 @@ export function openParkedWindowMenu(event: MouseEvent, windowId: number): void 
   ctxAppend(
     ctxItem("Restore window", () => restoreParked(windowId, false)),
     ctxItem("Restore into this window", () => restoreParked(windowId, true)),
-    ctxItem("Rename window…", () => startRenameParked(windowId)),
+    ctxItem("Rename window…", () => (host ? host.rename(windowId) : startRenameParked(windowId))),
+    ...(host ? [ctxItem("Show in Parked windows", host.showInList)] : []),
     ctxDivider(),
     ctxItem("Remove parked window", () => forgetParked(windowId)),
   );

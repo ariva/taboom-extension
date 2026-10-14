@@ -15,8 +15,9 @@ import {
   showCtxMenu,
 } from "../../../lib/ui/context-menu.ts";
 import { inlineEdit } from "../../../lib/ui/inline-edit.ts";
-import { winListBtn, winPop } from "../foundation/elements.ts";
+import { scopeSelect, winListBtn, winPop } from "../foundation/elements.ts";
 import { appendWindowIdentityItems, openMarkMenu, openRowMenu, openTabGroupMenu } from "../menus/menus.ts";
+import { openParkedWindowMenu } from "../menus/parked-menus.ts";
 import { windowMaps } from "../model/index.ts";
 import { refresh } from "../foundation/scheduler.ts";
 import {
@@ -35,6 +36,7 @@ import { keepAliveEntry } from "../../../app/keep-alive.ts";
 import { fillAliveRows } from "./alive.ts";
 import { fillDuplicateRows, openDuplicateMenuForKey, resetDuplicateSelection } from "./duplicates.ts";
 import { fillPinRows } from "./pins.ts";
+import { fillParkedRows, parkedRowsNewestFirst, startRenameParkedInList } from "./parked.ts";
 
 type WinPopView = "windows" | "groups" | "pins" | "alive" | "duplicates";
 let winPopView: WinPopView = "windows"; // reset on ▦ open
@@ -105,15 +107,15 @@ export function initWindowsPopover(): void {
     } else if (row.dataset.duplicateKey) {
       openDuplicateMenuForKey(event, row.dataset.duplicateKey);
     } else if (row.dataset.windowId) {
-      openWindowListMenu(event, Number(row.dataset.windowId));
+      openAnyWindowListMenu(event, Number(row.dataset.windowId));
     }
   });
 }
 
 // the popover's contents and the views they earn: a view exists only while it has
-// something to switch between or act on — Windows with a second window, Groups with a
-// group (the first one comes from the row menu's "Move to group ▸ New group…"), the rest
-// with a member. Empty = nothing to launch (the ▦ button is disabled then).
+// something to switch between or act on — Windows with a second window or a parked one,
+// Groups with a group (the first one comes from the row menu's "Move to group ▸ New
+// group…"), the rest with a member. Empty = nothing to launch (the ▦ button is disabled then).
 function quickLaunchViews() {
   // live sets: in the Parked windows scope state.allTabs holds snapshots, the quick launch stays live
   const maps = windowMaps(state.liveTabs, state.currentWindowId, state.liveWindowMeta);
@@ -121,9 +123,12 @@ function quickLaunchViews() {
   const pinnedTabs = state.liveTabs.filter((tab) => tab.pinned);
   const aliveMarks = keepAliveActive() ? state.keepAlive : [];
   const dupSets = duplicatesActive() ? duplicateSets(state.liveTabs) : [];
-  const windowsView: [WinPopView, string] = ["windows", `Windows (${maps.indexes.size})`];
+  const parkedCount = parkedActive() ? parkedRowsNewestFirst().length : 0;
+  const liveCount = maps.indexes.size;
+  // the count is live + parked: the view lists both (the Parked heading carries its own count)
+  const windowsView: [WinPopView, string] = ["windows", `Windows (${liveCount + parkedCount})`];
   const views: [view: WinPopView, label: string][] = [
-    ...(maps.indexes.size > 1 ? [windowsView] : []),
+    ...(liveCount > 1 || parkedCount > 0 ? [windowsView] : []),
     ...(groupList.length > 0 ? [["groups", `Groups (${groupList.length})`] satisfies [WinPopView, string]] : []),
     ...(pinnedTabs.length > 0 ? [["pins", `Pins (${pinnedTabs.length})`] satisfies [WinPopView, string]] : []),
     ...(aliveMarks.length > 0 ? [["alive", `Alive (${aliveMarks.length})`] satisfies [WinPopView, string]] : []),
@@ -137,7 +142,7 @@ export function syncQuickLaunchButton(): void {
   const empty = quickLaunchViews().views.length === 0;
   winListBtn.disabled = empty;
   winListBtn.title = empty
-    ? "Nothing to list: one window, no groups, pinned tabs, kept-alive or duplicated pages"
+    ? `Nothing to list: one window, no groups, pinned tabs, kept-alive or duplicated pages${parkedActive() ? ", nothing parked" : ""}`
     : "Windows list";
 }
 
@@ -279,6 +284,25 @@ function fillWindowsPopover(): void {
     item.append(row, menuBtn);
     winPop.append(item);
   }
+  if (parkedActive()) {
+    fillParkedRows(openAnyWindowListMenu);
+  }
+}
+
+// a popover row's window menu: a parked row (negative id) gets the parked one
+function openAnyWindowListMenu(event: MouseEvent, windowId: number): void {
+  if (windowId < 0) {
+    openParkedWindowMenu(event, windowId, {
+      rename: (id) => startRenameParkedInList(id, fillWindowsPopover),
+      showInList: () => {
+        winPop.hidePopover?.();
+        scopeSelect.value = "parked-windows";
+        scopeSelect.dispatchEvent(new Event("change")); // the toolbar's change handler does the scope switch
+      },
+    });
+    return;
+  }
+  openWindowListMenu(event, windowId);
 }
 
 // renders happen on every tab/storage event — keep an open popover current,
