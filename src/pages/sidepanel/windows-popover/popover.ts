@@ -163,14 +163,28 @@ function fillWindowsPopover(): void {
   }
   winPop.textContent = "";
 
+  // a title row like the ☰ menu's: the popover's name with Close beside it; the views below
   const head = document.createElement("div");
   head.className = "win-head";
+  const title = document.createElement("span");
+  title.className = "win-heading";
+  title.textContent = "Quick launch";
+  const close = document.createElement("button");
+  close.type = "button";
+  close.className = "win-close";
+  close.textContent = "Close";
+  close.addEventListener("click", () => winPop.hidePopover?.());
+  head.append(title, close);
+  winPop.append(head);
+
+  const tabs = document.createElement("div");
+  tabs.className = "win-tabs";
   if (views.length === 1) {
     // one view: a plain heading, nothing to switch to
     const heading = document.createElement("span");
     heading.className = "muted";
     heading.textContent = firstView[1];
-    head.append(heading);
+    tabs.append(heading);
   } else {
     const bar = document.createElement("span");
     bar.className = "win-views";
@@ -195,15 +209,9 @@ function fillWindowsPopover(): void {
       });
       bar.append(btn);
     }
-    head.append(bar);
+    tabs.append(bar);
   }
-  const close = document.createElement("button");
-  close.type = "button";
-  close.className = "win-close";
-  close.textContent = "Close";
-  close.addEventListener("click", () => winPop.hidePopover?.());
-  head.append(close);
-  winPop.append(head);
+  winPop.append(tabs);
 
   if (winPopView === "groups") {
     fillGroupRows(groupList);

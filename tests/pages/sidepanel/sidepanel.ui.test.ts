@@ -1571,7 +1571,14 @@ test("UI - Sidepanel - WINDOW_NAMES: named headers, custom dots, overview list, 
   winBtn.click();
   await tick();
   assert.deepEqual(qa(pop, ".win-view").length, 0, "a single view is a heading, not a switcher");
-  assert.equal(q(pop, ".win-head .muted").textContent, "Pins (1)", "opens on the only view left");
+  assert.equal(q(pop, ".win-tabs .muted").textContent, "Pins (1)", "opens on the only view left");
+  // a title row like the ☰ menu's: the popover's name with Close beside it, the views below
+  assert.equal(q(pop, ".win-head .win-heading").textContent, "Quick launch");
+  assert.equal(q(pop, ".win-head .win-close").textContent, "Close");
+  assert.ok(
+    q(pop, ".win-head").compareDocumentPosition(q(pop, ".win-tabs")) & 4, // 4 = FOLLOWING (happy-dom has no Node global)
+    "the view tabs sit under the title row",
+  );
   assert.ok(pop.querySelector('.win-row[data-tab-id="3"]'), "the pinned tab is listed");
   assert.equal(winBtn.disabled, false, "button live while a view exists");
   // nothing to list at all: the ▦ button is disabled, its tooltip says why

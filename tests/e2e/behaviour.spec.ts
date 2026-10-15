@@ -119,7 +119,7 @@ test("quick launch creates a real, named tab group and lists it", async ({ conte
   const panel = await openPanel(context, extensionId);
   await panel.locator("#win-list-btn").click();
   // one window, one group: Groups is the only view, so it is a heading and already open
-  await expect(panel.locator("#windows-pop .win-head .muted")).toHaveText("Groups (1)");
+  await expect(panel.locator("#windows-pop .win-tabs .muted")).toHaveText("Groups (1)");
   await panel.locator("#windows-pop .win-row.win-new").click();
   await panel.locator("#windows-pop .rename-input").fill("reading");
   await panel.keyboard.press("Enter");
