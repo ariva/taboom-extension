@@ -10,6 +10,7 @@ const KEEP_ALIVE_ON = TEST_FEATURES.KEEP_ALIVE?.enabled === true;
 const DUPLICATES_ON = TEST_FEATURES.DUPLICATES?.enabled === true;
 const PARKED_ON = TEST_FEATURES.PARKED_WINDOWS?.enabled === true;
 const TAGS_ON = TEST_FEATURES.TAGS?.enabled === true;
+const SPLIT_ON = TEST_FEATURES.SPLIT_VIEW?.enabled === true;
 
 const NOW = Date.now();
 const tabs: NonNullable<ChromeMockOptions["tabs"]> = [
@@ -275,8 +276,12 @@ test("UI - Sidepanel - Activating a row scrolls the current tab into view after 
   await tick();
   await chrome.tabs.onActivated.fire({});
   await new Promise((resolve) => setTimeout(resolve, 200)); // 150ms debounce
-  // activated tab sorts to the top → full scroll to top (not just nearest)
-  assert.equal(listEl.scrollTop, 0, "list scrolled fully to top");
+  // a click in the list: no jump — the position stays, the row is only revealed (nearest)
+  assert.equal(listEl.scrollTop, 500, "no scroll reset under the click");
+  assert.ok(
+    scrolled.some((c) => c.includes("current")),
+    "the activated row revealed",
+  );
   // a plain event-driven refresh must NOT autoscroll
   listEl.scrollTop = 500;
   scrolled.length = 0;
@@ -333,14 +338,27 @@ test("UI - Sidepanel - [hidden] beats author display rules (computed style)", ()
 test("UI - Sidepanel - Scroll position is per filter; search starts at top and restores", async () => {
   const list = byId("tab-list");
   const filter = (name: string) => q(document, `#filters button[data-filter="${name}"]`).click();
+  // a filter switch restores the saved position, then reveals the current row when the
+  // new view holds it (minimal scroll — the stub records the call, the position stays)
+  const scrolled: string[] = [];
+  window.HTMLElement.prototype.scrollIntoView = function (this: HTMLElement) {
+    scrolled.push(this.className);
+  };
 
   filter("all");
   list.scrollTop = 120;
   filter("awake");
   assert.equal(list.scrollTop, 0, "fresh filter starts at top");
+  assert.ok(
+    scrolled.some((c) => c.includes("current")),
+    "the current tab is awake: revealed in the Awake view",
+  );
   list.scrollTop = 60;
   filter("all");
   assert.equal(list.scrollTop, 120, "all-filter position restored");
+  scrolled.length = 0;
+  filter("snoozed");
+  assert.equal(scrolled.length, 0, "the current tab is not snoozed: nothing to reveal there");
   filter("awake");
   assert.equal(list.scrollTop, 60, "awake-filter position restored");
 
@@ -840,6 +858,9 @@ test("UI - Sidepanel - Right-click row offers move-to-window menu (selection-awa
       // TAB_GROUPS: move-to-group submenu (fixture has one group) — flag on in
       // shipped+experimental; the disabled pass hides it
       ...(TEST_FEATURES.TAB_GROUPS?.enabled === true ? ["Move to group ▸", "work", "New group…"] : []),
+      // SPLIT_VIEW: the row below (Inbox: pinned, other window — brought over on split) as a
+      // partner; nothing above the first row. Recently used order is 1, 3, 2
+      ...(SPLIT_ON ? ["Split with next tab"] : []),
     ],
     "bulk actions first, then the Move-to dropdown (own window excluded)",
   );
@@ -2941,4 +2962,191 @@ test("UI - Sidepanel - TAGS: window blur closes the New tag dialog (like the con
   await tick();
   assert.equal(ask.open, false, "the question is dropped when focus leaves the panel");
   assert.equal((await chrome.storage.local.get("tags")).tags?.length, 2, "nothing written");
+});
+
+test("UI - Sidepanel - SPLIT_VIEW: row menu pairs two tabs into Chrome's split view, badges them, offers Unsplit", {
+  skip: !SPLIT_ON,
+}, async () => {
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 200));
+  const ctx = byId("ctx-menu");
+  const listEl = byId("tab-list");
+  const items = () => qa<HTMLButtonElement>(ctx, ".ctx-item").map((el) => el.textContent);
+  const rowOf = (id: number) => q(document, `.row[data-tab-id="${id}"]`);
+  // fixture: tabs 1 and 2 side by side in window 1, tab 3 pinned in window 2; Group by
+  // window shows them in that order (Recently used would put Inbox between them)
+  Object.assign(must(tabs[0]), { windowId: 1, index: 0, groupId: -1 });
+  Object.assign(must(tabs[1]), { windowId: 1, index: 1, groupId: -1 });
+  const sortSel = byId<HTMLSelectElement>("sort");
+  const sortAtStart = sortSel.value;
+  sortSel.value = "window";
+  sortSel.dispatchEvent(new window.Event("change"));
+  await chrome.tabs.onUpdated.fire(1, {});
+  await settle();
+
+  // one row: split with the row above / below it in the list (when there is one)
+  rowOf(1).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+  assert.ok(!items().includes("Split with previous tab"), "first row: nothing above");
+  assert.ok(items().includes("Split with next tab"), "the row below is the partner");
+  assert.equal(
+    must(qa<HTMLButtonElement>(ctx, ".ctx-item").find((el) => el.textContent === "Split with next tab")).title,
+    "Some Video",
+    "the partner's title in the tooltip",
+  );
+  q(ctx, ".ctx-close").click();
+  rowOf(2).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+  assert.ok(items().includes("Split with previous tab"), "second row: the row above");
+  assert.ok(items().includes("Split with next tab"), "the row below (Inbox, pinned, other window) is brought over");
+  q(ctx, ".ctx-close").click();
+  rowOf(1).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+  calls.length = 0;
+  must(qa(ctx, ".ctx-item").find((el) => el.textContent === "Split with next tab")).click();
+  await settle();
+  assert.ok(calls.includes("tabs.createSplit 1,2"), "adjacent already: just the split");
+  assert.ok(!calls.some((c) => c.startsWith("tabs.move")), "no move needed");
+  assert.ok(
+    qa(rowOf(1), ".badge").some((el) => el.textContent === "split"),
+    "badge on the pair",
+  );
+  assert.ok(qa(rowOf(2), ".badge").some((el) => el.textContent === "split"));
+  // the pair reads like a tab group: a Split sub-header (divided-window icon) with the two rows nested under it
+  const splitHeader = q(document, ".split-header");
+  assert.equal(q(splitHeader, ".tg-title").textContent, "Split");
+  assert.ok(q(splitHeader, "svg"), "divided-window icon");
+  assert.equal(q(splitHeader, ".tg-count").textContent, "2/2", "visible/total, like a group header");
+  assert.equal(splitHeader.nextElementSibling, rowOf(1), "first member right under the header");
+  assert.equal(rowOf(1).nextElementSibling, rowOf(2), "second member next");
+  assert.ok(rowOf(1).classList.contains("in-split") && rowOf(2).classList.contains("in-split"), "nested rows");
+  assert.ok(!rowOf(3).classList.contains("in-split"));
+  // hover: "Split view", a rule, then the two tabs numbered with their urls
+  splitHeader.dispatchEvent(new window.MouseEvent("mouseover", { bubbles: true }));
+  const tip = byId("hover-tip");
+  assert.equal(tip.hidden, false);
+  assert.ok(tip.textContent.startsWith("Split view"));
+  assert.ok(q(tip, "hr.tip-divider"), "a rule under the title");
+  assert.deepEqual(
+    qa(tip, "ol.tip-list > li").map((li) => li.firstChild?.textContent),
+    ["My Pull Request", "Some Video"],
+  );
+  assert.deepEqual(
+    qa(tip, ".tip-url").map((el) => el.textContent),
+    ["https://github.com/pr/1", "https://youtube.com/watch"],
+  );
+  listEl.dispatchEvent(new window.Event("mouseleave"));
+  // one member filtered out: the header stays, counting 1/2, the row still nested
+  const search = byId<HTMLInputElement>("search");
+  search.value = "Video";
+  search.dispatchEvent(new window.Event("input", { bubbles: true }));
+  await settle();
+  assert.deepEqual(
+    qa(document, ".row").map((el) => el.dataset.tabId),
+    ["2"],
+  );
+  assert.equal(q(document, ".split-header .tg-count").textContent, "1/2");
+  assert.ok(rowOf(2).classList.contains("in-split"));
+  search.value = "";
+  search.dispatchEvent(new window.Event("input", { bubbles: true }));
+  await settle();
+  // the sub-header's own menu: Unsplit first, then the tab actions over the pair
+  // (re-queried: the search above re-rendered the list)
+  q(document, ".split-header").dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+  assert.equal(q(ctx, ".ctx-title").textContent, "Split view");
+  assert.equal(items()[0], "Unsplit");
+  assert.ok(items().includes("Snooze 2 tabs") && items().includes("Close 2 tabs"), "actions over both tabs");
+  q(ctx, ".ctx-close").click();
+  // the pair stays together in a sort that would part them (recent: tab 2 is an hour older)
+  sortSel.value = "title";
+  sortSel.dispatchEvent(new window.Event("change"));
+  await settle();
+  const order = qa(document, ".row").map((el) => el.dataset.tabId);
+  assert.equal(order.indexOf("2"), order.indexOf("1") + 1, "partner right after the first member");
+  assert.equal(q(document, ".split-header").nextElementSibling, rowOf(1), "the sub-header in a flat sort too");
+  sortSel.value = "window";
+  sortSel.dispatchEvent(new window.Event("change"));
+  await settle();
+
+  // a split member gets Unsplit instead
+  rowOf(1).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+  assert.ok(items().includes("Unsplit"));
+  assert.ok(!items().some((label) => label.startsWith("Split with")));
+  calls.length = 0;
+  must(qa(ctx, ".ctx-item").find((el) => el.textContent === "Unsplit")).click();
+  await settle();
+  assert.ok(calls.includes("tabs.unsplit 500"));
+  assert.ok(!qa(rowOf(1), ".badge").some((el) => el.textContent === "split"), "badge gone");
+  assert.equal(document.querySelector(".split-header"), null, "sub-header gone");
+  assert.ok(
+    !rowOf(1).classList.contains("in-split") && !rowOf(2).classList.contains("in-split"),
+    "rows back at the top level",
+  );
+
+  // two ticked rows: one item. Inbox is pinned in window 2, the anchor is not: it is moved
+  // over (Chrome unpins it on the way, which is the anchor's state) and split, no refusal
+  q<HTMLInputElement>(rowOf(1), "input").click();
+  q<HTMLInputElement>(rowOf(3), "input").click();
+  await tick();
+  rowOf(1).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+  assert.ok(items().includes("Split view (2 tabs)"));
+  calls.length = 0;
+  must(qa(ctx, ".ctx-item").find((el) => el.textContent === "Split view (2 tabs)")).click();
+  await settle();
+  assert.ok(calls.includes('tabs.move 3 {"windowId":1,"index":1}'), "partner moved right after the anchor");
+  assert.ok(!calls.some((c) => c.startsWith("tabs.update 3")), "already unpinned by the move: no pin update");
+  assert.ok(calls.includes("tabs.createSplit 1,3"));
+  assert.ok(
+    calls.indexOf('tabs.move 3 {"windowId":1,"index":1}') < calls.indexOf("tabs.createSplit 1,3"),
+    "move first",
+  );
+  assert.equal(q<HTMLInputElement>(rowOf(1), "input").checked, false, "the pair leaves the selection");
+  assert.equal(q<HTMLInputElement>(rowOf(3), "input").checked, false);
+  // Unsplit from the sub-header's menu
+  q(document, ".split-header").dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+  calls.length = 0;
+  must(qa(ctx, ".ctx-item").find((el) => el.textContent === "Unsplit")).click();
+  await settle();
+  assert.ok(calls.includes("tabs.unsplit 500"), "the header menu unsplits the pair");
+  assert.equal(document.querySelector(".split-header"), null);
+  // a pinned anchor and an unpinned partner further down its own window: the partner is moved
+  // beside it, pinned to match, then seated beside it again (pinning moves a tab into the
+  // pinned run — the mock never renumbers indexes, so the re-read still finds it at index 3)
+  Object.assign(must(tabs[0]), { pinned: true, index: 0 });
+  Object.assign(must(tabs[2]), { windowId: 1, pinned: false, index: 3 });
+  await chrome.tabs.onUpdated.fire(1, { pinned: true });
+  await settle();
+  q<HTMLInputElement>(rowOf(1), "input").click();
+  q<HTMLInputElement>(rowOf(3), "input").click();
+  await tick();
+  rowOf(1).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+  calls.length = 0;
+  must(qa(ctx, ".ctx-item").find((el) => el.textContent === "Split view (2 tabs)")).click();
+  await settle();
+  assert.deepEqual(
+    calls.filter((c) => /^tabs\.(move|update|createSplit)/.test(c)),
+    [
+      'tabs.move 3 {"windowId":1,"index":1}',
+      'tabs.update 3 {"pinned":true}',
+      'tabs.move 3 {"windowId":1,"index":1}',
+      "tabs.createSplit 1,3",
+    ],
+    "move beside, pin to match, seat again, split",
+  );
+  await chrome.tabs.unsplit(500);
+  Object.assign(must(tabs[0]), { pinned: false });
+  await settle();
+
+  // Chrome < 155 (no createSplit): no split items at all
+  const api = chrome.tabs as unknown as { createSplit?: unknown };
+  const createSplit = api.createSplit;
+  delete api.createSplit;
+  rowOf(1).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+  assert.ok(!items().some((label) => /Split view|Unsplit/.test(label)), "nothing split-related offered");
+  q(ctx, ".ctx-close").click();
+  api.createSplit = createSplit;
+
+  // restore the fixture
+  Object.assign(must(tabs[2]), { windowId: 2, pinned: true, index: 0, splitViewId: -1 });
+  must(tabs[0]).splitViewId = -1;
+  sortSel.value = sortAtStart;
+  sortSel.dispatchEvent(new window.Event("change"));
+  await chrome.tabs.onUpdated.fire(3, { pinned: true });
+  await settle();
 });

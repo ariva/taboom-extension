@@ -22,6 +22,7 @@ export function renderMembersWithTabGroupRuns(
   index: number,
   collapsed: Set<GroupKey>,
   windowDotColor: string | null,
+  beforeRow: (tab: PanelTab, nested: boolean) => HTMLElement | null = () => null,
 ): number {
   let runGroupId: number | null = null;
   let runCollapsed = false;
@@ -39,9 +40,52 @@ export function renderMembersWithTabGroupRuns(
     if (gid !== -1 && runCollapsed) {
       continue; // rows of a folded run (also excluded from state.visible)
     }
+    const extra = beforeRow(tab, gid !== -1);
+    if (extra) {
+      frag.append(extra);
+    }
     frag.append(renderRow(tab, rowVm(tab, index++)));
   }
   return index;
+}
+
+// a window divided in two: the split view's icon
+const SPLIT_ICON = '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M12 5v14"/>';
+
+// a split pair reads like a tab group: a sub-header in the tab-group style over its rows
+// (visible/total like a group header — 1/2 when the partner is filtered out). Nothing to
+// click — Unsplit lives in the menus — so no role / arrow / collapse.
+// nested: the pair sits inside a tab-group run (window view), one level further in
+export function renderSplitSubheader(tabs: PanelTab[], nested: boolean): HTMLElement {
+  const header = document.createElement("div");
+  header.className = "tabgroup-header split-header";
+  if (nested) {
+    header.classList.add("nested");
+  }
+  const [first] = tabs;
+  if (first?.splitViewId !== undefined) {
+    header.dataset.splitViewId = String(first.splitViewId); // right-click → split menu (Unsplit + the tab actions)
+  }
+  const icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  icon.setAttribute("viewBox", "0 0 24 24");
+  icon.setAttribute("fill", "none");
+  icon.setAttribute("stroke", "currentColor");
+  icon.setAttribute("stroke-width", "2");
+  icon.setAttribute("stroke-linejoin", "round");
+  icon.innerHTML = SPLIT_ICON; // constant markup from this file, never user data
+  const title = document.createElement("span");
+  title.className = "tg-title";
+  title.textContent = "Split";
+  const members = state.allTabs.filter((tab) => tab.splitViewId === first?.splitViewId);
+  const count = document.createElement("span");
+  count.className = "tg-count";
+  count.textContent = `${tabs.length}/${members.length}`;
+  // hover: "Split view" with the unsplit hint, a rule, then the pair numbered (title + url) —
+  // hover-tip.ts draws the list
+  header.dataset.tip = "Split view\nRight-click → Unsplit";
+  header.dataset.tipList = JSON.stringify(members.map((tab) => [tab.title || "(untitled)", tab.url ?? ""]));
+  header.append(icon, title, count);
+  return header;
 }
 
 function renderTabGroupSubheader(

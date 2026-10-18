@@ -1,5 +1,6 @@
 // Pure filter + sort selection: the filter / scope / sort value types, selectVisible
 // with its grouped and per-window orderings, and the filter-chip counts. No DOM, no chrome.*.
+import { keepSplitPairsTogether } from "../../../app/split.ts";
 import type { UiPrefs } from "../../../app/types.ts";
 import type { DerivedTabs } from "./derived.ts";
 import { fuzzyActive, searchCandidates } from "./search.ts";
@@ -164,7 +165,8 @@ export function selectVisible<T extends Tab>(tabs: T[], view: SelectView): T[] {
       break;
     }
   }
-  return result;
+  // a split pair stays side by side whatever the sort (Chrome keeps the two adjacent in the strip)
+  return keepSplitPairsTogether(result);
 }
 
 // within-window tab order for the window grouping (ui.groupByWindowTabsOrder)

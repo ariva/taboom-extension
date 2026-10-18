@@ -187,9 +187,15 @@ export function selectAutoSnoozeTargets(
   wakeTimes: WakeTimes | null = null,
   keepAlive: KeepAliveTab[] = [],
 ): number[] {
+  // the split partner of an active tab is on screen beside it: discarding it would blank
+  // half the window (Chrome 155+ split view; splitViewId -1 / absent = not split)
+  const onScreenSplits = new Set(
+    tabs.filter((tab) => tab.active && (tab.splitViewId ?? -1) !== -1).map((tab) => tab.splitViewId),
+  );
   // type predicate: isEligibleForAutoSnooze rejects tabs without an id
-  const eligible = tabs.filter((tab): tab is SnoozeTab & { id: number } =>
-    isEligibleForAutoSnooze(tab, settings, rules, now, wakeTimes, keepAlive),
+  const eligible = tabs.filter(
+    (tab): tab is SnoozeTab & { id: number } =>
+      !onScreenSplits.has(tab.splitViewId) && isEligibleForAutoSnooze(tab, settings, rules, now, wakeTimes, keepAlive),
   );
   const minAwake = settings.minAwakePerWindow ?? 0;
   if (minAwake <= 0) {

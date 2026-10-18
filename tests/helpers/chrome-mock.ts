@@ -164,6 +164,25 @@ export function makeChrome<
         }
         return gid;
       },
+      // Split View API (Chrome 155+): one split id for the pair
+      createSplit: async (tabIds: [number, number]) => {
+        calls.push(`tabs.createSplit ${list<number>(tabIds)}`);
+        for (const id of tabIds) {
+          const tab = tabs.find((t) => t.id === id);
+          if (tab) {
+            tab.splitViewId = 500;
+          }
+        }
+        return 500;
+      },
+      unsplit: async (splitViewId: number) => {
+        calls.push(`tabs.unsplit ${splitViewId}`);
+        for (const tab of tabs) {
+          if (tab.splitViewId === splitViewId) {
+            tab.splitViewId = -1;
+          }
+        }
+      },
       ungroup: async (tabIds: number | [number, ...number[]]) => {
         calls.push(`tabs.ungroup ${list<number>(tabIds)}`);
         for (const id of list<number>(tabIds)) {

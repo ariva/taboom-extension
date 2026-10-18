@@ -4,7 +4,8 @@ import { closest } from "../../../lib/dom.ts";
 import { hideCtxMenu } from "../../../lib/ui/context-menu.ts";
 import { listEl, winPop } from "../foundation/elements.ts";
 import { hideHoverTip } from "../render/hover-tip.ts";
-import { openRowMenu, openTabGroupMenu, openWindowHeaderMenu } from "./menus.ts";
+import { appendCtxActions, openRowMenu, openTabGroupMenu, openWindowHeaderMenu } from "./menus.ts";
+import { openSplitMenu } from "./split-menu.ts";
 
 export function initListContextMenu(): void {
   listEl.addEventListener("contextmenu", (event) => {
@@ -14,7 +15,8 @@ export function initListContextMenu(): void {
     const tgHeaderEl = closest(target, "[data-tab-group-id]");
     // "No group" bucket (-1) is a drop target but has no menu — keep native there
     const tgHeader = tgHeaderEl && Number(tgHeaderEl.dataset.tabGroupId) !== -1 ? tgHeaderEl : null;
-    if (!header?.dataset.windowId && !row && !tgHeader) {
+    const splitHeader = closest(target, "[data-split-view-id]");
+    if (!header?.dataset.windowId && !row && !tgHeader && !splitHeader) {
       return; // non-window headers/empty space keep the native menu
     }
     event.preventDefault();
@@ -24,7 +26,9 @@ export function initListContextMenu(): void {
     try {
       winPop.hidePopover?.();
     } catch {} // already hidden
-    if (tgHeader) {
+    if (splitHeader) {
+      openSplitMenu(event, Number(splitHeader.dataset.splitViewId), appendCtxActions);
+    } else if (tgHeader) {
       openTabGroupMenu(event, Number(tgHeader.dataset.tabGroupId));
     } else if (header?.dataset.windowId) {
       openWindowHeaderMenu(event, Number(header.dataset.windowId));

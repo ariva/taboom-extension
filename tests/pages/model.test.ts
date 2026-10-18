@@ -304,6 +304,33 @@ test("Model - RowViewModel maps tab state to plain data", () => {
   assert.equal(internal.canSnooze, false);
   const hostless = rowViewModel(tab({ id: 5, url: "about:blank" }), { ...ctx, cursor: -1 });
   assert.equal(letterOf(hostless.favicon), "•", "no hostname → bullet fallback");
+
+  // a split pair's two rows sit nested under the Split sub-header (edges come from the visible order)
+  const splitEdges = new Map<number, "first" | "last" | "only">([
+    [4, "first"],
+    [5, "last"],
+    [1, "only"],
+  ]);
+  assert.deepEqual(rowViewModel(tab({ id: 4, url: "chrome://settings" }), { ...ctx, cursor: -1, splitEdges }).classes, [
+    "row",
+    "in-split",
+    "split-first",
+  ]);
+  assert.deepEqual(rowViewModel(tab({ id: 5, url: "about:blank" }), { ...ctx, cursor: -1, splitEdges }).classes, [
+    "row",
+    "in-split",
+    "split-last",
+  ]);
+  assert.deepEqual(rowViewModel(tab({ id: 3, discarded: true }), { ...ctx, cursor: -1, splitEdges }).classes, [
+    "row",
+    "snoozed",
+  ]);
+  assert.deepEqual(rowViewModel(tab(), { ...ctx, cursor: -1, splitEdges }).classes, [
+    "row",
+    "in-split",
+    "split-first",
+    "split-last",
+  ]);
 });
 
 test("Model - Badges order and kinds", () => {
@@ -316,6 +343,8 @@ test("Model - Badges order and kinds", () => {
     ["🔊", ""],
   ]);
   assert.deepEqual(badges(tab(), false), [], "kept-alive flag defaults to off");
+  assert.deepEqual(badges(tab({ splitViewId: 5 }), false), [["split", ""]], "a split-view member");
+  assert.deepEqual(badges(tab({ splitViewId: -1 }), false), [], "SPLIT_VIEW_ID_NONE is not a split");
 });
 
 test("Model - DeriveTabs flags kept-alive pages by url without fragment", () => {

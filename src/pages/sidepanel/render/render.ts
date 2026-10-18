@@ -1,6 +1,7 @@
 // The list renderer: render() derives what is visible and picks animated or plain,
 // renderNow() rebuilds the list DOM; plus the chrome that follows every render
 // (row-height feedback, fold-all button, bulk bar).
+import { splitPairEdges } from "../../../app/split.ts";
 import { enabledTags, splitTagQuery, tagColorHex } from "../../../app/tags.ts";
 import { FOLD_ICONS } from "../../../lib/dom.ts";
 import { hideCtxMenu } from "../../../lib/ui/context-menu.ts";
@@ -28,13 +29,14 @@ import {
 } from "../model/index.ts";
 import type { FilterName, RowViewModel } from "../model/index.ts";
 import { perfMeasure } from "../foundation/perf.ts";
-import { renderGroupHeader, renderMembersWithTabGroupRuns } from "./headers.ts";
+import { renderGroupHeader, renderMembersWithTabGroupRuns, renderSplitSubheader } from "./headers.ts";
 import { pillFit, syncMetaFit } from "./meta-fit.ts";
+import { revealRow } from "./reveal.ts";
 import { nestedInGroup, renderRow } from "./row.ts";
 import { effectiveCollapsed, GROUPINGS, renderSortDirButton } from "./sorting.ts";
 import type { PanelRun } from "./sorting.ts";
 import { activeCollapsedSet, effectiveSort, nestedTabGroupsActive, parkedScope, state } from "../foundation/state.ts";
-import type { GroupKey } from "../foundation/state.ts";
+import type { GroupKey, PanelTab } from "../foundation/state.ts";
 import { refillTagAssignPickerIfOpen } from "../input/tag-assign-picker.ts";
 import { refillTagsPickerIfOpen } from "../input/tags-chip.ts";
 import { refillWindowsPopoverIfOpen, syncQuickLaunchButton } from "../windows-popover/popover.ts";
@@ -121,6 +123,23 @@ function renderList(): void {
   const now = Date.now();
   // tokenized once per render — rows highlight their matches while searching (#tokens light badges)
   const { text: queryTokens, tags: tagTokens } = splitTagQuery(state.query);
+  const splitEdges = splitPairEdges(state.visible); // the render order: where each split's header goes
+  // the Split sub-header goes right before a pair's first row, in every render path
+  const splitHeaderFor = (tab: PanelTab, nested: boolean): HTMLElement | null => {
+    const edge = splitEdges.get(tab.id);
+    if (edge !== "first" && edge !== "only") {
+      return null;
+    }
+    const at = state.visible.indexOf(tab);
+    return renderSplitSubheader(state.visible.slice(at, at + (edge === "first" ? 2 : 1)), nested);
+  };
+  const appendRow = (frag: DocumentFragment, tab: PanelTab, index: number): void => {
+    const header = splitHeaderFor(tab, false);
+    if (header) {
+      frag.append(header);
+    }
+    frag.append(renderRow(tab, rowVm(tab, index)));
+  };
   const rowVm = (tab: Tab, index: number): RowViewModel =>
     rowViewModel(tab, {
       index,
@@ -135,7 +154,8 @@ function renderList(): void {
       tagTokens,
       fuzzy: fuzzyActive(state),
       parked: parkedScope(),
-      fit: pillFit(nestedInGroup(tab)),
+      fit: pillFit(nestedInGroup(tab) || (tab.id !== undefined && splitEdges.has(tab.id))),
+      splitEdges,
     });
 
   let foldableGroups: PanelRun[] = [];
@@ -196,16 +216,17 @@ function renderList(): void {
           index,
           collapsed,
           maps.dotColors.size > 0 ? (maps.dotColors.get(groupKey as number) ?? null) : null, // window id
+          splitHeaderFor,
         );
         continue;
       }
       for (const tab of members) {
-        frag.append(renderRow(tab, rowVm(tab, index++)));
+        appendRow(frag, tab, index++);
       }
     }
   } else {
     state.visible.forEach((tab, index) => {
-      frag.append(renderRow(tab, rowVm(tab, index)));
+      appendRow(frag, tab, index);
     });
   }
   listEl.replaceChildren(frag);
@@ -219,17 +240,17 @@ function renderList(): void {
     state.pendingScroll = null;
   }
 
-  if (state.followCurrent) {
+  if (state.followCurrent || state.revealCurrent) {
+    // a row activated from the list must not jump under the click: the minimal scroll (the
+    // tab-switch refresh that follows sets revealCurrent too — the click wins); every other
+    // reveal puts the current row at the top
+    const align = state.followCurrent ? "nearest" : "start";
     state.followCurrent = false;
-    // top first (group headers/padding show), then the minimal scroll that
-    // reveals the current row — near the top both hold, far down the row wins
-    listEl.scrollTop = 0;
-    const current = listEl.querySelector(".row.current");
-    current?.scrollIntoView({ block: "nearest" });
-  }
-  if (state.revealCurrent) {
     state.revealCurrent = false;
-    listEl.querySelector(".row.current")?.scrollIntoView({ block: "nearest" });
+    const current = listEl.querySelector<HTMLElement>(".row.current");
+    if (current) {
+      revealRow(current, align);
+    }
   }
   renderBulkBar();
   // Parked windows scope: the newest Remove (window, group or tab) can be undone right here

@@ -21,5 +21,6 @@
   "FUZZY_SEARCH": { "enabled": false, "experimental": true },
   "KEEP_ALIVE": { "enabled": true, "experimental": false },
   "DUPLICATES": { "enabled": true, "experimental": false },
-  "PARKED_WINDOWS": { "enabled": true, "experimental": false }
+  "PARKED_WINDOWS": { "enabled": true, "experimental": false },
+  "SPLIT_VIEW": { "enabled": false, "experimental": true }
 }

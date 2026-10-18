@@ -75,18 +75,20 @@ filterBar.addEventListener("click", (event) => {
   scrollMap.set(state.filter, listEl.scrollTop);
   state.filter = button.dataset.filter!; // the button matched [data-filter]
   state.pendingScroll = scrollMap.get(state.filter) ?? 0;
+  state.revealCurrent = true; // the current row at the top, when this view holds it
   persistUiPrefs();
   // mid-search the old/new filtered sets barely overlap — a view transition
   // cross-fades two unrelated lists (reads as ghosting), so skip animation
   render(!state.query);
 });
 
-// scope/sort change = a different list — start at top, and saved per-filter
-// positions from the old view are meaningless now
+// scope/sort change = a different list — start at top (the current row at the top when the
+// list holds it), and saved per-filter positions from the old view are meaningless now
 function resetScrollPositions(): void {
   scrollByFilter.clear();
   searchScrollByFilter.clear();
   state.pendingScroll = 0;
+  state.revealCurrent = true;
 }
 
 scopeSelect.addEventListener("change", () => {

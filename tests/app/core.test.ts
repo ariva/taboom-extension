@@ -92,6 +92,20 @@ test("Core - SelectAutoSnoozeTargets respects minAwakePerWindow", () => {
   assert.deepEqual(selectAutoSnoozeTargets(tabs, keep9, [], NOW), []);
 });
 
+test("Core - SelectAutoSnoozeTargets keeps the split partner of an active tab awake", () => {
+  // tab 2 shares the active tab's split view: it is on screen beside it, so it stays;
+  // tab 4's partner (3) is not active, so both can go
+  const tabs = [
+    tab({ id: 1, windowId: 1, active: true, lastAccessed: NOW, splitViewId: 9 }),
+    tab({ id: 2, windowId: 1, lastAccessed: NOW - 5 * HOUR, splitViewId: 9 }),
+    tab({ id: 3, windowId: 1, lastAccessed: NOW - 5 * HOUR, splitViewId: 8 }),
+    tab({ id: 4, windowId: 1, lastAccessed: NOW - 5 * HOUR, splitViewId: 8 }),
+    tab({ id: 5, windowId: 1, lastAccessed: NOW - 5 * HOUR, splitViewId: -1 }),
+  ];
+  const noLimit = { ...settings, minAwakePerWindow: 0 };
+  assert.deepEqual(selectAutoSnoozeTargets(tabs, noLimit, [], NOW).sort(), [3, 4, 5]);
+});
+
 test("Core - Protection rules", () => {
   const host = partialRule({ id: "1", type: "host", pattern: "mail.google.com" });
   assert.equal(matchesRule("mail.google.com", host), true);

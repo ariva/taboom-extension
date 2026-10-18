@@ -3,6 +3,7 @@
 import { formatAge, isSupportedUrl } from "../../../app/core.ts";
 import { tagColorHex, tagMatches, usesDarkText } from "../../../app/tags.ts";
 import type { Tag } from "../../../app/types.ts";
+import { isSplit, type SplitEdge } from "../../../app/split.ts";
 import type { DerivedTabs, TabId } from "./derived.ts";
 import { highlightRanges } from "./search.ts";
 import type { HighlightRange } from "./search.ts";
@@ -34,6 +35,7 @@ export interface RowContext {
   fuzzy?: boolean;
   parked?: boolean; // the row is a parked snapshot, not a live tab
   fit?: PillFit; // the meta line's measured room for tag pills (absent: happy-dom / first paint)
+  splitEdges?: Map<number, SplitEdge>; // where a split's rows sit in the visible order (splitPairEdges)
 }
 
 // what fitTagPills needs from the DOM (render/meta-fit.ts measures it): the row's line from the
@@ -89,7 +91,7 @@ const ROW_GAP = 0.375;
 const TEXT_SCALE = 0.85 / 0.77; // the host and age are set in the meta's font, badges in a smaller one
 
 export function badges(
-  tab: Pick<Tab, "discarded" | "pinned" | "audible">,
+  tab: Pick<Tab, "discarded" | "pinned" | "audible" | "splitViewId">,
   isProtectedTab: boolean,
   isKeptAliveTab = false,
   tags: Tag[] = [],
@@ -118,6 +120,9 @@ export function badges(
   }
   if (tab.audible) {
     list.push(["🔊", ""]);
+  }
+  if (isSplit(tab)) {
+    list.push(["split", ""]); // one half of a Chrome split view
   }
   return list;
 }
@@ -222,9 +227,11 @@ export function rowViewModel(
     fuzzy = false,
     parked = false,
     fit,
+    splitEdges,
   }: RowContext,
 ): RowViewModel {
   const d = derived.get(tab.id)!; // derived is built from the same tabs (deriveTabs, once per refresh)
+  const splitEdge = tab.id === undefined ? undefined : splitEdges?.get(tab.id);
   // a badge lights up for a #token prefix or a plain token inside the tag name
   const hitTagIds = new Set(
     d.tags
@@ -266,6 +273,9 @@ export function rowViewModel(
       tab.active && "active-tab",
       tab.active && tab.windowId === currentWindowId && "current",
       parked && "parked",
+      splitEdge !== undefined && "in-split", // nested under the Split sub-header (render/headers.ts)
+      (splitEdge === "first" || splitEdge === "only") && "split-first", // the block's outer corners
+      (splitEdge === "last" || splitEdge === "only") && "split-last",
     ].filter((name): name is string => Boolean(name)),
     viewTransitionName: `tab-${tab.id}`,
     checked: selected.has(tab.id),

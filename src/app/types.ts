@@ -194,7 +194,7 @@ export type Features = Partial<Record<FeatureName, FeatureFlag>>;
 
 export type SnoozeTab = Pick<
   chrome.tabs.Tab,
-  "id" | "windowId" | "active" | "discarded" | "pinned" | "audible" | "url" | "lastAccessed"
+  "id" | "windowId" | "active" | "discarded" | "pinned" | "audible" | "url" | "lastAccessed" | "splitViewId"
 >;
 
 export type SearchableTab = Pick<chrome.tabs.Tab, "title" | "url">;

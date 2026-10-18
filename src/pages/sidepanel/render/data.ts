@@ -54,12 +54,8 @@ export async function refresh(animate = false, preloaded: AppState | null = null
   document.documentElement.style.fontSize = `${state.ui.fontSize ?? 1}rem`;
   // light-dark() colors resolve via color-scheme, so forcing it flips the palette
   document.documentElement.style.colorScheme = resolveColorScheme(state.ui.theme);
-  // focus moved to another window: the window grouping reorders (new current
-  // window jumps to the top) — without a scroll the viewport stays mid-list
-  // and the current group sits above it
-  if (state.currentWindowId != null && win.id !== state.currentWindowId && effectiveSort() === "window") {
-    state.followCurrent = true;
-  }
+  // (a focus move to another window changes the active tab below: that reveal covers the
+  // window grouping's reorder, the new current window's group jumping to the top)
   state.currentWindowId = win.id!; // live windows always have an id (only sessions-API windows lack one)
   // active tab switched from outside the panel (worker's history command,
   // Ctrl+Tab): the row re-renders as current but may sit off-screen. The first

@@ -489,18 +489,19 @@ test("UI - Sidepanel Sort - Window focus switch scrolls current window's group i
   await tick();
   const listEl = byId("tab-list");
   const scrolled: string[] = [];
-  window.HTMLElement.prototype.scrollIntoView = function () {
-    scrolled.push(this.className);
+  window.HTMLElement.prototype.scrollIntoView = function (options?: boolean | ScrollIntoViewOptions) {
+    scrolled.push(`${this.className}:${typeof options === "object" ? options.block : ""}`);
   };
   tabOf(4).active = true; // window 2's active tab
   chrome.windows.getLastFocused = async () => ({ id: 2 });
   listEl.scrollTop = 400; // pretend we're scrolled deep down
   await chrome.windows.onFocusChanged.fire(2);
   await new Promise((resolve) => setTimeout(resolve, 200)); // 150ms refresh debounce
-  assert.equal(listEl.scrollTop, 0, "focus switch scrolls to top");
+  // the new current window's group jumps to the top of the list: its current row goes to the
+  // top of the viewport (no layout here: the browser's own "start" scroll)
   assert.ok(
-    scrolled.some((c) => c.includes("current")),
-    "then reveals the current tab",
+    scrolled.some((c) => c.includes("current") && c.endsWith(":start")),
+    "the current tab revealed at the top",
   );
 
   // same window again: plain refresh keeps scroll position

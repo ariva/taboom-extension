@@ -53,7 +53,7 @@ export interface PanelState {
   currentWindowId: number | null; // null until the first refresh() resolves
   activeTabId: number | null; // active tab of the current window as of the last refresh()
   followCurrent: boolean;
-  revealCurrent: boolean;
+  revealCurrent: boolean; // after the next render: the current row at the top of the list (reveal.ts "start")
   pendingScroll: number | null;
   windowMeta: WindowMetaMap;
   tabGroups: Map<number, TabGroup>;
@@ -103,12 +103,12 @@ export const state: PanelState = {
   cursor: -1,
   currentWindowId: null, // until the first refresh() resolves
   activeTabId: null,
-  // after activating, the tab jumps in the list (top in recent/window sorts) —
-  // follow it on the next event-driven re-render so it doesn't vanish off-screen
+  // a row activated from the list: on the next event-driven re-render the minimal scroll
+  // keeps it on screen (recent sort moves it to the top) without the list jumping under the click
   followCurrent: false,
-  // the active tab changed outside the panel (keyboard history command, Ctrl+Tab):
-  // minimal scroll so the row is visible — no jump to top, a row already on
-  // screen stays where it is
+  // the active tab changed outside the panel (keyboard history command, Ctrl+Tab), the panel
+  // opened, or the view changed (filter / scope / sort): the current row — with its Split or
+  // group header — goes to the top of the list, as far as the scroll range allows
   revealCurrent: false,
   pendingScroll: null, // scrollTop to apply after the next render (filter/search switches)
   windowMeta: new Map(), // windowId → { name, color } from windowProfiles (WINDOW_NAMES)
@@ -162,6 +162,11 @@ export function parkedActive(): boolean {
 // TAGS resolved flag — Tags ▸ in the row menu, the Tags chip, the badges, the quick launch view
 export function tagsActive(): boolean {
   return featureEnabled(state.features, "TAGS");
+}
+
+// SPLIT_VIEW resolved flag — the row menu's Split view / Unsplit items
+export function splitActive(): boolean {
+  return featureEnabled(state.features, "SPLIT_VIEW");
 }
 
 // the list shows parked snapshots instead of live tabs

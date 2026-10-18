@@ -35,6 +35,26 @@ listEl.addEventListener("mouseover", (event) => {
   } else {
     hoverTip.textContent = tip;
   }
+  // a numbered list under a rule (the split header: its two tabs, title and url each)
+  if (carrier.dataset.tipList) {
+    const entries: [string, string][] = JSON.parse(carrier.dataset.tipList); // written by headers.ts
+    const rule = document.createElement("hr");
+    rule.className = "tip-divider";
+    const list = document.createElement("ol");
+    list.className = "tip-list";
+    for (const [title, url] of entries) {
+      const item = document.createElement("li");
+      item.textContent = title;
+      if (url) {
+        const line = document.createElement("div");
+        line.className = "tip-url";
+        line.textContent = url;
+        item.append(line);
+      }
+      list.append(item);
+    }
+    hoverTip.append(rule, list);
+  }
   // a row's states as the same badges it shows (protected / kept alive green, snoozed amber, pinned grey)
   if (carrier.dataset.tipBadges) {
     const badges: Badge[] = JSON.parse(carrier.dataset.tipBadges); // written by row.ts from the view model

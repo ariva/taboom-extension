@@ -44,6 +44,7 @@ import { persistUiPrefs } from "../input/toolbar-events.ts";
 import { moveTabsToParked, parkWindowPrompt } from "../ops/parked-ops.ts";
 import { openParkedGroupMenu, openParkedTabMenu, openParkedWindowMenu } from "./parked-menus.ts";
 import { appendTagItems } from "./tag-menu.ts";
+import { appendSplitItems } from "./split-menu.ts";
 import {
   moveTabsToWindow,
   orderedWindowIds,
@@ -59,7 +60,7 @@ type TabGroup = chrome.tabGroups.TabGroup;
 // alwaysCount: window menus say "Close 1 tab" even for a lone tab — bare
 // "Close" on a window header reads as "close the window"; the row menu keeps
 // bare labels (the clicked tab is unambiguous there)
-function appendCtxActions(ids: number[], alwaysCount = false): void {
+export function appendCtxActions(ids: number[], alwaysCount = false): void {
   // filter(Boolean) drops the misses — TS cannot see that through the Boolean constructor
   const targets = ids.map((id) => state.allTabs.find((tab) => tab.id === id)).filter(Boolean) as PanelTab[];
   const actions: [label: string, run: () => void][] = [
@@ -164,6 +165,7 @@ export function openRowMenu(event: MouseEvent, tabId: number): void {
       ctxAppend(ctxItem("Remove from group", () => ungroupTabs(grouped)));
     }
   }
+  appendSplitItems(ids, clicked);
   showCtxMenu(event);
 }
 
