@@ -1,5 +1,7 @@
 # Taboom - Tabs Manager - Chrome Extension
 
+[Install](#installation) · [Support](#buy-me-pizzacoffeetea) · [Features](#features) · [Privacy](#privacy-first) · [Permissions](#permissions) · [Screenshots](#screenshots) · [Docs](#documentation) · [Licence](#licence)
+
 Search, protect, and snooze inactive Chrome tabs.
 
 Taboom - Tabs Manager frees memory by snoozing (discarding) tabs you haven't used in a while — they stay in the tab strip and reload when clicked, nothing is ever closed automatically. A side panel lists all your tabs with instant search, filters, and bulk actions; sites that lose state on reload can be protected from snoozing. TypeScript, no runtime dependencies, runs fully locally with no telemetry.
@@ -18,10 +20,12 @@ Taboom - Tabs Manager frees memory by snoozing (discarding) tabs you haven't use
 ## Installation
 
 ### Chrome Web Store
-* **[Install from the Chrome Web Store](https://chromewebstore.google.com/detail/taboom-tabs-manager-by-ar/dllcchbdnomgagjlongoanjgolnjnegg?hl=en)**
+1. **[Install from the Chrome Web Store](https://chromewebstore.google.com/detail/taboom-tabs-manager-by-ar/dllcchbdnomgagjlongoanjgolnjnegg?hl=en)** — click **Add to Chrome**, confirm.
+2. **Pin it**: click the puzzle-piece 🧩 icon at the right of Chrome's toolbar, then the pin next to **Taboom - Tabs Manager**. The moon icon stays in the toolbar.
+3. **Open it**: click the moon icon. The side panel opens with every tab of every window; it stays open while you switch tabs.
 
 ### Local Installation
-* Instructions: [docs/INSTALL.md](docs/INSTALL.md) — load unpacked in Chrome, requirements, troubleshooting
+* Developers: [docs/LOCAL_DEV.md](docs/LOCAL_DEV.md) — build from source and load unpacked in Chrome, requirements, troubleshooting
 
 ## Features
 
@@ -75,8 +79,7 @@ More in [Features](docs/FEATURES.md) — the demo retakes every screenshot on ea
 
 ## Documentation
 
-- [Installation](docs/INSTALL.md) — load unpacked in Chrome, requirements, troubleshooting.
-  After installing, pin the Taboom - Tabs Manager icon via Chrome's puzzle-piece (🧩) menu so the side panel is always one click away.
+- [Local development](docs/LOCAL_DEV.md) — build from source and load unpacked in Chrome, requirements, troubleshooting.
 - [Features](docs/FEATURES.md) — one picture per feature, the demo's own stills, with links into Usage.
 - [Usage](docs/USAGE.md) — concepts, side panel, automatic snooze, protection rules, verifying freed memory.
 - [Building](docs/BUILD.md) — every build command, what a build produces, the dev loop, the release checks, the optional minified build (with measurements).

@@ -1,4 +1,4 @@
-# Installing Taboom - Tabs Manager Locally
+# Local development: build and load Taboom - Tabs Manager
 
 Taboom - Tabs Manager is written in TypeScript and built with [Vite](https://vite.dev) into a plain, readable (unminified) extension folder that Chrome loads directly.
 
