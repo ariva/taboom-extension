@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
 import type { Message, MessageError, MessageResponses } from "../../src/app/messages.ts";
-import type { KeepAliveTab, ProtectionRule, Removal, Settings } from "../../src/app/types.ts";
+import type { KeepAliveTab, LocalStorageSchema, ProtectionRule, Removal, Settings } from "../../src/app/types.ts";
 import type { ChromeMockOptions } from "../helpers/chrome-mock.ts";
 import { makeChrome, tick, TEST_EXPERIMENTAL, TEST_FEATURES } from "../helpers/ui.ts";
 
@@ -19,6 +19,7 @@ const NAV_ON = DEFAULT_MODE !== "off";
 const TRADITIONAL_DEFAULT = DEFAULT_MODE === "traditional";
 const COMPACT_AVAILABLE = NAV_STACK_ON && TEST_FEATURES.NAVIGATION_COMPACT_STACK?.enabled === true;
 const KEEP_ALIVE_ON = TEST_FEATURES.KEEP_ALIVE?.enabled === true;
+const TAGS_ON = TEST_FEATURES.TAGS?.enabled === true;
 
 const NOW = Date.now();
 const HOUR = 3_600_000;
@@ -81,6 +82,8 @@ const stored: {
   keepAliveTrash?: Removal<KeepAliveTab>[];
   protectionTrash?: Removal<ProtectionRule>[];
   updateAvailable?: string;
+  tags?: LocalStorageSchema["tags"];
+  tagPages?: LocalStorageSchema["tagPages"];
 } = {
   settings: {
     autoSnoozeEnabled: true,
@@ -957,4 +960,50 @@ test("Service Worker - KEEP_ALIVE off: sweep alarm and menu click are inert", { 
   assert.equal(calls.filter((c) => c.startsWith("tabs.reload")).length, 0);
   assert.equal(stored.keepAlive.length, 1, "list untouched");
   stored.keepAlive = [];
+});
+
+test("Service Worker - TAGS: Tag page ▸ items follow the tag list, a click toggles the page, the active tab syncs the checks", {
+  skip: !TAGS_ON,
+}, async () => {
+  stored.tags = [{ id: "tw", name: "work", color: "blue" }];
+  stored.tagPages = [];
+  calls.length = 0;
+  await chrome.storage.onChanged.fire({ tags: {} }, "local");
+  await tick();
+  await tick();
+  assert.ok(calls.includes("contextMenus.create tag-page"), "the Tag page ▸ parent");
+  assert.ok(calls.includes("contextMenus.create tag-tw"), "one checkbox per tag");
+  // a click tags the clicked page (old.example.com, tab 2)
+  await chrome.contextMenus.onClicked.fire(
+    { menuItemId: "tag-tw" },
+    tabs.find((t) => t.id === 2),
+  );
+  await tick();
+  await tick();
+  assert.deepEqual(stored.tagPages, [{ url: "https://old.example.com/a", tagIds: ["tw"] }]);
+  // the checks follow the active tab
+  calls.length = 0;
+  await chrome.tabs.onActivated.fire({ tabId: 2 });
+  await tick();
+  assert.ok(calls.includes('contextMenus.update tag-tw {"checked":true}'), "tagged page: checked");
+  calls.length = 0;
+  await chrome.tabs.onActivated.fire({ tabId: 1 });
+  await tick();
+  assert.ok(calls.includes('contextMenus.update tag-tw {"checked":false}'), "untagged page: unchecked");
+  // a second click takes the tag off again
+  await chrome.contextMenus.onClicked.fire(
+    { menuItemId: "tag-tw" },
+    tabs.find((t) => t.id === 2),
+  );
+  await tick();
+  await tick();
+  assert.deepEqual(stored.tagPages, []);
+  // no tags left: the parent goes (nothing to pick)
+  stored.tags = [];
+  calls.length = 0;
+  await chrome.storage.onChanged.fire({ tags: {} }, "local");
+  await tick();
+  await tick();
+  assert.ok(calls.includes("contextMenus.remove tag-page"));
+  assert.ok(!calls.includes("contextMenus.create tag-page"));
 });

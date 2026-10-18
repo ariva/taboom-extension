@@ -12,7 +12,7 @@ type Tab = chrome.tabs.Tab;
 // allowed values of the filter buttons / scope + sort selects / direction button.
 // The view fields below stay `string`: they arrive unvalidated from the DOM and
 // storage (see UiPrefs), and unknown values simply fall through the switches.
-export type FilterName = "all" | "awake" | "snoozed" | "protected";
+export type FilterName = "all" | "awake" | "snoozed" | "protected" | "tags";
 export type ScopeName = "all-windows" | "current-window" | "parked-windows";
 export type SortName =
   | "recent"
@@ -23,6 +23,7 @@ export type SortName =
   | "group-domain"
   | "group-url"
   | "group-tabgroup"
+  | "group-tag"
   | "window";
 export type SortDir = "asc" | "desc" | "none";
 
@@ -34,6 +35,18 @@ export interface SelectView extends SearchView {
   sortDir?: string; // SortDir
   tabGroups?: Map<number, chrome.tabGroups.TabGroup>;
   windowMeta?: WindowMetaMap | null;
+  tagFilter?: ReadonlySet<string>; // TAGS: the ticked tag ids of the Tags chip; empty = any tagged tab
+}
+
+// the tags filter: any tag when nothing is ticked, else one of the ticked ones (OR)
+function hasWantedTag(tags: { id: string }[], wanted: ReadonlySet<string> | undefined): boolean {
+  return wanted && wanted.size > 0 ? tags.some((tag) => wanted.has(tag.id)) : tags.length > 0;
+}
+
+// group-tag: the first tag in tag-list order names the group; untagged tabs sort last
+function tagSortKey(tags: { name: string }[]): string {
+  const first = tags[0];
+  return first ? first.name.toLocaleLowerCase() : "\uffff";
 }
 
 // filter + sort the full tab list down to what the panel shows.
@@ -55,6 +68,9 @@ export function selectVisible<T extends Tab>(tabs: T[], view: SelectView): T[] {
       break;
     case "protected":
       result = result.filter((tab) => derived.get(tab.id)!.protected);
+      break;
+    case "tags":
+      result = result.filter((tab) => hasWantedTag(derived.get(tab.id)!.tags, view.tagFilter));
       break;
   }
   const last = (tab: Tab): number => tab.lastAccessed ?? now;
@@ -85,6 +101,9 @@ export function selectVisible<T extends Tab>(tabs: T[], view: SelectView): T[] {
       break;
     case "group-url":
       sortGroupedByKey(result, (tab) => tab.url ?? "", sortDir, last);
+      break;
+    case "group-tag":
+      sortGroupedByKey(result, (tab) => tagSortKey(derived.get(tab.id)!.tags), sortDir, last);
       break;
     // Chrome tab groups: groups ABC by title, ungrouped bucket last; the
     // gid suffix keeps same-titled groups apart. Inside a group rows follow
@@ -185,17 +204,24 @@ function sortGroupedByKey(
   );
 }
 
-export function countsByFilter(tabs: Tab[], derived: DerivedTabs): Record<FilterName, number> {
-  const counts: Record<FilterName, number> = { all: tabs.length, awake: 0, snoozed: 0, protected: 0 };
+export function countsByFilter(
+  tabs: Tab[],
+  derived: DerivedTabs,
+  tagFilter?: ReadonlySet<string>,
+): Record<FilterName, number> {
+  const counts: Record<FilterName, number> = { all: tabs.length, awake: 0, snoozed: 0, protected: 0, tags: 0 };
   for (const tab of tabs) {
     if (tab.discarded) {
       counts.snoozed++;
     } else {
       counts.awake++;
     }
-    if (derived.get(tab.id)!.protected) {
-      // derived is built from these same tabs
+    const d = derived.get(tab.id)!; // derived is built from these same tabs
+    if (d.protected) {
       counts.protected++;
+    }
+    if (hasWantedTag(d.tags, tagFilter)) {
+      counts.tags++;
     }
   }
   return counts;

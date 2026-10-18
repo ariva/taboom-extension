@@ -1,23 +1,15 @@
-// Pure list grouping: consecutive same-key runs, the title / domain / url group names
+// Pure list grouping: consecutive same-key runs, the title / domain / url / tag group names
 // and Chrome's tab-group color table. No DOM, no chrome.*.
+import { TAG_COLORS } from "../../../app/tags.ts";
+import type { Tag } from "../../../app/types.ts";
 
 type Tab = chrome.tabs.Tab;
 
 // ordered [key, tabs[]] pair — see groupTabs
 export type TabRun<K, T extends Tab = Tab> = [key: K, tabs: T[]];
 
-// Chrome's 9 fixed tab-group colors (chrome.tabGroups.Color → hex)
-export const TAB_GROUP_COLORS = {
-  grey: "#5f6368",
-  blue: "#1a73e8",
-  red: "#d93025",
-  yellow: "#f9ab00",
-  green: "#188038",
-  pink: "#d01884",
-  purple: "#a142f4",
-  cyan: "#007b83",
-  orange: "#fa903e",
-};
+// Chrome's 9 fixed tab-group colors (chrome.tabGroups.Color → hex) — one table with tags
+export const TAB_GROUP_COLORS = TAG_COLORS;
 
 // hex of a tab-group color; undefined for none / one this table lacks (a vanished
 // group, a color newer than the table) — callers supply the fallback
@@ -36,6 +28,11 @@ export function domainGroupName(host: string): string {
 
 export function urlGroupName(url: string): string {
   return url || "(no url)";
+}
+
+// group-tag header: the first tag's name; the untagged bucket
+export function tagGroupName(tag: Tag | undefined): string {
+  return tag ? tag.name : "No tag";
 }
 
 // Generic grouping: consecutive same-key runs → ordered [key, tabs[]] pairs.

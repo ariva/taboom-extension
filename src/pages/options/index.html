@@ -209,6 +209,103 @@
       border: 1px solid var(--border); border-radius: var(--radius-s); background: var(--card-bg); color: inherit;
     }
     #keep-alive-table .countdown { font-variant-numeric: tabular-nums; }
+    /* tags: two tables in the keep-alive shape — tag list (color select, click-to-edit name, pages
+       count) and tagged pages (click-to-edit address, one toggle chip per tag) */
+    #tags-section h3 { margin: 16px 0 4px; font-size: 13px; font-weight: 600; }
+    #tag-table, #tag-page-table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+    #tag-table th, #tag-page-table th { text-align: left; font-weight: 500; color: var(--muted); font-size: 11px; padding: 2px 6px 4px 0; }
+    #tag-table td, #tag-page-table td { padding: 4px 6px 4px 0; border-top: 1px solid light-dark(#eee, #333); vertical-align: middle; white-space: nowrap; }
+    #tag-table td:first-child, #tag-page-table td:first-child { color: var(--muted); font-variant-numeric: tabular-nums; }
+    #tag-table tbody td:nth-child(5) { width: 100%; max-width: 0; overflow: hidden; text-overflow: ellipsis; cursor: text; padding-right: 12px; }
+    /* tagged pages: fixed columns — the address takes what the 40 % Tags column leaves; chips wrap inside it */
+    #tag-page-table { table-layout: fixed; }
+    #tag-page-table th:nth-child(1) { width: 1.5rem; }
+    #tag-page-table th:nth-child(3) { width: 40%; }
+    #tag-page-table th:nth-child(4) { width: 5.5rem; }
+    #tag-page-table td:nth-child(2) { overflow: hidden; text-overflow: ellipsis; cursor: text; padding-right: 12px; }
+    #tag-page-table td:nth-child(3) { overflow: hidden; }
+    #tag-page-table .tag-chips { display: flex; align-items: center; gap: 4px; min-width: 0; }
+    #tag-page-table .tag-chips .tag-chip { flex: 0 1 auto; min-width: 2.5rem; margin: 0; }
+    #tag-page-table .tag-chips .tag-chip-name { flex: 1 1 auto; min-width: 0; }
+    #tag-page-table .tag-chips .tag-more, #tag-page-table .tag-chips .tag-pick-btn { flex: none; }
+    /* rows: a little left air before the number, rounded ends (separate borders — collapse has no radius),
+       a faint zebra tint and a hover ring */
+    #tag-page-table { border-collapse: separate; border-spacing: 0; }
+    #tag-page-table th:first-child, #tag-page-table td:first-child { padding-left: 8px; }
+    #tag-page-table td:first-child { border-radius: 6px 0 0 6px; }
+    #tag-page-table td:last-child { border-radius: 0 6px 6px 0; padding-right: 6px; }
+    #tag-page-rows tr:nth-child(even) td { background: light-dark(rgb(0 0 0 / 0.025), rgb(255 255 255 / 0.03)); }
+    #tag-page-rows tr:hover td { background: var(--hover); box-shadow: inset 0 1px 0 var(--border), inset 0 -1px 0 var(--border); }
+    #tag-page-rows tr:hover td:first-child { box-shadow: inset 1px 1px 0 var(--border), inset 0 -1px 0 var(--border); }
+    #tag-page-rows tr:hover td:last-child { box-shadow: inset -1px 1px 0 var(--border), inset 0 -1px 0 var(--border); }
+    #tag-table td:last-child, #tag-page-table td:last-child { text-align: right; }
+    #tag-table tfoot td { border-top: 1px solid light-dark(#eee, #333); padding-top: 8px; }
+    #new-tag-name { width: 100%; box-sizing: border-box; }
+    #tag-table .tag-name, #tag-page-table .url { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; }
+    #tag-page-table .url { color: var(--muted); }
+    #tag-page-table .url:hover, #tag-table .tag-name:hover { color: inherit; }
+    #tag-table .rename-input, #tag-page-table .rename-input { width: 100%; box-sizing: border-box; font: inherit; }
+    /* a page's tags: up to three solid chips with a ✕ each, "+N" for the rest, then the Tags ▾ picker button */
+    #tag-page-table .tag-chip {
+      /* no fixed height: the text's own line box plus even padding keeps it centered next to the ✕ */
+      display: inline-flex; align-items: center; gap: 2px; padding: 2px 3px 2px 8px;
+      border-radius: 999px; color: #fff; font-size: 12px; line-height: 16px; max-width: 18rem; vertical-align: middle;
+    }
+    #tag-page-table .tag-chip.dark { color: #202124; }
+    #tag-page-table .tag-chip.off { background: var(--badge-bg); color: var(--muted); }
+    #tag-page-table .tag-chip.off .tag-chip-name { text-decoration: line-through; }
+    #tag-page-table .tag-chip-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 16px; }
+    #tag-page-table .tag-chip-remove { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border: none; background: none; color: inherit; font: inherit; font-size: 11px; line-height: 1; padding: 0; cursor: pointer; border-radius: 50%; opacity: 0.85; }
+    #tag-page-table .tag-chip-remove:hover { opacity: 1; background: rgb(0 0 0 / 0.15); }
+    #tag-page-table .tag-more { color: var(--muted); font-size: 12px; margin-right: 4px; }
+    #tag-page-table .tag-pick-btn { height: 20px; line-height: 16px; box-sizing: border-box; border: 1px solid var(--border); border-radius: 999px; background: none; color: inherit; font: inherit; font-size: 12px; padding: 0 8px; cursor: pointer; vertical-align: middle; }
+    #tag-page-table .tag-pick-btn:hover { background: var(--hover); }
+    #tag-page-pick {
+      position: fixed; margin: 0; inset: auto; /* top / left set from the button */
+      width: max-content; min-width: 10rem; max-width: min(18rem, calc(100vw - 16px));
+      max-height: 40vh; overflow-y: auto; /* many tags: scroll inside the picker */
+      padding: 6px; border: 1px solid var(--border); border-radius: 8px; background: var(--card-bg); color: inherit; box-shadow: 0 6px 24px rgb(0 0 0 / 0.25); font-size: 13px;
+    }
+    /* sticky: the list scrolls under the header (the popover itself is the scroll box) */
+    #tag-page-pick .tag-pick-head { position: sticky; top: -6px; z-index: 1; background: var(--card-bg); display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: -6px -6px 4px; padding: 6px 6px 4px 12px; border-bottom: 1px solid var(--border); }
+    #tag-page-pick .tag-pick-title { font-size: 11px; }
+    #tag-page-pick .tag-pick-close { border: none; background: none; color: var(--muted); cursor: pointer; padding: 3px; border-radius: 4px; display: inline-flex; }
+    #tag-page-pick .tag-pick-close:hover { background: var(--hover); }
+    #tag-page-pick .tag-pick-close svg { width: 10px; height: 10px; }
+    #tag-page-pick .tag-pick { display: flex; align-items: center; gap: 6px; padding: 4px 6px; border-radius: 6px; cursor: pointer; }
+    #tag-page-pick .tag-pick:hover { background: var(--hover); }
+    /* a plain tick, not the page's switch: the picker is a checklist */
+    #tag-page-pick .tag-pick input[type="checkbox"] {
+      appearance: auto; width: 14px; height: 14px; border-radius: 0; background: none; margin: 0; accent-color: var(--accent);
+    }
+    #tag-page-pick .tag-pick input[type="checkbox"]::before { content: none; }
+    #tag-page-pick .tag-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex: none; }
+    #tag-page-pick .tag-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #tag-page-pick .muted { padding: 4px 6px; }
+    #tag-table button, #tag-page-table button.remove-page { border: 1px solid var(--border); border-radius: 6px; background: none; color: inherit; font: inherit; font-size: 12px; padding: 2px 8px; cursor: pointer; }
+    #tag-table button:hover, #tag-page-table button.remove-page:hover { background: var(--hover); }
+    #tag-error { color: var(--danger, #d93025); margin-top: 4px; }
+    /* drag reorder of the tag rows, like the side panel's tab rows: the dragged row dims, the row
+       under the pointer is highlighted whole (dashed accent frame + tint) */
+    #tag-rows tr[draggable="true"] { cursor: grab; }
+    #tag-rows tr[draggable="false"] .drag-grip { opacity: 0.35; }
+    /* sortable headers: a faint ⇅ invites the click, the active one shows ▲ / ▼ */
+    #tag-table th[data-sort] { cursor: pointer; user-select: none; white-space: nowrap; }
+    #tag-table th[data-sort]:hover { color: inherit; }
+    #tag-table th[data-sort] .sort-arrow { font-size: 10px; opacity: 0.45; }
+    #tag-table th[data-sort][data-dir] { color: inherit; }
+    #tag-table th[data-sort][data-dir] .sort-arrow { opacity: 1; color: var(--accent); }
+    #tag-rows .drag-grip { display: inline-flex; color: var(--muted); }
+    #tag-rows .drag-grip svg { width: 10px; height: 14px; display: block; }
+    #tag-rows tr.dragging td { opacity: 0.4; }
+    /* switched off: the row reads muted, the switch itself stays crisp */
+    #tag-rows tr.off td:not(:nth-child(3)) { opacity: 0.5; }
+    #tag-rows tr.drop-target td {
+      background: color-mix(in srgb, var(--accent) 14%, transparent);
+      box-shadow: inset 0 2px 0 var(--accent), inset 0 -2px 0 var(--accent);
+    }
+    #tag-rows tr.drop-target td:first-child { box-shadow: inset 2px 2px 0 var(--accent), inset 0 -2px 0 var(--accent); border-radius: 6px 0 0 6px; }
+    #tag-rows tr.drop-target td:last-child { box-shadow: inset -2px 2px 0 var(--accent), inset 0 -2px 0 var(--accent); border-radius: 0 6px 6px 0; }
     #keep-alive-table td:last-child { text-align: right; }
     #keep-alive-table button {
       border: 1px solid light-dark(#ddd, #444);
@@ -241,7 +338,7 @@
     .muted { color: var(--muted); font-size: 11px; }
 
     .card.danger-zone { border: 1px solid color-mix(in srgb, var(--danger) 40%, transparent); }
-    #danger, #restore-defaults, #clear-protected, #clear-keep-alive, #delete-restore-data {
+    #danger, #restore-defaults, #clear-protected, #clear-keep-alive, #clear-tags, #delete-restore-data {
       color: var(--danger);
       border: 1px solid currentColor;
       border-radius: var(--radius-s);
@@ -249,7 +346,7 @@
       padding: 4px 12px;
       transition: background var(--transition);
     }
-    #danger:hover, #restore-defaults:hover, #clear-protected:hover, #clear-keep-alive:hover, #delete-restore-data:hover {
+    #danger:hover, #restore-defaults:hover, #clear-protected:hover, #clear-keep-alive:hover, #clear-tags:hover, #delete-restore-data:hover {
       background: color-mix(in srgb, var(--danger) 10%, transparent);
     }
     #delete-restore-data:disabled { opacity: 0.5; cursor: default; }
@@ -404,6 +501,54 @@
     </div>
   </section>
 
+  <section class="card" id="tags-section" hidden>
+    <h2>Tags</h2>
+    <p class="muted">A tag is a colored label on a page: tag a tab from its side panel row menu (<strong>Tags ▸</strong>) or the page's right-click menu (<strong>Tag page ▸</strong>), filter the list by tag with the <strong>Tags ▾</strong> chip, search with <code>#name</code>. Tags stick to the page address (without its <code>#fragment</code>), so they survive a restart and cover every tab on that page.</p>
+    <p class="muted">Drag a row onto another to reorder: the stored order is the order of the badges on a tab and of the Group by tag headers. Click #, Color, Tag or Pages to sort this table. The switch turns a tag off: it keeps its pages here but shows nowhere else until switched on again.</p>
+    <label>Tags order in pickers
+      <select id="tagPickOrder">
+        <option value="stored">Stored order (this table's drag order)</option>
+        <option value="name">Tag name (A–Z)</option>
+        <option value="used">Most used first</option>
+        <option value="table">Sorted table (follows the sort above)</option>
+      </select>
+    </label>
+    <table id="tag-table">
+      <!-- Color / Tag / Pages sort the view (asc → desc → stored order); the stored order is what drag changes -->
+      <thead><tr><th></th><th data-sort="stored">#<span class="sort-arrow">⇅</span></th><th></th><th data-sort="color">Color <span class="sort-arrow">⇅</span></th><th data-sort="name">Tag <span class="sort-arrow">⇅</span></th><th data-sort="pages">Pages <span class="sort-arrow">⇅</span></th><th></th></tr></thead>
+      <tbody id="tag-rows"></tbody>
+      <!-- the Add row is a table row: "New" under the grip / #, the color under Color, the name under Tag -->
+      <tfoot>
+        <tr id="new-tag-row">
+          <td colspan="3" class="muted">New</td>
+          <td><select id="new-tag-color" aria-label="Tag color"></select></td>
+          <td><input type="text" id="new-tag-name" placeholder="Tag name" maxlength="24" /></td>
+          <td></td>
+          <td><button id="add-tag">Add</button></td>
+        </tr>
+      </tfoot>
+    </table>
+    <p class="muted" id="tag-error" hidden></p>
+    <h3>Tagged pages</h3>
+    <table id="tag-page-table">
+      <thead><tr><th>#</th><th>Page</th><th>Tags</th><th></th></tr></thead>
+      <tbody id="tag-page-rows"></tbody>
+    </table>
+    <!-- one picker for every page row: filled for the row whose Tags ▾ opened it -->
+    <div id="tag-page-pick" popover></div>
+    <div class="row">
+      <input type="text" id="new-tag-page" placeholder="https://app.example.com/board" />
+      <select id="new-tag-page-tag" aria-label="Tag"></select>
+      <button id="add-tag-page">Add</button>
+    </div>
+    <hr class="card-divider" />
+    <p class="muted">Removes every tag and every tagged page. Settings stay unchanged. Any removal (a row's Remove, a menu's Remove tag, Remove all) can be undone, newest first.</p>
+    <div class="row">
+      <button id="clear-tags">Remove all tags</button>
+      <button id="restore-tags" hidden>Restore last removal</button>
+    </div>
+  </section>
+
   <section class="card">
     <h2>Useful Links</h2>
     <ul id="links">
@@ -418,11 +563,11 @@
 
   <section class="card danger-zone">
     <h2>Data</h2>
-    <p class="muted">Forgets every undoable removal (protected sites, keep-alive marks, removed parked windows): the Restore / Undo buttons go away. Disabled when there is nothing to forget.</p>
+    <p class="muted">Forgets every undoable removal (protected sites, keep-alive marks, removed parked windows, tags): the Restore / Undo buttons go away. Disabled when there is nothing to forget.</p>
     <button id="delete-restore-data">Clear restore data</button>
-    <p class="muted">Restores all settings and appearance to their defaults. Protected sites, keep-alive marks and parked windows stay unchanged.</p>
+    <p class="muted">Restores all settings and appearance to their defaults. Protected sites, keep-alive marks, parked windows and tags stay unchanged.</p>
     <button id="restore-defaults">Restore default settings</button>
-    <p class="muted">Removes everything: settings, protected sites, keep-alive marks, parked windows and the undo data. Cannot be undone.</p>
+    <p class="muted">Removes everything: settings, protected sites, keep-alive marks, parked windows, tags and the undo data. Cannot be undone.</p>
     <button id="danger">Delete all Extension data</button>
   </section>
 

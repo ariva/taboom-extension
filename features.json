@@ -12,6 +12,7 @@
   "WINDOW_NAMES": { "enabled": true, "experimental": false },
   "WINDOW_PIN": { "enabled": true },
   "TAB_GROUPS": { "enabled": true },
+  "TAGS": { "enabled": true, "experimental": false },
   "GROUP_BY_TITLE": { "enabled": true },
   "GROUP_BY_DOMAIN": { "enabled": true },
   "GROUP_BY_URL": { "enabled": true },

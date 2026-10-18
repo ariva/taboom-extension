@@ -45,14 +45,14 @@ Open by clicking the Taboom toolbar icon, or `Ctrl+Shift+Space`.
 
 Panel position (left or right) is a global Chrome setting: `chrome://settings/appearance` → **Side panel**. Extensions cannot set it, and top/bottom docking does not exist for side panels.
 
-- **Search** — focused on open; matches title, URL, and hostname; multiple words all must match (`github rust`).
-- **Filters** — All / Awake / Snoozed / Protected, with live counts.
+- **Search** — focused on open; matches title, URL, hostname and tag names; multiple words all must match (`github rust`). A `#word` token matches tags only, by prefix (`#wo` finds *work*) — see **Tags** below.
+- **Filters** — All / Awake / Snoozed / Protected, with live counts, and the **Tags ▾** dropdown chip (see **Tags**).
 - **Scope & sort** — **All open windows**, **Current window** or **Parked windows** (see below); recent / oldest / title / domain.
 - **Row click** — focuses the window and activates the tab (snoozed tabs reload).
-- **Visual states** — each window's active tab has an accent left edge + bold title; snoozed tabs are dimmed with a ⏸ title prefix and `SNOOZED` badge.
+- **Visual states** — each window's active tab has an accent left edge + bold title; snoozed tabs are dimmed with a ⏸ title prefix and `SNOOZED` badge. Hovering a row shows its full address, under it its state badges in their colors (snoozed, protected, kept alive, pinned, 🔊) and, when it has tags, a **Tags:** line of colored pills.
 - **Hover actions** — ⏸ snooze, 🛡 protect/unprotect site, ✕ close.
 - **Checkboxes** — select several tabs, then bulk Snooze / Protect / Close from the bottom bar. Closing more than one tab asks for confirmation.
-- **Quick launch (▦)** — a popover headed **Quick launch** with a **Close** button (like the ☰ menu), then one view per thing worth switching between, each a tab with its count: **Windows** (only with two or more windows, or a parked one), **Groups** (only once a group exists — the first one comes from a row's **Move to group ▸ New group…**; the view's own **+ New group…** row adds more), **Pins**, **Alive** and **Dupes** (only while they have members). A single view shows as a heading; with nothing at all (one window, nothing else) the ▦ button is greyed out.
+- **Quick launch (▦)** — a popover headed **Quick launch** with a **Close** button (like the ☰ menu), then one view per thing worth switching between, each a tab with its count: **Windows** (only with two or more windows, or a parked one), **Groups** (only once a group exists — the first one comes from a row's **Move to group ▸ New group…**; the view's own **+ New group…** row adds more), **Pins**, **Tags**, **Alive** and **Dupes** (only while they have members). A single view shows as a heading; with nothing at all (one window, nothing else) the ▦ button is greyed out.
 - **Quick actions (☰)** — top-right menu (opening it closes any other popup: quick launch, history list, a dropdown): **Open Settings**, **Cleanup Duplicates (N)**, which runs *There can be only one* over every duplicated page at once (N = tabs it would close; greyed out when nothing is duplicated; confirmed first), and **Undo last remove in Parked windows**.
 - **Select all** — checkbox left of the scope selector selects/unselects every tab currently shown (i.e. matching the active search and filter). Search first, select all, then bulk-act.
 
@@ -83,6 +83,19 @@ A window you do not need right now but do not want to lose can be **parked**: Ta
 - **Groups** — a parked tab group's header (right-click) has its own menu: **Rename group…**, **Move group to ▸** / **Open group in ▸** a window (the tabs arrive as a Chrome group with the same name and color) and **Remove parked group**.
 - **Remove** — **Remove parked window / group / tab** drops it without opening anything. Every removal can be undone, newest first: the **Undo remove (N)** button in the toolbar while you are in the Parked windows scope, **Undo last remove** in the parked window menu, and **Undo last remove in Parked windows** in the ☰ quick actions menu (works from any scope, also when nothing is parked any more). A removed group or tab goes back into its parked window (or stands on its own if that window is gone).
 - **Several at once** — tick parked rows, then open any ticked row's menu: Move / Open / Remove act on the whole selection. The bottom bar only counts them there (its tab actions are hidden).
+
+### Tags
+
+A tag is a colored label on a page address (without its `#fragment`), like a keep-alive mark is a timer on one: it survives a restart, it shows on every tab of that page, and on a parked copy of it.
+
+- **Tag a tab** — row menu (or a selection's menu) → **Tags…** opens a checklist at the click, the same one as Settings: one checkbox per tag (ticked when the tab has it; over a selection, ticked when all of them have it), tick or untick as many as you like without reopening, the list scrolls past a screenful; **New tag…** (at the bottom of the checklist, and right in the row menu next to **Tags…**) asks for a name and one of the nine colors (same palette as tab groups). Names are unique (case does not matter), up to 24 characters, no `#`.
+- **See it** — a solid pill in the tag's color after the plain state badges (*protected*, *kept alive*, *pinned* …) on the row (white text, dark on yellow and orange); up to three pills (a search hit always among them), then *+N* for the rest. The row's hover tip ends with a **Tags:** line of every pill.
+- **Filter** — the **Tags ▾** chip shows only tagged tabs and opens a picker with one tick per tag and its count. No tick = any tag; ticks = any of the ticked ones (OR). The chip reads *Tags*, the tag's name with its dot, or *2 tags*; **Reset selection** under the ticks clears them.
+- **Search** — `#work` (prefix) finds tabs tagged *work*; the matching pill gets a ring. Plain words match tag names too (`work` finds tagged tabs and titles with *work*). Both kinds combine: `#bills invoice`.
+- **Group by tag** — the Sort select gains **Group by tag**: one header per tag with its color square, a tab under its first tag (tag-list order), untagged tabs under **No tag** last.
+- **Quick launch (▦) → Tags (N)** — one row per tag: `N tabs · M windows` (or *no open tab*). Click a row to filter the list to that tag; its ⋯ / right-click menu offers **Rename tag…** (in place), **Tag color ▸** and **Remove tag**.
+- **Page right-click menu** — **Taboom → Tag page ▸** lists the existing tags as checkboxes for the page under the cursor (no New tag… there — make tags in the panel or Settings).
+- **Settings → Tags** — two tables in the Keep Tabs Alive shape. **Tags**: number, an on / off switch (off keeps the tag and its pages in the table — struck through on the tagged pages, not offered in their picker — but hides it everywhere else — badges, chip, search, grouping, menus — until switched on again), color dropdown, name (click to rename), how many pages carry it, **Remove**; an **Add** row (name + color); drag a row by its ⋮⋮ grip onto another to reorder — the list order is the order of a tab's badges, of the Tags… checklist and of the Group by tag headers (dragged down lands after the target, up lands before it). Click **Color**, **Tag** or **Pages** in the header to sort (ascending, then descending, then the stored order again), or **#** to go straight back to the stored order; the `#` column keeps showing the stored position. The sort is saved at once. **Tags order in pickers** (a dropdown in the card) decides how every tag list you pick from is ordered — the Tags… checklist, the Tags ▾ picker, the quick launch's Tags view, the page menu's Tag page ▸, the Add-page dropdown: **Stored order** (default, the drag order), **Tag name (A–Z)**, **Most used first** (pages carrying it) or **Sorted table** (whatever this table is sorted by right now). Badges on a row always keep the stored order. Dragging is off while a sort is active. **Tagged pages**: number, address (click to edit), the page's tags as colored chips — the first three, each with a ✕ that takes it off, then *+N* for the rest — and a **Tags ▾** button opening a picker with one tick per tag (it scrolls past a screenful), **Remove**; an **Add** row tags an address without opening it. **Remove all tags** (confirmed) empties both; every removal (a Remove, a menu's Remove tag, Remove all) is undoable, newest first — **Restore last removal** here (Settings only — the panel has no undo for tags). Unticking the last tag of a page just drops the page (nothing to undo).
 
 ### Changing the key bindings
 
@@ -168,8 +181,8 @@ Rule of thumb: protect what would break if reloaded; keep alive what would go st
 
 ## Context menu
 
-Right-click any page → **Taboom - Tabs Manager**: Snooze this tab · Protect site · Keep this tab alive · Snooze all inactive tabs.
+Right-click any page → **Taboom - Tabs Manager**: Snooze this tab · Protect site · Keep this tab alive · Tag page ▸ (once a tag exists) · Snooze all inactive tabs.
 
 ## Privacy
 
-Everything runs locally: no server, no telemetry, no content scripts, no host permissions. **Settings → Delete all Extension data** wipes everything stored (settings, protected sites, keep-alive marks, parked windows, undo data); **Restore default settings** resets only settings and appearance and keeps those.
+Everything runs locally: no server, no telemetry, no content scripts, no host permissions. **Settings → Delete all Extension data** wipes everything stored (settings, protected sites, keep-alive marks, parked windows, tags, undo data); **Restore default settings** resets only settings and appearance and keeps those.

@@ -1,6 +1,7 @@
 // Pure search logic: fuzzy activation and scoring, query-token highlight ranges and
 // the search + window-scope candidate pool. No DOM, no chrome.*.
 import { featureEnabled } from "../../../app/core.ts";
+import { splitTagQuery, tagMatches } from "../../../app/tags.ts";
 import type { Features, UiPrefs } from "../../../app/types.ts";
 import type { DerivedTabs } from "./derived.ts";
 
@@ -130,11 +131,19 @@ export function highlightRanges(text: string, tokens: string[], fuzzy = false): 
 // back the same tabs they passed in, so a narrower tab type survives the trip.
 export function searchCandidates<T extends Tab>(tabs: T[], view: SearchView): T[] {
   const { query, scope, currentWindowId, derived } = view;
-  const tokens = query.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
+  // #tokens name tags (strict prefix, outside the fuzzy ranking); the rest is text
+  const { text: tokens, tags: tagTokens } = splitTagQuery(query);
+  const tagged =
+    tagTokens.length === 0
+      ? tabs
+      : tabs.filter((tab) =>
+          // derived.get()!: built from these same tabs
+          tagTokens.every((token) => derived.get(tab.id)!.tags.some((tag) => tagMatches(tag, token))),
+        );
   let result: T[];
   if (tokens.length > 0 && fuzzyActive(view)) {
     const scored: [number, T][] = [];
-    for (const tab of tabs) {
+    for (const tab of tagged) {
       let total = 0;
       for (const token of tokens) {
         // derived.get()!: derived is built from these same tabs (deriveTabs, once per refresh)
@@ -152,7 +161,7 @@ export function searchCandidates<T extends Tab>(tabs: T[], view: SearchView): T[
     scored.sort((a, b) => b[0] - a[0] || (b[1].lastAccessed ?? 0) - (a[1].lastAccessed ?? 0));
     result = scored.map(([, tab]) => tab);
   } else {
-    result = tabs.filter((tab) =>
+    result = tagged.filter((tab) =>
       // derived.get()!: built from these same tabs
       tokens.every((token) => derived.get(tab.id)!.haystack.includes(token)),
     );

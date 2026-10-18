@@ -9,6 +9,7 @@ const AUTO_ALL_ON = TEST_FEATURES.SEARCH_AUTO_SELECT_ALL?.enabled === true;
 const KEEP_ALIVE_ON = TEST_FEATURES.KEEP_ALIVE?.enabled === true;
 const DUPLICATES_ON = TEST_FEATURES.DUPLICATES?.enabled === true;
 const PARKED_ON = TEST_FEATURES.PARKED_WINDOWS?.enabled === true;
+const TAGS_ON = TEST_FEATURES.TAGS?.enabled === true;
 
 const NOW = Date.now();
 const tabs: NonNullable<ChromeMockOptions["tabs"]> = [
@@ -819,6 +820,8 @@ test("UI - Sidepanel - Right-click row offers move-to-window menu (selection-awa
       "Close",
       // KEEP_ALIVE: the setting defaults to on, so the experimental pass shows the mark item
       ...(KEEP_ALIVE_ON ? ["Keep alive"] : []),
+      // TAGS: the Tags… picker entry and New tag…
+      ...(TAGS_ON ? ["Tags…", "New tag…"] : []),
       "Move tab to ▸",
       "Window #2",
       "New window",
@@ -828,7 +831,7 @@ test("UI - Sidepanel - Right-click row offers move-to-window menu (selection-awa
     ],
     "bulk actions first, then the Move-to dropdown (own window excluded)",
   );
-  const submenu = q(menu, ".ctx-submenu");
+  const submenu = q(menu, ".ctx-submenu:not(.tags)"); // TAGS adds its own submenu before Move tab to
   assert.equal(submenu.hidden, true, "move targets folded by default");
   const moveToggle = must(qa(menu, ".ctx-item").find((el) => el.textContent.startsWith("Move tab to")));
   moveToggle.dispatchEvent(new window.Event("mouseenter"));
@@ -1338,7 +1341,7 @@ test("UI - Sidepanel - WINDOW_NAMES: named headers, custom dots, overview list, 
   // "Move tab to" targets follow the windows-list order: ABC by display name…
   const moveTargets = () => {
     q(document, '.row[data-tab-id="1"]').dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
-    const names = qa(q(ctx, ".ctx-submenu"), ".ctx-item").map((el) => el.textContent);
+    const names = qa(q(ctx, ".ctx-submenu:not(.tags)"), ".ctx-item").map((el) => el.textContent);
     document.body.click();
     return names;
   };
@@ -2258,7 +2261,12 @@ test("UI - Sidepanel - PARKED_WINDOWS: Park window… asks first; the Parked win
   calls.length = 0;
   q(must(rows()[0]), ".title").click();
   await tick();
-  assert.deepEqual(items().slice(0, 2), ["Copy URL", "Move parked tab to ▸"]);
+  assert.deepEqual(
+    items()
+      .filter((label) => label !== "Tags…" && label !== "New tag…")
+      .slice(0, 2),
+    ["Copy URL", "Move parked tab to ▸"],
+  );
   assert.ok(items().includes("Open parked tab in ▸"), "copy variant offered");
   assert.ok(items().includes("Remove parked tab"));
   assert.ok(items().includes("Window Current #1"), "live windows are the targets");
@@ -2533,7 +2541,7 @@ test("UI - Sidepanel - PARKED_WINDOWS: Move tab to ▸ offers the parked windows
   const menu = byId("ctx-menu");
   const row = q(document, '.row[data-tab-id="1"]');
   row.dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
-  const submenu = q(menu, ".ctx-submenu");
+  const submenu = q(menu, ".ctx-submenu:not(.tags)");
   assert.ok(submenu.querySelector(".ctx-divider"), "a divider separates the parked targets");
   assert.equal(q(submenu, ".ctx-title").textContent, "Parked:");
   const parkedItems = qa(submenu, ".ctx-item")
@@ -2564,4 +2572,299 @@ test("UI - Sidepanel - PARKED_WINDOWS: Move tab to ▸ offers the parked windows
   await chrome.storage.local.set({ parkedWindows: [], parkedTrash: [] });
   await chrome.storage.onChanged.fire({ parkedWindows: {} }, "local");
   await settle();
+});
+
+test("UI - Sidepanel - TAGS: row menu Tags ▸ creates / toggles tags; badge, chip filter, #search, group by tag", {
+  skip: !TAGS_ON,
+}, async () => {
+  const menu = byId("ctx-menu");
+  const ask = byId<HTMLDialogElement>("ask-dialog");
+  const pick = byId("tag-assign-pop");
+  const rowOf = (id: number) => q(document, `.row[data-tab-id="${id}"]`);
+  // Tags… in the row menu opens the checklist picker for that row
+  const open = (id: number) => {
+    rowOf(id).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+    assert.equal(menu.hidden, false);
+    must(qa(menu, ".ctx-item").find((el) => el.textContent === "Tags…")).click();
+  };
+  const pickRow = (name: string) => must(qa(pick, ".tag-pick").find((el) => q(el, ".tag-name").textContent === name));
+  // New tag… from the picker: name + a color swatch; the new tag lands on the clicked tab
+  open(1);
+  assert.equal(menu.hidden, true, "the menu closes; the picker takes its place");
+  assert.equal(q(pick, ".tag-pick-title").textContent, "Tags");
+  assert.ok(q(pick, ".tag-pick-close svg"), "a corner ✕ like the menu's");
+  assert.equal(qa(pick, ".tag-pick").length, 0, "no tags yet");
+  q(pick, ".tag-new").click();
+  assert.equal(ask.open, true, "the new-tag dialog opens");
+  const swatches = qa(ask, ".ask-swatch");
+  assert.equal(swatches.length, 9, "the nine group colors");
+  assert.equal(q(ask, '.ask-swatch[aria-pressed="true"]').dataset.color, "blue", "blue preselected");
+  must(swatches.find((el) => el.dataset.color === "green")).click();
+  q<HTMLInputElement>(ask, ".ask-input").value = " Work ";
+  q(ask, ".ask-ok").click();
+  await tick();
+  await tick();
+  let stored = await chrome.storage.local.get(["tags", "tagPages"]);
+  assert.deepEqual(
+    stored.tags?.map((tag) => [tag.name, tag.color]),
+    [["Work", "green"]],
+  );
+  assert.deepEqual(stored.tagPages, [{ url: "https://github.com/pr/1", tagIds: [stored.tags?.[0]?.id] }]);
+  const badge = q(rowOf(1), ".badge.tag");
+  assert.equal(badge.textContent, "Work");
+  assert.equal(badge.style.background, "#188038", "solid fill in the tag color (happy-dom keeps the hex)");
+  assert.equal(rowOf(2).querySelector(".badge.tag"), null);
+  // a duplicate name is refused with a toast, nothing written
+  open(2);
+  q(pick, ".tag-new").click();
+  q<HTMLInputElement>(ask, ".ask-input").value = "work";
+  q(ask, ".ask-ok").click();
+  await tick();
+  await tick();
+  assert.equal((await chrome.storage.local.get("tags")).tags?.length, 1, "no second tag");
+  assert.match(byId("toast").textContent ?? "", /exists/);
+  // the existing tag is a checkbox: ticked when the tab has it
+  open(2);
+  const workBox = q<HTMLInputElement>(pickRow("Work"), "input");
+  assert.equal(workBox.checked, false);
+  workBox.click();
+  await tick();
+  await tick();
+  assert.equal(q(rowOf(2), ".badge.tag").textContent, "Work");
+  open(2);
+  assert.equal(q<HTMLInputElement>(pickRow("Work"), "input").checked, true);
+  menu.hidden = true;
+  // the Tags chip: visible, counts tagged tabs, filters to them
+  const chip = q(document, '#filters button[data-filter="tags"]');
+  assert.equal(chip.hidden, false);
+  assert.equal(q(chip, ".tag-count").textContent, "2");
+  assert.equal(q(chip, ".chip-label").textContent, "Tags");
+  chip.click();
+  await tick();
+  assert.deepEqual(
+    qa(document, ".row").map((el) => el.dataset.tabId),
+    ["1", "2"],
+    "only tagged tabs",
+  );
+  q(document, '#filters button[data-filter="all"]').click();
+  await tick();
+  // #prefix searches tag names; the matching badge lights up
+  const search = byId<HTMLInputElement>("search");
+  search.value = "#wo";
+  search.dispatchEvent(new window.Event("input", { bubbles: true }));
+  await tick();
+  assert.deepEqual(
+    qa(document, ".row").map((el) => el.dataset.tabId),
+    ["1", "2"],
+  );
+  assert.ok(q(rowOf(1), ".badge.tag").classList.contains("hit"));
+  search.value = "";
+  search.dispatchEvent(new window.Event("input", { bubbles: true }));
+  await tick();
+  // Group by tag: a header per tag with a square in its color, untagged tabs under "No tag"
+  const sort = byId<HTMLSelectElement>("sort");
+  assert.equal(q<HTMLOptionElement>(sort, 'option[value="group-tag"]').hidden, false);
+  sort.value = "group-tag";
+  sort.dispatchEvent(new window.Event("change"));
+  await tick();
+  const headers = qa(document, ".group-header");
+  assert.deepEqual(
+    headers.map((el) => q(el, ".group-label").textContent),
+    ["Work", "No tag"],
+  );
+  assert.equal(q(headers[0] ?? document.body, ".tg-square").style.background, "#188038");
+  assert.equal(headers[1]?.querySelector(".tg-square, .win-dot"), null, "the untagged bucket has no marker");
+  sort.value = "recent";
+  sort.dispatchEvent(new window.Event("change"));
+  await tick();
+  // unticking removes the tag from the page; the badge goes
+  open(1);
+  q<HTMLInputElement>(pickRow("Work"), "input").click();
+  await tick();
+  await tick();
+  assert.equal(rowOf(1).querySelector(".badge.tag"), null);
+  stored = await chrome.storage.local.get(["tagPages"]);
+  assert.deepEqual(
+    stored.tagPages?.map((page) => page.url),
+    ["https://youtube.com/watch"],
+  );
+});
+
+test("UI - Sidepanel - TAGS: the Tags chip opens a picker; ticks narrow the filter, label and count follow", {
+  skip: !TAGS_ON,
+}, async () => {
+  const menu = byId("ctx-menu");
+  const rowOf = (id: number) => q(document, `.row[data-tab-id="${id}"]`);
+  // a second tag on tab 3 (Work is on tab 2 from the test above)
+  rowOf(3).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+  must(qa(menu, ".ctx-item").find((el) => el.textContent === "Tags…")).click();
+  q(byId("tag-assign-pop"), ".tag-new").click();
+  const ask = byId<HTMLDialogElement>("ask-dialog");
+  q<HTMLInputElement>(ask, ".ask-input").value = "bills";
+  q(ask, ".ask-ok").click();
+  await tick();
+  await tick();
+  const chip = q(document, '#filters button[data-filter="tags"]');
+  const pop = byId("tags-pop");
+  chip.click();
+  await tick();
+  assert.equal(chip.getAttribute("aria-pressed"), "true", "the chip is the active filter");
+  const picks = qa<HTMLInputElement>(pop, ".tag-pick input");
+  assert.deepEqual(
+    qa(pop, ".tag-pick").map((el) => `${q(el, ".tag-name").textContent} ${q(el, ".tag-pick-count").textContent}`),
+    ["Work 1", "bills 1"],
+    "one tick per tag with its count",
+  );
+  const shown = () =>
+    qa(document, ".row")
+      .map((el) => el.dataset.tabId)
+      .sort();
+  assert.deepEqual(shown(), ["2", "3"], "no tick: every tagged tab");
+  picks[1]?.click();
+  await tick();
+  assert.deepEqual(shown(), ["3"], "ticked: only that tag");
+  assert.equal(q(chip, ".chip-label").textContent, "bills", "one tick: the chip names it");
+  assert.equal(q(chip, ".tag-count").textContent, "1");
+  assert.equal(q<HTMLElement>(chip, ".tag-dot").hidden, false);
+  assert.equal(q<HTMLElement>(chip, ".tag-dot").style.background, "#1a73e8");
+  qa<HTMLInputElement>(pop, ".tag-pick input")[0]?.click();
+  await tick();
+  assert.equal(q(chip, ".chip-label").textContent, "2 tags");
+  assert.deepEqual(shown(), ["2", "3"], "OR over the ticks");
+  q(pop, ".tag-pick-clear").click();
+  await tick();
+  assert.equal(q(chip, ".chip-label").textContent, "Tags", "cleared");
+  assert.deepEqual(shown(), ["2", "3"]);
+  q(document, '#filters button[data-filter="all"]').click();
+  await tick();
+});
+
+test("UI - Sidepanel - TAGS: quick launch Tags view — rows filter, menu renames / recolors / removes, ☰ undoes", {
+  skip: !TAGS_ON,
+}, async () => {
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 200));
+  const winBtn = byId<HTMLButtonElement>("win-list-btn");
+  const pop = byId("windows-pop");
+  const ctx = byId("ctx-menu");
+  const chip = q(document, '#filters button[data-filter="tags"]');
+  // happy-dom never reports the popover open, so renders do not refill it: reopen to read it
+  const openTagsView = async () => {
+    winBtn.click();
+    await tick();
+    must(qa(pop, ".win-view").find((el) => el.textContent.startsWith("Tags"))).click();
+    await tick();
+  };
+  winBtn.click();
+  await tick();
+  assert.equal(must(qa(pop, ".win-view").find((el) => el.textContent.startsWith("Tags"))).textContent, "Tags (2)");
+  await openTagsView();
+  const tagRows = () => qa<HTMLElement>(pop, ".win-row[data-tag-id]");
+  assert.deepEqual(
+    tagRows().map((el) => `${q(el, ".win-title").textContent} · ${q(el, ".win-stats").textContent}`),
+    ["Work · 1 tab · 1 window", "bills · 1 tab · 1 window"],
+  );
+  assert.equal(q<HTMLElement>(must(tagRows()[0]), ".win-dot").style.background, "#188038");
+  // click = the list filtered to that tag
+  must(tagRows()[1]).click();
+  await tick();
+  assert.equal(chip.getAttribute("aria-pressed"), "true");
+  assert.equal(q(chip, ".chip-label").textContent, "bills");
+  assert.deepEqual(
+    qa(document, ".row").map((el) => el.dataset.tabId),
+    ["3"],
+  );
+  q(document, '#filters button[data-filter="all"]').click();
+  await tick();
+  // ⋯ menu: color, rename in place, remove
+  await openTagsView();
+  must(qa<HTMLButtonElement>(pop, ".win-menu-btn")[0]).click();
+  await tick();
+  assert.equal(q(ctx, ".ctx-title").textContent, "Work");
+  assert.deepEqual(
+    qa(ctx, ".ctx-item")
+      .map((el) => el.textContent)
+      .filter((label) => !/^[A-Z][a-z]+$/.test(label)),
+    ["Rename tag…", "Tag color ▸", "Remove tag"],
+    "the nine color names sit in the submenu",
+  );
+  assert.equal(q(ctx, ".ctx-submenu .ctx-item.current").textContent, "Green", "current color marked");
+  must(qa(ctx, ".ctx-submenu .ctx-item").find((el) => el.textContent === "Red")).click();
+  await settle();
+  let tags = (await chrome.storage.local.get("tags")).tags ?? [];
+  assert.equal(tags[0]?.color, "red");
+  await openTagsView();
+  assert.equal(q<HTMLElement>(must(tagRows()[0]), ".win-dot").style.background, "#d93025", "the row follows");
+  must(qa<HTMLButtonElement>(pop, ".win-menu-btn")[0]).click();
+  await tick();
+  must(qa(ctx, ".ctx-item").find((el) => el.textContent === "Rename tag…")).click();
+  await tick();
+  const input = q<HTMLInputElement>(pop, ".rename-input");
+  assert.equal(input.value, "Work");
+  input.value = "Job";
+  input.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+  await settle();
+  tags = (await chrome.storage.local.get("tags")).tags ?? [];
+  assert.equal(tags[0]?.name, "Job");
+  assert.equal(q(must(tagRows()[0]), ".win-title").textContent, "Job", "renamed in place");
+  // a clashing rename is refused (toast), the name stays
+  must(qa<HTMLButtonElement>(pop, ".win-menu-btn")[0]).click();
+  await tick();
+  must(qa(ctx, ".ctx-item").find((el) => el.textContent === "Rename tag…")).click();
+  await tick();
+  q<HTMLInputElement>(pop, ".rename-input").value = "BILLS";
+  q(pop, ".rename-input").dispatchEvent(new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+  await settle();
+  assert.equal(((await chrome.storage.local.get("tags")).tags ?? [])[0]?.name, "Job");
+  assert.match(byId("toast").textContent ?? "", /exists/);
+  // Remove tag → the trash; ☰ offers the undo
+  must(qa<HTMLButtonElement>(pop, ".win-menu-btn")[0]).click();
+  await tick();
+  must(qa(ctx, ".ctx-item").find((el) => el.textContent === "Remove tag")).click();
+  await settle();
+  tags = (await chrome.storage.local.get("tags")).tags ?? [];
+  assert.deepEqual(
+    tags.map((tag) => tag.name),
+    ["bills"],
+  );
+  assert.equal(q(document, '.row[data-tab-id="2"]').querySelector(".badge.tag"), null, "its badge is gone");
+  await openTagsView();
+  assert.deepEqual(
+    tagRows().map((el) => q(el, ".win-title").textContent),
+    ["bills"],
+    "the view follows",
+  );
+  pop.hidePopover?.();
+  byId("quick-actions-btn").click();
+  await tick();
+  assert.ok(
+    !qa(ctx, ".ctx-item").some((el) => el.textContent === "Undo last remove in Tags"),
+    "undo is Settings' business: not in ☰",
+  );
+  ctx.hidden = true;
+  const { restoreTags } = await import("../../../src/app/storage.ts");
+  await restoreTags(); // Settings → Tags → Restore last removal
+  await chrome.storage.onChanged.fire({ tags: {} }, "local"); // the panel follows the storage change
+  await settle();
+  tags = (await chrome.storage.local.get("tags")).tags ?? [];
+  assert.deepEqual(
+    tags.map((tag) => tag.name),
+    ["bills", "Job"],
+  );
+  assert.equal(q(q(document, '.row[data-tab-id="2"]'), ".badge.tag").textContent, "Job", "the page got it back");
+  q(document, '#filters button[data-filter="all"]').click();
+  await tick();
+});
+
+test("UI - Sidepanel - TAGS: window blur closes the New tag dialog (like the context menu)", {
+  skip: !TAGS_ON,
+}, async () => {
+  const menu = byId("ctx-menu");
+  const ask = byId<HTMLDialogElement>("ask-dialog");
+  q(document, ".row").dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+  must(qa(menu, ".ctx-item").find((el) => el.textContent === "New tag…")).click();
+  assert.equal(ask.open, true);
+  window.dispatchEvent(new window.Event("blur"));
+  await tick();
+  assert.equal(ask.open, false, "the question is dropped when focus leaves the panel");
+  assert.equal((await chrome.storage.local.get("tags")).tags?.length, 2, "nothing written");
 });

@@ -19,7 +19,10 @@ import {
   windowMaps,
 } from "../../src/pages/sidepanel/model/index.ts";
 import type { RowContext, RowViewModel, SearchView, SelectView } from "../../src/pages/sidepanel/model/index.ts";
-import type { ProtectionRule, UiPrefs } from "../../src/app/types.ts";
+import type { ProtectionRule, Tag, TagPage, UiPrefs } from "../../src/app/types.ts";
+import { tagGroupName } from "../../src/pages/sidepanel/model/index.ts";
+import { nextTagSort, orderedTags, sortedTags } from "../../src/app/tags.ts";
+import type { TagSort } from "../../src/app/types.ts";
 
 type Tab = chrome.tabs.Tab;
 type TabGroup = chrome.tabGroups.TabGroup;
@@ -337,7 +340,13 @@ test("Model - DeriveTabs flags kept-alive pages by url without fragment", () => 
 test("Model - CountsByFilter", () => {
   const rules = [rule({ id: "r", type: "host", pattern: "example.com" })];
   const tabs = [tab(), tab({ id: 2, discarded: true }), tab({ id: 3, url: "https://other.io/" })];
-  assert.deepEqual(countsByFilter(tabs, deriveTabs(tabs, rules)), { all: 3, awake: 2, snoozed: 1, protected: 2 });
+  assert.deepEqual(countsByFilter(tabs, deriveTabs(tabs, rules)), {
+    all: 3,
+    awake: 2,
+    snoozed: 1,
+    protected: 2,
+    tags: 0,
+  });
 });
 
 test("Model - BulkSummary states: none, partial, all selected", () => {
@@ -679,4 +688,214 @@ test("Model - Tab groups sort: strip order inside a group, recency in the ungrou
   const order = selectVisible(tabs, view(tabs, { sort: "group-tabgroup", tabGroups: groups })).map((t) => t.id);
   // group "work" first (2,3,1 by strip index), then ungrouped by recency (5,4)
   assert.deepEqual(order, [2, 3, 1, 5, 4]);
+});
+
+// ---------- tags ----------
+const work: Tag = { id: "t1", name: "Work", color: "blue" };
+const bills: Tag = { id: "t2", name: "bills", color: "yellow" };
+const tagging = {
+  tags: [work, bills],
+  pages: [
+    { url: "https://example.com/x", tagIds: ["t2", "t1"] },
+    { url: "https://other.io/", tagIds: ["t2"] },
+  ] satisfies TagPage[],
+};
+
+test("Model - TAGS: deriveTabs attaches a tab's tags (tag-list order) and searches their names", () => {
+  const tabs = [
+    tab({ url: "https://example.com/x#frag" }),
+    tab({ id: 2, url: "https://other.io/" }),
+    tab({ id: 3, url: "https://none.io/" }),
+  ];
+  const derived = deriveTabs(tabs, [], [], tagging);
+  assert.deepEqual(derived.get(1)?.tags, [work, bills], "fragment ignored, tag-list order");
+  assert.deepEqual(derived.get(2)?.tags, [bills]);
+  assert.deepEqual(derived.get(3)?.tags, []);
+  assert.match(derived.get(1)?.haystack ?? "", / work bills$/, "plain words find tagged tabs");
+  assert.deepEqual(deriveTabs(tabs, []).get(1)?.tags, [], "no tagging = no tags");
+  const offList = { ...tagging, tags: [{ ...work, disabled: true }, bills] };
+  assert.deepEqual(deriveTabs(tabs, [], [], offList).get(1)?.tags, [bills], "a disabled tag is not a tag here");
+  assert.doesNotMatch(deriveTabs(tabs, [], [], offList).get(1)?.haystack ?? "", /work/);
+});
+
+test("Model - TAGS: badges carry the tag as a solid pill after the plain states (pinned included); hits marked", () => {
+  const list = badges(tab({ pinned: true }), true, false, [work, bills], new Set(["t2"]));
+  assert.deepEqual(list, [
+    ["protected", "ok"],
+    ["pinned", ""],
+    ["bills", "tag dark hit", "#f9ab00"], // the hit comes first
+    ["Work", "tag", "#1a73e8"],
+  ]);
+  // past three tags: three pills and a "+N" — a search hit always makes the cut
+  const many: Tag[] = [
+    work,
+    bills,
+    { id: "t3", name: "c", color: "red" },
+    { id: "t4", name: "d", color: "cyan" },
+    { id: "t5", name: "e", color: "green" },
+  ];
+  assert.deepEqual(
+    badges(tab(), false, false, many).map(([label]) => label),
+    ["Work", "bills", "c", "+2"],
+  );
+  assert.deepEqual(
+    badges(tab(), false, false, many, new Set(["t5"])).map(([label, kind]) => [label, kind]),
+    [
+      ["e", "tag hit"],
+      ["Work", "tag"],
+      ["bills", "tag dark"],
+      ["+2", "tag-more"],
+    ],
+    "the hit tag moves to the front; the rest keep their order",
+  );
+});
+
+test("Model - TAGS: the tags filter (any tag, or the ticked ones) and its count", () => {
+  const tabs = [tab(), tab({ id: 2, url: "https://other.io/" }), tab({ id: 3, url: "https://none.io/" })];
+  const derived = deriveTabs(tabs, [], [], tagging);
+  const base = view(tabs, { filter: "tags", derived });
+  assert.deepEqual(
+    selectVisible(tabs, base).map((t) => t.id),
+    [1, 2],
+    "no tick = any tagged tab",
+  );
+  assert.deepEqual(
+    selectVisible(tabs, { ...base, tagFilter: new Set(["t1"]) }).map((t) => t.id),
+    [1],
+  );
+  assert.deepEqual(
+    selectVisible(tabs, { ...base, tagFilter: new Set(["t1", "t2"]) }).map((t) => t.id),
+    [1, 2],
+    "OR",
+  );
+  assert.deepEqual(
+    selectVisible(tabs, { ...base, tagFilter: new Set(["zz"]) }).map((t) => t.id),
+    [],
+    "a vanished tag matches nothing",
+  );
+  assert.equal(countsByFilter(tabs, derived).tags, 2);
+  assert.equal(countsByFilter(tabs, derived, new Set(["t1"])).tags, 1, "the chip counts what it would show");
+  assert.match(emptyMessage("", "tags"), /No tagged tabs/);
+});
+
+test("Model - TAGS: #token searches tag names by prefix, text tokens stay text, both must match", () => {
+  const tabs = [
+    tab({ title: "Alpha" }),
+    tab({ id: 2, url: "https://other.io/", title: "Beta" }),
+    tab({ id: 3, url: "https://none.io/", title: "Gamma work" }),
+  ];
+  const derived = deriveTabs(tabs, [], [], tagging);
+  const ids = (query: string) => selectVisible(tabs, view(tabs, { query, derived })).map((t) => t.id);
+  assert.deepEqual(ids("#wo"), [1], "prefix on the tag name — the title 'work' of tab 3 is not a tag");
+  assert.deepEqual(ids("#bills"), [1, 2]);
+  assert.deepEqual(ids("#bills beta"), [2]);
+  assert.deepEqual(ids("work"), [1, 3], "plain word: tag name or title");
+  assert.deepEqual(ids("#"), [1, 2, 3], "a lone # is noise");
+  assert.deepEqual(ids("#zz"), []);
+});
+
+test("Model - TAGS: group-tag sort clusters by the first tag (tag-list order), untagged last", () => {
+  const tabs = [
+    tab({ id: 1, url: "https://none.io/", title: "none" }),
+    tab({ id: 2, url: "https://other.io/", title: "bills only", lastAccessed: NOW - 3 * HOUR }),
+    tab({ id: 3, url: "https://example.com/x", title: "work+bills" }),
+    tab({ id: 4, url: "https://other.io/#two", title: "bills newer", lastAccessed: NOW - HOUR }),
+  ];
+  const derived = deriveTabs(tabs, [], [], tagging);
+  assert.deepEqual(
+    selectVisible(tabs, view(tabs, { sort: "group-tag", sortDir: "none", derived })).map((t) => t.id),
+    [4, 2, 3, 1],
+    "groups ABC by tag name (bills, Work), recent-first inside, No tag last",
+  );
+  assert.deepEqual(
+    selectVisible(tabs, view(tabs, { sort: "group-tag", sortDir: "asc", derived })).map((t) => t.id),
+    [3, 1, 4, 2],
+    "asc: smallest groups first, ties ABC (Work, then the untagged bucket), bills last",
+  );
+  assert.equal(tagGroupName(work), "Work");
+  assert.equal(tagGroupName(undefined), "No tag");
+});
+
+test("Model - RowViewModel tip: the url, the row's plain badges as a states line, the tags apart", () => {
+  const rules = [rule({ id: "r", type: "host", pattern: "example.com" })];
+  const tabs = [tab({ discarded: true, pinned: true, audible: true }), tab({ id: 2, url: "https://none.io/" })];
+  const ctx: RowContext = {
+    index: 0,
+    cursor: -1,
+    now: NOW,
+    currentWindowId: 1,
+    derived: deriveTabs(tabs, rules, [], tagging),
+    selected: new Set(),
+    dotColors: new Map(),
+    indexes: new Map(),
+  };
+  const vm = rowViewModel(tabs[0]!, ctx);
+  assert.equal(vm.tip, "https://example.com/x", "the text is the url; states and tags are their own lines");
+  assert.deepEqual(vm.tipBadges, [
+    ["snoozed", "warn"],
+    ["protected", "ok"],
+    ["pinned", ""],
+    ["🔊", ""],
+  ]);
+  assert.deepEqual(vm.tipTags, [
+    { name: "Work", color: "#1a73e8", dark: false },
+    { name: "bills", color: "#f9ab00", dark: true },
+  ]);
+  assert.equal(rowViewModel(tabs[1]!, ctx).tip, "https://none.io/", "nothing to say: the url alone");
+  assert.deepEqual(rowViewModel(tabs[1]!, ctx).tipBadges, []);
+  assert.deepEqual(rowViewModel(tabs[1]!, ctx).tipTags, []);
+  assert.equal(
+    rowViewModel(tab({ id: 3, url: undefined }), { ...ctx, derived: deriveTabs([tab({ id: 3, url: undefined })], []) })
+      .tip,
+    "",
+  );
+});
+
+test("Model - Options - Tag table sort: a header cycles none → asc → desc → none; another header starts asc", () => {
+  const counts = new Map([
+    ["t1", 2],
+    ["t2", 0],
+    ["t3", 5],
+  ]);
+  const list: Tag[] = [
+    { id: "t1", name: "work", color: "blue" },
+    { id: "t2", name: "Alpha", color: "red" },
+    { id: "t3", name: "bills", color: "grey" },
+  ];
+  assert.deepEqual(nextTagSort(null, "name"), { key: "name", dir: "asc" });
+  assert.deepEqual(nextTagSort({ key: "name", dir: "asc" }, "name"), { key: "name", dir: "desc" });
+  assert.equal(nextTagSort({ key: "name", dir: "desc" }, "name"), null, "third click: the stored order");
+  assert.deepEqual(nextTagSort({ key: "name", dir: "desc" }, "pages"), { key: "pages", dir: "asc" });
+  const ids = (sort: TagSort | null) => sortedTags(list, counts, sort).map((tag) => tag.id);
+  assert.deepEqual(ids(null), ["t1", "t2", "t3"], "no sort: as stored");
+  assert.deepEqual(ids({ key: "name", dir: "asc" }), ["t2", "t3", "t1"], "names A–Z, case-insensitive");
+  assert.deepEqual(ids({ key: "name", dir: "desc" }), ["t1", "t3", "t2"]);
+  assert.deepEqual(ids({ key: "pages", dir: "asc" }), ["t2", "t1", "t3"]);
+  assert.deepEqual(ids({ key: "pages", dir: "desc" }), ["t3", "t1", "t2"]);
+  assert.deepEqual(ids({ key: "color", dir: "asc" }), ["t3", "t1", "t2"], "palette order: grey, blue, red");
+  assert.deepEqual(ids({ key: "color", dir: "desc" }), ["t2", "t1", "t3"]);
+  // every picker list: enabled tags in the "Tags order in pickers" order
+  const pages = [
+    { url: "https://a.test/", tagIds: ["t1", "t3"] },
+    { url: "https://b.test/", tagIds: ["t3"] },
+  ];
+  const picked = (ui: Parameters<typeof orderedTags>[2]) => orderedTags(list, pages, ui).map((tag) => tag.id);
+  assert.deepEqual(picked({ tagPickOrder: "stored" }), ["t1", "t2", "t3"]);
+  assert.deepEqual(picked({}), ["t1", "t2", "t3"], "absent = stored");
+  assert.deepEqual(picked({ tagPickOrder: "name" }), ["t2", "t3", "t1"]);
+  assert.deepEqual(picked({ tagPickOrder: "used" }), ["t3", "t1", "t2"], "most pages first");
+  assert.deepEqual(picked({ tagPickOrder: "table", tagSort: { key: "name", dir: "desc" } }), ["t1", "t3", "t2"]);
+  assert.deepEqual(picked({ tagPickOrder: "table" }), ["t1", "t2", "t3"], "no table sort = stored");
+  assert.deepEqual(
+    picked({ tagPickOrder: "stored", tagSort: { key: "name", dir: "asc" } }),
+    ["t1", "t2", "t3"],
+    "a table sort alone does not reorder the pickers",
+  );
+  assert.deepEqual(
+    orderedTags([{ ...list[0]!, disabled: true }, list[1]!, list[2]!], pages, { tagPickOrder: "name" }).map(
+      (tag) => tag.id,
+    ),
+    ["t2", "t3"],
+    "switched-off tags are left out",
+  );
 });

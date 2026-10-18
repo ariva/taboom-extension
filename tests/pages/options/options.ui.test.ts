@@ -5,6 +5,14 @@ import { byId, q, qa } from "../../helpers/dom.ts";
 import { makeChrome, loadPage, tick, RAW_FEATURES, TEST_EXPERIMENTAL, TEST_FEATURES } from "../../helpers/ui.ts";
 
 const calls: string[] = [];
+
+// A lookup that must hit: a miss fails the test with a readable message
+function must<T>(found: T | null | undefined): T {
+  if (found == null) {
+    throw new Error("test: expected node / value is missing");
+  }
+  return found;
+}
 // the slice of chrome.storage.local this page reads and writes (the mock mutates it in place);
 // the rules carry no createdAt — the page never reads it
 const stored: Pick<LocalStorageSchema, "settings" | "ui"> &
@@ -15,6 +23,9 @@ const stored: Pick<LocalStorageSchema, "settings" | "ui"> &
     protectionTrash?: Removal<Omit<ProtectionRule, "createdAt">>[];
     parkedTrash?: LocalStorageSchema["parkedTrash"];
     parkedWindows?: LocalStorageSchema["parkedWindows"];
+    tags?: LocalStorageSchema["tags"];
+    tagPages?: LocalStorageSchema["tagPages"];
+    tagTrash?: LocalStorageSchema["tagTrash"];
   } = {
   settings: { autoSnoozeEnabled: false, inactivityMinutes: 45 },
   protectionRules: [{ id: "r1", type: "domain", pattern: "*.github.com" }],
@@ -314,7 +325,7 @@ test("UI - Options - Restore defaults resets settings/ui but keeps protected sit
   assert.equal(stored.parkedWindows?.length, 1, "parked windows untouched");
   assert.match(
     byId("restore-defaults").previousElementSibling?.textContent ?? "",
-    /Protected sites, keep-alive marks and parked windows stay unchanged/,
+    /Protected sites, keep-alive marks, parked windows and tags stay unchanged/,
     "card says what is kept",
   );
   stored.keepAlive = [];
@@ -1059,4 +1070,384 @@ test("UI - Options - PARKED_WINDOWS: 'Ask before parking' checkbox follows the f
   box.checked = true;
   box.dispatchEvent(new window.Event("change", { bubbles: true }));
   await tick();
+});
+
+test("UI - Options - TAGS card: tag table (add, rename, recolor, remove), tagged pages (add, toggle, remove), restore, remove all", async () => {
+  const { applyExperimental, featureEnabled } = await import("../../../src/app/core.ts");
+  const flagOn = featureEnabled(applyExperimental(RAW_FEATURES, stored.ui?.showExperimental ?? false), "TAGS");
+  stored.tags = [];
+  stored.tagPages = [];
+  stored.tagTrash = [];
+  await chrome.storage.onChanged.fire({ tags: {} }, "local");
+  await tick();
+  await tick();
+  assert.equal(byId("tags-section").hidden, !flagOn, "card visible iff TAGS resolves on");
+  if (!flagOn) {
+    return;
+  }
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 50));
+  const rerender = async () => {
+    await chrome.storage.onChanged.fire({ tags: {} }, "local");
+    await tick();
+    await tick();
+  };
+  // Add a tag: name + color
+  byId<HTMLInputElement>("new-tag-name").value = " Work ";
+  byId<HTMLSelectElement>("new-tag-color").value = "green";
+  byId("add-tag").click();
+  await settle();
+  assert.deepEqual(
+    stored.tags.map((tag) => [tag.name, tag.color]),
+    [["Work", "green"]],
+  );
+  assert.equal(byId<HTMLInputElement>("new-tag-name").value, "", "input cleared");
+  byId<HTMLInputElement>("new-tag-name").value = "work";
+  byId("add-tag").click();
+  await settle();
+  assert.equal(stored.tags.length, 1, "duplicate refused");
+  assert.match(byId("tag-error").textContent ?? "", /exists/, "the reason shows next to the row");
+  byId<HTMLInputElement>("new-tag-name").value = "bills";
+  byId<HTMLSelectElement>("new-tag-color").value = "yellow";
+  byId("add-tag").click();
+  await settle();
+  await rerender();
+  const work = stored.tags[0];
+  const bills = stored.tags[1];
+  assert.ok(work && bills);
+  const tagRows = () => qa<HTMLTableRowElement>(document, "#tag-rows tr");
+  assert.deepEqual(
+    tagRows().map((row) => qa(row, "td").map((cell, index) => (index === 3 ? "(color)" : cell.textContent?.trim()))),
+    [
+      ["", "1", "", "(color)", "Work", "0", "Remove"],
+      ["", "2", "", "(color)", "bills", "0", "Remove"],
+    ],
+    "grip · # · on/off · color · name · pages · Remove",
+  );
+  assert.ok(must(tagRows()[0]).querySelector("td:first-child .drag-grip svg"), "a grip icon says: draggable");
+  // the on/off switch: off keeps the tag and its pages, the row reads muted; on again clears the key
+  const onOff = q<HTMLInputElement>(must(tagRows()[1]), ".tag-enabled");
+  assert.equal(onOff.checked, true);
+  onOff.click();
+  await settle();
+  assert.equal(stored.tags[1]?.disabled, true);
+  await rerender();
+  assert.ok(must(tagRows()[1]).classList.contains("off"));
+  q<HTMLInputElement>(must(tagRows()[1]), ".tag-enabled").click();
+  await settle();
+  assert.equal(stored.tags[1]?.disabled, undefined, "the key is absent when on");
+  await rerender();
+  // recolor through the row's select
+  const colorSelect = q<HTMLSelectElement>(must(tagRows()[0]), "select");
+  assert.equal(colorSelect.value, "green");
+  colorSelect.value = "red";
+  colorSelect.dispatchEvent(new window.Event("change", { bubbles: true }));
+  await settle();
+  assert.equal(stored.tags[0]?.color, "red");
+  // rename in place: click the name, Enter saves; a clash is refused
+  await rerender();
+  q(must(tagRows()[0]), ".tag-name").click();
+  await tick();
+  const edit = q<HTMLInputElement>(document, "#tag-rows .rename-input");
+  edit.value = "Job";
+  edit.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+  await settle();
+  assert.equal(stored.tags[0]?.name, "Job");
+  await rerender();
+  q(must(tagRows()[1]), ".tag-name").click();
+  await tick();
+  const clash = q<HTMLInputElement>(document, "#tag-rows .rename-input");
+  clash.value = "job";
+  clash.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+  await settle();
+  assert.equal(stored.tags[1]?.name, "bills", "clash refused");
+  // Tagged pages: add by address with a tag, toggle the other tag on it, counts follow
+  await rerender();
+  byId<HTMLInputElement>("new-tag-page").value = "app.example.com/board#x";
+  byId<HTMLSelectElement>("new-tag-page-tag").value = work.id;
+  byId("add-tag-page").click();
+  await settle();
+  assert.deepEqual(
+    stored.tagPages,
+    [{ url: "https://app.example.com/board", tagIds: [work.id] }],
+    "normalized, fragment dropped",
+  );
+  await rerender();
+  const pageRows = () => qa<HTMLTableRowElement>(document, "#tag-page-rows tr");
+  assert.equal(pageRows().length, 1);
+  assert.equal(q(must(pageRows()[0]), ".url").textContent, "https://app.example.com/board");
+  // the page's tags as chips with a ✕ each; the Tags ▾ button opens a picker with one tick per tag
+  const chips = () => qa<HTMLElement>(must(pageRows()[0]), ".tag-chip");
+  assert.deepEqual(
+    chips().map((chip) => q(chip, ".tag-chip-name").textContent),
+    ["Job"],
+  );
+  const pick = byId("tag-page-pick");
+  q(must(pageRows()[0]), ".tag-pick-btn").click();
+  await tick();
+  assert.equal(q(pick, ".tag-pick-title").textContent, "Tags");
+  assert.ok(q(pick, ".tag-pick-close svg"), "a corner ✕ like the side panel's picker");
+  const ticks = () => qa<HTMLInputElement>(pick, ".tag-pick input");
+  assert.deepEqual(
+    ticks().map((box) => `${box.closest("label")?.querySelector(".tag-name")?.textContent}:${box.checked}`),
+    ["Job:true", "bills:false"],
+  );
+  must(ticks()[1]).click();
+  await settle();
+  assert.deepEqual(stored.tagPages[0]?.tagIds, [work.id, bills.id]);
+  assert.deepEqual(
+    ticks().map((box) => box.checked),
+    [true, true],
+    "the open picker follows the write",
+  );
+  await rerender();
+  assert.deepEqual(
+    tagRows().map((row) => qa(row, "td")[5]?.textContent),
+    ["1", "1"],
+    "pages column counts",
+  );
+  // past three tags the row shows three chips and a "+N" count
+  stored.tags.push({ id: "tc", name: "c", color: "red" }, { id: "td", name: "d", color: "cyan" });
+  stored.tagPages[0]!.tagIds.push("tc", "td");
+  await rerender();
+  assert.deepEqual(
+    chips().map((chip) => q(chip, ".tag-chip-name").textContent),
+    ["Job", "bills", "c"],
+  );
+  assert.equal(q(must(pageRows()[0]), ".tag-more").textContent, "+1");
+  stored.tags.splice(2, 2);
+  stored.tagPages[0]!.tagIds.splice(2, 2);
+  await rerender();
+  // ✕ on a chip takes that tag off; the last one gone drops the page (no trash — nothing to undo)
+  q(must(chips()[0]), ".tag-chip-remove").click();
+  await settle();
+  assert.deepEqual(stored.tagPages[0]?.tagIds, [bills.id]);
+  await rerender();
+  q(must(chips()[0]), ".tag-chip-remove").click();
+  await settle();
+  assert.equal(stored.tagPages.length, 0);
+  assert.equal(stored.tagTrash.length, 0);
+  // Remove a page → trash → Restore last removal
+  byId<HTMLInputElement>("new-tag-page").value = "https://b.test/";
+  byId<HTMLSelectElement>("new-tag-page-tag").value = bills.id;
+  byId("add-tag-page").click();
+  await settle();
+  await rerender();
+  q(must(pageRows()[0]), ".remove-page").click();
+  await settle();
+  assert.equal(stored.tagPages.length, 0);
+  assert.equal(stored.tagTrash.length, 1);
+  await rerender();
+  const restore = byId<HTMLButtonElement>("restore-tags");
+  assert.equal(restore.hidden, false);
+  assert.equal(restore.textContent, "Restore last removal (1 page)");
+  restore.click();
+  await settle();
+  assert.deepEqual(
+    stored.tagPages.map((page) => page.url),
+    ["https://b.test/"],
+  );
+  // Remove a tag → its page ids go too; Remove all → one action; Restore brings everything back
+  await rerender();
+  q(must(tagRows()[1]), ".remove-tag").click();
+  await settle();
+  assert.deepEqual(
+    stored.tags.map((tag) => tag.name),
+    ["Job"],
+  );
+  assert.equal(stored.tagPages.length, 0, "the page carried only bills");
+  await rerender();
+  assert.equal(byId("restore-tags").textContent, "Restore last removal (1 tag)");
+  byId("clear-tags").click(); // confirm() is stubbed to true
+  await settle();
+  assert.equal(stored.tags.length, 0);
+  await rerender();
+  assert.equal(byId("restore-tags").textContent, "Restore last removal (1 tag)");
+  byId("restore-tags").click();
+  await settle();
+  byId("restore-tags").click();
+  await settle();
+  assert.deepEqual(
+    stored.tags.map((tag) => tag.name),
+    ["Job", "bills"],
+  );
+  assert.deepEqual(
+    stored.tagPages.map((page) => page.url),
+    ["https://b.test/"],
+  );
+  // the Data card names tags among what Restore defaults keeps and Delete all removes
+  assert.match(byId("restore-defaults").previousElementSibling?.textContent ?? "", /tags/);
+  assert.match(byId("danger").previousElementSibling?.textContent ?? "", /tags/);
+  stored.tags = [];
+  stored.tagPages = [];
+  stored.tagTrash = [];
+});
+
+test("UI - Options - TAGS: drag a tag row onto another to reorder the list (the order drives badges and Group by tag)", async () => {
+  const { applyExperimental, featureEnabled } = await import("../../../src/app/core.ts");
+  if (!featureEnabled(applyExperimental(RAW_FEATURES, stored.ui?.showExperimental ?? false), "TAGS")) {
+    return;
+  }
+  stored.tags = [
+    { id: "ta", name: "alpha", color: "blue" },
+    { id: "tb", name: "beta", color: "red" },
+    { id: "tc", name: "gamma", color: "green" },
+  ];
+  await chrome.storage.onChanged.fire({ tags: {} }, "local");
+  await tick();
+  await tick();
+  const rows = () => qa<HTMLTableRowElement>(document, "#tag-rows tr");
+  assert.ok(
+    rows().every((row) => row.draggable),
+    "rows are drag handles",
+  );
+  must(rows()[0]).dispatchEvent(new window.Event("dragstart", { bubbles: true }));
+  must(rows()[2]).dispatchEvent(new window.Event("dragover", { bubbles: true, cancelable: true }));
+  assert.ok(must(rows()[2]).classList.contains("drop-target"), "target row highlighted");
+  must(rows()[2]).dispatchEvent(new window.Event("drop", { bubbles: true, cancelable: true }));
+  await tick();
+  await tick();
+  assert.deepEqual(
+    stored.tags.map((tag) => tag.id),
+    ["tb", "tc", "ta"],
+    "dragged down: lands after the target",
+  );
+  await chrome.storage.onChanged.fire({ tags: {} }, "local");
+  await tick();
+  await tick();
+  assert.deepEqual(
+    rows().map((row) => q(row, ".tag-name").textContent),
+    ["beta", "gamma", "alpha"],
+  );
+  must(rows()[2]).dispatchEvent(new window.Event("dragstart", { bubbles: true }));
+  must(rows()[0]).dispatchEvent(new window.Event("dragover", { bubbles: true, cancelable: true }));
+  must(rows()[0]).dispatchEvent(new window.Event("drop", { bubbles: true, cancelable: true }));
+  await tick();
+  await tick();
+  assert.deepEqual(
+    stored.tags.map((tag) => tag.id),
+    ["ta", "tb", "tc"],
+    "dragged up: lands before the target",
+  );
+  stored.tags = [];
+});
+
+test("UI - Options - TAGS: a switched-off tag shows struck through on its pages and is not offered in the picker", async () => {
+  const { applyExperimental, featureEnabled } = await import("../../../src/app/core.ts");
+  if (!featureEnabled(applyExperimental(RAW_FEATURES, stored.ui?.showExperimental ?? false), "TAGS")) {
+    return;
+  }
+  stored.tags = [
+    { id: "ta", name: "alpha", color: "blue" },
+    { id: "tb", name: "beta", color: "red", disabled: true },
+  ];
+  stored.tagPages = [{ url: "https://p.test/", tagIds: ["ta", "tb"] }];
+  stored.tagTrash = [];
+  await chrome.storage.onChanged.fire({ tags: {} }, "local");
+  await tick();
+  await tick();
+  const row = must(qa<HTMLTableRowElement>(document, "#tag-page-rows tr")[0]);
+  const chips = qa<HTMLElement>(row, ".tag-chip");
+  assert.deepEqual(
+    chips.map((chip) => `${q(chip, ".tag-chip-name").textContent}:${chip.classList.contains("off")}`),
+    ["alpha:false", "beta:true"],
+  );
+  q(row, ".tag-pick-btn").click();
+  await tick();
+  assert.deepEqual(
+    qa(byId("tag-page-pick"), ".tag-pick .tag-name").map((el) => el.textContent),
+    ["alpha"],
+    "the picker lists enabled tags only",
+  );
+  stored.tags = [];
+  stored.tagPages = [];
+});
+
+test("UI - Options - TAGS: click Color / Tag / Pages headers to sort the table (asc, desc, stored order); no drag while sorted", async () => {
+  const { applyExperimental, featureEnabled } = await import("../../../src/app/core.ts");
+  if (!featureEnabled(applyExperimental(RAW_FEATURES, stored.ui?.showExperimental ?? false), "TAGS")) {
+    return;
+  }
+  stored.tags = [
+    { id: "ta", name: "work", color: "blue" },
+    { id: "tb", name: "Alpha", color: "red" },
+    { id: "tc", name: "bills", color: "grey" },
+  ];
+  stored.tagPages = [
+    { url: "https://a.test/", tagIds: ["ta", "tc"] },
+    { url: "https://b.test/", tagIds: ["tc"] },
+  ];
+  await chrome.storage.onChanged.fire({ tags: {} }, "local");
+  await tick();
+  await tick();
+  const names = () => qa(document, "#tag-rows .tag-name").map((el) => el.textContent);
+  const header = (key: string) => q<HTMLElement>(document, `#tag-table th[data-sort="${key}"]`);
+  assert.deepEqual(names(), ["work", "Alpha", "bills"]);
+  assert.ok(header("name").title.length > 0, "the header says it sorts");
+  assert.equal(header("stored").dataset.dir, "asc", "# marks the stored order while no column sorts");
+  header("name").click();
+  await tick();
+  await tick();
+  assert.deepEqual(names(), ["Alpha", "bills", "work"]);
+  assert.equal(header("name").dataset.dir, "asc");
+  assert.equal(header("stored").dataset.dir, undefined);
+  assert.deepEqual(stored.ui.tagSort, { key: "name", dir: "asc" }, "the sort is saved");
+  assert.ok(
+    qa<HTMLTableRowElement>(document, "#tag-rows tr").every((row) => !row.draggable),
+    "no drag in a sorted view",
+  );
+  // Tags order in pickers: stored by default; "Sorted table" and "Most used" reorder every picker list
+  const dropdown = () => qa<HTMLOptionElement>(byId("new-tag-page-tag"), "option").map((option) => option.textContent);
+  assert.deepEqual(dropdown(), ["work", "Alpha", "bills"], "pickers keep the stored order by default");
+  const pickOrder = byId<HTMLSelectElement>("tagPickOrder");
+  assert.equal(pickOrder.value, "stored");
+  const setPickOrder = async (value: string) => {
+    pickOrder.value = value;
+    pickOrder.dispatchEvent(new window.Event("change", { bubbles: true }));
+    await tick();
+    await tick();
+    await chrome.storage.onChanged.fire({ ui: {} }, "local");
+    await tick();
+    await tick();
+  };
+  await setPickOrder("table");
+  assert.equal(stored.ui.tagPickOrder, "table");
+  assert.deepEqual(dropdown(), ["Alpha", "bills", "work"], "the Add-page dropdown follows the table sort");
+  await setPickOrder("used");
+  assert.deepEqual(dropdown(), ["bills", "work", "Alpha"], "most used first (2, 1, 0 pages)");
+  await setPickOrder("name");
+  assert.deepEqual(dropdown(), ["Alpha", "bills", "work"]);
+  await setPickOrder("stored");
+  assert.deepEqual(dropdown(), ["work", "Alpha", "bills"]);
+  header("name").click();
+  await tick();
+  assert.deepEqual(names(), ["work", "bills", "Alpha"]);
+  assert.equal(header("name").dataset.dir, "desc");
+  header("pages").click();
+  await tick();
+  assert.deepEqual(names(), ["Alpha", "work", "bills"], "another header starts ascending");
+  assert.equal(header("name").dataset.dir, undefined, "only one header carries the arrow");
+  header("pages").click();
+  await tick();
+  await tick();
+  header("pages").click();
+  await tick();
+  await tick();
+  assert.deepEqual(names(), ["work", "Alpha", "bills"], "third click: stored order again");
+  assert.equal(stored.ui.tagSort, undefined, "no sort = the key is absent");
+  assert.ok(
+    qa<HTMLTableRowElement>(document, "#tag-rows tr").every((row) => row.draggable),
+    "drag is back",
+  );
+  // the # header is the one-click way back
+  header("color").click();
+  await tick();
+  await tick();
+  assert.deepEqual(names(), ["bills", "work", "Alpha"], "palette order: grey, blue, red");
+  header("stored").click();
+  await tick();
+  await tick();
+  assert.deepEqual(names(), ["work", "Alpha", "bills"]);
+  assert.equal(header("stored").dataset.dir, "asc");
+  stored.tags = [];
+  stored.tagPages = [];
 });

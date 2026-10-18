@@ -12,7 +12,7 @@ import {
   showCtxMenu,
 } from "../../../lib/ui/context-menu.ts";
 import type { ParkedTarget } from "../../../app/messages.ts";
-import { state, tabGroupsActive } from "../foundation/state.ts";
+import { state, tabGroupsActive, tagsActive } from "../foundation/state.ts";
 import { TAB_GROUP_COLORS, windowGroupName, windowMaps } from "../model/index.ts";
 import { actionIds, copyUrls } from "../ops/actions.ts";
 import {
@@ -27,6 +27,7 @@ import {
   startRenameParkedGroup,
 } from "../ops/parked-ops.ts";
 import { orderedWindowIds } from "../ops/window-ops.ts";
+import { appendTagItems } from "./tag-menu.ts";
 
 // the quick launch opens the same menu from its parked rows: rename edits the row there,
 // not a list header, and "Show in Parked windows" jumps to the scope
@@ -108,6 +109,10 @@ export function openParkedTabMenu(event: MouseEvent, tabId: number): void {
     ctxDivider(),
   );
   ctxAppend(ctxItem(ids.length > 1 ? `Copy ${ids.length} URLs` : "Copy URL", () => copyUrls(ids)));
+  if (tagsActive()) {
+    ctxAppend(ctxDivider());
+    appendTagItems(ids, event); // tags follow the address: a parked row is tagged like a live tab
+  }
   ctxAppend(ctxDivider());
   // Move = opens there and leaves the snapshot; Open = a copy, the tab stays parked
   const move = ctxSubmenu(`Move ${plural} to`);

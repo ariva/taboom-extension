@@ -13,16 +13,17 @@ export async function renderDangerZone(): Promise<void> {
     keepAliveTrash = [],
     protectionTrash = [],
     parkedTrash = [],
-  } = await localStore.get(["keepAliveTrash", "protectionTrash", "parkedTrash"]);
+    tagTrash = [],
+  } = await localStore.get(["keepAliveTrash", "protectionTrash", "parkedTrash", "tagTrash"]);
   getElementById<HTMLButtonElement>("delete-restore-data").disabled =
-    keepAliveTrash.length === 0 && protectionTrash.length === 0 && parkedTrash.length === 0;
+    keepAliveTrash.length === 0 && protectionTrash.length === 0 && parkedTrash.length === 0 && tagTrash.length === 0;
 }
 
 export function initDangerZone(): void {
   // no confirm: the data is only undo history, and the button is dead while there is none
   getElementById("delete-restore-data").addEventListener("click", async () => {
     // every undo stack at once — removed parked windows / groups / tabs included
-    await localStore.set({ keepAliveTrash: [], protectionTrash: [], parkedTrash: [] });
+    await localStore.set({ keepAliveTrash: [], protectionTrash: [], parkedTrash: [], tagTrash: [] });
     flashSaved();
     render(); // only trash keys changed — the storage listener does not re-render for those
   });
@@ -30,7 +31,9 @@ export function initDangerZone(): void {
   // resets settings + appearance only — rules, keep-alive marks and parked windows deliberately untouched
   getElementById("restore-defaults").addEventListener("click", async () => {
     if (
-      !confirm("Restore all settings to their defaults? Protected sites, keep-alive marks and parked windows are kept.")
+      !confirm(
+        "Restore all settings to their defaults? Protected sites, keep-alive marks, parked windows and tags are kept.",
+      )
     ) {
       return;
     }
@@ -41,7 +44,7 @@ export function initDangerZone(): void {
   });
 
   getElementById("danger").addEventListener("click", async () => {
-    if (!confirm("Delete all Taboom data — settings, protected sites, keep-alive marks and parked windows?")) {
+    if (!confirm("Delete all Taboom data — settings, protected sites, keep-alive marks, parked windows and tags?")) {
       return;
     }
     await chrome.storage.local.clear();

@@ -25,6 +25,7 @@ import { initListEvents } from "./input/list-events.ts";
 import { initBulkButtons } from "./input/toolbar-events.ts";
 import { initKeyboardNav } from "./input/keyboard-nav.ts";
 import { initQuickActions } from "./input/quick-actions.ts";
+import { initTagsChip } from "./input/tags-chip.ts";
 import { initialDirFor } from "./render/sorting.ts";
 import "./input/live-updates.ts";
 // The feature modules register nothing when evaluated: each wires its listeners in an
@@ -76,6 +77,7 @@ initGlobalKeys();
 initBulkButtons();
 initKeyboardNav();
 initQuickActions();
+initTagsChip(); // after the filter-bar handler in toolbar-events.ts: the chip click filters first, then opens the picker
 
 // ---------- init ----------
 

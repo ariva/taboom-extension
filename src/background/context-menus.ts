@@ -16,6 +16,13 @@ const MENU_ITEMS: chrome.contextMenus.CreateProperties[] = [
   { id: "snooze-all-inactive", title: "Snooze all inactive tabs" },
 ];
 
+// background/tags.ts hands its builder in: it imports the queue from here, so this module
+// cannot import it back without a cycle
+let tagMenuBuilder: (() => Promise<void>) | null = null;
+export function registerTagMenuBuilder(builder: () => Promise<void>): void {
+  tagMenuBuilder = builder;
+}
+
 export function createContextMenus(): Promise<unknown> {
   return enqueueMenuOp(async () => {
     await chrome.contextMenus.removeAll();
@@ -24,6 +31,7 @@ export function createContextMenus(): Promise<unknown> {
       chrome.contextMenus.create({ ...item, parentId: "root", contexts: ["page"] });
       if (item.id === "protect-this-site") {
         await createKeepAliveItem();
+        await tagMenuBuilder?.(); // Tag page ▸ right under it — background/tags.ts registers it (it sits above this module)
       }
     }
     menuDirty = false; // the fresh rebuild below covers any queued history pass
@@ -60,7 +68,7 @@ async function createKeepAliveItem(): Promise<void> {
 const MENU_HISTORY_MAX = 15;
 
 // callback form: contextMenus promises need Chrome 123, we support 121
-const removeMenu = (id: string) =>
+export const removeMenu = (id: string) =>
   new Promise((resolve) =>
     chrome.contextMenus.remove(id, () => {
       void chrome.runtime.lastError; // "not found" on first build — expected

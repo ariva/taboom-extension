@@ -29,12 +29,21 @@ import {
 } from "../ops/actions.ts";
 import { TAB_GROUP_COLORS, WINDOW_DOT_COLORS, windowGroupName, windowMaps } from "../model/index.ts";
 import { refresh, render } from "../foundation/scheduler.ts";
-import { keepAliveActive, namesActive, parkedActive, pinActive, state, tabGroupsActive } from "../foundation/state.ts";
+import {
+  keepAliveActive,
+  namesActive,
+  parkedActive,
+  pinActive,
+  state,
+  tabGroupsActive,
+  tagsActive,
+} from "../foundation/state.ts";
 import type { PanelTab } from "../foundation/state.ts";
 import { moveTabsToGroup, startRenameTabGroup, ungroupTabs, updateTabGroup } from "../ops/tab-group-ops.ts";
 import { persistUiPrefs } from "../input/toolbar-events.ts";
 import { moveTabsToParked, parkWindowPrompt } from "../ops/parked-ops.ts";
 import { openParkedGroupMenu, openParkedTabMenu, openParkedWindowMenu } from "./parked-menus.ts";
+import { appendTagItems } from "./tag-menu.ts";
 import {
   moveTabsToWindow,
   orderedWindowIds,
@@ -97,6 +106,10 @@ export function openRowMenu(event: MouseEvent, tabId: number): void {
       ctxAppend(ctxItem(paused ? "Resume keep-alive" : "Pause keep-alive", () => keepAlivePause(ids, !paused)));
       ctxAppend(ctxItem("Remove from keep-alive", () => keepAlive(ids, false)));
     }
+  }
+  if (tagsActive()) {
+    ctxAppend(ctxDivider());
+    appendTagItems(ids, event); // Tags…: the checklist picker over the clicked tab or the whole selection
   }
   ctxAppend(ctxDivider());
   const { btn, submenu } = ctxSubmenu(ids.length > 1 ? `Move ${ids.length} tabs to` : "Move tab to");

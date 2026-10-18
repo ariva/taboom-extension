@@ -3,6 +3,7 @@
 import { closest } from "../../../lib/dom.ts";
 import { listEl } from "../foundation/elements.ts";
 import { fuzzyActive, highlightRanges } from "../model/index.ts";
+import type { Badge, TipTag } from "../model/index.ts";
 import { setTextWithMarks } from "./row.ts";
 import { state } from "../foundation/state.ts";
 
@@ -27,12 +28,42 @@ listEl.addEventListener("mouseover", (event) => {
     return;
   }
   const tip = carrier.dataset.tip;
-  // row tip = the URL — while searching, mark the matched tokens in it too
+  // row tip = the URL and the states line — while searching, mark the matched tokens in it too
   if (carrier.classList.contains("row") && state.query.trim()) {
     const tokens = state.query.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
     setTextWithMarks(hoverTip, tip, highlightRanges(tip, tokens, fuzzyActive(state)));
   } else {
     hoverTip.textContent = tip;
+  }
+  // a row's states as the same badges it shows (protected / kept alive green, snoozed amber, pinned grey)
+  if (carrier.dataset.tipBadges) {
+    const badges: Badge[] = JSON.parse(carrier.dataset.tipBadges); // written by row.ts from the view model
+    const line = document.createElement("div");
+    line.className = "tip-states";
+    for (const [label, kind] of badges) {
+      const badge = document.createElement("span");
+      badge.className = kind ? `badge ${kind}` : "badge";
+      badge.textContent = label;
+      line.append(badge);
+    }
+    hoverTip.append(line);
+  }
+  // a row with tags: a last line of colored pills, like the badges
+  if (carrier.dataset.tipTags) {
+    const tags: TipTag[] = JSON.parse(carrier.dataset.tipTags); // written by row.ts from the view model
+    const line = document.createElement("div");
+    line.className = "tip-tags";
+    line.append("Tags: ");
+    for (const tag of tags) {
+      const pill = document.createElement("span");
+      pill.className = tag.dark ? "badge tag dark" : "badge tag";
+      pill.style.background = tag.color;
+      const text = document.createElement("span"); // same markup as the row's pills
+      text.textContent = tag.name;
+      pill.append(text);
+      line.append(pill);
+    }
+    hoverTip.append(line);
   }
   hoverTip.hidden = false;
   moveHoverTip(event);

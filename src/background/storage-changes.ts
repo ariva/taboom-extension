@@ -9,6 +9,7 @@ import { invalidateNavMode, navMode } from "./nav-mode.ts";
 import { applyAutoDiscardable, syncProtectMenu } from "./protection.ts";
 import { ensureAlarm } from "./snooze.ts";
 import { withHistory } from "./tab-history.ts";
+import { rebuildTagMenu, syncTagMenu } from "./tags.ts";
 
 export async function onStorageChanged(
   changes: { [key: string]: chrome.storage.StorageChange },
@@ -63,5 +64,11 @@ export async function onStorageChanged(
   }
   if (changes.tabHistory || changes.ui) {
     await rebuildHistoryMenu();
+  }
+  if (changes.tags || changes.ui) {
+    await rebuildTagMenu(); // the list changed, or the experimental opt-in flipped the flag
+  } else if (changes.tagPages) {
+    const [active] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+    await syncTagMenu(active);
   }
 }

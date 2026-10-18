@@ -17,6 +17,7 @@ import {
   parkedActive,
   parkedScope,
   state,
+  tagsActive,
 } from "../foundation/state.ts";
 import type { PanelTab } from "../foundation/state.ts";
 
@@ -30,20 +31,22 @@ export async function refresh(animate = false, preloaded: AppState | null = null
     persisted,
     tabs,
     win,
-    { windowProfiles = {}, keepAlive = [], parkedWindows = [], parkedTrash = [] },
+    { windowProfiles = {}, keepAlive = [], parkedWindows = [], parkedTrash = [], tags = [], tagPages = [] },
     { windowSessionMap = {} },
     groups,
   ] = await Promise.all([
     preloaded ?? loadState(), // startup passes its already-read state — no second read
     chrome.tabs.query({}),
     chrome.windows.getLastFocused(),
-    localStore.get(["windowProfiles", "keepAlive", "parkedWindows", "parkedTrash"]),
+    localStore.get(["windowProfiles", "keepAlive", "parkedWindows", "parkedTrash", "tags", "tagPages"]),
     sessionStore.get("windowSessionMap"),
     capabilities.tabGroups ? chrome.tabGroups.query({}).catch(() => []) : [],
   ]);
   state.tabGroups = new Map(groups.map((group): [number, TabGroup] => [group.id, group]));
   state.parked = parkedWindows;
   state.parkedTrashCount = parkedTrash.length;
+  state.tags = tags;
+  state.tagPages = tagPages;
   state.rules = persisted.protectionRules;
   state.keepAlive = keepAlive;
   state.keepAliveEnabled = persisted.settings.keepAliveEnabled;
@@ -104,6 +107,11 @@ export async function refresh(animate = false, preloaded: AppState | null = null
     // static markup: both chips exist in #filters
     mustQuery(filterBar, `button[data-filter="${name}"]`).hidden = parkedScope();
   }
+  // static markup: the Tags chip exists in #filters; a stored "tags" filter with the flag off reads as All
+  mustQuery(filterBar, 'button[data-filter="tags"]').hidden = !tagsActive();
+  if (state.filter === "tags" && !tagsActive()) {
+    state.filter = "all";
+  }
   // tabs closed outside the panel (or id-swapped by discard) leave stale ids
   // in the selection — prune so counts and select-all stay truthful
   const shownIds = new Set(state.allTabs.map((tab) => tab.id));
@@ -112,7 +120,12 @@ export async function refresh(animate = false, preloaded: AppState | null = null
       state.selected.delete(tabId);
     }
   }
-  state.derived = deriveTabs(state.allTabs, state.rules, keepAliveActive() ? state.keepAlive : []);
+  state.derived = deriveTabs(
+    state.allTabs,
+    state.rules,
+    keepAliveActive() ? state.keepAlive : [],
+    tagsActive() ? { tags: state.tags, pages: state.tagPages } : undefined,
+  );
   // flag turned off mid-navigation: drop the cursor so no stale outline lingers
   if (!featureEnabled(state.features, "SIDEBAR_KEYBOARD_NAVIGATION")) {
     state.cursor = -1;

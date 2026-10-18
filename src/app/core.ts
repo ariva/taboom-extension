@@ -44,6 +44,7 @@ export const DEFAULTS = {
     theme: "auto", // "auto" | "light" | "dark"
     historyNav: "traditional", // "disabled" | "traditional" | "compact" (legacy: true/false)
     searchEmptyFilter: "keep", // "keep" | "all" — when search matches are hidden by the current filter
+    tagPickOrder: "stored", // "stored" | "name" | "used" | "table" — the order of every tag picker list
     hideUpdateBanner: false, // suppress the new-version banner in the side panel
     windowNamesEnabled: true, // WINDOW_NAMES flag: show custom window names/colors (user toggle)
     onExtensionUpdate: "banner", // "auto" | "banner" | "none" — reopen side panels lost to an update/restart

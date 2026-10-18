@@ -1,6 +1,7 @@
 // The list renderer: render() derives what is visible and picks animated or plain,
 // renderNow() rebuilds the list DOM; plus the chrome that follows every render
 // (row-height feedback, fold-all button, bulk bar).
+import { enabledTags, splitTagQuery, tagColorHex } from "../../../app/tags.ts";
 import { FOLD_ICONS } from "../../../lib/dom.ts";
 import { hideCtxMenu } from "../../../lib/ui/context-menu.ts";
 import {
@@ -33,6 +34,8 @@ import { effectiveCollapsed, GROUPINGS, renderSortDirButton } from "./sorting.ts
 import type { PanelRun } from "./sorting.ts";
 import { activeCollapsedSet, effectiveSort, nestedTabGroupsActive, parkedScope, state } from "../foundation/state.ts";
 import type { GroupKey } from "../foundation/state.ts";
+import { refillTagAssignPickerIfOpen } from "../input/tag-assign-picker.ts";
+import { refillTagsPickerIfOpen } from "../input/tags-chip.ts";
 import { refillWindowsPopoverIfOpen, syncQuickLaunchButton } from "../windows-popover/popover.ts";
 
 type Tab = chrome.tabs.Tab;
@@ -74,13 +77,18 @@ function renderNowImpl(): void {
   hideCtxMenu();
   // active search: chips count found items (what clicking each filter would show)
   const counted = state.query ? searchCandidates(state.allTabs, state) : state.allTabs;
-  const byFilter = countsByFilter(counted, state.derived);
+  const byFilter = countsByFilter(counted, state.derived, state.tagFilter);
   for (const button of filterBar.querySelectorAll("button")) {
     const name = button.dataset.filter;
-    // static markup: every filter button has its .count span and a FilterName in data-filter
-    button.querySelector(".count")!.textContent = String(byFilter[name as FilterName]);
+    // static markup: every filter button has its count span (the Tags chip's is .tag-count, so
+    // the four plain chips stay the ".count" set) and a FilterName in data-filter
+    const count = button.querySelector(".count, .tag-count");
+    if (count) {
+      count.textContent = String(byFilter[name as FilterName]);
+    }
     button.setAttribute("aria-pressed", String(name === state.filter));
   }
+  renderTagsChip();
 
   listEl.classList.toggle("compact", state.ui.density === "compact");
   state.cursor = Math.min(state.cursor, state.visible.length - 1);
@@ -95,8 +103,8 @@ function renderNowImpl(): void {
 
   const maps = windowMaps(state.allTabs, state.currentWindowId, state.windowMeta);
   const now = Date.now();
-  // tokenized once per render — rows highlight their matches while searching
-  const queryTokens = state.query.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
+  // tokenized once per render — rows highlight their matches while searching (#tokens light badges)
+  const { text: queryTokens, tags: tagTokens } = splitTagQuery(state.query);
   const rowVm = (tab: Tab, index: number): RowViewModel =>
     rowViewModel(tab, {
       index,
@@ -108,6 +116,7 @@ function renderNowImpl(): void {
       dotColors: maps.dotColors,
       indexes: maps.indexes,
       queryTokens,
+      tagTokens,
       fuzzy: fuzzyActive(state),
       parked: parkedScope(),
     });
@@ -147,8 +156,11 @@ function renderNowImpl(): void {
               ? (maps.dotColors.get(groupKey as number) ?? null)
               : sort === "group-tabgroup" && groupKey !== -1
                 ? (tabGroupColor(state.tabGroups.get(groupKey as number)?.color) ?? null)
-                : null,
+                : sort === "group-tag" && groupKey !== ""
+                  ? tagColorHex(state.tags.find((tag) => tag.id === groupKey)?.color)
+                  : null,
           tabGroupId: sort === "group-tabgroup" ? (groupKey as number) : null, // -1 = "No group" (drop = ungroup)
+          tagHeader: sort === "group-tag" && groupKey !== "", // square marker like a tab group
           tabs: members,
           noun: grouping.noun,
           count: members.length,
@@ -208,6 +220,8 @@ function renderNowImpl(): void {
   parkedUndoBtn.textContent = `Undo remove (${state.parkedTrashCount})`;
   syncQuickLaunchButton();
   refillWindowsPopoverIfOpen();
+  refillTagsPickerIfOpen();
+  refillTagAssignPickerIfOpen();
 }
 
 // Feed the real row height back into the content-visibility placeholder
@@ -276,6 +290,23 @@ collapseAllBtn.addEventListener("click", () => {
   }
   render();
 });
+
+// the Tags chip names its ticked tags: "Tags" (any), "● work" (one) or "2 tags"; the
+// picker's tick list is rebuilt from state by its own module (input/tags-chip.ts)
+function renderTagsChip(): void {
+  const label = filterBar.querySelector('button[data-filter="tags"] .chip-label');
+  if (!label) {
+    return;
+  }
+  const ticked = enabledTags(state.tags).filter((tag) => state.tagFilter.has(tag.id));
+  const [one] = ticked;
+  label.textContent = ticked.length === 0 ? "Tags" : one && ticked.length === 1 ? one.name : `${ticked.length} tags`;
+  const dot = filterBar.querySelector<HTMLElement>('button[data-filter="tags"] .tag-dot');
+  if (dot) {
+    dot.hidden = ticked.length !== 1;
+    dot.style.background = one ? tagColorHex(one.color) : "";
+  }
+}
 
 function renderBulkBar(): void {
   const summary = bulkSummary(state.visible, state.selected);

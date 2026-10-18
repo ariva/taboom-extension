@@ -1,7 +1,7 @@
 // Grouped sorts and sort direction as the panel applies them: the grouping registry,
 // the direction a sort starts in, the direction button, and the collapse set in effect.
 import { sortDirBtn } from "../foundation/elements.ts";
-import { domainGroupName, titleGroupName, urlGroupName, windowGroupName } from "../model/index.ts";
+import { domainGroupName, tagGroupName, titleGroupName, urlGroupName, windowGroupName } from "../model/index.ts";
 import type { SortDir, TabRun, WindowMaps } from "../model/index.ts";
 import { canonicalDir, DIR_TITLES, SORT_DIRECTIONS } from "../model/sort-direction.ts";
 import { activeCollapsedSet, effectiveSort, state } from "../foundation/state.ts";
@@ -54,6 +54,12 @@ export const GROUPINGS: Record<string, Grouping> = {
     key: (tab) => tab.url ?? "",
     name: (url: string) => urlGroupName(url),
     noun: "group",
+  },
+  // TAGS: the first tag (tag-list order) names the group; "" = untagged bucket
+  "group-tag": {
+    key: (tab) => state.derived.get(tab.id)?.tags[0]?.id ?? "",
+    name: (tagId: string) => tagGroupName(state.tags.find((tag) => tag.id === tagId)),
+    noun: "tag",
   },
 };
 

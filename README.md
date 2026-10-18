@@ -20,6 +20,7 @@ Taboom - Tabs Manager frees memory by snoozing (discarding) tabs you haven't use
 - **Duplicates cleanup** — the quick launch lists every page open more than once; keep one copy across all windows or one per window, pinned copies and one New Tab per window always stay.
 - **Park windows** — park a window: its tabs (order, pins, groups) and its name are saved and the window closes; restore it later as a new window or into the current one. Parked windows appear in the side panel's **Parked windows** scope with search and grouping and in the quick launch's Windows list, and single tabs can be moved between live and parked windows.
 - **Keep tabs alive** — some sites log you out after a few idle minutes, dashboards go stale once the tab sleeps; mark such pages and they reload on a timer (session renewed, data fresh) and are never auto-snoozed.
+- **Tags** — colored labels on pages: tag a tab from its row menu or the page's right-click menu, see the tag as a badge on every tab of that page, filter the list by tag, search with `#name`, group by tag, and manage tags and tagged pages in Settings. Tags follow the page address, so they survive restarts.
 - **Context menu and keyboard shortcuts** for quick per-tab actions; `Ctrl+Shift+,` / `Ctrl+Shift+.` step back / forward through the tab history from any tab.
 
 ## Privacy first

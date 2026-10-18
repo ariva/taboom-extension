@@ -6,6 +6,7 @@ import { KEEP_ALIVE_MENU_ID, toggleTabKeepAlive } from "./keep-alive.ts";
 import { toggleSiteProtection } from "./protection.ts";
 import { autoSnoozePass, snoozeTab } from "./snooze.ts";
 import { historyJump, historyStep } from "./tab-history.ts";
+import { tagIdOfMenuItem, toggleTagForTab } from "./tags.ts";
 
 // commands.onCommand
 export async function runCommand(command: string): Promise<void> {
@@ -34,6 +35,13 @@ export async function runCommand(command: string): Promise<void> {
 export async function runMenuClick(info: chrome.contextMenus.OnClickData, tab?: chrome.tabs.Tab): Promise<void> {
   if (typeof info.menuItemId === "string" && info.menuItemId.startsWith("hist-")) {
     return historyJump(Number(info.menuItemId.slice(5)));
+  }
+  const tagId = tagIdOfMenuItem(info.menuItemId);
+  if (tagId !== undefined) {
+    if (tab && isSupportedUrl(tab.url)) {
+      await toggleTagForTab(tab, tagId);
+    }
+    return;
   }
   switch (info.menuItemId) {
     case "show-manager":

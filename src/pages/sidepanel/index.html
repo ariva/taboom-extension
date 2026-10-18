@@ -37,7 +37,10 @@
       <button data-filter="awake" aria-pressed="false">Awake <span class="count"></span></button>
       <button data-filter="snoozed" aria-pressed="false">Snoozed <span class="count"></span></button>
       <button data-filter="protected" aria-pressed="false">Protected <span class="count"></span></button>
+      <!-- TAGS: a dropdown chip — click filters by tag and opens the picker (one tick per tag) -->
+      <button data-filter="tags" aria-pressed="false" hidden title="Tagged tabs — pick which tags"><span class="tag-dot" hidden></span><span class="chip-label">Tags</span> <span class="tag-count"></span><span class="chip-caret">▾</span></button>
     </div>
+    <div id="tags-pop" popover></div>
     <div class="toolbar">
       <label class="select-all"><input type="checkbox" id="select-all" aria-label="Select all visible tabs" /></label>
       <select id="scope" aria-label="Window scope">
@@ -54,6 +57,7 @@
         <option value="group-domain">Group by domain</option>
         <option value="group-url">Group by URL</option>
         <option value="group-tabgroup">Tab groups</option>
+        <option value="group-tag">Group by tag</option>
         <option value="window">Group by window</option>
       </select>
       <!-- sort direction: icon shows the CURRENT order (data-dir=none/asc/desc), click cycles it.

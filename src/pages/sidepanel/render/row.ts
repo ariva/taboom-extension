@@ -52,8 +52,14 @@ function renderRowImpl(tab: Tab, vm: RowViewModel): HTMLElement {
   row.dataset.tabId = String(tab.id);
   const parked = vm.classes.includes("parked");
   row.draggable = !parked; // drag onto another window's rows/header to move (a parked row moves through its menu)
-  if (tab.url) {
-    row.dataset.tip = tab.url; // full URL in the hover tip (titles ellipsize)
+  if (vm.tip) {
+    row.dataset.tip = vm.tip; // full URL (titles ellipsize) and the row's states in the hover tip
+  }
+  if (vm.tipBadges.length > 0) {
+    row.dataset.tipBadges = JSON.stringify(vm.tipBadges); // the tip's states line, as badges (hover-tip.ts)
+  }
+  if (vm.tipTags.length > 0) {
+    row.dataset.tipTags = JSON.stringify(vm.tipTags); // the tip's colored "Tags:" line (hover-tip.ts)
   }
 
   mustQuery<HTMLInputElement>(row, "input").checked = vm.checked;
@@ -110,10 +116,17 @@ function renderRowImpl(tab: Tab, vm: RowViewModel): HTMLElement {
     age.textContent = vm.age;
     meta.append(age);
   }
-  for (const [label, kind] of vm.badges) {
+  for (const [label, kind, color] of vm.badges) {
     const badge = document.createElement("span");
     badge.className = kind ? `badge ${kind}` : "badge";
-    badge.textContent = label;
+    if (color) {
+      badge.style.background = color; // a tag badge: solid fill in the tag's color
+      const text = document.createElement("span"); // the ellipsizing part of a flex-centered pill
+      text.textContent = label;
+      badge.append(text);
+    } else {
+      badge.textContent = label;
+    }
     meta.append(badge);
   }
 

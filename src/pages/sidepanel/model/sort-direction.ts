@@ -20,6 +20,7 @@ export const SORT_DIRECTIONS: Record<string, SortDirectionMeta> = {
   "group-title": { states: ["desc", "asc", "none"] }, // biggest groups first by default
   "group-domain": { states: ["desc", "asc", "none"] },
   "group-url": { states: ["desc", "asc", "none"] },
+  "group-tag": { states: ["none", "desc", "asc"] }, // tags read ABC first, like windows
 };
 
 export function canonicalDir(sort: string): SortDir {

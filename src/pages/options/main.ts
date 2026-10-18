@@ -12,6 +12,7 @@ import { initSettingsForm, renderSettings } from "./settings-form.ts";
 import { initUiPrefs, renderUiPrefs } from "./ui-prefs.ts";
 import { initRules, renderRules } from "./rules.ts";
 import { initKeepAlive, renderKeepAlive } from "./keep-alive.ts";
+import { initTags, renderTags } from "./tags.ts";
 import { initPerfPanel } from "./perf-panel.ts";
 import { initDangerZone, renderDangerZone } from "./danger-zone.ts";
 import { initWhatsNew } from "./whats-new.ts";
@@ -28,6 +29,7 @@ async function render() {
   await renderRules(state);
   renderUiPrefs(state);
   await renderKeepAlive(state);
+  await renderTags(state);
   await renderDangerZone();
 
   getElementById("about").textContent = aboutText(getReleaseVersion());
@@ -39,6 +41,7 @@ initSettingsForm();
 initUiPrefs();
 initRules();
 initKeepAlive();
+initTags();
 
 // chrome:// URLs can't be plain hrefs — open via tabs API
 getElementById("links").addEventListener("click", (event) => {
@@ -61,7 +64,18 @@ render();
 chrome.storage.onChanged.addListener((changes) => {
   // the three undo stacks drive the Restore buttons and "Clear restore data" — an undo or
   // a removal made in the side panel (parked windows, keep-alive, unprotect) must show here too
-  const shown = ["settings", "protectionRules", "ui", "keepAlive", "keepAliveTrash", "protectionTrash", "parkedTrash"];
+  const shown = [
+    "settings",
+    "protectionRules",
+    "ui",
+    "keepAlive",
+    "keepAliveTrash",
+    "protectionTrash",
+    "parkedTrash",
+    "tags",
+    "tagPages",
+    "tagTrash",
+  ];
   if (shown.some((key) => key in changes)) {
     render();
   }

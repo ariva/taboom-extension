@@ -11,6 +11,7 @@ import { reprotectOnNavigation, syncProtectMenu } from "./protection.ts";
 import { onAlarm } from "./snooze.ts";
 import { onStorageChanged } from "./storage-changes.ts";
 import { dropClosedTabs, recordActivation, recordWindowFocus, replaceTabId } from "./tab-history.ts";
+import { syncTagMenu, syncTagMenuOnNavigation } from "./tags.ts";
 import { refreshOnTabChange, scheduleProfileRefresh, trackPanelPort } from "./window-profiles.ts";
 
 // ---------- lifecycle ----------
@@ -45,6 +46,7 @@ chrome.tabs.onActivated.addListener(async ({ tabId }) => {
   const tab = await chrome.tabs.get(tabId).catch(() => null);
   syncProtectMenu(tab);
   syncKeepAliveMenu(tab);
+  syncTagMenu(tab);
 });
 
 // ---------- tab history (back/forward across tabs) ----------
@@ -56,6 +58,7 @@ chrome.tabs.onReplaced.addListener(replaceTabId);
 
 chrome.tabs.onUpdated.addListener(reprotectOnNavigation);
 chrome.tabs.onUpdated.addListener(syncKeepAliveMenuOnNavigation);
+chrome.tabs.onUpdated.addListener(syncTagMenuOnNavigation);
 
 // ---------- keyboard commands + context menus ----------
 

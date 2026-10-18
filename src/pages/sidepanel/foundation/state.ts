@@ -8,6 +8,8 @@ import type {
   NavMode,
   ParkedWindow,
   ProtectionRule,
+  Tag,
+  TagPage,
   UiPrefs,
 } from "../../../app/types.ts";
 import { capabilities } from "../../../lib/platform/capabilities.ts";
@@ -63,6 +65,10 @@ export interface PanelState {
   liveWindowMeta: WindowMetaMap;
   parked: ParkedWindow[];
   parkedTrashCount: number;
+  // TAGS: the tag list, the tagged pages, the undo count and the Tags chip's ticked ids
+  tags: Tag[];
+  tagPages: TagPage[];
+  tagFilter: Set<string>;
 }
 
 // the single mutable state of the panel — handlers write here, render reads
@@ -112,6 +118,9 @@ export const state: PanelState = {
   liveWindowMeta: new Map(),
   parked: [], // storage.local.parkedWindows
   parkedTrashCount: 0, // forgotten parked windows waiting in parkedTrash
+  tags: [], // storage.local.tags
+  tagPages: [], // storage.local.tagPages
+  tagFilter: new Set(), // session only: the ticked tags of the Tags chip (empty = any tagged tab)
 };
 
 // TAB_GROUPS flag + API present (permission granted, Chrome supports it)
@@ -150,6 +159,11 @@ export function parkedActive(): boolean {
   return featureEnabled(state.features, "PARKED_WINDOWS");
 }
 
+// TAGS resolved flag — Tags ▸ in the row menu, the Tags chip, the badges, the quick launch view
+export function tagsActive(): boolean {
+  return featureEnabled(state.features, "TAGS");
+}
+
 // the list shows parked snapshots instead of live tabs
 export function parkedScope(): boolean {
   return parkedActive() && state.scope === "parked-windows";
@@ -162,6 +176,7 @@ export const FLAG_GATED_SORTS: Record<string, FeatureName> = {
   "group-title": "GROUP_BY_TITLE",
   "group-domain": "GROUP_BY_DOMAIN",
   "group-url": "GROUP_BY_URL",
+  "group-tag": "TAGS",
 };
 
 // flag-gated sort selected while its flag is off: fall back to the window

@@ -18,6 +18,19 @@ import {
 } from "./parked.ts";
 import { restoreRuleRemoval } from "./protection-rules.ts";
 import { recordRemoval } from "./removal-trash.ts";
+import {
+  createTag,
+  moveTagTo,
+  newTagId,
+  recolorTag,
+  removeTagPages,
+  removeTags,
+  renameTag,
+  restoreTagRemoval,
+  setPageTags,
+  setTagEnabled,
+  togglePageTags,
+} from "./tags.ts";
 import type {
   AppState,
   Features,
@@ -27,6 +40,9 @@ import type {
   ParkedWindow,
   ProtectionRule,
   SessionStorageSchema,
+  Tag,
+  TagPage,
+  TagRemoval,
 } from "./types.ts";
 
 // the only doors to chrome.storage — keys and value types come from the schemas
@@ -227,6 +243,118 @@ export async function forgetParkedWindow(id: string): Promise<boolean> {
 export async function restoreParkedWindows(): Promise<boolean> {
   const { parkedWindows = [], parkedTrash = [] } = await localStore.get(["parkedWindows", "parkedTrash"]);
   const restored = restoreParkedRemoval(parkedWindows, parkedTrash);
+  if (!restored) {
+    return false;
+  }
+  await localStore.set(restored);
+  return true;
+}
+
+// ---------- tags: the only writers of storage.local.tags / tagPages ----------
+
+// the created tag (the row menu applies it at once), undefined when the name is taken / invalid
+export async function addTag(name: string, color: string): Promise<Tag | undefined> {
+  const { tags = [] } = await localStore.get("tags");
+  const made = createTag(tags, name, color, newTagId());
+  if (!made) {
+    return undefined;
+  }
+  await localStore.set({ tags: made.tags });
+  return made.tag;
+}
+
+// rename / recolor / switch on or off; false when nothing changed (same value, unknown id, name clash)
+export async function editTag(
+  id: string,
+  patch: { name?: string; color?: string; enabled?: boolean },
+): Promise<boolean> {
+  const { tags = [] } = await localStore.get("tags");
+  let next: Tag[] | undefined;
+  if (patch.name !== undefined) {
+    next = renameTag(tags, id, patch.name);
+  }
+  if (patch.color !== undefined) {
+    next = recolorTag(next ?? tags, id, patch.color) ?? next;
+  }
+  if (patch.enabled !== undefined) {
+    next = setTagEnabled(next ?? tags, id, patch.enabled) ?? next;
+  }
+  if (!next) {
+    return false;
+  }
+  await localStore.set({ tags: next });
+  return true;
+}
+
+// Settings drag reorder; false when the drop changes nothing
+export async function reorderTags(draggedId: string, targetId: string): Promise<boolean> {
+  const { tags = [] } = await localStore.get("tags");
+  const next = moveTagTo(tags, draggedId, targetId);
+  if (!next) {
+    return false;
+  }
+  await localStore.set({ tags: next });
+  return true;
+}
+
+async function editPages(edit: (pages: TagPage[]) => TagPage[] | undefined): Promise<boolean> {
+  const { tagPages = [] } = await localStore.get("tagPages");
+  const next = edit(tagPages);
+  if (!next) {
+    return false;
+  }
+  await localStore.set({ tagPages: next });
+  return true;
+}
+
+// row menu / page context menu: one tag on or off over these pages
+export function toggleTagOnPages(urls: string[], tagId: string, on: boolean): Promise<boolean> {
+  return editPages((pages) => togglePageTags(pages, urls, tagId, on));
+}
+
+// Settings → Tagged pages: a page's whole tag set (empty = the page leaves the list, no trash)
+export function setPageTagIds(url: string, tagIds: string[]): Promise<boolean> {
+  return editPages((pages) => setPageTags(pages, url, tagIds));
+}
+
+// the one door for dropping tags or tagged pages: what leaves lands in the trash for Undo / Restore
+async function writeTagRemoval(
+  next: (tags: Tag[], pages: TagPage[]) => { tags: Tag[]; pages: TagPage[]; removed: TagRemoval } | undefined,
+): Promise<boolean> {
+  const { tags = [], tagPages = [], tagTrash = [] } = await localStore.get(["tags", "tagPages", "tagTrash"]);
+  const result = next(tags, tagPages);
+  if (!result) {
+    return false;
+  }
+  await localStore.set({
+    tags: result.tags,
+    tagPages: result.pages,
+    tagTrash: recordRemoval(tagTrash, [result.removed], Date.now()),
+  });
+  return true;
+}
+
+export function removeTagsToTrash(ids: string[]): Promise<boolean> {
+  return writeTagRemoval((tags, pages) => removeTags(tags, pages, ids));
+}
+
+export function removeTagPagesToTrash(urls: string[]): Promise<boolean> {
+  return writeTagRemoval((tags, pages) => {
+    const removed = removeTagPages(pages, urls);
+    return removed ? { tags, ...removed } : undefined;
+  });
+}
+
+// Settings "Remove all tags": tags and pages go together as one undoable action
+export function clearTags(): Promise<boolean> {
+  return writeTagRemoval((tags, pages) =>
+    tags.length === 0 && pages.length === 0 ? undefined : { tags: [], pages: [], removed: { tags, pages } },
+  );
+}
+
+export async function restoreTags(): Promise<boolean> {
+  const { tags = [], tagPages = [], tagTrash = [] } = await localStore.get(["tags", "tagPages", "tagTrash"]);
+  const restored = restoreTagRemoval(tags, tagPages, tagTrash);
   if (!restored) {
     return false;
   }

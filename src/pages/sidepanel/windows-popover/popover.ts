@@ -18,6 +18,7 @@ import { inlineEdit } from "../../../lib/ui/inline-edit.ts";
 import { scopeSelect, winListBtn, winPop } from "../foundation/elements.ts";
 import { appendWindowIdentityItems, openMarkMenu, openRowMenu, openTabGroupMenu } from "../menus/menus.ts";
 import { openParkedWindowMenu } from "../menus/parked-menus.ts";
+import { openTagMenu } from "../menus/tag-menu.ts";
 import { windowMaps } from "../model/index.ts";
 import { refresh } from "../foundation/scheduler.ts";
 import {
@@ -27,6 +28,7 @@ import {
   pinActive,
   state,
   tabGroupsActive,
+  tagsActive,
 } from "../foundation/state.ts";
 import { parkWindowPrompt } from "../ops/parked-ops.ts";
 import { orderedWindowIds, windowLabel } from "../ops/window-ops.ts";
@@ -37,8 +39,10 @@ import { fillAliveRows } from "./alive.ts";
 import { fillDuplicateRows, openDuplicateMenuForKey, resetDuplicateSelection } from "./duplicates.ts";
 import { fillPinRows } from "./pins.ts";
 import { fillParkedRows, parkedRowsNewestFirst, startRenameParkedInList } from "./parked.ts";
+import { fillTagRows, startRenameTagInList } from "./tags.ts";
+import { orderedTags } from "../../../app/tags.ts";
 
-type WinPopView = "windows" | "groups" | "pins" | "alive" | "duplicates";
+type WinPopView = "windows" | "groups" | "pins" | "alive" | "duplicates" | "tags";
 let winPopView: WinPopView = "windows"; // reset on ▦ open
 
 // the Groups view sits below this module in the import graph — it refills through this
@@ -106,6 +110,8 @@ export function initWindowsPopover(): void {
       }
     } else if (row.dataset.duplicateKey) {
       openDuplicateMenuForKey(event, row.dataset.duplicateKey);
+    } else if (row.dataset.tagId) {
+      openTagListMenu(event, row.dataset.tagId);
     } else if (row.dataset.windowId) {
       openAnyWindowListMenu(event, Number(row.dataset.windowId));
     }
@@ -123,6 +129,7 @@ function quickLaunchViews() {
   const pinnedTabs = state.liveTabs.filter((tab) => tab.pinned);
   const aliveMarks = keepAliveActive() ? state.keepAlive : [];
   const dupSets = duplicatesActive() ? duplicateSets(state.liveTabs) : [];
+  const tagList = tagsActive() ? orderedTags(state.tags, state.tagPages, state.ui) : []; // Settings picker order, enabled only
   const parkedCount = parkedActive() ? parkedRowsNewestFirst().length : 0;
   const liveCount = maps.indexes.size;
   // the count is live + parked: the view lists both (the Parked heading carries its own count)
@@ -131,10 +138,11 @@ function quickLaunchViews() {
     ...(liveCount > 1 || parkedCount > 0 ? [windowsView] : []),
     ...(groupList.length > 0 ? [["groups", `Groups (${groupList.length})`] satisfies [WinPopView, string]] : []),
     ...(pinnedTabs.length > 0 ? [["pins", `Pins (${pinnedTabs.length})`] satisfies [WinPopView, string]] : []),
+    ...(tagList.length > 0 ? [["tags", `Tags (${tagList.length})`] satisfies [WinPopView, string]] : []),
     ...(aliveMarks.length > 0 ? [["alive", `Alive (${aliveMarks.length})`] satisfies [WinPopView, string]] : []),
     ...(dupSets.length > 0 ? [["duplicates", `Dupes (${dupSets.length})`] satisfies [WinPopView, string]] : []),
   ];
-  return { maps, groupList, pinnedTabs, aliveMarks, dupSets, windowsView, views };
+  return { maps, groupList, pinnedTabs, aliveMarks, dupSets, tagList, windowsView, views };
 }
 
 // every render: the ▦ button is live only while the popover would have a view to show
@@ -142,7 +150,7 @@ export function syncQuickLaunchButton(): void {
   const empty = quickLaunchViews().views.length === 0;
   winListBtn.disabled = empty;
   winListBtn.title = empty
-    ? `Nothing to list: one window, no groups, pinned tabs, kept-alive or duplicated pages${parkedActive() ? ", nothing parked" : ""}`
+    ? `Nothing to list: one window, no groups, pinned tabs, kept-alive or duplicated pages${parkedActive() ? ", nothing parked" : ""}${tagsActive() ? ", no tags" : ""}`
     : "Windows list";
 }
 
@@ -152,7 +160,7 @@ function fillWindowsPopover(): void {
   winPop.style.top = `${anchor.bottom + 4}px`;
   winPop.style.right = "0.5rem";
   winPop.style.left = "auto";
-  const { maps, groupList, pinnedTabs, aliveMarks, dupSets, windowsView, views } = quickLaunchViews();
+  const { maps, groupList, pinnedTabs, aliveMarks, dupSets, tagList, windowsView, views } = quickLaunchViews();
   // an open popover whose last member just vanished still shows something: the Windows list
   const [firstView = windowsView] = views;
   if (views.length === 0) {
@@ -229,6 +237,10 @@ function fillWindowsPopover(): void {
     fillDuplicateRows(dupSets, fillWindowsPopover);
     return;
   }
+  if (winPopView === "tags") {
+    fillTagRows(tagList, state.liveTabs, openTagListMenu);
+    return;
+  }
 
   for (const windowId of orderedWindowIds(maps)) {
     const tabs = state.liveTabs.filter((tab) => tab.windowId === windowId);
@@ -295,6 +307,11 @@ function fillWindowsPopover(): void {
   if (parkedActive()) {
     fillParkedRows(openAnyWindowListMenu);
   }
+}
+
+// a Tags row's menu: rename edits the row in place
+function openTagListMenu(event: MouseEvent, tagId: string): void {
+  openTagMenu(event, tagId, { rename: (id) => startRenameTagInList(id, fillWindowsPopover) });
 }
 
 // a popover row's window menu: a parked row (negative id) gets the parked one

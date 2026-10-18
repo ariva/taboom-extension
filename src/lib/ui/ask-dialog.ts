@@ -15,6 +15,14 @@ askEl.addEventListener("click", (event) => {
   }
 });
 
+// focus left for another window / the page beside a side panel: the question is dropped
+// (resolves null), like a popover menu closing on blur
+window.addEventListener("blur", () => {
+  if (askEl.open) {
+    askEl.close();
+  }
+});
+
 export function isAskDialogOpen(): boolean {
   return askEl.open;
 }
@@ -31,6 +39,8 @@ export interface AskDialogOptions {
   cancelLabel?: string;
   // a checkbox under the message ("Don't ask again"); its state reaches the caller on OK only
   checkbox?: { label: string; onConfirm: (checked: boolean) => void } | null;
+  // a row of color swatches under the input (a tag's color); the picked name reaches the caller on OK only
+  swatches?: { colors: [name: string, hex: string][]; initial: string; onConfirm: (name: string) => void } | null;
 }
 
 export function askDialog({
@@ -39,6 +49,7 @@ export function askDialog({
   okLabel = "OK",
   cancelLabel = "Cancel",
   checkbox = null,
+  swatches = null,
 }: AskDialogOptions): Promise<string | true | null> {
   return new Promise((resolve) => {
     let result: string | true | null = null;
@@ -47,13 +58,38 @@ export function askDialog({
     text.textContent = message;
     const field = input ? document.createElement("input") : null;
     const check = checkbox ? document.createElement("input") : null;
+    let picked = swatches?.initial ?? "";
     const confirm = () => {
       result = field ? field.value : true;
       if (check) {
         checkbox?.onConfirm(check.checked);
       }
+      if (swatches) {
+        swatches.onConfirm(picked);
+      }
       askEl.close();
     };
+    let swatchRow: HTMLDivElement | null = null;
+    if (swatches) {
+      swatchRow = document.createElement("div");
+      swatchRow.className = "ask-swatches";
+      for (const [name, hex] of swatches.colors) {
+        const swatch = document.createElement("button");
+        swatch.type = "button";
+        swatch.className = "ask-swatch";
+        swatch.dataset.color = name;
+        swatch.style.background = hex;
+        swatch.title = swatch.ariaLabel = name[0]?.toUpperCase() + name.slice(1);
+        swatch.setAttribute("aria-pressed", String(name === picked));
+        swatch.addEventListener("click", () => {
+          picked = name;
+          for (const other of swatchRow?.children ?? []) {
+            other.setAttribute("aria-pressed", String(other === swatch));
+          }
+        });
+        swatchRow.append(swatch);
+      }
+    }
     let checkLabel: HTMLLabelElement | null = null;
     if (check) {
       check.type = "checkbox";
@@ -85,7 +121,13 @@ export function askDialog({
     const actions = document.createElement("div");
     actions.className = "ask-actions";
     actions.append(cancel, ok);
-    askEl.replaceChildren(text, ...(field ? [field] : []), ...(checkLabel ? [checkLabel] : []), actions);
+    askEl.replaceChildren(
+      text,
+      ...(field ? [field] : []),
+      ...(swatchRow ? [swatchRow] : []),
+      ...(checkLabel ? [checkLabel] : []),
+      actions,
+    );
     // every exit — OK, Cancel, Esc, backdrop — funnels through the close event
     askEl.addEventListener("close", () => resolve(result), { once: true });
     askEl.showModal();

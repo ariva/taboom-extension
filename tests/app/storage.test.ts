@@ -129,3 +129,74 @@ test("Core - Storage - Parked windows: add, rename, drop tabs, take, forget to t
   assert.equal(stored.parkedWindows?.length, 0);
   assert.equal(await takeParkedWindow("p1"), undefined);
 });
+
+test("Core - Storage - Tags: add, edit, page tags, remove to trash, clear, restore last removal", async () => {
+  const stored: Partial<LocalStorageSchema> = {};
+  const calls: string[] = [];
+  Object.assign(globalThis, { chrome: makeChrome({ stored, calls }) });
+  const {
+    addTag,
+    clearTags,
+    editTag,
+    removeTagPagesToTrash,
+    removeTagsToTrash,
+    restoreTags,
+    setPageTagIds,
+    toggleTagOnPages,
+  } = await import("../../src/app/storage.ts");
+  const work = await addTag("work", "blue");
+  const bills = await addTag("bills", "yellow");
+  assert.ok(work && bills);
+  assert.equal(await addTag("WORK", "red"), undefined, "duplicate name writes nothing");
+  assert.deepEqual(
+    stored.tags?.map((tag) => tag.name),
+    ["work", "bills"],
+  );
+  assert.equal(await editTag(work.id, { name: "Work", color: "red" }), true);
+  assert.deepEqual(stored.tags?.[0], { id: work.id, name: "Work", color: "red" });
+  assert.equal(await editTag(work.id, { color: "red" }), false, "no change, no write");
+
+  assert.equal(await toggleTagOnPages(["https://a.test/", "https://b.test/#x"], work.id, true), true);
+  assert.deepEqual(stored.tagPages, [
+    { url: "https://a.test/", tagIds: [work.id] },
+    { url: "https://b.test/", tagIds: [work.id] },
+  ]);
+  assert.equal(await setPageTagIds("https://a.test/", [work.id, bills.id]), true);
+  assert.deepEqual(stored.tagPages?.[0]?.tagIds, [work.id, bills.id]);
+
+  assert.equal(await removeTagPagesToTrash(["https://b.test/"]), true);
+  assert.deepEqual(
+    stored.tagPages?.map((page) => page.url),
+    ["https://a.test/"],
+  );
+  assert.equal(stored.tagTrash?.length, 1);
+  assert.equal(await removeTagsToTrash([bills.id]), true);
+  assert.deepEqual(
+    stored.tags?.map((tag) => tag.id),
+    [work.id],
+  );
+  assert.deepEqual(stored.tagPages?.[0]?.tagIds, [work.id]);
+  assert.equal(stored.tagTrash?.length, 2);
+  assert.equal(await removeTagsToTrash(["nope"]), false);
+
+  assert.equal(await restoreTags(), true, "bills comes back with its page id");
+  assert.deepEqual(
+    stored.tags?.map((tag) => tag.id),
+    [work.id, bills.id],
+  );
+  assert.deepEqual(stored.tagPages?.[0]?.tagIds, [work.id, bills.id]);
+  assert.equal(await restoreTags(), true, "then the removed page");
+  assert.deepEqual(
+    stored.tagPages?.map((page) => page.url),
+    ["https://a.test/", "https://b.test/"],
+  );
+  assert.equal(await restoreTags(), false);
+
+  assert.equal(await clearTags(), true);
+  assert.deepEqual(stored.tags, []);
+  assert.deepEqual(stored.tagPages, []);
+  assert.equal(await restoreTags(), true, "Remove all is one undoable action");
+  assert.equal(stored.tags?.length, 2);
+  assert.equal(stored.tagPages?.length, 2);
+  assert.equal(await clearTags(), true, "clearing a filled list is a change");
+});

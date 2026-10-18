@@ -14,6 +14,7 @@ export function renderUiPrefs(state: AppState): void {
   getElementById("sortDirMode").value = state.ui.sortDirMode ?? "default";
   getElementById("groupByWindowTabsOrder").value = state.ui.groupByWindowTabsOrder ?? "same-as-window";
   getElementById("searchEmptyFilter").value = state.ui.searchEmptyFilter ?? "keep";
+  getElementById("tagPickOrder").value = state.ui.tagPickOrder ?? "stored";
   getElementById("theme").value = state.ui.theme ?? "auto";
   getElementById("showExperimental").checked = state.ui.showExperimental ?? false;
   getElementById("hideUpdateBanner").checked = state.ui.hideUpdateBanner ?? false;
@@ -133,6 +134,7 @@ const UI_FIELDS: UiField[] = [
   { id: "sortDirMode", prop: "value" },
   { id: "groupByWindowTabsOrder", prop: "value" },
   { id: "searchEmptyFilter", prop: "value" },
+  { id: "tagPickOrder", prop: "value" },
   { id: "theme", prop: "value", apply: (v) => applyTheme(String(v)) },
   { id: "historyNav", prop: "value" },
   { id: "showExperimental", prop: "checked" },

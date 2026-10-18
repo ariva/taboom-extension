@@ -132,13 +132,26 @@ interface GroupHeaderOptions {
   count: number;
   total: number;
   tabGroupId?: number | null;
+  tagHeader?: boolean; // group-tag: the marker is a square in the tag's color
   onMenu: WindowMenuOpener;
 }
 
 // clickable group header (any grouping): toggles collapse of the group's rows
 export function renderGroupHeader(
   groupKey: GroupKey,
-  { isCollapsed, collapsible, name, dotColor, tabs, noun, count, total, tabGroupId = null, onMenu }: GroupHeaderOptions,
+  {
+    isCollapsed,
+    collapsible,
+    name,
+    dotColor,
+    tabs,
+    noun,
+    count,
+    total,
+    tabGroupId = null,
+    tagHeader = false,
+    onMenu,
+  }: GroupHeaderOptions,
 ): HTMLElement {
   const header = document.createElement("div");
   header.className = "group-header";
@@ -179,7 +192,7 @@ export function renderGroupHeader(
     const dot = document.createElement("span");
     // tab-group headers get the SQUARE marker (groups are squares everywhere,
     // windows are circles)
-    dot.className = tabGroupId != null && tabGroupId !== -1 ? "tg-square" : "win-dot";
+    dot.className = (tabGroupId != null && tabGroupId !== -1) || tagHeader ? "tg-square" : "win-dot";
     if (dotColor) {
       dot.style.background = dotColor;
     } else {

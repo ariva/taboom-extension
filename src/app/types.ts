@@ -35,6 +35,41 @@ export interface Removal<T> {
 }
 export type KeepAliveRemoval = Removal<KeepAliveTab>;
 
+// ---------- tags (storage.local.tags[] + tagPages[]) ----------
+// A tag is a colored label; a page carries tag ids. Keyed by page address without the
+// fragment (tagPageKey) — like keep-alive, so a tag survives a restart and covers every
+// tab on that page, parked copies included.
+
+export interface Tag {
+  id: string;
+  name: string; // unique, case-insensitive (tagNameError)
+  color: string; // a chrome.tabGroups color name (TAG_COLORS); unknown reads grey
+  disabled?: boolean; // absent = on; off = kept with its pages in Settings, invisible everywhere else
+}
+
+export interface TagPage {
+  url: string; // tagPageKey of the page
+  tagIds: string[]; // never empty — a page with no tags leaves the list
+}
+
+// Settings → Tags header sort: a view order every tag list follows (dropdowns, pickers, quick
+// launch); the stored list order stays what drag changes. Absent = stored order
+export type TagSortKey = "color" | "name" | "pages";
+export interface TagSort {
+  key: TagSortKey;
+  dir: "asc" | "desc";
+}
+
+// Settings → Tags → "Tags order in pickers": how every tag list the user picks from is ordered
+// (the Tags… checklist, the Tags ▾ picker, the quick launch view, the page menu, the Add-page dropdown)
+export type TagPickOrder = "stored" | "name" | "used" | "table";
+
+// one undoable tag removal: whole tags (and the page ids they took with them) or whole pages
+export interface TagRemoval {
+  tags: Tag[];
+  pages: TagPage[];
+}
+
 // ---------- parked windows (storage.local.parkedWindows[]) ----------
 // A parked window is a closed window kept as data: its tabs in strip order, its tab
 // groups and its identity (name / color / pin), enough to rebuild it. Tabs carry no ids —
@@ -99,6 +134,8 @@ export interface UiPrefs {
   showExperimental: boolean;
   // not in DEFAULTS: experimental_-prefixed opt-out, read as true when absent (FUZZY_SEARCH)
   experimental_fuzzySearch?: boolean;
+  tagSort?: TagSort; // not in DEFAULTS: absent = no table sort (the stored tag order)
+  tagPickOrder: TagPickOrder;
 }
 
 // shape returned by loadState() and of DEFAULTS
@@ -123,6 +160,9 @@ export interface LocalStorageSchema {
   keepAliveTrash: KeepAliveRemoval[];
   parkedWindows: ParkedWindow[];
   parkedTrash: Removal<ParkedWindow>[]; // forgotten parked windows, newest last — Restore last removal
+  tags: Tag[];
+  tagPages: TagPage[];
+  tagTrash: Removal<TagRemoval>[]; // removed tags / tagged pages, newest last — Restore last removal
   windowProfiles: WindowProfiles;
   tabHistory: TabHistory;
   perfMetrics: PerfMetrics;
