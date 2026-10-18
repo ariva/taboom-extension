@@ -65,7 +65,10 @@ test("Demo - Stills - README shows every readme-* still and nothing else", () =>
   const names = [...stillsBySource().values()].flat().filter(isReadme);
   assert.ok(names.length > 0, "no readme-* stills: the README screenshots come from the readme scene");
   const page = readFileSync("README.md", "utf8");
-  const images = [...page.matchAll(/docs\/assets\/([a-z0-9_/-]+)\.png/g)].map((match) => match[1] ?? "");
+  const notScreenshots = ["bmc_qr"]; // the Buy Me a Coffee QR code: not a picture of the UI
+  const images = [...page.matchAll(/docs\/assets\/([a-z0-9_/-]+)\.png/g)]
+    .map((match) => match[1] ?? "")
+    .filter((image) => !notScreenshots.includes(image));
   assert.deepEqual(
     images.filter((image) => !names.includes(image.replace(/^features\//, ""))),
     [],

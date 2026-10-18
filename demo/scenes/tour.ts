@@ -7,6 +7,7 @@ export const tour: Scene = {
   gif: [0, 6],
   async run(stage) {
     await stage.caption("Taboom — 10 windows, 500 tabs, one side panel", 1800);
+    await stage.hover(stage.panel.locator("#search")); // off the window header: no hover tip in the still
     await stage.still("panel-overview");
     await stage.scrollList(900);
     await stage.scrollList(900);

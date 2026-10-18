@@ -10,6 +10,11 @@ Taboom - Tabs Manager frees memory by snoozing (discarding) tabs you haven't use
 
 * The [full feature demo](docs/assets/demo/taboom-demo.mp4) (MP4, ~4-5 minutes) walks through every feature with the matching Settings section beside the panel.
 
+## Buy me Pizza/Coffee/Tea
+* Like what I do? Taboom is free and stays free. If it saved you time or memory, you can support the next release: **[Buy me a coffee ☕](https://buymeacoffee.com/ariva)** — or scan the code.
+
+<p align="center"><a href="https://buymeacoffee.com/ariva"><img src="docs/assets/bmc_qr.png" alt="Buy me a coffee — QR code" width="140"></a></p>
+
 ## Installation
 
 ### Chrome Web Store
