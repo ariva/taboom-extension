@@ -1,5 +1,6 @@
 // Groups view of the windows popover: group rows, the "+ New group…" row, rename in
 // place, and drag & drop reordering of the list.
+import { isUnloaded } from "../../../app/core.ts";
 import { closest } from "../../../lib/dom.ts";
 import { inlineEdit } from "../../../lib/ui/inline-edit.ts";
 import { toast } from "../../../lib/ui/toast.ts";
@@ -52,7 +53,7 @@ export function fillGroupRows(groupList: TabGroup[]): void {
     const name = document.createElement("span");
     name.className = "win-title";
     name.textContent = group.title || "(unnamed group)";
-    const snoozed = tabs.filter((tab) => tab.discarded).length;
+    const snoozed = tabs.filter((tab) => isUnloaded(tab)).length;
     const awake = tabs.length - snoozed; // filter-chip terminology, like the Windows view
     const stats = document.createElement("span");
     stats.className = "win-stats muted";

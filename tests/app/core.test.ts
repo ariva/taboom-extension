@@ -4,6 +4,7 @@ import {
   formatAge,
   hostnameOf,
   isEligibleForAutoSnooze,
+  isUnloaded,
   isProtected,
   isSupportedUrl,
   makeRule,
@@ -49,6 +50,8 @@ test("Core - Eligibility", () => {
   assert.equal(isEligibleForAutoSnooze(tab(), settings, [], NOW), true);
   assert.equal(isEligibleForAutoSnooze(tab({ active: true }), settings, [], NOW), false);
   assert.equal(isEligibleForAutoSnooze(tab({ discarded: true }), settings, [], NOW), false);
+  // a session-restored tab Chrome has not loaded yet: status "unloaded", discarded false — nothing to free
+  assert.equal(isEligibleForAutoSnooze(tab({ status: "unloaded" }), settings, [], NOW), false);
   assert.equal(isEligibleForAutoSnooze(tab({ pinned: true }), settings, [], NOW), false);
   assert.equal(isEligibleForAutoSnooze(tab({ audible: true }), settings, [], NOW), false);
   assert.equal(isEligibleForAutoSnooze(tab({ id: undefined }), settings, [], NOW), false);
@@ -69,6 +72,14 @@ test("Core - Eligibility", () => {
   assert.equal(isEligibleForAutoSnooze(tab({ pinned: true, audible: true }), relaxed, [], NOW), true);
 });
 
+test("Core - isUnloaded: discarded by us, or restored by Chrome and never loaded", () => {
+  assert.equal(isUnloaded({ discarded: false, status: "complete" }), false);
+  assert.equal(isUnloaded({ discarded: true, status: "unloaded" }), true);
+  assert.equal(isUnloaded({ discarded: false, status: "unloaded" }), true, "session restore defers the load");
+  assert.equal(isUnloaded({ discarded: false, status: "loading" }), false);
+  assert.equal(isUnloaded({}), false, "a tab object without either field (sessions API) is not unloaded");
+});
+
 test("Core - SelectAutoSnoozeTargets respects minAwakePerWindow", () => {
   // window 1: active tab + 3 old eligible tabs = 4 awake
   const tabs = [
@@ -87,6 +98,9 @@ test("Core - SelectAutoSnoozeTargets respects minAwakePerWindow", () => {
   // window 1 discards oldest until 2 awake remain (ids 2,3); window 2 has
   // only 1 awake tab → nothing discarded there
   assert.deepEqual(selectAutoSnoozeTargets(tabs, keep2, [], NOW), [2, 3]);
+  // an unloaded (never loaded since restore) tab is not awake: it neither counts nor goes
+  const withUnloaded = [...tabs, tab({ id: 7, windowId: 1, lastAccessed: NOW - 9 * HOUR, status: "unloaded" })];
+  assert.deepEqual(selectAutoSnoozeTargets(withUnloaded, keep2, [], NOW), [2, 3]);
 
   const keep9 = { ...settings, minAwakePerWindow: 9 };
   assert.deepEqual(selectAutoSnoozeTargets(tabs, keep9, [], NOW), []);

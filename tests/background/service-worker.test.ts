@@ -233,6 +233,17 @@ test("Service Worker - Snooze-tab on active lone tab creates a focus-taker first
   assert.equal(tabs.find((t) => t.id === 4)?.discarded, true);
 });
 
+test("Service Worker - Snooze-tab leaves a restored-but-unloaded tab alone (nothing to free)", async () => {
+  const tab = tabs.find((t) => t.id === 2);
+  assert.ok(tab);
+  const before = { discarded: tab.discarded, status: tab.status };
+  Object.assign(tab, { discarded: false, status: "unloaded" }); // Chrome: session restore deferred the load
+  calls.length = 0;
+  await send({ type: "snooze-tab", tabId: 2 });
+  assert.equal(calls.filter((c) => c.startsWith("tabs.discard")).length, 0, "no discard of an unloaded tab");
+  Object.assign(tab, before);
+});
+
 test("Service Worker - Snooze-tab reports refusal as error response", async () => {
   const original = chrome.tabs.discard;
   chrome.tabs.discard = async (id) => ({ id, discarded: false }); // Chrome refused

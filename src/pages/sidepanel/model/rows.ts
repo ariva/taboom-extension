@@ -3,6 +3,7 @@
 import { formatAge, isSupportedUrl } from "../../../app/core.ts";
 import { tagColorHex, tagMatches, usesDarkText } from "../../../app/tags.ts";
 import type { Tag } from "../../../app/types.ts";
+import { isUnloaded } from "../../../app/core.ts";
 import { isSplit, type SplitEdge } from "../../../app/split.ts";
 import type { DerivedTabs, TabId } from "./derived.ts";
 import { highlightRanges } from "./search.ts";
@@ -91,14 +92,14 @@ const ROW_GAP = 0.375;
 const TEXT_SCALE = 0.85 / 0.77; // the host and age are set in the meta's font, badges in a smaller one
 
 export function badges(
-  tab: Pick<Tab, "discarded" | "pinned" | "audible" | "splitViewId">,
+  tab: Pick<Tab, "discarded" | "status" | "pinned" | "audible" | "splitViewId">,
   isProtectedTab: boolean,
   isKeptAliveTab = false,
   tags: Tag[] = [],
   hitTagIds: ReadonlySet<string> = new Set(),
 ): Badge[] {
   const list: Badge[] = [];
-  if (tab.discarded) {
+  if (isUnloaded(tab)) {
     list.push(["snoozed", "warn"]);
   }
   if (isProtectedTab) {
@@ -242,7 +243,7 @@ export function rowViewModel(
       )
       .map((tag) => tag.id),
   );
-  const title = (tab.discarded ? "⏸ " : "") + (tab.title || tab.url || "(untitled)");
+  const title = (isUnloaded(tab) ? "⏸ " : "") + (tab.title || tab.url || "(untitled)");
   const host = d.host || tab.url || "";
   const titleRanges = highlightRanges(title, queryTokens, fuzzy);
   const hostRanges = highlightRanges(host, queryTokens, fuzzy);
@@ -250,7 +251,7 @@ export function rowViewModel(
   // raw URL — say so, otherwise the row looks like a false positive
   const urlOnlyMatch = queryTokens.length > 0 && titleRanges.length === 0 && hostRanges.length === 0;
   const age = !tab.active && tab.lastAccessed ? formatAge(now - tab.lastAccessed) : null;
-  const canSnooze = !parked && !tab.discarded && isSupportedUrl(tab.url);
+  const canSnooze = !parked && !isUnloaded(tab) && isSupportedUrl(tab.url);
   const badgeList = fitTagPills(
     [
       ...(parked ? [["parked", ""] satisfies Badge] : []),
@@ -269,7 +270,7 @@ export function rowViewModel(
     classes: [
       "row",
       index === cursor && "cursor",
-      tab.discarded && "snoozed",
+      isUnloaded(tab) && "snoozed",
       tab.active && "active-tab",
       tab.active && tab.windowId === currentWindowId && "current",
       parked && "parked",

@@ -1,6 +1,6 @@
 // Snoozing (tab discard): the auto-snooze alarm and its pass, manual snooze of
 // one tab, and the manual-wake timestamps that reset the inactivity clock.
-import { isSupportedUrl, selectAutoSnoozeTargets } from "../app/core.ts";
+import { isSupportedUrl, isUnloaded, selectAutoSnoozeTargets } from "../app/core.ts";
 import { loadState, sessionStore } from "../app/storage.ts";
 import type { Settings } from "../app/types.ts";
 import { activeKeepAliveList } from "./keep-alive.ts";
@@ -55,13 +55,13 @@ export async function recordWakes(tabIds: number[]): Promise<void> {
 
 export async function snoozeTab(tabId: number): Promise<void> {
   const tab = await chrome.tabs.get(tabId);
-  if (tab.discarded || !isSupportedUrl(tab.url)) {
+  if (isUnloaded(tab) || !isSupportedUrl(tab.url)) {
     return;
   }
   if (tab.active) {
     // Chrome refuses to discard the active tab; activate a neighbor first.
     const tabs = await chrome.tabs.query({ windowId: tab.windowId });
-    const other = tabs.find((t) => t.id !== tabId && !t.discarded) ?? tabs.find((t) => t.id !== tabId);
+    const other = tabs.find((t) => t.id !== tabId && !isUnloaded(t)) ?? tabs.find((t) => t.id !== tabId);
     if (other) {
       await chrome.tabs.update(other.id, { active: true });
     } else {

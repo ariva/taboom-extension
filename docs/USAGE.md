@@ -6,9 +6,9 @@ Pictures of each feature: [Features](FEATURES.md).
 
 | Term | Meaning |
 |---|---|
-| **Snoozed** | Tab discarded from memory via `chrome.tabs.discard()`. Stays in the tab strip; Chrome reloads it when you click it. |
+| **Snoozed** | Tab discarded from memory via `chrome.tabs.discard()` — or a tab Chrome restored at startup and has not loaded yet (it reports `status: "unloaded"`, not `discarded`). Same thing either way: no memory held, stays in the tab strip, Chrome reloads it when you click it. |
 | **Protected** | Site excluded from automatic snoozing (and marked `autoDiscardable: false` so Chrome's own Memory Saver skips it too). |
-| **Awake** | Open tab that is not discarded. |
+| **Awake** | Open tab that is loaded (neither discarded nor unloaded). |
 
 Snoozing never closes tabs. Closing only happens when you explicitly close.
 

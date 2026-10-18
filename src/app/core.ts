@@ -137,6 +137,15 @@ export function isKeptAlive(list: KeepAliveTab[], url: string | undefined): bool
   return list.some((entry) => matchesKeepAlive(entry.url, url));
 }
 
+// Not loaded: discarded by us (chrome.tabs.discard) — or restored by Chrome at startup with
+// its load deferred, which reports status "unloaded" and discarded FALSE (Chromium
+// extension_tab_util.cc: "an unloaded tab [may] not be discarded (session restored tabs whose
+// loads have been deferred)"). Both hold no memory and reload on activation: one state to the user.
+// both fields are optional on chrome.tabs.Tab (a sessions-API tab has neither)
+export function isUnloaded(tab: { discarded?: boolean; status?: string }): boolean {
+  return tab.discarded === true || tab.status === "unloaded";
+}
+
 // wakeTimes: tabId → ms timestamp of a MANUAL wake — a reload of a discarded
 // tab leaves lastAccessed at its pre-snooze value, so without this the next
 // pass would re-snooze the tab the user just woke
@@ -154,8 +163,8 @@ export function isEligibleForAutoSnooze(
   if (tab.active) {
     return false;
   }
-  if (tab.discarded) {
-    return false;
+  if (isUnloaded(tab)) {
+    return false; // nothing to free
   }
   if (settings.excludePinned && tab.pinned) {
     return false;
@@ -204,7 +213,7 @@ export function selectAutoSnoozeTargets(
 
   const awakeByWindow = new Map<number, number>();
   for (const tab of tabs) {
-    if (!tab.discarded) {
+    if (!isUnloaded(tab)) {
       awakeByWindow.set(tab.windowId, (awakeByWindow.get(tab.windowId) ?? 0) + 1);
     }
   }

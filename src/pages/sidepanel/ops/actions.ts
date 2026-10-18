@@ -1,6 +1,7 @@
 // Tab actions: activate, snooze, wake, close, pin, protect / unprotect. Each one consumes
 // the tabs it acted on from the selection and refreshes the panel. copyUrls is the
 // exception: it touches no tab, so the selection stays.
+import { isUnloaded } from "../../../app/core.ts";
 import { send } from "../../../app/messages.ts";
 import { parkedRef } from "../../../app/parked.ts";
 import { pauseKeepAlive } from "../../../app/storage.ts";
@@ -53,7 +54,10 @@ export async function snooze(tabIds: number[]): Promise<void> {
 // background reload of snoozed tabs — wakes without switching to them;
 // non-discarded tabs are skipped so a mixed selection never force-reloads live pages
 export async function wake(tabIds: number[]): Promise<void> {
-  const snoozed = tabIds.filter((tabId) => state.allTabs.find((tab) => tab.id === tabId)?.discarded);
+  const snoozed = tabIds.filter((tabId) => {
+    const tab = state.allTabs.find((candidate) => candidate.id === tabId);
+    return tab !== undefined && isUnloaded(tab);
+  });
   await Promise.all(snoozed.map((tabId) => chrome.tabs.reload(tabId).catch(() => {})));
   if (snoozed.length > 0) {
     // reload keeps the old lastAccessed — tell the SW to restart their clocks

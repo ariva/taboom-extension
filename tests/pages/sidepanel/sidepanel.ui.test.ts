@@ -112,6 +112,29 @@ test("UI - Sidepanel - Current window's active tab is marked, other window's is 
   assert.match(must(other[0]).textContent, /Inbox/);
 });
 
+test("UI - Sidepanel - A tab Chrome restored but never loaded (status unloaded) shows as snoozed", async () => {
+  // Chrome: a session-restored tab whose load was deferred reports status "unloaded" with
+  // discarded false — no memory held, reloads on activation: the same thing as snoozed to the user
+  const inbox = must(tabs.find((tab) => tab.id === 3));
+  const statusBefore = inbox.status;
+  inbox.status = "unloaded";
+  await chrome.tabs.onUpdated.fire(3, { title: "Inbox" });
+  await new Promise((resolve) => setTimeout(resolve, 200));
+  const row = q(document, '.row[data-tab-id="3"]');
+  assert.ok(row.classList.contains("snoozed"), "dimmed like a snoozed row");
+  assert.ok(row.textContent.includes("⏸"), "the pause mark");
+  assert.ok(
+    qa(row, ".badge").some((el) => el.textContent === "snoozed"),
+    "the snoozed badge",
+  );
+  assert.equal(row.querySelector('[data-action="snooze"]'), null, "nothing to snooze");
+  assert.equal(q(document, '#filters button[data-filter="snoozed"] .count').textContent, "2", "counted as snoozed");
+  inbox.status = statusBefore;
+  await chrome.tabs.onUpdated.fire(3, { title: "Inbox" });
+  await new Promise((resolve) => setTimeout(resolve, 200));
+  assert.ok(!q(document, '.row[data-tab-id="3"]').classList.contains("snoozed"));
+});
+
 test("UI - Sidepanel - Badges: snoozed=warn, protected=ok, pinned plain", () => {
   assert.match(document.querySelector(".badge.warn")?.textContent ?? "", /snoozed/);
   assert.match(document.querySelector(".badge.ok")?.textContent ?? "", /protected/);

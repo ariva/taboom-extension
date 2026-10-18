@@ -1,5 +1,6 @@
 // Pure filter + sort selection: the filter / scope / sort value types, selectVisible
 // with its grouped and per-window orderings, and the filter-chip counts. No DOM, no chrome.*.
+import { isUnloaded } from "../../../app/core.ts";
 import { keepSplitPairsTogether } from "../../../app/split.ts";
 import type { UiPrefs } from "../../../app/types.ts";
 import type { DerivedTabs } from "./derived.ts";
@@ -62,10 +63,10 @@ export function selectVisible<T extends Tab>(tabs: T[], view: SelectView): T[] {
   // derived.get()! below: derived is built from these same tabs (deriveTabs, once per refresh)
   switch (filter) {
     case "awake":
-      result = result.filter((tab) => !tab.discarded);
+      result = result.filter((tab) => !isUnloaded(tab));
       break;
     case "snoozed":
-      result = result.filter((tab) => tab.discarded);
+      result = result.filter((tab) => isUnloaded(tab));
       break;
     case "protected":
       result = result.filter((tab) => derived.get(tab.id)!.protected);
@@ -213,7 +214,7 @@ export function countsByFilter(
 ): Record<FilterName, number> {
   const counts: Record<FilterName, number> = { all: tabs.length, awake: 0, snoozed: 0, protected: 0, tags: 0 };
   for (const tab of tabs) {
-    if (tab.discarded) {
+    if (isUnloaded(tab)) {
       counts.snoozed++;
     } else {
       counts.awake++;

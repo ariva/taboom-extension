@@ -1,6 +1,7 @@
 // Windows popover: the shell (view switch, open / close, click-away, right-click), the
 // Windows view and its row menu. Groups and Pins views live in windows-popover-*.ts;
 // the Alive view (keep-it-alive marks) lives in alive.ts and reuses the Pins rows.
+import { isUnloaded } from "../../../app/core.ts";
 import { send } from "../../../app/messages.ts";
 import { closest } from "../../../lib/dom.ts";
 import { askDialogContains } from "../../../lib/ui/ask-dialog.ts";
@@ -244,7 +245,7 @@ function fillWindowsPopover(): void {
 
   for (const windowId of orderedWindowIds(maps)) {
     const tabs = state.liveTabs.filter((tab) => tab.windowId === windowId);
-    const snoozed = tabs.filter((tab) => tab.discarded).length;
+    const snoozed = tabs.filter((tab) => isUnloaded(tab)).length;
     const awake = tabs.length - snoozed; // filter-chip terminology: awake = not snoozed
     const row = document.createElement("button");
     row.type = "button";
