@@ -14,6 +14,7 @@ const {
   ctxSubmenu,
   ctxTitle,
   hideCtxMenu,
+  hideCtxMenuForRender,
   isCtxMenuOpen,
   showCtxMenu,
 } = await import("../../../src/lib/ui/context-menu.ts");
@@ -75,6 +76,22 @@ test("Lib - UI - Context menu - A click elsewhere and a window blur dismiss the 
   showCtxMenu(at(0, 0));
   window.dispatchEvent(new Event("blur"));
   assert.equal(isCtxMenuOpen(), false);
+});
+
+test("Lib - UI - Context menu - A host re-render closes a menu unless it was shown as surviving renders", () => {
+  showCtxMenu(at(0, 0));
+  hideCtxMenuForRender();
+  assert.equal(isCtxMenuOpen(), false, "a list-bound menu goes: its ids are stale");
+  clearCtxMenu();
+  showCtxMenu(at(0, 0), "Close", { survivesRender: true });
+  hideCtxMenuForRender();
+  assert.equal(isCtxMenuOpen(), true, "a menu that depends on nothing in the list stays");
+  hideCtxMenu();
+  assert.equal(isCtxMenuOpen(), false, "the ordinary hide still works on it");
+  clearCtxMenu();
+  showCtxMenu(at(0, 0));
+  hideCtxMenuForRender();
+  assert.equal(isCtxMenuOpen(), false, "clear resets the flag for the next build");
 });
 
 test("Lib - UI - Context menu - Submenu: click toggles, the menu stays open, the caret mirrors the state", () => {

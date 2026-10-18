@@ -13,12 +13,23 @@ ctxMenu.hidden = true;
 ctxMenu.setAttribute("popover", "manual");
 document.body.append(ctxMenu);
 
+// set by showCtxMenu: a menu whose items depend on nothing the host re-renders (a toolbar
+// menu) stays open across the host's renders; a list-bound menu (row ids) must not
+let survivesRender = false;
+
 export function hideCtxMenu(): void {
   ctxMenu.hidden = true;
   try {
     ctxMenu.hidePopover();
   } catch {
     // not open / no popover API (tests) — the hidden attr already did the job
+  }
+}
+
+// the host re-rendered what the menu may refer to: close it, unless it was shown as surviving
+export function hideCtxMenuForRender(): void {
+  if (!survivesRender) {
+    hideCtxMenu();
   }
 }
 
@@ -34,6 +45,7 @@ export function ctxMenuContains(target: Node | null): boolean {
 // menu builders start from an empty menu, append their items, then showCtxMenu()
 export function clearCtxMenu(): void {
   ctxMenu.textContent = "";
+  survivesRender = false;
 }
 
 export function ctxAppend(...nodes: (Node | string)[]): void {
@@ -131,8 +143,13 @@ export function ctxDivider(): HTMLDivElement {
 
 // `at`: the pointer event, or a plain {clientX, clientY} for a menu anchored to a button.
 // `closeLabel`: a text button ("Close") instead of the corner X — for menus that behave
-// like a small panel rather than a right-click menu
-export function showCtxMenu(at: Pick<MouseEvent, "clientX" | "clientY">, closeLabel?: string): void {
+// like a small panel rather than a right-click menu. `survivesRender`: see hideCtxMenuForRender
+export function showCtxMenu(
+  at: Pick<MouseEvent, "clientX" | "clientY">,
+  closeLabel?: string,
+  options: { survivesRender?: boolean } = {},
+): void {
+  survivesRender = options.survivesRender ?? false;
   // every menu build ends here — stamp the close control in the top-right corner
   const close = document.createElement("button");
   close.type = "button";

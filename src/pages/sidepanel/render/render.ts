@@ -4,7 +4,7 @@
 import { splitPairEdges } from "../../../app/split.ts";
 import { enabledTags, splitTagQuery, tagColorHex } from "../../../app/tags.ts";
 import { FOLD_ICONS } from "../../../lib/dom.ts";
-import { hideCtxMenu } from "../../../lib/ui/context-menu.ts";
+import { hideCtxMenuForRender } from "../../../lib/ui/context-menu.ts";
 import {
   bulkBar,
   bulkCount,
@@ -92,7 +92,8 @@ function renderNowImpl(): void {
 function renderList(): void {
   // any re-render (selection change, tab/window events, background refresh)
   // invalidates the open context menu's ids — close it rather than act stale
-  hideCtxMenu();
+  // (the ☰ quick-actions menu names no row and stays: showCtxMenu's survivesRender)
+  hideCtxMenuForRender();
   // active search: chips count found items (what clicking each filter would show)
   const counted = state.query ? searchCandidates(state.allTabs, state) : state.allTabs;
   const byFilter = countsByFilter(counted, state.derived, state.tagFilter);

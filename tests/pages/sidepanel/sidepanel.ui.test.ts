@@ -1995,6 +1995,22 @@ test("UI - Sidepanel - Quick actions (☰): Open Settings opens the options page
   document.body.click();
   await tick();
 
+  // clicking the panel of an unfocused window focuses it: Chrome's windows.onFocusChanged
+  // refreshes the list — the menu depends on nothing in it, so it stays open (a row menu goes)
+  byId("quick-actions-btn").click();
+  await tick();
+  assert.equal(menu.hidden, false);
+  await chrome.windows.onFocusChanged.fire(1);
+  await new Promise((resolve) => setTimeout(resolve, 200)); // 150 ms refresh debounce + render
+  assert.equal(menu.hidden, false, "the quick-actions menu survives the refresh");
+  document.body.click();
+  await tick();
+  q(document, '.row[data-tab-id="1"]').dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+  assert.equal(menu.hidden, false);
+  await chrome.windows.onFocusChanged.fire(1);
+  await new Promise((resolve) => setTimeout(resolve, 200));
+  assert.equal(menu.hidden, true, "a row menu closes on a refresh: its ids are stale");
+
   byId("quick-actions-btn").click();
   await tick();
   must(qa(menu, ".ctx-item").find((el) => el.textContent === "Open Settings")).click();
