@@ -61,7 +61,7 @@ export async function runMenuClick(info: chrome.contextMenus.OnClickData, tab?: 
       }
       break;
     case "snooze-all-inactive":
-      await autoSnoozePass();
+      await autoSnoozePass(true);
       break;
     case KEEP_ALIVE_MENU_ID:
       if (tab && isSupportedUrl(tab.url)) {

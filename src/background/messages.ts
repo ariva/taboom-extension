@@ -24,7 +24,7 @@ export async function handleMessage(
     case "unprotect-urls":
       return unprotectUrls(message.urls);
     case "snooze-all-inactive":
-      return { snoozed: await autoSnoozePass() };
+      return { snoozed: await autoSnoozePass(true) };
     case "history-back":
       return historyStep(-1);
     case "history-forward":

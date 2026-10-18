@@ -55,7 +55,7 @@ Panel position (left or right) is a global Chrome setting: `chrome://settings/ap
 - **Hover actions** — ⏸ snooze, 🛡 protect/unprotect site, ✕ close.
 - **Checkboxes** — select several tabs, then bulk Snooze / Protect / Close from the bottom bar. Closing more than one tab asks for confirmation.
 - **Quick launch (▦)** — a popover headed **Quick launch** with a **Close** button (like the ☰ menu), then one view per thing worth switching between, each a tab with its count: **Windows** (only with two or more windows, or a parked one), **Groups** (only once a group exists — the first one comes from a row's **Move to group ▸ New group…**; the view's own **+ New group…** row adds more), **Pins**, **Tags**, **Alive** and **Dupes** (only while they have members). A single view shows as a heading; with nothing at all (one window, nothing else) the ▦ button is greyed out.
-- **Quick actions (☰)** — top-right menu (opening it closes any other popup: quick launch, history list, a dropdown): **Open Settings**, **Snooze inactive tabs now** (one automatic-snooze check right away with the Settings rules, timer on or off; the toast says how many tabs it snoozed), **Cleanup Duplicates (N)**, which runs *There can be only one* over every duplicated page at once (N = tabs it would close; greyed out when nothing is duplicated; confirmed first), and **Undo last remove in Parked windows**.
+- **Quick actions (☰)** — top-right menu (opening it closes any other popup: quick launch, history list, a dropdown): **Open Settings**, **Snooze inactive tabs now** (snoozes every tab the automatic-snooze rules allow, ignoring the inactivity threshold; the toast says how many), **Cleanup Duplicates (N)**, which runs *There can be only one* over every duplicated page at once (N = tabs it would close; greyed out when nothing is duplicated; confirmed first), and **Undo last remove in Parked windows**.
 - **Select all** — checkbox left of the scope selector selects/unselects every tab currently shown (i.e. matching the active search and filter). Search first, select all, then bulk-act.
 
 Keyboard: `/` focus search · `↑`/`↓` move selection · `Enter` activate · `Esc` clear search.
@@ -119,7 +119,7 @@ Additionally, each window keeps at least 2 awake tabs (configurable, 0 = no limi
 
 Toggle and tune everything in **Settings** (side panel ☰ → **Open Settings**, or the extension's Options page).
 
-No need to wait for the timer: **Settings → Automatic Snooze → Snooze inactive tabs now**, the side panel's ☰ → **Snooze inactive tabs now**, or right-click a page → Taboom - Tabs Manager → **Snooze all inactive tabs** runs one check immediately with the rules above and reports how many tabs it snoozed. All three work even while **Automatically snooze inactive tabs** is unticked — the toggle only stops the timer.
+No need to wait for the timer: **Settings → Automatic Snooze → Snooze inactive tabs now**, the side panel's ☰ → **Snooze inactive tabs now**, or right-click a page → Taboom - Tabs Manager → **Snooze all inactive tabs** snoozes right away every tab the rules above allow — not active, not pinned, not playing audio, not protected, not kept alive, not already snoozed, and the per-window minimum kept — as if each had already crossed the inactivity threshold (the "Inactive for" minutes do not apply), and reports how many tabs it snoozed. All three work even while **Automatically snooze inactive tabs** is unticked — the toggle only stops the timer.
 
 ## Protecting sites
 

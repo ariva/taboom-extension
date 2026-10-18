@@ -178,15 +178,41 @@ test("Service Worker - Auto-snooze off: the alarm pass does nothing, the explici
   await tick();
   assert.equal(calls.filter((c) => c.startsWith("tabs.discard")).length, 0, "timer respects the toggle");
 
-  // the Settings button and the context menu are explicit user actions: they run regardless
-  const response = await send({ type: "snooze-all-inactive" });
-  assert.deepEqual(response, { snoozed: 1 });
-  assert.deepEqual(
-    calls.filter((c) => c.startsWith("tabs.discard")),
-    ["tabs.discard 2"],
-  );
-  stored.settings.autoSnoozeEnabled = true;
-  tab.discarded = true; // restore the state the earlier pass left
+  // the Settings button and the context menu are explicit user actions: they run regardless,
+  // and the inactivity threshold does not apply (every rule but the clock still does)
+  const fresh = {
+    id: 6,
+    windowId: 1,
+    active: false,
+    discarded: false,
+    pinned: false,
+    audible: false,
+    autoDiscardable: true,
+    url: "https://fresh.example.com/",
+    title: "Fresh",
+    lastAccessed: NOW,
+  };
+  const pinnedFresh = { ...fresh, id: 7, pinned: true, url: "https://pinned.example.com/" };
+  tabs.push(fresh, pinnedFresh);
+  try {
+    const response = await send({ type: "snooze-all-inactive" });
+    assert.deepEqual(response, { snoozed: 2 });
+    assert.deepEqual(calls.filter((c) => c.startsWith("tabs.discard")).sort(), ["tabs.discard 2", "tabs.discard 6"]);
+
+    // the timer keeps the clock: the fresh tab survives an alarm pass
+    stored.settings.autoSnoozeEnabled = true;
+    fresh.discarded = false;
+    tab.discarded = true;
+    calls.length = 0;
+    await chrome.alarms.onAlarm.fire({ name: "auto-snooze" });
+    await tick();
+    await tick();
+    assert.equal(calls.filter((c) => c.startsWith("tabs.discard")).length, 0, "fresh tab not yet inactive");
+  } finally {
+    tabs.splice(tabs.indexOf(fresh), 2);
+    stored.settings.autoSnoozeEnabled = true;
+    tab.discarded = true; // restore the state the earlier pass left
+  }
 });
 
 // what the worker answers: the handler's response, or { error } when it threw / the type is unknown

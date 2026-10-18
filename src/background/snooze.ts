@@ -21,9 +21,12 @@ export function onAlarm(alarm: chrome.alarms.Alarm): void {
   }
 }
 
-// resolves with how many tabs were handed to discard()
-export async function autoSnoozePass(): Promise<number> {
+// resolves with how many tabs were handed to discard(). onDemand: the user asked
+// (Settings button, ☰ quick action, page menu) — every rule but the inactivity
+// clock applies, as if each tab had already crossed the threshold
+export async function autoSnoozePass(onDemand = false): Promise<number> {
   const state = await loadState();
+  const settings = onDemand ? { ...state.settings, inactivityMinutes: 0 } : state.settings;
   const [tabs, keepAlive] = await Promise.all([chrome.tabs.query({}), activeKeepAliveList()]);
   // manual wakes reset the inactivity clock (storage.session: survives SW
   // idle-death, gone with the browser session like the tabs themselves)
@@ -33,7 +36,7 @@ export async function autoSnoozePass(): Promise<number> {
   if (Object.keys(pruned).length !== Object.keys(wakeTimes).length) {
     await sessionStore.set({ wakeTimes: pruned });
   }
-  const targets = selectAutoSnoozeTargets(tabs, state.settings, state.protectionRules, Date.now(), pruned, keepAlive);
+  const targets = selectAutoSnoozeTargets(tabs, settings, state.protectionRules, Date.now(), pruned, keepAlive);
   await Promise.allSettled(
     targets.map((tabId) => chrome.tabs.discard(tabId).catch((error) => console.debug("discard failed", tabId, error))),
   );

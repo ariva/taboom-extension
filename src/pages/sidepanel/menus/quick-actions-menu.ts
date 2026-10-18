@@ -45,7 +45,8 @@ export function openQuickActionsMenu(at: Pick<MouseEvent, "clientX" | "clientY">
     toast(await snoozeInactiveNow());
     refresh(true); // discards arrive as tab events too, but the rows should not wait for them
   });
-  snoozeNow.title = "Run the automatic-snooze check right away with the Settings rules, timer on or off";
+  snoozeNow.title =
+    "Snooze every tab that is not active, pinned, playing audio, protected, kept alive or already snoozed — the inactivity threshold does not apply";
   ctxAppend(snoozeNow);
   if (duplicatesActive()) {
     const sets = allDuplicateSets();
