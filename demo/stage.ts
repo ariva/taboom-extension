@@ -6,7 +6,7 @@
 // and the Settings page, scrolled to the section a scene is about.
 import { join } from "node:path";
 import type { Locator, Page, Worker } from "@playwright/test";
-import type { World } from "./browser.ts";
+import { CAPTION_BAND, PANEL_VIEWPORT, type World } from "./browser.ts";
 
 export interface Stage {
   panel: Page;
@@ -39,7 +39,7 @@ interface OverlayApi {
   move: (x: number, y: number) => void;
   press: () => void;
   caption: (text: string) => void;
-  hidden: (hide: boolean) => void; // the whole overlay off while a still is taken
+  hidden: (hide: boolean) => void; // cursor, ring and caption off while a still is taken (the band strip stays)
 }
 type DemoWindow = Window & { __demo?: OverlayApi };
 interface StoryApi {
@@ -54,10 +54,14 @@ export interface Hidden {
 }
 
 // runs inside the panel page
-function installInPage(own: Hidden): void {
+function installInPage({ own, band }: { own: Hidden; band: number }): void {
   if (document.getElementById("demo-overlay")) {
     return;
   }
+  // the app keeps its full height above the band; the band is the caption's own strip
+  const reserve = document.createElement("style");
+  reserve.textContent = `body { height: calc(100vh - ${band}px) !important; }`;
+  document.head.append(reserve);
   const overlay = document.createElement("div");
   overlay.id = "demo-overlay";
   overlay.setAttribute("popover", "manual");
@@ -72,9 +76,12 @@ function installInPage(own: Hidden): void {
   ring.style.cssText =
     "position:absolute;left:0;top:0;width:34px;height:34px;margin:-17px 0 0 -17px;border-radius:50%;border:3px solid #ff6b35;opacity:0;transform:translate(200px,300px) scale(.4)";
   const caption = document.createElement("div");
+  const strip = document.createElement("div");
+  strip.style.cssText = `position:absolute;left:0;right:0;bottom:0;height:${band}px;background:#14161a`;
   caption.style.cssText =
-    "position:absolute;left:12px;right:12px;bottom:14px;padding:10px 14px;border-radius:10px;background:rgba(20,22,26,.9);color:#fff;font:600 15px/1.35 system-ui,sans-serif;text-align:center;opacity:0;transition:opacity 250ms;box-shadow:0 4px 16px rgba(0,0,0,.35)";
-  overlay.append(ring, cursor, caption);
+    "position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:0 16px;color:#fff;font:600 15px/1.35 system-ui,sans-serif;text-align:center;opacity:0;transition:opacity 250ms";
+  strip.append(caption);
+  overlay.append(ring, cursor, strip);
   document.body.append(overlay);
   const style = document.createElement("style");
   const rows = own.tabIds.flatMap((id) => [
@@ -126,7 +133,11 @@ function installInPage(own: Hidden): void {
       caption.style.opacity = "1";
     },
     hidden(hide) {
-      overlay.style.visibility = hide ? "hidden" : "";
+      // the strip stays: a still clips it away anyway, and the film must never show the
+      // page behind the band
+      for (const part of [cursor, ring, caption]) {
+        part.style.visibility = hide ? "hidden" : "";
+      }
     },
   };
   (window as DemoWindow).__demo = api; // the recorder's handle into the page (not part of the extension)
@@ -135,7 +146,7 @@ function installInPage(own: Hidden): void {
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 export async function installOverlay(panel: Page, own: Hidden): Promise<void> {
-  await panel.evaluate(installInPage, own);
+  await panel.evaluate(installInPage, { own, band: CAPTION_BAND });
 }
 
 // runs inside the Settings page: scroll to the card of the element, outline it for a moment
@@ -346,7 +357,12 @@ export function makeStage(
         await page.evaluate(() => window.scrollTo(0, 0));
         await sleep(250);
       }
-      await page.screenshot({ path: join(stillsDir, `${name}.png`) });
+      // a panel still is the app alone: the caption band below it is cut off
+      const clip =
+        pane === "panel"
+          ? { x: 0, y: 0, width: PANEL_VIEWPORT.width, height: PANEL_VIEWPORT.height - CAPTION_BAND }
+          : undefined;
+      await page.screenshot({ path: join(stillsDir, `${name}.png`), clip });
       if (height !== undefined && size) {
         await page.setViewportSize(size);
       }

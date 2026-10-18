@@ -22,6 +22,10 @@ world (seeded).
 
 ## Feature stills
 
+Captions are painted into a dark band below the panel (72 px, `CAPTION_BAND` in `demo/browser.ts`):
+the panel page runs 600×892 with its body held at 820 px, so a caption never covers the UI, in the
+film and in the GIF alike. Stills clip the band away.
+
 Scenes also take named screenshots where a feature is on screen — `stage.still("search-tag")`,
 or `stage.still("settings-tags", "settings")` for the Settings pane (`"settings", 1180` shoots the
 page from its top, that many px tall) — with the cursor and caption hidden.

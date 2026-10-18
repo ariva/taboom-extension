@@ -1,7 +1,36 @@
 # CHANGES
 
-## v1.0.5 — 2026-10-11
-TODO
+## v1.0.5 — 2026-10-18
+
+### Summary
+Custom tab tags, parked windows and a demo-driven documentation refresh
+
+### New Features
+- Add custom tab tags support (dcab258)
+- Add parked windows (b27f75f)
+- Show parked windows in the quick launch (d77524f)
+- Add parked windows as move targets in the tab menu (2feefd7)
+- Show the extension version in the settings heading (7612b1a)
+- Options - protected sites: hover a chip for "Exact host / Domain and its subdomains / Exact page: <pattern>" (92a2c58)
+
+### Fixes
+- Hide the single-window Windows view and empty Groups view from the quick launch (fe86a9f)
+- Rename the "All windows" scope option to "All open windows" (f758fbb)
+- Tags polishing (04d31a6)
+- Rework the Tags… picker and New tag dialog flow (29e7162)
+- Add a titled header to the quick launch popover (6c04db9)
+- Restore defaults / Delete all wording matches what they touch (96273fd)
+
+### Other
+- Add a support section to the `README.md` (fa93df4)
+- Add the demo recorder: a synthetic world filmed scene by scene into the feature demo MP4 and GIF (742bcc0)
+- Re-record the demo on every `just build` (`SKIP_DEMO=1` skips it) (742bcc0)
+- Add `just publish` as the release command: `just build` (7d9a825)
+- Add feature stills: named screenshots per scene published to `docs/assets/features/` (742bcc0)
+- Add `docs/FEATURES.md`, one picture per feature from those stills (742bcc0)
+- Add quick actions image to the `README.md` (f1a432f)
+- Reorder settings cards - Interface, Automatic Snooze, Customizations, Protected Sites, Keep Tabs Alive (ad10b97)
+- Versioned release zip names (c186dfd)
 
 ## v1.0.4 — 2026-10-11
 

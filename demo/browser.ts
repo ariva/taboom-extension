@@ -20,7 +20,10 @@ export interface Browser {
   close: () => Promise<void>;
 }
 
-export const PANEL_VIEWPORT = { width: 600, height: 820 };
+// the panel film: the 600×820 app plus a band below it where the captions go (stage.ts
+// paints them there, never over the panel); stills clip the band away
+export const CAPTION_BAND = 72;
+export const PANEL_VIEWPORT = { width: 600, height: 820 + CAPTION_BAND };
 export const WINDOW_VIEWPORT = { width: 920, height: 620 };
 // the two aside pages of the MP4's right column (encode.sh lays them out 1:1)
 export const STORY_VIEWPORT = { width: 768, height: 300 };

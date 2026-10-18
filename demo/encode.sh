@@ -34,7 +34,7 @@ if [[ -n "$STILLS_ONLY" ]]; then publish_stills; exit 0; fi
 
 # every pane is composed 1:1 at its viewport (demo/browser.ts *_VIEWPORT), PAD around and between
 PAD=24
-PANEL_W=600; PANEL_H=820
+PANEL_W=600; PANEL_H=892   # the 820 px app plus the 72 px caption band (demo/browser.ts CAPTION_BAND)
 STORY_W=768; STORY_H=300
 SETTINGS_W=768; SETTINGS_H=496
 CANVAS_W=$((PAD + PANEL_W + PAD + STORY_W + PAD)); CANVAS_H=$((PAD + PANEL_H + PAD))
