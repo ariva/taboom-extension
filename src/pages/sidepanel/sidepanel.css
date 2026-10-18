@@ -498,6 +498,11 @@ header input[type="checkbox"],
   box-shadow: var(--shadow-2);
 }
 #ask-dialog::backdrop { background: rgb(0 0 0 / 0.35); }
+/* corner ✕ (closeButton): the message keeps clear of it */
+#ask-dialog .ask-close { position: absolute; top: 0.375rem; right: 0.375rem; border: none; background: none; color: var(--muted); cursor: pointer; padding: 0.1875rem; border-radius: 0.25rem; display: inline-flex; }
+#ask-dialog .ask-close:hover { background: var(--badge-bg); }
+#ask-dialog .ask-close svg { width: 0.625rem; height: 0.625rem; }
+#ask-dialog .ask-close + .ask-message { padding-right: 1.5rem; }
 #ask-dialog .ask-message { margin: 0 0 0.5rem; overflow-wrap: anywhere; white-space: pre-line; }
 #ask-dialog .ask-check-label { display: flex; align-items: center; gap: 0.375rem; margin: 0 0 0.625rem; font-size: 0.8125rem; color: var(--muted); }
 #ask-dialog .ask-check { margin: 0; }
@@ -513,6 +518,8 @@ header input[type="checkbox"],
   border-radius: var(--radius-m);
 }
 #ask-dialog .ask-input:focus { outline: none; border-color: var(--accent); }
+/* validation under the input (New tag…: a taken name); the dialog stays open */
+#ask-dialog .ask-error { margin: -0.375rem 0 0.625rem; font-size: 0.8125rem; color: var(--danger, #d93025); }
 /* color swatches (New tag…): round chips, the picked one ringed */
 #ask-dialog .ask-swatches { display: flex; flex-wrap: wrap; gap: 0.375rem; margin: 0 0 0.625rem; }
 #ask-dialog .ask-swatch { width: 1.25rem; height: 1.25rem; border-radius: 50%; border: 0.125rem solid transparent; cursor: pointer; padding: 0; }
@@ -771,6 +778,11 @@ header input[type="checkbox"],
 
 /* the Tags… picker dims what is under it, like a dialog's backdrop */
 #tag-assign-pop::backdrop { background: rgb(0 0 0 / 0.25); }
+/* …and the page under it takes no hover: rows, their hover actions and the toolbar stay still (a
+   click outside still reaches the light dismiss — it lands on the body) */
+body.tag-picking header,
+body.tag-picking main,
+body.tag-picking #hover-tip { pointer-events: none; }
 /* TAGS: the chip's picker (under the chip) and the row menu's Tags… picker (at the click) — one tick per tag */
 #tags-pop,
 #tag-assign-pop {
@@ -800,10 +812,13 @@ header input[type="checkbox"],
 #tag-assign-pop .tag-pick-close { border: none; background: none; color: var(--muted); cursor: pointer; padding: 0.1875rem; border-radius: 0.25rem; display: inline-flex; }
 #tag-assign-pop .tag-pick-close:hover { background: var(--badge-bg); }
 #tag-assign-pop .tag-pick-close svg { width: 0.625rem; height: 0.625rem; }
-/* New tag…: a plain item under a divider, like the ticks above it */
-#tag-assign-pop .tag-pick-divider { border-top: 1px solid var(--border); margin: 0.25rem 0; }
-#tag-assign-pop .tag-new { display: block; width: 100%; text-align: left; border: none; border-radius: var(--radius-s); background: none; color: inherit; font: inherit; cursor: pointer; padding: 0.25rem 0.375rem; }
-#tag-assign-pop .tag-new:hover { background: var(--badge-bg); }
+/* Cancel / Apply under the list: only Apply writes the staged ticks */
+#tag-assign-pop .tag-pick-actions { display: flex; justify-content: flex-end; gap: 0.375rem; margin-top: 0.375rem; padding-top: 0.375rem; border-top: 1px solid var(--border); }
+#tag-assign-pop .tag-pick-actions button { border: 1px solid var(--border); border-radius: var(--radius-s); background: none; color: inherit; font: inherit; font-size: 0.8125rem; padding: 0.125rem 0.625rem; cursor: pointer; }
+#tag-assign-pop .tag-pick-actions button:hover { background: var(--badge-bg); }
+#tag-assign-pop .tag-pick-actions button:disabled { opacity: 0.45; cursor: default; filter: none; }
+#tag-assign-pop .tag-pick-actions .tag-pick-apply { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+#tag-assign-pop .tag-pick-actions .tag-pick-apply:hover { background: var(--accent); filter: brightness(1.1); }
 /* under the ticks, flush with them: a link, not a centered button */
 #tags-pop .tag-pick-clear { display: block; width: 100%; text-align: left; margin-top: 0.25rem; border: none; background: none; color: var(--accent); font: inherit; cursor: pointer; padding: 0.25rem 0.375rem; }
 

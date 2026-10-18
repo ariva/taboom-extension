@@ -2588,14 +2588,24 @@ test("UI - Sidepanel - TAGS: row menu Tags ▸ creates / toggles tags; badge, ch
     must(qa(menu, ".ctx-item").find((el) => el.textContent === "Tags…")).click();
   };
   const pickRow = (name: string) => must(qa(pick, ".tag-pick").find((el) => q(el, ".tag-name").textContent === name));
-  // New tag… from the picker: name + a color swatch; the new tag lands on the clicked tab
+  const newTag = (id: number) => {
+    rowOf(id).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+    must(qa(menu, ".ctx-item").find((el) => el.textContent === "New tag…")).click();
+  };
+  // the picker: title, ✕, no tags yet (New tag… is the row menu's own item)
   open(1);
   assert.equal(menu.hidden, true, "the menu closes; the picker takes its place");
   assert.equal(q(pick, ".tag-pick-title").textContent, "Tags");
   assert.ok(q(pick, ".tag-pick-close svg"), "a corner ✕ like the menu's");
   assert.equal(qa(pick, ".tag-pick").length, 0, "no tags yet");
-  q(pick, ".tag-new").click();
+  assert.equal(pick.querySelector(".tag-new"), null, "no New tag… in the picker");
+  q(pick, ".tag-pick-cancel").click();
+  assert.equal(menu.hidden, false, "Cancel brings the row menu back");
+  menu.hidden = true;
+  // New tag… from the row menu: name + a color swatch; the new tag lands on the clicked tab
+  newTag(1);
   assert.equal(ask.open, true, "the new-tag dialog opens");
+  assert.ok(q(ask, ".ask-close svg"), "a corner ✕ like the pickers");
   const swatches = qa(ask, ".ask-swatch");
   assert.equal(swatches.length, 9, "the nine group colors");
   assert.equal(q(ask, '.ask-swatch[aria-pressed="true"]').dataset.color, "blue", "blue preselected");
@@ -2614,23 +2624,57 @@ test("UI - Sidepanel - TAGS: row menu Tags ▸ creates / toggles tags; badge, ch
   assert.equal(badge.textContent, "Work");
   assert.equal(badge.style.background, "#188038", "solid fill in the tag color (happy-dom keeps the hex)");
   assert.equal(rowOf(2).querySelector(".badge.tag"), null);
-  // a duplicate name is refused with a toast, nothing written
-  open(2);
-  q(pick, ".tag-new").click();
+  // a duplicate name keeps the dialog open and says so under the input; nothing written
+  newTag(2);
   q<HTMLInputElement>(ask, ".ask-input").value = "work";
   q(ask, ".ask-ok").click();
   await tick();
   await tick();
+  assert.equal(ask.open, true, "the dialog stays open");
+  assert.match(q(ask, ".ask-error").textContent ?? "", /exists/);
+  assert.equal(q<HTMLElement>(ask, ".ask-error").hidden, false);
   assert.equal((await chrome.storage.local.get("tags")).tags?.length, 1, "no second tag");
-  assert.match(byId("toast").textContent ?? "", /exists/);
-  // the existing tag is a checkbox: ticked when the tab has it
+  q<HTMLInputElement>(ask, ".ask-input").value = "work2";
+  q(ask, ".ask-input").dispatchEvent(new window.Event("input", { bubbles: true }));
+  assert.equal(q<HTMLElement>(ask, ".ask-error").hidden, true, "typing clears the message");
+  q(ask, ".ask-cancel").click();
+  await tick();
+  await tick();
+  assert.equal(ask.open, false);
+  assert.equal(menu.hidden, false, "the Cancel button brings the row menu back");
+  menu.hidden = true;
+  // Esc just closes: no menu
+  newTag(2);
+  assert.equal(ask.open, true);
+  ask.dispatchEvent(new window.Event("cancel")); // what Esc fires on a native <dialog>
+  ask.close();
+  await tick();
+  await tick();
+  assert.equal(ask.open, false);
+  assert.equal(menu.hidden, true, "Esc does not bring the menu back");
+  // the existing tag is a checkbox: ticked when the tab has it; a tick is staged until Apply
   open(2);
   const workBox = q<HTMLInputElement>(pickRow("Work"), "input");
   assert.equal(workBox.checked, false);
+  assert.equal(q<HTMLButtonElement>(pick, ".tag-pick-apply").disabled, true, "nothing changed: Apply is off");
   workBox.click();
   await tick();
   await tick();
-  assert.equal(q(rowOf(2), ".badge.tag").textContent, "Work");
+  assert.equal(q<HTMLButtonElement>(pick, ".tag-pick-apply").disabled, false, "a change: Apply is on");
+  workBox.click(); // back to stored = no change
+  assert.equal(q<HTMLButtonElement>(pick, ".tag-pick-apply").disabled, true);
+  workBox.click();
+  assert.equal(rowOf(2).querySelector(".badge.tag"), null, "nothing written before Apply");
+  q(pick, ".tag-pick-cancel").click();
+  await tick();
+  assert.equal(menu.hidden, false, "…and the menu is back");
+  open(2);
+  assert.equal(q<HTMLInputElement>(pickRow("Work"), "input").checked, false, "Cancel dropped the tick");
+  q<HTMLInputElement>(pickRow("Work"), "input").click();
+  pick.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true })); // Enter = Apply
+  await tick();
+  await tick();
+  assert.equal(q(rowOf(2), ".badge.tag").textContent, "Work", "Enter applied it");
   open(2);
   assert.equal(q<HTMLInputElement>(pickRow("Work"), "input").checked, true);
   menu.hidden = true;
@@ -2677,9 +2721,10 @@ test("UI - Sidepanel - TAGS: row menu Tags ▸ creates / toggles tags; badge, ch
   sort.value = "recent";
   sort.dispatchEvent(new window.Event("change"));
   await tick();
-  // unticking removes the tag from the page; the badge goes
+  // unticking (and Apply) removes the tag from the page; the badge goes
   open(1);
   q<HTMLInputElement>(pickRow("Work"), "input").click();
+  q(pick, ".tag-pick-apply").click();
   await tick();
   await tick();
   assert.equal(rowOf(1).querySelector(".badge.tag"), null);
@@ -2697,8 +2742,7 @@ test("UI - Sidepanel - TAGS: the Tags chip opens a picker; ticks narrow the filt
   const rowOf = (id: number) => q(document, `.row[data-tab-id="${id}"]`);
   // a second tag on tab 3 (Work is on tab 2 from the test above)
   rowOf(3).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
-  must(qa(menu, ".ctx-item").find((el) => el.textContent === "Tags…")).click();
-  q(byId("tag-assign-pop"), ".tag-new").click();
+  must(qa(menu, ".ctx-item").find((el) => el.textContent === "New tag…")).click();
   const ask = byId<HTMLDialogElement>("ask-dialog");
   q<HTMLInputElement>(ask, ".ask-input").value = "bills";
   q(ask, ".ask-ok").click();

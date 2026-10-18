@@ -20,12 +20,6 @@ export function tagPageUrls(tabIds: number[]): string[] {
   });
 }
 
-// a tag stays on the page, not the row: the selection survives (nothing was consumed)
-export async function toggleTag(tabIds: number[], tagId: string, on: boolean): Promise<void> {
-  await toggleTagOnPages(tagPageUrls(tabIds), tagId, on);
-  refresh(true);
-}
-
 // quick launch row click: the list shows that tag alone (the chip's tick set becomes this tag)
 export function filterByTag(tagId: string): void {
   state.filter = "tags";
@@ -46,12 +40,26 @@ export async function removeTag(tagId: string): Promise<void> {
   refresh(true);
 }
 
-// New tag…: name + color in one dialog; the tag is created and applied to the rows at once
-export async function newTagForTabs(tabIds: number[]): Promise<void> {
+// New tag…: name + color in one dialog; the tag is created and applied to the rows at once.
+// reopen: the row menu the item came from — Cancel / ✕ bring it back (Esc, the backdrop and a
+// blur just close); at: where that menu was — the dialog opens there, not under the toolbar
+export async function newTagForTabs(
+  tabIds: number[],
+  reopen: (() => void) | null = null,
+  at: Pick<MouseEvent, "clientX" | "clientY"> | null = null,
+): Promise<void> {
   let color = "blue";
   const name = await askDialog({
     message: "New tag",
     input: { placeholder: "Tag name" },
+    near: at,
+    closeButton: true,
+    onCancel: (reason) => {
+      if (reason === "button") {
+        reopen?.();
+      }
+    },
+    validate: (value) => tagNameError(state.tags, value), // a taken name keeps the dialog open and says so
     swatches: {
       colors: TAG_SWATCHES,
       initial: color,
@@ -62,12 +70,7 @@ export async function newTagForTabs(tabIds: number[]): Promise<void> {
     okLabel: "Add",
   });
   if (typeof name !== "string") {
-    return;
-  }
-  const error = tagNameError(state.tags, name);
-  if (error) {
-    toast(error);
-    return;
+    return; // onCancel decided whether the menu comes back
   }
   const tag = await addTag(name, color);
   if (!tag) {

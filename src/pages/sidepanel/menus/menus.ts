@@ -109,7 +109,7 @@ export function openRowMenu(event: MouseEvent, tabId: number): void {
   }
   if (tagsActive()) {
     ctxAppend(ctxDivider());
-    appendTagItems(ids, event); // Tags…: the checklist picker over the clicked tab or the whole selection
+    appendTagItems(ids, event, () => openRowMenu(event, tabId)); // Tags…: the checklist picker over the clicked tab or the selection
   }
   ctxAppend(ctxDivider());
   const { btn, submenu } = ctxSubmenu(ids.length > 1 ? `Move ${ids.length} tabs to` : "Move tab to");

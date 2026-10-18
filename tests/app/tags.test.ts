@@ -87,11 +87,26 @@ test("Tags - renameTag / recolorTag: undefined for no change, unknown id or an i
   assert.equal(recolorTag(TAGS, "t1", "mauve"), undefined);
 });
 
-test("Tags - page keys: fragment dropped like keep-alive, typed addresses normalized, junk is empty", () => {
+test("Tags - page keys: fragment dropped, internal pages allowed, New Tab and junk are empty, typed addresses normalized", () => {
   assert.equal(tagPageKey("https://a.test/x#frag"), "https://a.test/x");
-  assert.equal(tagPageKey("chrome://extensions"), "");
+  assert.equal(
+    tagPageKey("chrome://extensions/"),
+    "chrome://extensions/",
+    "a label needs no reload: internal pages count",
+  );
+  assert.equal(
+    tagPageKey("chrome-extension://abc/src/pages/options/index.html"),
+    "chrome-extension://abc/src/pages/options/index.html",
+  );
+  assert.equal(tagPageKey("chrome://newtab/"), "", "every new tab shares it");
+  assert.equal(tagPageKey("chrome://new-tab-page/"), "");
+  assert.equal(tagPageKey("about:blank"), "");
+  assert.equal(tagPageKey(undefined), "");
+  assert.equal(tagPageKey("garbage"), "", "no scheme, no page");
   assert.equal(tagPageUrlFromInput(" a.test/x#frag "), "https://a.test/x");
-  assert.equal(tagPageUrlFromInput("not a url"), "");
+  assert.equal(tagPageUrlFromInput("chrome://settings/"), "chrome://settings/", "an internal address as typed");
+  assert.equal(tagPageUrlFromInput("not a url"), "", "spaces: URL() refuses it");
+  assert.equal(tagPageUrlFromInput("   "), "");
 });
 
 test("Tags - tagsForUrl: tag-list order, vanished ids skipped, fragment ignored", () => {

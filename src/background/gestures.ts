@@ -7,6 +7,7 @@ import { toggleSiteProtection } from "./protection.ts";
 import { autoSnoozePass, snoozeTab } from "./snooze.ts";
 import { historyJump, historyStep } from "./tab-history.ts";
 import { tagIdOfMenuItem, toggleTagForTab } from "./tags.ts";
+import { tagPageKey } from "../app/tags.ts";
 
 // commands.onCommand
 export async function runCommand(command: string): Promise<void> {
@@ -38,8 +39,8 @@ export async function runMenuClick(info: chrome.contextMenus.OnClickData, tab?: 
   }
   const tagId = tagIdOfMenuItem(info.menuItemId);
   if (tagId !== undefined) {
-    if (tab && isSupportedUrl(tab.url)) {
-      await toggleTagForTab(tab, tagId);
+    if (tab && tagPageKey(tab.url) !== "") {
+      await toggleTagForTab(tab, tagId); // any addressed page but New Tab
     }
     return;
   }

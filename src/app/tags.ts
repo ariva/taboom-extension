@@ -1,8 +1,7 @@
 // Tags as pure functions: the color table, the name rules, the tag list and tagged-page
 // edits, the undo stack hooks and the search token split. No DOM, no chrome.* — the side
 // panel, the options page and the worker all go through here.
-import { keepAliveKey } from "./core.ts";
-import { keepAliveUrlFromInput } from "./keep-alive.ts";
+import { duplicateKey, NEW_TAB_KEY } from "./duplicates.ts";
 import { popRemoval } from "./removal-trash.ts";
 import type { Removal, Tag, TagPage, TagPickOrder, TagRemoval, TagSort, TagSortKey } from "./types.ts";
 
@@ -125,14 +124,26 @@ export function moveTagTo(list: Tag[], draggedId: string, targetId: string): Tag
   return next;
 }
 
-// the key a page is tagged by: the address without its fragment, "" for unsupported urls
+// the key a page is tagged by: the address without its fragment. Any page with an address —
+// chrome:// and extension pages included (a label needs no reload, unlike keep-alive) — except
+// the New Tab page: every new tab shares that address, so a tag there would land on all of them
 export function tagPageKey(url: string | undefined): string {
-  return keepAliveKey(url);
+  const key = duplicateKey(url);
+  return key === NEW_TAB_KEY || !key.includes(":") ? "" : key;
 }
 
-// a typed address (options Add row): normalized like a tab url, fragment dropped
+// a typed address (options Add row): URL() normalizes as Chrome reports tab urls (lowercased
+// host, trailing slash), a bare host gets https; the fragment goes like for a tab
 export function tagPageUrlFromInput(text: string): string {
-  return tagPageKey(keepAliveUrlFromInput(text));
+  const trimmed = text.trim();
+  if (trimmed === "") {
+    return "";
+  }
+  try {
+    return tagPageKey(new URL(/^[a-z][a-z0-9+.-]*:/i.test(trimmed) ? trimmed : `https://${trimmed}`).href);
+  } catch {
+    return "";
+  }
 }
 
 function pageOf(pages: TagPage[], url: string | undefined): TagPage | undefined {

@@ -111,7 +111,7 @@ export function openParkedTabMenu(event: MouseEvent, tabId: number): void {
   ctxAppend(ctxItem(ids.length > 1 ? `Copy ${ids.length} URLs` : "Copy URL", () => copyUrls(ids)));
   if (tagsActive()) {
     ctxAppend(ctxDivider());
-    appendTagItems(ids, event); // tags follow the address: a parked row is tagged like a live tab
+    appendTagItems(ids, event, () => openParkedTabMenu(event, tabId)); // tags follow the address: a parked row is tagged like a live tab
   }
   ctxAppend(ctxDivider());
   // Move = opens there and leaves the snapshot; Open = a copy, the tab stays parked

@@ -68,7 +68,7 @@ The worker is stateless across suspensions: everything is recoverable from stora
 | `dnd/` | `tab-dnd.ts`, `drop-target.ts`, and the pure `dnd-model.ts` (`dropSpecFor`, `reorderedGroupTitles`) |
 | `history/` | `history-nav.ts` (back / forward buttons, history popover, long-press) |
 | `banners/` | `update-banner.ts`, `restore-banner.ts` |
-| `input/` | `list-events.ts`, `toolbar-events.ts`, `quick-actions.ts` (☰ button; its own file because `menus.ts` imports `toolbar-events.ts`), `tags-chip.ts` (the Tags chip's picker popover: ticks drive `state.tagFilter`), `tag-assign-picker.ts` (the row menu's Tags… checklist popover: one checkbox per tag for the clicked rows, New tag… under it, refilled on render), `keyboard-nav.ts`, `global-keys.ts` (capture-phase Esc), `live-updates.ts` (chrome tab / storage events → debounced refresh) |
+| `input/` | `list-events.ts`, `toolbar-events.ts`, `quick-actions.ts` (☰ button; its own file because `menus.ts` imports `toolbar-events.ts`), `tags-chip.ts` (the Tags chip's picker popover: ticks drive `state.tagFilter`), `tag-assign-picker.ts` (the row menu's Tags… checklist popover: one checkbox per tag for the clicked rows, ticks staged behind Cancel / Apply, refilled on render), `keyboard-nav.ts`, `global-keys.ts` (capture-phase Esc), `live-updates.ts` (chrome tab / storage events → debounced refresh) |
 
 Dependency direction: `foundation` ← `model` ← `ops` ← `menus` ← `windows-popover` / `dnd` / `input` ← `main.ts`.
 
@@ -90,7 +90,7 @@ Two things worth knowing before changing this folder:
 | `messaging.ts` | `createMessenger<Message, Responses>()` → typed `send()`. A message type without a response entry does not compile. |
 | `storage.ts` | `createStorage<Schema>(area)` → typed `get` / `set` / `remove` over `chrome.storage[area]`. |
 | `platform/capabilities.ts`, `platform/favicon.ts`, `platform/panel.ts` | The one browser-specific seam: feature detection, `_favicon/` URLs, side-panel open / toolbar behaviour. Chromium implementation only; app code asks for a capability, never for a browser name. |
-| `ui/ask-dialog.ts` | confirm / prompt on the native `<dialog>` |
+| `ui/ask-dialog.ts` | confirm / prompt on the native `<dialog>`, optional swatches and a `validate` hook (a message keeps it open) |
 | `ui/inline-edit.ts` | label → input editing, including "the press that ends an edit only ends the edit" |
 | `ui/context-menu.ts` | popover menu with hover-intent submenus |
 | `ui/dropdown.ts` | custom select that positions inside a side panel |

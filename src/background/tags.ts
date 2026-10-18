@@ -1,7 +1,7 @@
 // TAGS in the page context menu: a "Tag page ▸" submenu with one checkbox per tag
 // (existing tags only — tags are made in the side panel or Settings). The items follow
 // the tag list; the checks follow the active tab's page.
-import { applyExperimental, featureEnabled, isSupportedUrl } from "../app/core.ts";
+import { applyExperimental, featureEnabled } from "../app/core.ts";
 import { loadState, localStore, toggleTagOnPages } from "../app/storage.ts";
 import { orderedTags, tagPageKey, tagsForUrl } from "../app/tags.ts";
 import type { Tag } from "../app/types.ts";
@@ -10,7 +10,6 @@ import { getFeatures } from "./nav-mode.ts";
 
 export const TAG_MENU_ID = "tag-page";
 const TAG_ITEM_PREFIX = "tag-";
-const PAGE_PATTERNS = ["http://*/*", "https://*/*", "file://*/*"];
 
 export function tagIdOfMenuItem(menuItemId: string | number): string | undefined {
   return typeof menuItemId === "string" && menuItemId.startsWith(TAG_ITEM_PREFIX) && menuItemId !== TAG_MENU_ID
@@ -43,12 +42,12 @@ export async function createTagMenuItems(): Promise<void> {
     chrome.tabs.query({ active: true, lastFocusedWindow: true }),
   ]);
   const checked = new Set(tagsForUrl(tagPages, tags, active?.url).map((tag) => tag.id));
+  // no documentUrlPatterns: any page with an address can carry a tag (the click guards New Tab)
   chrome.contextMenus.create({
     id: TAG_MENU_ID,
     title: "Tag page",
     parentId: "root",
     contexts: ["page"],
-    documentUrlPatterns: PAGE_PATTERNS,
   });
   for (const tag of tags) {
     chrome.contextMenus.create({
@@ -58,7 +57,6 @@ export async function createTagMenuItems(): Promise<void> {
       type: "checkbox",
       checked: checked.has(tag.id),
       contexts: ["page"],
-      documentUrlPatterns: PAGE_PATTERNS,
     });
   }
 }
@@ -112,8 +110,8 @@ export async function syncTagMenuOnNavigation(
 // context menu click: flip that tag on the clicked page
 export async function toggleTagForTab(tab: chrome.tabs.Tab, tagId: string): Promise<void> {
   const key = tagPageKey(tab.url);
-  if (key === "" || !isSupportedUrl(tab.url)) {
-    return;
+  if (key === "") {
+    return; // the New Tab page, or no address
   }
   const { tags = [], tagPages = [] } = await localStore.get(["tags", "tagPages"]);
   const has = tagsForUrl(tagPages, tags, tab.url).some((tag) => tag.id === tagId);

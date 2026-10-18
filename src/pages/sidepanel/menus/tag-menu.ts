@@ -16,12 +16,13 @@ import { newTagForTabs, recolorTagById, removeTag, tagPageUrls } from "../ops/ta
 
 // Tags…: the checklist picker (input/tag-assign-picker.ts) opens at the click — ticking
 // several tags needs no re-opening, like Settings → Tagged pages
-export function appendTagItems(ids: number[], at: Pick<MouseEvent, "clientX" | "clientY">): void {
+export function appendTagItems(ids: number[], at: Pick<MouseEvent, "clientX" | "clientY">, reopen: () => void): void {
   if (tagPageUrls(ids).length === 0) {
     return; // nothing taggable (chrome:// pages)
   }
-  ctxAppend(ctxItem("Tags…", () => openTagAssignPicker(at, ids))); // the menu closes, the picker takes its place
-  ctxAppend(ctxItem("New tag…", () => newTagForTabs(ids))); // the picker offers it too; here it is one click
+  // the menu closes, the picker takes its place; Cancel / ✕ bring the menu back (reopen)
+  ctxAppend(ctxItem("Tags…", () => openTagAssignPicker(at, ids, reopen)));
+  ctxAppend(ctxItem("New tag…", () => newTagForTabs(ids, reopen, at))); // opens where the menu was; Cancel brings the menu back
 }
 
 // the quick launch's Tags rows: rename edits the row there
