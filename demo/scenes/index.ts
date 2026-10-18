@@ -16,7 +16,7 @@ export interface Scene {
   title: string;
   settings: string; // an #id of options/index.html: the Settings pane scrolls to its card when the scene starts
   newIn?: string; // the release this scene demonstrates something new of (CHANGES.md version)
-  covers?: RegExp; // which "### New Features" bullets of that release it stands for
+  covers?: RegExp; // which "### New Features" bullets of the current CHANGES.md entry it shows (new scene or not)
   gif?: [fromSec: number, toSec: number]; // the clip that goes into the short GIF
   stillsOnly?: true; // not filmed, no row in scenes.json: the scene only takes stills
   run: (stage: Stage) => Promise<void>;

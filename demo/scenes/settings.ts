@@ -6,6 +6,7 @@ export const settings: Scene = {
   id: "settings",
   title: "Settings",
   settings: "#page-title",
+  covers: /settings heading|protected sites/i, // the version in the heading, the protected-site chips
   async run(stage) {
     await stage.caption("Settings: look, automatic snooze, protected sites, keep-alive marks, tags", 1400);
     await stage.caption("Font size, density and theme — the panel follows at once", 600);

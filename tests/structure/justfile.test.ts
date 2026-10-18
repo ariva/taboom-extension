@@ -32,3 +32,10 @@ test("Tooling - Justfile - demo-stills takes the stills without filming, all by 
   assert.match(dryRun("demo-stills", "readme"), /node demo\/record\.ts --stills readme\n/, "readme only");
   assert.match(dryRun("demo-stills", "features"), /node demo\/record\.ts --stills features\n/, "features only");
 });
+
+test("Tooling - Justfile - build packs without the demo, publish records it", () => {
+  assert.match(dryRun("build"), /MINIFY= \.\/scripts\/build\.sh/, "build runs the gate");
+  assert.doesNotMatch(dryRun("build"), /RECORD_DEMO=1/, "build does not record");
+  assert.match(dryRun("publish"), /MINIFY= RECORD_DEMO=1 \.\/scripts\/build\.sh/, "publish records");
+  assert.match(dryRun("publish", "minify=true"), /MINIFY=1 RECORD_DEMO=1 \.\/scripts\/build\.sh/, "publish minified");
+});

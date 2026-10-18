@@ -65,9 +65,14 @@ dev:
 # store upload stays readable. just hands `minify=true` to the recipe as a literal argument, hence
 # the regex. Details and measurements: docs/BUILD.md
 # release gate (version, notes, hashes, check, browser tier) → pack dist/prod → e2e on the packed
-# build → demo re-recorded against it (`SKIP_DEMO=1 just build` skips the ~5 min recording)
+# build. No recording: docs/assets/demo/ and docs/assets/features/ stay as they are
 build minify="false":
     MINIFY={{ if minify =~ '^(minify=)?true$' { "1" } else { "" } }} ./scripts/build.sh
+
+# the same gate and zip, then the demo film, the feature stills and the README screenshots
+# re-recorded against the packed build (~5 min, needs ffmpeg) — what a release ships with
+publish minify="false":
+    MINIFY={{ if minify =~ '^(minify=)?true$' { "1" } else { "" } }} RECORD_DEMO=1 ./scripts/build.sh
 
 # remove dist/
 clean:

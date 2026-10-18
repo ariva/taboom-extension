@@ -35,8 +35,9 @@ fixed slugs, unique across scenes, at least one per scene (`tests/demo/stills.te
 
 ## Rerunning
 
-`just build` records and encodes as its last step, against the `dist/prod` it packed, so a
-release always ships with a current tour; `SKIP_DEMO=1 just build` skips that.
+`just publish` records and encodes as its last step, against the `dist/prod` it packed, so a
+release always ships with a current tour; a plain `just build` stops at the zip and keeps the
+previous film and screenshots.
 
 ```bash
 just demo                 # everything: build, record, encode

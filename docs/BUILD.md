@@ -14,8 +14,9 @@ Every command goes through [`just`](https://github.com/casey/just) — run `just
 | `just test`, `just test-enabled`, `just test-experimental`, `just test-disabled`, `just test-watch` | The unit + UI tier, whole or one flag scenario, or re-running on save. | See [TESTING.md](TESTING.md). |
 | `just test-browser` | Real-browser tier (headless Chromium). | Anything about focus, clicks, popovers, dialogs, drag & drop. |
 | `just test-e2e` | Builds `dist/prod`, then runs the Playwright tests against the real extension. | Anything that depends on what Chrome really does. |
-| `just build` | The release: every check below, then `dist/taboom-tabs-manager-v<version>.zip` (version from `package.json`), then the demo re-recorded against it. `SKIP_DEMO=1 just build` leaves the demo as it is. | Producing the store upload. |
-| `just build minify=true` | Same release gate, minified output: `dist/taboom-tabs-manager-v<version>-min.zip`. | Only if you want the smaller zip — see [Minified build](#minified-build). |
+| `just build` | The release gate: every check below, then `dist/taboom-tabs-manager-v<version>.zip` (version from `package.json`). No recording: `docs/assets/demo/` and `docs/assets/features/` keep their files. | A packed build to test or to repack quickly. |
+| `just build minify=true`, `just publish minify=true` | Same, minified output: `dist/taboom-tabs-manager-v<version>-min.zip`. | Only if you want the smaller zip — see [Minified build](#minified-build). |
+| `just publish` | `just build`, then the demo film, the feature stills and the README screenshots re-recorded against the packed build and copied into `docs/assets/` (about 5 minutes, needs ffmpeg). | Producing the store upload: a release ships with a current tour. |
 | `just lint`, `just typecheck`, `just format` | The pieces of `check` on their own; `format` applies Biome's formatting and safe fixes. | |
 | `just clean` | Removes `dist/`. | |
 | `just demo` | Builds `dist/prod`, records every demo scene against it in headless Chromium (a synthetic 10-window / 500-tab world) and encodes `dist/demo/<version>/taboom-<version>.mp4` (panel + four windows, every scene) and `.gif` (panel only, the short clips), copied to `docs/assets/demo/taboom-demo.mp4` / `.gif`, plus the feature stills and the README screenshots to `docs/assets/features/*.png`. About 5 minutes. `just demo scene=<id>` retakes one scene; `just demo-encode` re-encodes from the takes on disk; `just demo-stills [all|features|readme]` takes only the stills (feature stills, README screenshots, or both), no film. See [`demo/README.md`](../demo/README.md). | Release notes, README, store listing. |
@@ -52,7 +53,7 @@ Type errors appear in the same terminal but never block the rebuild — Vite onl
 
 ## The release build
 
-`just build` runs `scripts/build.sh`, which stops at the first failure:
+`just build` runs `scripts/build.sh` (`just publish` the same with `RECORD_DEMO=1`), which stops at the first failure:
 
 1. `scripts/validate_versions.sh` — the version in `package.json` (the only place it lives) is newer than the latest `release-v*` git tag, and `CHANGES.md` has an entry for it.
 2. `scripts/validate_hashes.sh` — every commit hash mentioned in `CHANGES.md` exists in git history.
@@ -60,11 +61,11 @@ Type errors appear in the same terminal but never block the rebuild — Vite onl
 4. `just test-browser`.
 5. `scripts/pack.sh` — production build into `dist/prod`, zipped to `dist/taboom-tabs-manager-v<version>.zip`.
 6. `npx playwright test` — the e2e tests, against the `dist/prod` that was just packed.
-7. `node demo/record.ts` + `demo/encode.sh` — the feature demo, filmed against that same `dist/prod` and copied to `docs/assets/demo/`, with the feature stills and the README screenshots (`readme-*`) to `docs/assets/features/` (about 5 minutes, needs ffmpeg). A scene that fails the release. `SKIP_DEMO=1 just build` skips this step and keeps the previous recording.
+7. `node demo/record.ts` + `demo/encode.sh` — the feature demo, filmed against that same `dist/prod` and copied to `docs/assets/demo/`, with the feature stills and the README screenshots (`readme-*`) to `docs/assets/features/` (about 5 minutes, needs ffmpeg). A scene that fails fails the release. Only `just publish` runs this step; `just build` stops after step 6 and keeps the previous recording.
 
 Inside step 3, the test suite also pins what ships: the zip's file list and manifest, no dev or tooling files, no dev-loop or network code, no source maps.
 
-To cut a release: bump `version` in `package.json`, write the `CHANGES.md` entry, run `just build`, tag `release-v<version>`.
+To cut a release: bump `version` in `package.json`, write the `CHANGES.md` entry, run `just publish`, tag `release-v<version>`.
 
 ## Minified build
 
