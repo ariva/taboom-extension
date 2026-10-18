@@ -102,3 +102,21 @@ test("dragging a group row onto another reorders the list and saves the order by
   ).toBe(true);
   expect(popoverOpen()).toBe(true);
 });
+
+test("a Space typed into a quick launch rename stays a Space: the row button under the input must not activate", async () => {
+  if (!popoverOpen()) {
+    await userEvent.click(document.getElementById("win-list-btn") as HTMLElement);
+  }
+  await userEvent.click(byText("#windows-pop .win-view", "Windows"));
+  const row = document.querySelector('#windows-pop .win-row[data-window-id="2"]') as HTMLElement;
+  await userEvent.hover(row);
+  await userEvent.click(row.nextElementSibling as HTMLElement); // the row's ⋯
+  await userEvent.click(byText("#ctx-menu .ctx-item", "Rename window…"));
+  await userEvent.keyboard("Side projects");
+  await settle();
+  const input = document.querySelector("#windows-pop .rename-input") as HTMLInputElement | null;
+  expect(popoverOpen()).toBe(true); // the Space keyup used to bubble to the <button> row and "click" it: popover closed, window focused
+  expect(input?.value).toBe("Side projects");
+  await userEvent.keyboard("{Escape}");
+  await settle();
+});

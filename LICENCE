@@ -1,28 +1,31 @@
 Taboom — Tabs Manager
 Copyright (c) 2026 Arunas Ivanauskas. All rights reserved.
 
-Personal, Non-Commercial Licence
+Non-Monetized Use Licence
 
 1. Grant
-   Permission is hereby granted, free of charge, to any person obtaining a copy
-   of this software and associated files (the "Software") to use, copy, modify,
-   and run the Software for personal, non-commercial purposes only, subject to
-   the conditions below.
+   Permission is hereby granted, free of charge, to any person or organisation
+   obtaining a copy of this software and associated files (the "Software") to
+   use, copy, modify, and run the Software as a browser extension, for personal
+   use or in the course of business, provided the Software itself is not
+   monetized, subject to the conditions below.
 
-2. Non-commercial use
-   "Non-commercial" means use that is not intended for, or directed toward,
-   commercial advantage or monetary compensation. This includes private use,
-   study, evaluation, and personal projects that generate no revenue.
+2. Non-monetized use
+   "Non-monetized" means that no one is charged for the Software or for access
+   to it, and the Software is not offered as part of anything that is charged
+   for. Installing and using the Software at work, in a company or in an
+   organisation, free of charge, is non-monetized use and needs no permission.
 
-3. Commercial use
-   Any commercial use of the Software, in whole or in part, requires the prior
-   explicit written permission of the copyright holder. Commercial use includes,
-   without limitation: selling, licensing, or otherwise distributing the
-   Software or derivative works for a fee; using the Software within a business
-   or organisation as part of paid products or services; and publishing the
-   Software or derivative works on any extension store or marketplace.
+3. Monetized use
+   Monetizing the Software, in whole or in part, requires the prior explicit
+   written permission of the copyright holder. Monetizing includes, without
+   limitation: selling, licensing, renting or otherwise distributing the
+   Software or derivative works for a fee; offering the Software or derivative
+   works as part of a paid product, subscription or service; publishing the
+   Software or derivative works on any extension store or marketplace for a
+   fee; and placing advertising, sponsorship or paid features in it.
 
-   Requests for commercial permission:
+   Requests for permission:
      Arunas Ivanauskas
      arunas.work.hg@gmail.com
 

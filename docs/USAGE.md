@@ -1,5 +1,7 @@
 # Using Taboom - Tabs Manager
 
+Pictures of each feature: [Features](FEATURES.md).
+
 ## Concepts
 
 | Term | Meaning |

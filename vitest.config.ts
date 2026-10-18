@@ -16,6 +16,7 @@ const FLAG_INDEPENDENT = [
   "tests/lib/**/*.test.*",
   "tests/tooling/**/*.test.*",
   "tests/structure/**/*.test.*",
+  "tests/demo/**/*.test.*",
   "tests/pages/options/page-state.test.*",
   "tests/pages/sidepanel/foundation/**/*.test.*",
   "tests/pages/sidepanel/dnd/**/*.test.*",

@@ -10,6 +10,7 @@
       "src/**",
       "tooling/**",
       "tests/**",
+      "demo/**",
       "*.config.ts",
       "!tests/fixtures",
       "!**/*.html",

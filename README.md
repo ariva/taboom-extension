@@ -4,6 +4,12 @@ Search, protect, and snooze inactive Chrome tabs.
 
 Taboom - Tabs Manager frees memory by snoozing (discarding) tabs you haven't used in a while — they stay in the tab strip and reload when clicked, nothing is ever closed automatically. A side panel lists all your tabs with instant search, filters, and bulk actions; sites that lose state on reload can be protected from snoozing. TypeScript, no runtime dependencies, runs fully locally with no telemetry.
 
+<p align="center">
+  <img src="docs/assets/demo/taboom-demo.gif" alt="Taboom in 30 seconds: tags, the side panel, search, windows" width="480">
+</p>
+
+* The [full feature demo](docs/assets/demo/taboom-demo.mp4) (MP4, ~4-5 minutes) walks through every feature with the matching Settings section beside the panel.
+
 ## Installation
 
 ### Chrome Web Store
@@ -51,19 +57,22 @@ Nothing else is requested: Taboom cannot read or modify page content, cannot see
 Side panel:
 
 <p>
-  <img src="docs/assets/sidemenu_quicklaunch.png" alt="Side panel - Quick Launch" width="360">
-  <img src="docs/assets/quick_actions.png" alt="Side panel - Quick actions menu" width="360">
-  <img src="docs/assets/sidemenu.png" alt="Side panel" width="360">
+  <img src="docs/assets/features/readme-panel.png" alt="Side panel" width="360">
+  <img src="docs/assets/features/readme-quick-launch.png" alt="Side panel - Quick launch" width="360">
+  <img src="docs/assets/features/readme-quick-actions.png" alt="Side panel - Quick actions menu" width="360">
 </p>
 
 Options page:
 
-<img src="docs/assets/options.png" alt="Options" width="460">
+<img src="docs/assets/features/readme-settings.png" alt="Settings" width="460">
+
+More in [Features](docs/FEATURES.md) — the demo retakes every screenshot on each build.
 
 ## Documentation
 
 - [Installation](docs/INSTALL.md) — load unpacked in Chrome, requirements, troubleshooting.
   After installing, pin the Taboom - Tabs Manager icon via Chrome's puzzle-piece (🧩) menu so the side panel is always one click away.
+- [Features](docs/FEATURES.md) — one picture per feature, the demo's own stills, with links into Usage.
 - [Usage](docs/USAGE.md) — concepts, side panel, automatic snooze, protection rules, verifying freed memory.
 - [Building](docs/BUILD.md) — every build command, what a build produces, the dev loop, the release checks, the optional minified build (with measurements).
 - [Architecture](docs/ARCHITECTURE.md) — how the code is layered: service worker, side panel, options, the generic library, build and release.
@@ -71,4 +80,4 @@ Options page:
 
 ## Licence
 
-Free for personal, non-commercial use. Commercial use requires explicit permission from Arunas Ivanauskas (arunas.work.hg [ AT ] [g] [m] [a] [i] [l] [.] [c] [o] [m]). See [LICENCE](LICENCE).
+Free to use as a Chrome extension, personally or at work, as long as the extension itself is not monetized. Monetizing it in any form — selling it, charging for it, bundling it into a paid product or service, or publishing it on a store for a fee — requires explicit permission from Arunas Ivanauskas (arunas.work.hg [ AT ] [g] [m] [a] [i] [l] [.] [c] [o] [m]). See [LICENCE](LICENCE).

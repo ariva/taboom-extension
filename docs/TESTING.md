@@ -69,8 +69,11 @@ Tests that do not depend on flags (tooling, release packaging, changelog format)
 | `tests/e2e/` | Playwright on the built extension: `smoke.spec.ts`, `behaviour.spec.ts`; `fixtures.ts` is a generic "one unpacked MV3 extension" fixture. Sites are faked with `context.route` on `*.test` hosts — no network. Keep this tier small (seconds, under ~10 tests): UI behaviour belongs in `tests/browser/` |
 | `tests/helpers/` | `chrome-mock.ts` — the typed `chrome.*` stub (capturing events, flat call log), browser-safe, shared by the ui and browser tiers; `ui.ts` — happy-dom harness: `loadPage("src/pages/…/index.html")` (repo-root-relative), binds the mock to the current flag scenario |
 | `tests/fixtures/` | `release-snapshot.json` |
+| `tests/demo/` | `registry.test.ts` — the demo recorder's scene registry: unique ids, every `### New Features` bullet of the current `CHANGES.md` entry has a scene marked new for that release, the GIF clips fit the 30 s budget, every scene's Settings anchor is an id of the options page |
 
-Which tests run per flag scenario and which run once is decided in `vitest.config.ts` (`FLAG_DEPENDENT` / `FLAG_INDEPENDENT`): `lib/`, `tooling/`, `structure/` and the pure page units run once; `app/`, `background/` and the rest of `pages/` run three times.
+Which tests run per flag scenario and which run once is decided in `vitest.config.ts` (`FLAG_DEPENDENT` / `FLAG_INDEPENDENT`): `lib/`, `tooling/`, `structure/`, `demo/` and the pure page units run once; `app/`, `background/` and the rest of `pages/` run three times.
+
+Not a test tier but built on the same Playwright setup: `demo/` records the feature demos (`just demo`, [`demo/README.md`](../demo/README.md)). It drives the built extension like `tests/e2e/` does and found two shipped bugs on its first run (a merged CSS selector, a Space keyup activating the quick launch row under a rename input) — when a scene looks wrong, suspect the extension before the scene.
 
 ## Conventions
 

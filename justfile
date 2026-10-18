@@ -64,10 +64,31 @@ dev:
 # `just build minify=true` (or `just build true`) packs a minified copy instead (…-min.zip); the
 # store upload stays readable. just hands `minify=true` to the recipe as a literal argument, hence
 # the regex. Details and measurements: docs/BUILD.md
-# release gate (version, notes, hashes, check, browser tier) → pack dist/prod → e2e on the packed build
+# release gate (version, notes, hashes, check, browser tier) → pack dist/prod → e2e on the packed
+# build → demo re-recorded against it (`SKIP_DEMO=1 just build` skips the ~5 min recording)
 build minify="false":
     MINIFY={{ if minify =~ '^(minify=)?true$' { "1" } else { "" } }} ./scripts/build.sh
 
 # remove dist/
 clean:
     rm -rf dist
+
+# Feature demo recordings (demo/README.md): a synthetic 10-window / 500-tab world in headless
+# Chromium, scenes filmed per window, ffmpeg composes dist/demo/<version>/taboom-<version>.mp4
+# (panel + four windows, every scene) and .gif (panel only, the short clips).
+# record every scene and encode both files — `just demo scene=search` retakes one scene
+demo scene="":
+    npx vite build --logLevel warn
+    node demo/record.ts {{ if scene != "" { "--scene " + scene } else { "" } }}
+    ./demo/encode.sh
+
+# re-encode the MP4 and GIF from the takes on disk (no browser)
+demo-encode:
+    ./demo/encode.sh
+
+# only the stills, no film, no ffmpeg: `all` (default) = the feature stills of every scene and
+# the README screenshots, `features` or `readme` = one of the two, published to docs/assets/features/
+demo-stills what="all":
+    npx vite build --logLevel warn
+    node demo/record.ts --stills {{ what }}
+    ./demo/encode.sh --stills

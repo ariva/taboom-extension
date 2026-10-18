@@ -61,6 +61,16 @@ export function inlineEdit(label: Element, { initial, placeholder, commit, finis
       input.blur();
     }
   });
+  // the label may sit inside a <button> (quick launch rows): Blink runs the button's default
+  // Space-keyup activation for the whole event path, stopPropagation or not — only
+  // preventDefault keeps the row from "clicking" (popover closed, window focused) mid-rename;
+  // the character itself was inserted on keydown, so nothing is lost
+  input.addEventListener("keyup", (event) => {
+    event.stopPropagation();
+    if (event.key === " ") {
+      event.preventDefault();
+    }
+  });
   input.addEventListener("blur", async () => {
     swallowNextClick = pressInFlight; // blurred by a press: that click is spent on ending the edit
     if (!cancelled) {

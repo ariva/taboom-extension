@@ -26,3 +26,9 @@ test("Tooling - Justfile - build minify=true really turns minification on", () =
     );
   }
 });
+
+test("Tooling - Justfile - demo-stills takes the stills without filming, all by default", () => {
+  assert.match(dryRun("demo-stills"), /node demo\/record\.ts --stills all\n.*encode\.sh --stills/, "no arg: all");
+  assert.match(dryRun("demo-stills", "readme"), /node demo\/record\.ts --stills readme\n/, "readme only");
+  assert.match(dryRun("demo-stills", "features"), /node demo\/record\.ts --stills features\n/, "features only");
+});

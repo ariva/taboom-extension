@@ -240,10 +240,10 @@ main.compact .row.in-group { padding: 0.1875rem 0.5rem 0.1875rem 1.5625rem; }
    sub-pixel difference between the measured fit and the layout */
 .row .host { flex: 1 1 6rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .row .age { flex: none; white-space: nowrap; } /* "1h 0m" never folds: only the host gives way */
+/* the tip's states and tags lines: the same pills as the rows, each on its own line */
+#hover-tip .tip-states, #hover-tip .tip-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem; margin-top: 0.25rem; }
 /* search-match highlight — bold yellow text, no background (rows + hover tip) */
 .row mark,
-/* the tip's tags line: the same pills as the rows, on their own line under the states */
-#hover-tip .tip-states, #hover-tip .tip-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem; margin-top: 0.25rem; }
 #hover-tip mark {
   background: none;
   font-weight: 700;
