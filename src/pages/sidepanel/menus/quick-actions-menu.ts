@@ -1,8 +1,11 @@
-// The titlebar's ☰ menu: Open Settings and Cleanup Duplicates ("There can be only one"
-// over every duplicated page). Items carry an icon — the shared ctx menu is text-only
-// elsewhere, so the svg is prepended here.
+// The titlebar's ☰ menu: Open Settings, Snooze inactive tabs now and Cleanup Duplicates
+// ("There can be only one" over every duplicated page). Items carry an icon — the shared
+// ctx menu is text-only elsewhere, so the svg is prepended here.
 import { duplicatesToClose } from "../../../app/duplicates.ts";
+import { snoozeInactiveNow } from "../../../app/snooze-now.ts";
 import { clearCtxMenu, ctxAppend, ctxDivider, ctxItem, ctxTitle, showCtxMenu } from "../../../lib/ui/context-menu.ts";
+import { toast } from "../../../lib/ui/toast.ts";
+import { refresh } from "../foundation/scheduler.ts";
 import { duplicatesActive, parkedActive, state } from "../foundation/state.ts";
 import { allDuplicateSets, cleanupAllDuplicates, keeperContext } from "../ops/duplicate-ops.ts";
 import { restoreLastForgotten } from "../ops/parked-ops.ts";
@@ -13,6 +16,8 @@ const GEAR =
 // (2..22) like the gear so the two icons read the same size at the same box
 const DUPES =
   '<rect x="10" y="10" width="12" height="12" rx="2"/><path d="M16 10V4a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h6"/><path d="M13.5 13.5l5 5M18.5 13.5l-5 5"/>';
+// a crescent moon, same one as the Settings button: one auto-snooze pass right now
+const MOON = '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>';
 // an undo arrow: bring a forgotten parked window back
 const UNDO = '<path d="M3 7v6h6"/><path d="M3 13a9 9 0 1 0 3-7.7L3 7"/>';
 
@@ -36,6 +41,12 @@ export function openQuickActionsMenu(at: Pick<MouseEvent, "clientX" | "clientY">
   // a title like every other menu: names the menu and keeps the first item clear of the ✕
   ctxAppend(ctxTitle("Quick actions"), ctxDivider());
   ctxAppend(iconItem(GEAR, "Open Settings", () => chrome.runtime.openOptionsPage()));
+  const snoozeNow = iconItem(MOON, "Snooze inactive tabs now", async () => {
+    toast(await snoozeInactiveNow());
+    refresh(true); // discards arrive as tab events too, but the rows should not wait for them
+  });
+  snoozeNow.title = "Run the automatic-snooze check right away with the Settings rules, timer on or off";
+  ctxAppend(snoozeNow);
   if (duplicatesActive()) {
     const sets = allDuplicateSets();
     const count = sets.reduce((sum, set) => sum + duplicatesToClose(set, "one", keeperContext()).length, 0);

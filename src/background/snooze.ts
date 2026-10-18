@@ -13,18 +13,17 @@ export async function ensureAlarm(settings: Settings): Promise<void> {
   });
 }
 
-// alarms.onAlarm
+// alarms.onAlarm — the toggle gates only the timer: the Settings button and the
+// context menu are explicit requests and run with auto-snooze switched off
 export function onAlarm(alarm: chrome.alarms.Alarm): void {
   if (alarm.name === ALARM_NAME) {
-    autoSnoozePass();
+    loadState().then((state) => (state.settings.autoSnoozeEnabled ? autoSnoozePass() : undefined));
   }
 }
 
-export async function autoSnoozePass(): Promise<void> {
+// resolves with how many tabs were handed to discard()
+export async function autoSnoozePass(): Promise<number> {
   const state = await loadState();
-  if (!state.settings.autoSnoozeEnabled) {
-    return;
-  }
   const [tabs, keepAlive] = await Promise.all([chrome.tabs.query({}), activeKeepAliveList()]);
   // manual wakes reset the inactivity clock (storage.session: survives SW
   // idle-death, gone with the browser session like the tabs themselves)
@@ -34,11 +33,11 @@ export async function autoSnoozePass(): Promise<void> {
   if (Object.keys(pruned).length !== Object.keys(wakeTimes).length) {
     await sessionStore.set({ wakeTimes: pruned });
   }
+  const targets = selectAutoSnoozeTargets(tabs, state.settings, state.protectionRules, Date.now(), pruned, keepAlive);
   await Promise.allSettled(
-    selectAutoSnoozeTargets(tabs, state.settings, state.protectionRules, Date.now(), pruned, keepAlive).map((tabId) =>
-      chrome.tabs.discard(tabId).catch((error) => console.debug("discard failed", tabId, error)),
-    ),
+    targets.map((tabId) => chrome.tabs.discard(tabId).catch((error) => console.debug("discard failed", tabId, error))),
   );
+  return targets.length;
 }
 
 // manual wake — restart the inactivity clock for these tabs

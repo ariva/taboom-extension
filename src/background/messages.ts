@@ -9,7 +9,9 @@ import { autoSnoozePass, recordWakes, snoozeTab } from "./snooze.ts";
 import { historyJump, historyStep, withHistory } from "./tab-history.ts";
 import { panelsToRestore, patchWindowProfiles, setPanelOpen } from "./window-profiles.ts";
 
-export async function handleMessage(message: Message): Promise<{ protected: boolean } | { windows: number[] } | void> {
+export async function handleMessage(
+  message: Message,
+): Promise<{ protected: boolean } | { windows: number[] } | { snoozed: number } | void> {
   switch (message.type) {
     case "snooze-tab":
       return snoozeTab(message.tabId);
@@ -22,7 +24,7 @@ export async function handleMessage(message: Message): Promise<{ protected: bool
     case "unprotect-urls":
       return unprotectUrls(message.urls);
     case "snooze-all-inactive":
-      return autoSnoozePass();
+      return { snoozed: await autoSnoozePass() };
     case "history-back":
       return historyStep(-1);
     case "history-forward":

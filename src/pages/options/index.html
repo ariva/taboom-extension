@@ -337,6 +337,23 @@
     .row input { flex: 1; }
     .muted { color: var(--muted); font-size: 11px; }
 
+    /* the one "do it now" action on the page: accent outline, fills on hover, a moon for snooze */
+    #snooze-now {
+      display: inline-flex; align-items: center; gap: 6px;
+      margin-top: 10px;
+      padding: 5px 14px;
+      color: var(--accent);
+      border: 1px solid currentColor;
+      border-radius: var(--radius-s);
+      background: color-mix(in srgb, var(--accent) 6%, transparent);
+      font-weight: 500;
+      transition: background var(--transition), color var(--transition), transform var(--transition), box-shadow var(--transition);
+    }
+    #snooze-now svg { width: 15px; height: 15px; display: block; }
+    #snooze-now:hover { background: var(--accent); color: var(--accent-fg); box-shadow: var(--shadow-1); }
+    #snooze-now:active { transform: translateY(1px); box-shadow: none; }
+    #snooze-now:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
     .card.danger-zone { border: 1px solid color-mix(in srgb, var(--danger) 40%, transparent); }
     #danger, #restore-defaults, #clear-protected, #clear-keep-alive, #clear-tags, #delete-restore-data {
       color: var(--danger);
@@ -357,7 +374,7 @@
     .danger-zone p + button + p { margin-top: 14px; }
     .card-divider { border: 0; border-top: 1px solid var(--border); margin: 14px 0 10px; }
 
-    #saved {
+    #saved, #toast {
       position: fixed;
       bottom: 16px;
       right: 16px;
@@ -369,9 +386,9 @@
       transition: opacity var(--transition), transform var(--transition),
         display var(--transition) allow-discrete;
     }
-    #saved[hidden] { display: none; opacity: 0; transform: translateY(6px); }
+    #saved[hidden], #toast[hidden] { display: none; opacity: 0; transform: translateY(6px); }
     @starting-style {
-      #saved { opacity: 0; transform: translateY(6px); }
+      #saved, #toast { opacity: 0; transform: translateY(6px); }
     }
   </style>
 </head>
@@ -414,6 +431,10 @@
     <label><input type="checkbox" id="excludeAudible" /> Never auto-snooze tabs playing audio</label>
     <label>Keep at least <input type="number" id="minAwakePerWindow" min="0" /> awake tabs per window <span class="muted">(0 = no limit)</span></label>
     <p class="muted">Active, protected, and already-snoozed tabs are always excluded.</p>
+    <button type="button" id="snooze-now" title="Run the check above right away, timer or not">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+      Snooze inactive tabs now
+    </button>
   </section>
 
   <section class="card">
@@ -588,6 +609,7 @@
   </section>
 
   <div id="saved" hidden>Saved ✓</div>
+  <div id="toast" hidden></div>
 
   <script type="module" src="main.ts"></script>
 </body>

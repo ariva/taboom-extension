@@ -55,6 +55,23 @@ test("UI - Options - Stored theme forced onto the page", () => {
   assert.equal(document.documentElement.style.colorScheme, "light");
 });
 
+test("UI - Options - 'Snooze inactive tabs now' asks the worker for a pass and reports the count", async () => {
+  const original = chrome.runtime.sendMessage;
+  chrome.runtime.sendMessage = async (msg: { type: string }) => {
+    calls.push(`sendMessage ${msg.type}`);
+    return { snoozed: 3 };
+  };
+  calls.length = 0;
+  byId<HTMLButtonElement>("snooze-now").click();
+  await tick();
+  await tick();
+  chrome.runtime.sendMessage = original;
+  assert.deepEqual(calls, ["sendMessage snooze-all-inactive"]);
+  const toast = byId("toast");
+  assert.equal(toast.hidden, false);
+  assert.equal(toast.textContent, "Snoozed 3 tabs");
+});
+
 test("UI - Options - Protection rules render as removable entries", async () => {
   const li = q(document, "#rules li");
   assert.match(li.textContent, /\*\.github\.com/);

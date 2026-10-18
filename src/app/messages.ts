@@ -60,7 +60,7 @@ export interface MessageResponses {
   "protect-hosts": MessageAck;
   "protect-urls": MessageAck;
   "unprotect-urls": MessageAck;
-  "snooze-all-inactive": MessageAck;
+  "snooze-all-inactive": { snoozed: number };
   "history-back": MessageAck;
   "history-forward": MessageAck;
   "history-jump": MessageAck;

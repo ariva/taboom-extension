@@ -1908,6 +1908,7 @@ test("UI - Sidepanel - Quick actions (☰): Open Settings opens the options page
   await tick();
   const labels = qa(menu, ".ctx-item").map((el) => el.textContent);
   assert.equal(labels[0], "Open Settings");
+  assert.equal(labels[1], "Snooze inactive tabs now", "before the duplicate cleanup");
   assert.equal(
     labels.some((text) => text.startsWith("Cleanup Duplicates")),
     DUPLICATES_ON,
@@ -1966,6 +1967,23 @@ test("UI - Sidepanel - Quick actions (☰): Open Settings opens the options page
   must(qa(menu, ".ctx-item").find((el) => el.textContent === "Open Settings")).click();
   await tick();
   assert.ok(calls.includes("openOptionsPage"), "options page opened");
+  assert.equal(menu.hidden, true, "menu closed after the action");
+
+  // Snooze inactive tabs now: one worker pass, the count in the toast
+  const originalSend = chrome.runtime.sendMessage;
+  chrome.runtime.sendMessage = async (msg: { type: string }) => {
+    calls.push(`sendMessage ${msg.type}`);
+    return { snoozed: 2 };
+  };
+  calls.length = 0;
+  byId("quick-actions-btn").click();
+  await tick();
+  must(qa(menu, ".ctx-item").find((el) => el.textContent === "Snooze inactive tabs now")).click();
+  await tick();
+  await tick();
+  chrome.runtime.sendMessage = originalSend;
+  assert.ok(calls.includes("sendMessage snooze-all-inactive"), "worker asked for a pass");
+  assert.equal(byId("toast").textContent, "Snoozed 2 tabs");
   assert.equal(menu.hidden, true, "menu closed after the action");
   if (DUPLICATES_ON) {
     byId("quick-actions-btn").click();

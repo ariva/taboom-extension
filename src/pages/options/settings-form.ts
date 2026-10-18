@@ -1,8 +1,10 @@
 // Auto-snooze settings form: fills the inputs from the stored settings and saves them
-// on every change.
+// on every change; "Snooze inactive tabs now" runs one pass without waiting for the timer.
+import { snoozeInactiveNow } from "../../app/snooze-now.ts";
 import { saveState } from "../../app/storage.ts";
 import type { AppState, Settings } from "../../app/types.ts";
 import { getElementById } from "../../lib/dom.ts";
+import { toast } from "../../lib/ui/toast.ts";
 import { clampedNumber } from "./model.ts";
 import { flashSaved } from "./page-state.ts";
 
@@ -41,8 +43,13 @@ async function saveSettings() {
   flashSaved();
 }
 
+async function snoozeNow() {
+  toast(await snoozeInactiveNow());
+}
+
 export function initSettingsForm(): void {
   for (const id of SETTING_IDS) {
     getElementById(id).addEventListener("change", saveSettings);
   }
+  getElementById("snooze-now").addEventListener("click", snoozeNow);
 }

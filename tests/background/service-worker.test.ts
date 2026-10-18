@@ -167,6 +167,28 @@ test("Service Worker - Alarm with different name does nothing", async () => {
   assert.equal(calls.filter((c) => c.startsWith("tabs.discard")).length, 0);
 });
 
+test("Service Worker - Auto-snooze off: the alarm pass does nothing, the explicit snooze-all-inactive still runs", async () => {
+  const tab = tabs.find((t) => t.id === 2);
+  assert.ok(tab);
+  tab.discarded = false; // eligible again (old, unprotected, not active)
+  stored.settings.autoSnoozeEnabled = false;
+  calls.length = 0;
+  await chrome.alarms.onAlarm.fire({ name: "auto-snooze" });
+  await tick();
+  await tick();
+  assert.equal(calls.filter((c) => c.startsWith("tabs.discard")).length, 0, "timer respects the toggle");
+
+  // the Settings button and the context menu are explicit user actions: they run regardless
+  const response = await send({ type: "snooze-all-inactive" });
+  assert.deepEqual(response, { snoozed: 1 });
+  assert.deepEqual(
+    calls.filter((c) => c.startsWith("tabs.discard")),
+    ["tabs.discard 2"],
+  );
+  stored.settings.autoSnoozeEnabled = true;
+  tab.discarded = true; // restore the state the earlier pass left
+});
+
 // what the worker answers: the handler's response, or { error } when it threw / the type is unknown
 type Sent = Message | { type: "nonsense" };
 type Reply<T extends Sent> = (T extends Message ? MessageResponses[T["type"]] : never) | MessageError;
