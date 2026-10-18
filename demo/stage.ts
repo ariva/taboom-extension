@@ -60,7 +60,9 @@ function installInPage({ own, band }: { own: Hidden; band: number }): void {
   }
   // the app keeps its full height above the band; the band is the caption's own strip
   const reserve = document.createElement("style");
-  reserve.textContent = `body { height: calc(100vh - ${band}px) !important; }`;
+  // the toast is fixed to the viewport's bottom edge, which here is the caption band: lift it
+  // by the band so it shows inside the panel, in the film and in the stills (they clip the band)
+  reserve.textContent = `body { height: calc(100vh - ${band}px) !important; } #toast { bottom: calc(2.75rem + ${band}px) !important; }`;
   document.head.append(reserve);
   const overlay = document.createElement("div");
   overlay.id = "demo-overlay";

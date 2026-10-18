@@ -5,6 +5,7 @@ import { duplicates, snoozeProtect } from "./actions.ts";
 import { grouping } from "./grouping.ts";
 import { filters, search } from "./search.ts";
 import { settings } from "./settings.ts";
+import { snoozeNow } from "./snooze-now.ts";
 import { tags } from "./tags.ts";
 import { tour } from "./tour.ts";
 import { outro } from "./outro.ts";
@@ -25,6 +26,7 @@ export interface Scene {
 // the "new in this release" scenes play first, then the tour of everything else; the outro
 // (no newIn, ever) stays last through the reordering
 export const SCENES: Scene[] = [
+  snoozeNow,
   tags,
   parked,
   tour,

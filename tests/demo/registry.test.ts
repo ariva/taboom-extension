@@ -65,13 +65,16 @@ test("Demo - Registry - a stills-only scene is never filmed: no GIF clip, no rel
   }
 });
 
-test("Demo - Registry - every New Features bullet of the current CHANGES.md entry has a scene", () => {
+test("Demo - Registry - every New Features bullet of the current CHANGES.md entry has a scene (experimental ones excepted)", () => {
   const { entryVersion, bullets } = currentNewFeatures();
   if (entryVersion !== version) {
     return; // the entry for this version is not written yet (/release-notes) — nothing to cover
   }
-  // any scene may stand for a bullet (covers); newIn only decides which scenes play first
-  const uncovered = bullets.filter((bullet) => !SCENES.some((scene) => scene.covers?.test(bullet)));
+  // any scene may stand for a bullet (covers); newIn only decides which scenes play first.
+  // A feature shipped behind "Show experimental features" is not filmed: the bullet says so
+  const uncovered = bullets
+    .filter((bullet) => !/\bexperimental\b/i.test(bullet))
+    .filter((bullet) => !SCENES.some((scene) => scene.covers?.test(bullet)));
   assert.deepEqual(uncovered, [], `New Features of v${version} without a demo scene:\n- ${uncovered.join("\n- ")}`);
   for (const scene of SCENES.filter((scene) => scene.newIn === version)) {
     assert.ok(scene.covers, `${scene.id} is new in ${version} but names no bullet (covers)`);

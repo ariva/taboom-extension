@@ -17,31 +17,29 @@ export function appendSplitItems(ids: number[], clicked: PanelTab | undefined): 
     );
     return;
   }
-  const partnerId = ids.find((id) => id !== clicked.id);
-  if (ids.length === 2 && partnerId !== undefined) {
-    ctxAppend(
-      ctxDivider(),
-      ctxItem("Split view (2 tabs)", () => splitTabs(clicked.id, partnerId)),
-    );
-    return;
-  }
-  if (ids.length !== 1) {
-    return; // three or more: Chrome splits exactly two
-  }
-  // partners: the rows right above and below in the list as shown, each offered only
-  // when the plan can get it beside the clicked tab (a pin mismatch is not offered)
+  // exactly two ticked (the clicked one among them): the pair item. Three or more: none —
+  // Chrome splits exactly two
+  const partnerId = ids.length === 2 ? ids.find((id) => id !== clicked.id) : undefined;
+  // and always the clicked row's own partners: the rows right above and below in the list
+  // as shown (a selection is no reason to take them away), each unless the plan refuses it
+  // (already split); the ticked partner is not listed twice
   const at = state.visible.findIndex((tab) => tab.id === clicked.id);
   const neighbours: [string, PanelTab | undefined][] = [
     ["Split with previous tab", state.visible[at - 1]],
     ["Split with next tab", state.visible[at + 1]],
   ];
   const items = neighbours.flatMap(([label, tab]) =>
-    tab && !("refusal" in splitPlan(asSplitTab(clicked), asSplitTab(tab))) ? [{ label, tab }] : [],
+    tab && tab.id !== partnerId && !("refusal" in splitPlan(asSplitTab(clicked), asSplitTab(tab)))
+      ? [{ label, tab }]
+      : [],
   );
-  if (items.length === 0) {
+  if (partnerId === undefined && items.length === 0) {
     return;
   }
   ctxAppend(ctxDivider());
+  if (partnerId !== undefined) {
+    ctxAppend(ctxItem("Split view (2 tabs)", () => splitTabs(clicked.id, partnerId)));
+  }
   for (const { label, tab } of items) {
     const item = ctxItem(label, () => splitTabs(clicked.id, tab.id));
     item.title = tab.title || tab.url || "(tab)";
@@ -63,10 +61,14 @@ export function openSplitMenu(
   }
   clearCtxMenu();
   ctxAppend(ctxTitle("Split view"), ctxDivider());
-  ctxAppend(
-    ctxItem("Unsplit", () => unsplitTab(first.id)),
-    ctxDivider(),
-  );
+  // the pair's block renders from Chrome's own state whatever the flag; acting on it is the
+  // feature: Unsplit only with SPLIT_VIEW on and the Split View API present (Chrome 155+)
+  if (splitActive() && splitSupported()) {
+    ctxAppend(
+      ctxItem("Unsplit", () => unsplitTab(first.id)),
+      ctxDivider(),
+    );
+  }
   appendActions(
     members.map((tab) => tab.id),
     true,

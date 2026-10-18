@@ -135,6 +135,30 @@ test("UI - Sidepanel - A tab Chrome restored but never loaded (status unloaded) 
   assert.ok(!q(document, '.row[data-tab-id="3"]').classList.contains("snoozed"));
 });
 
+test("UI - Sidepanel - SPLIT_VIEW off: a pair Chrome made still shows as a block, but its menu offers no Unsplit", {
+  skip: SPLIT_ON,
+}, async () => {
+  const ctx = byId("ctx-menu");
+  const items = () => qa<HTMLButtonElement>(ctx, ".ctx-item").map((el) => el.textContent);
+  Object.assign(must(tabs[0]), { splitViewId: 7 });
+  Object.assign(must(tabs[1]), { splitViewId: 7 });
+  await chrome.tabs.onUpdated.fire(1, { title: "My Pull Request" }); // a rendered prop: the panel refreshes
+  await new Promise((resolve) => setTimeout(resolve, 200));
+  const header = q(document, ".split-header");
+  assert.equal(q(header, ".tg-title").textContent, "Split", "the state is Chrome's: shown whatever the flag");
+  header.dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+  assert.ok(!items().includes("Unsplit"), "Unsplit is the feature: off with the flag");
+  assert.ok(items().includes("Close 2 tabs"));
+  q(ctx, ".ctx-close").click();
+  q(document, '.row[data-tab-id="1"]').dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+  assert.ok(!items().some((label) => /Split|Unsplit/.test(label)), "the row menu offers nothing split-related");
+  q(ctx, ".ctx-close").click();
+  must(tabs[0]).splitViewId = -1;
+  must(tabs[1]).splitViewId = -1;
+  await chrome.tabs.onUpdated.fire(1, { title: "My Pull Request" });
+  await new Promise((resolve) => setTimeout(resolve, 200));
+});
+
 test("UI - Sidepanel - Badges: snoozed=warn, protected=ok, pinned plain", () => {
   assert.match(document.querySelector(".badge.warn")?.textContent ?? "", /snoozed/);
   assert.match(document.querySelector(".badge.ok")?.textContent ?? "", /protected/);
@@ -3125,6 +3149,19 @@ test("UI - Sidepanel - SPLIT_VIEW: row menu pairs two tabs into Chrome's split v
   await tick();
   rowOf(1).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
   assert.ok(items().includes("Split view (2 tabs)"));
+  // the neighbour items are the clicked row's own: a selection never takes them away
+  assert.ok(items().includes("Split with next tab"), "next-tab item beside the ticked-pair item");
+  q(ctx, ".ctx-close").click();
+  // three ticked: Chrome splits exactly two, so no pair item — the neighbour items still show
+  q<HTMLInputElement>(rowOf(2), "input").click();
+  await tick();
+  rowOf(2).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+  assert.ok(!items().includes("Split view (2 tabs)"), "three ticked: no pair item");
+  assert.ok(items().includes("Split with previous tab") && items().includes("Split with next tab"));
+  q(ctx, ".ctx-close").click();
+  q<HTMLInputElement>(rowOf(2), "input").click(); // back to the pair 1 + 3
+  await tick();
+  rowOf(1).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
   calls.length = 0;
   must(qa(ctx, ".ctx-item").find((el) => el.textContent === "Split view (2 tabs)")).click();
   await settle();
@@ -3172,13 +3209,25 @@ test("UI - Sidepanel - SPLIT_VIEW: row menu pairs two tabs into Chrome's split v
   Object.assign(must(tabs[0]), { pinned: false });
   await settle();
 
-  // Chrome < 155 (no createSplit): no split items at all
+  // Chrome < 155 (no createSplit): no split items at all — the row menu and the Split
+  // header's menu alike (a pair Chrome made itself still renders, but cannot be unsplit here)
   const api = chrome.tabs as unknown as { createSplit?: unknown };
   const createSplit = api.createSplit;
   delete api.createSplit;
   rowOf(1).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
   assert.ok(!items().some((label) => /Split view|Unsplit/.test(label)), "nothing split-related offered");
   q(ctx, ".ctx-close").click();
+  Object.assign(must(tabs[0]), { splitViewId: 7 });
+  Object.assign(must(tabs[1]), { splitViewId: 7 });
+  await chrome.tabs.onUpdated.fire(1, { title: "My Pull Request" }); // a rendered prop: the panel refreshes
+  await settle();
+  q(document, ".split-header").dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+  assert.equal(q(ctx, ".ctx-title").textContent, "Split view");
+  assert.ok(!items().includes("Unsplit"), "no Unsplit without the API");
+  assert.ok(items().includes("Close 2 tabs"), "the tab actions over the pair stay");
+  q(ctx, ".ctx-close").click();
+  must(tabs[0]).splitViewId = -1;
+  must(tabs[1]).splitViewId = -1;
   api.createSplit = createSplit;
 
   // restore the fixture

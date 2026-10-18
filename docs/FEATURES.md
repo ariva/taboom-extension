@@ -99,6 +99,15 @@ and the ☰ menu's **Cleanup Duplicates** keeps one copy of each.
   <img src="assets/features/quick-actions-menu.png" alt="Quick actions menu" width="360">
 </p>
 
+**Snooze inactive tabs now** — the ☰ menu (and the same button in Settings → Automatic Snooze)
+runs the automatic-snooze check right away: every tab the rules allow goes, the inactivity
+threshold does not apply, and a toast says how many.
+
+<p>
+  <img src="assets/features/quick-actions-snooze-now.png" alt="Quick actions - Snooze inactive tabs now" width="360">
+  <img src="assets/features/snooze-now-toast.png" alt="Snooze now - the count toast" width="360">
+</p>
+
 → [Usage: Duplicates](USAGE.md#duplicates)
 
 ## Settings
@@ -113,6 +122,9 @@ tables. Every table edits in place; removals can be undone.
 </p>
 <p>
   <img src="assets/features/settings-auto-snooze.png" alt="Settings - Automatic snooze" width="460">
+  <img src="assets/features/settings-snooze-now.png" alt="Settings - Snooze inactive tabs now" width="460">
+</p>
+<p>
   <img src="assets/features/settings-protected-sites.png" alt="Settings - Protected sites" width="460">
 </p>
 <p>

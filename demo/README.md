@@ -82,7 +82,9 @@ scene names `settings: "#<id>"` — an id of `src/pages/options/index.html`; the
 scrolls to that card when the scene starts (`#page-title` for the top), and `stage.settings()`
 jumps again mid-scene. Mark it `newIn: "<version>"` with a `covers` regex when it shows a
 `### New Features` bullet of that release — `tests/demo/registry.test.ts` fails the build when
-a bullet has no scene or an anchor is gone, so nothing new ships undemonstrated. Keep a scene
+a bullet has no scene or an anchor is gone, so nothing new ships undemonstrated. The one
+exception: a bullet that says "experimental" (a feature behind **Show experimental features**)
+is not filmed and needs no scene — the film shows what every user gets. Keep a scene
 under ~25 s; `gif: [from, to]` picks its GIF clip.
 
 ## Why it looks the way it does
