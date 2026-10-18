@@ -65,6 +65,11 @@ const chrome = makeChrome({
   },
 });
 loadPage("src/pages/sidepanel/index.html", chrome);
+// the boot render must reveal the current row (opening the panel with the active tab far down)
+const bootScrolled: string[] = [];
+window.HTMLElement.prototype.scrollIntoView = function (this: HTMLElement) {
+  bootScrolled.push(this.className);
+};
 await import("../../../src/pages/sidepanel/main.ts");
 await tick();
 await tick();
@@ -88,6 +93,13 @@ test("UI - Sidepanel - Renders one row per tab with filter counts", () => {
   assert.equal(document.querySelectorAll(".row").length, 3);
   const counts = qa(document, "#filters .count").map((el) => el.textContent);
   assert.deepEqual(counts, ["3", "2", "1", "1"], "all/awake/snoozed/protected");
+});
+
+test("UI - Sidepanel - Opening the panel scrolls the current row into view", () => {
+  assert.ok(
+    bootScrolled.some((c) => c.includes("current")),
+    "first render reveals the current row (nearest, no jump to top)",
+  );
 });
 
 test("UI - Sidepanel - Current window's active tab is marked, other window's is not", () => {

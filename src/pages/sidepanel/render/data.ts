@@ -62,10 +62,11 @@ export async function refresh(animate = false, preloaded: AppState | null = null
   }
   state.currentWindowId = win.id!; // live windows always have an id (only sessions-API windows lack one)
   // active tab switched from outside the panel (worker's history command,
-  // Ctrl+Tab): the row re-renders as current but may sit off-screen
+  // Ctrl+Tab): the row re-renders as current but may sit off-screen. The first
+  // refresh counts too: the panel opens at the top, the active tab may be far down
   const previousActive = state.activeTabId;
   state.activeTabId = tabs.find((tab) => tab.active && tab.windowId === win.id)?.id ?? null;
-  if (previousActive != null && state.activeTabId !== previousActive) {
+  if (state.activeTabId !== previousActive) {
     state.revealCurrent = true;
   }
   state.allTabs = tabs as PanelTab[]; // chrome.tabs.query: every tab has an id — see PanelTab
