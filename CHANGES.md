@@ -1,5 +1,24 @@
 # CHANGES
 
+## v1.0.6 — 2026-10-18
+
+### Summary
+Split view, snooze-now actions and side panel fixes
+
+### New Features
+- Split view (experimental, Chrome 155+) — pair two tabs from the row menu, badge them, unsplit (6010cfc)
+- Add manual snooze now button (4107eeb)
+
+### Fixes
+- Fix prev/next split action (7a12255)
+- Treat session-restored "discarded" or status "unloaded" tabs as snoozed everywhere (1656e79)
+- Fix bug where action window was auto-closed on sidebar actions icon click (24e3119)
+- Make on-demand snooze ignore the inactivity threshold (698d312)
+- Reveal the active tab when the panel opens (e7853f9)
+
+### Other
+- Rename `docs/INSTALL.md` to `docs/LOCAL_DEV.md` (3b11f58)
+
 ## v1.0.5 — 2026-10-18
 
 ### Summary
