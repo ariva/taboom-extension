@@ -9,6 +9,11 @@ import { effectiveSort, state, tabGroupsActive } from "../foundation/state.ts";
 
 type Tab = chrome.tabs.Tab;
 
+// the row sits indented under a tab group sub-header (window view): its meta line is narrower
+export function nestedInGroup(tab: Tab): boolean {
+  return tabGroupsActive() && (tab.groupId ?? -1) !== -1 && effectiveSort() === "window";
+}
+
 // translate a row view-model into DOM; wires event handlers to actions
 export function renderRow(tab: Tab, vm: RowViewModel): HTMLElement {
   if (!perfOn()) {
@@ -87,6 +92,7 @@ function renderRowImpl(tab: Tab, vm: RowViewModel): HTMLElement {
   // every other sort — after the window dot: checkbox, dot, square, text.
   const sortNow = effectiveSort();
   if (tabGroupsActive() && (tab.groupId ?? -1) !== -1 && sortNow !== "group-tabgroup") {
+    // (nestedInGroup is this test with sortNow === "window": keep the two in step)
     const group = state.tabGroups.get(tab.groupId);
     const square = document.createElement("span");
     square.className = "tg-square";
@@ -113,12 +119,16 @@ function renderRowImpl(tab: Tab, vm: RowViewModel): HTMLElement {
   const meta = mustQuery(row, ".meta");
   if (vm.age) {
     const age = document.createElement("span");
+    age.className = "age";
     age.textContent = vm.age;
     meta.append(age);
   }
-  for (const [label, kind, color] of vm.badges) {
+  for (const [label, kind, color, maxWidth] of vm.badges) {
     const badge = document.createElement("span");
     badge.className = kind ? `badge ${kind}` : "badge";
+    if (maxWidth !== undefined) {
+      badge.style.maxWidth = `${maxWidth}px`; // the one pill that cannot fit whole: the fit's room for it
+    }
     if (color) {
       badge.style.background = color; // a tag badge: solid fill in the tag's color
       const text = document.createElement("span"); // the ellipsizing part of a flex-centered pill

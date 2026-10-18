@@ -18,7 +18,7 @@ import { state } from "./foundation/state.ts";
 // event type, or was already registered ahead of the listeners wired by the init*()
 // calls below (listEl "scroll": hover tip, then the ctx-menu hide; chrome.storage.onChanged:
 // live-updates first) — so the order among these imports does not matter.
-import { refresh, registerPanel } from "./foundation/scheduler.ts";
+import { refresh, registerPanel, render } from "./foundation/scheduler.ts";
 import { refresh as refreshImpl } from "./render/data.ts";
 import { render as renderImpl } from "./render/render.ts";
 import { initListEvents } from "./input/list-events.ts";
@@ -26,6 +26,7 @@ import { initBulkButtons } from "./input/toolbar-events.ts";
 import { initKeyboardNav } from "./input/keyboard-nav.ts";
 import { initQuickActions } from "./input/quick-actions.ts";
 import { initTagsChip } from "./input/tags-chip.ts";
+import { initMetaFit } from "./render/meta-fit.ts";
 import { initialDirFor } from "./render/sorting.ts";
 import "./input/live-updates.ts";
 // The feature modules register nothing when evaluated: each wires its listeners in an
@@ -78,6 +79,7 @@ initBulkButtons();
 initKeyboardNav();
 initQuickActions();
 initTagsChip(); // after the filter-bar handler in toolbar-events.ts: the chip click filters first, then opens the picker
+initMetaFit(() => render(false)); // the pill fit follows the panel's width
 
 // ---------- init ----------
 

@@ -29,7 +29,8 @@ import {
 import type { FilterName, RowViewModel } from "../model/index.ts";
 import { perfMeasure } from "../foundation/perf.ts";
 import { renderGroupHeader, renderMembersWithTabGroupRuns } from "./headers.ts";
-import { renderRow } from "./row.ts";
+import { pillFit, syncMetaFit } from "./meta-fit.ts";
+import { nestedInGroup, renderRow } from "./row.ts";
 import { effectiveCollapsed, GROUPINGS, renderSortDirButton } from "./sorting.ts";
 import type { PanelRun } from "./sorting.ts";
 import { activeCollapsedSet, effectiveSort, nestedTabGroupsActive, parkedScope, state } from "../foundation/state.ts";
@@ -71,7 +72,22 @@ export function renderNow(): void {
   perfMeasure("sidepanel.render", renderNowImpl);
 }
 
+// the pill fit is measured from the rendered rows: when the line width or font changed since the
+// last render (first paint, resize, font size setting), render once more — same task, no flash
+let refitting = false;
 function renderNowImpl(): void {
+  renderList();
+  if (!refitting && syncMetaFit()) {
+    refitting = true;
+    try {
+      renderList();
+    } finally {
+      refitting = false;
+    }
+  }
+}
+
+function renderList(): void {
   // any re-render (selection change, tab/window events, background refresh)
   // invalidates the open context menu's ids — close it rather than act stale
   hideCtxMenu();
@@ -119,6 +135,7 @@ function renderNowImpl(): void {
       tagTokens,
       fuzzy: fuzzyActive(state),
       parked: parkedScope(),
+      fit: pillFit(nestedInGroup(tab)),
     });
 
   let foldableGroups: PanelRun[] = [];

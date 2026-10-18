@@ -4,6 +4,7 @@ import { test } from "vitest";
 import {
   badges,
   bulkSummary,
+  fitTagPills,
   countsByFilter,
   deriveTabs,
   emptyMessage,
@@ -18,7 +19,7 @@ import {
   windowColor,
   windowMaps,
 } from "../../src/pages/sidepanel/model/index.ts";
-import type { RowContext, RowViewModel, SearchView, SelectView } from "../../src/pages/sidepanel/model/index.ts";
+import type { Badge, RowContext, RowViewModel, SearchView, SelectView } from "../../src/pages/sidepanel/model/index.ts";
 import type { ProtectionRule, Tag, TagPage, UiPrefs } from "../../src/app/types.ts";
 import { tagGroupName } from "../../src/pages/sidepanel/model/index.ts";
 import { nextTagSort, orderedTags, sortedTags } from "../../src/app/tags.ts";
@@ -726,7 +727,7 @@ test("Model - TAGS: badges carry the tag as a solid pill after the plain states 
     ["bills", "tag dark hit", "#f9ab00"], // the hit comes first
     ["Work", "tag", "#1a73e8"],
   ]);
-  // past three tags: three pills and a "+N" — a search hit always makes the cut
+  // every tag is a pill here (fitTagPills trims to the line) — a search hit moves to the front
   const many: Tag[] = [
     work,
     bills,
@@ -736,7 +737,7 @@ test("Model - TAGS: badges carry the tag as a solid pill after the plain states 
   ];
   assert.deepEqual(
     badges(tab(), false, false, many).map(([label]) => label),
-    ["Work", "bills", "c", "+2"],
+    ["Work", "bills", "c", "d", "e"],
   );
   assert.deepEqual(
     badges(tab(), false, false, many, new Set(["t5"])).map(([label, kind]) => [label, kind]),
@@ -744,9 +745,47 @@ test("Model - TAGS: badges carry the tag as a solid pill after the plain states 
       ["e", "tag hit"],
       ["Work", "tag"],
       ["bills", "tag dark"],
-      ["+2", "tag-more"],
+      ["c", "tag"],
+      ["d", "tag"],
     ],
     "the hit tag moves to the front; the rest keep their order",
+  );
+});
+
+test("Model - TAGS: fitTagPills keeps the pills that fit the meta line and folds the rest into +N", () => {
+  const pill = (name: string, kind = "tag"): Badge => [name, kind, "#1a73e8"];
+  const list: Badge[] = [["pinned", ""], pill("alpha"), pill("beta"), pill("gamma"), pill("delta"), ["🔊", ""]];
+  // 6 px per character, 10 px per rem: a pill = text + 7.5 px, a plain badge = text + 6.25 px, the gap
+  // 3.75 px, the host keeps 60 px; no action buttons unless said
+  const measured = (line: number) => ({ line, rem: 10, textWidth: (label: string) => label.length * 6 });
+  const labels = (badges: Badge[]) => badges.map(([label]) => label);
+  const on = (line: number, age: string | null = null, buttons = 0) =>
+    labels(fitTagPills(list, age, "example.com", buttons, measured(line)));
+  assert.deepEqual(
+    labels(fitTagPills(list, null, "example.com", 0, undefined)),
+    ["pinned", "alpha", "beta", "gamma", "+1", "🔊"],
+    "no measure: three pills",
+  );
+  assert.deepEqual(on(1000), ["pinned", "alpha", "beta", "gamma", "delta", "🔊"], "room for all: no +N");
+  // host 60 + gap + pinned 42.25 + gap + alpha 37.5 + gap + beta 31.5 + gap + "+2" 12 + gap + 🔊 (2 chars) 18.25 = 220.25
+  assert.deepEqual(on(221), ["pinned", "alpha", "beta", "+2", "🔊"]);
+  assert.deepEqual(on(219), ["pinned", "alpha", "+3", "🔊"], "the +N itself needs its room");
+  assert.deepEqual(on(50), ["pinned", "alpha", "+3", "🔊"], "the first pill always shows");
+  // the age is set in the meta's font: 2 chars × 6 × 0.85/0.77 ≈ 13.25 + a gap
+  assert.deepEqual(on(237, "3h"), ["pinned", "alpha", "+3", "🔊"], "the age takes its share");
+  assert.deepEqual(on(238, "3h"), ["pinned", "alpha", "beta", "+2", "🔊"]);
+  // three buttons: 3 × 15 + 2 × 1.25 + the 3.75 row gap = 51.25 off the line
+  assert.deepEqual(on(272, null, 3), ["pinned", "alpha", "beta", "+2", "🔊"]);
+  assert.deepEqual(on(271, null, 3), ["pinned", "alpha", "+3", "🔊"], "the buttons take theirs");
+  // one pill that cannot fit whole: it carries the room left after the host floor, the plain badges and the
+  // "+N" (60 + 42.25 + 18.25 + 12 + 4 gaps 15 = 147.5 → 32.5 of 180), the CSS ellipsizes it; never under 2rem
+  assert.deepEqual(fitTagPills(list, null, "example.com", 0, measured(180))[1], ["alpha", "tag", "#1a73e8", 32.5]);
+  assert.deepEqual(fitTagPills(list, null, "example.com", 0, measured(100))[1], ["alpha", "tag", "#1a73e8", 20]);
+  assert.equal(fitTagPills([["pinned", ""]], null, "x", 0, measured(10)).length, 1, "no pills: untouched");
+  assert.deepEqual(
+    fitTagPills(list, null, "x", 0, measured(1000))[1],
+    pill("alpha"),
+    "pills keep their kind and color",
   );
 });
 
