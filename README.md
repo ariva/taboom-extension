@@ -17,6 +17,9 @@ Taboom - Tabs Manager frees memory by snoozing (discarding) tabs you haven't use
 
 <p align="center"><a href="https://buymeacoffee.com/ariva"><img src="docs/assets/bmc_qr.png" alt="Buy me a coffee — QR code" width="140"></a></p>
 
+## Support
+* Have a question, found a bug, or want to suggest a feature? Send me a message: **arunas.work.hg [ AT ] [g] [m] [a] [i] [l] [.] [c] [o] [m]**.
+
 ## Installation
 
 ### Chrome Web Store
