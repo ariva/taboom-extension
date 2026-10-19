@@ -80,14 +80,15 @@ clean:
 
 # Feature demo recordings (demo/README.md): a synthetic 10-window / 500-tab world in headless
 # Chromium, scenes filmed per window, ffmpeg composes dist/demo/<version>/taboom-<version>.mp4
-# (panel + four windows, every scene) and .gif (panel only, the short clips).
+# (panel + story pane + Settings, every scene), taboom-<version>-1080p.mp4 (the same at 1920×1080)
+# and .gif (panel only, the short clips).
 # record every scene and encode both files — `just demo scene=search` retakes one scene
 demo scene="":
     npx vite build --logLevel warn
     node demo/record.ts {{ if scene != "" { "--scene " + scene } else { "" } }}
     ./demo/encode.sh
 
-# re-encode the MP4 and GIF from the takes on disk (no browser)
+# re-encode the MP4s and GIF from the takes on disk (no browser)
 demo-encode:
     ./demo/encode.sh
 

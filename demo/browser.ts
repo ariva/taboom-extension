@@ -29,6 +29,10 @@ export const WINDOW_VIEWPORT = { width: 920, height: 620 };
 export const STORY_VIEWPORT = { width: 768, height: 300 };
 export const SETTINGS_VIEWPORT = { width: 768, height: 496 };
 export const STORY_URL = "http://story.test/";
+// the film is shot at this device scale (frames are DEVICE_SCALE × the viewports) so encode.sh
+// can cut a sharp 1080p film; the pages still see devicePixelRatio 1 — Playwright's viewport
+// emulation pins it — so layout, the stills (page.screenshot, 1:1) and the scenes are untouched
+export const DEVICE_SCALE = 2;
 
 // The fake sites come from a local HTTP server, not from Playwright's route interception:
 // interception attaches per page after the page exists, and 500 tabs created in a tight loop
@@ -64,6 +68,7 @@ export async function launch(extensionDir: string, tabs: DemoTab[], pages: Map<s
       "--disable-sync",
       "--metrics-recording-only",
       "--mute-audio",
+      `--force-device-scale-factor=${DEVICE_SCALE}`,
       "--remote-debugging-pipe",
       "--host-resolver-rules=MAP *.test 127.0.0.1",
       `--testing-fixed-http-port=${port}`,

@@ -5,7 +5,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "vitest";
-import { CAPTION_BAND, PANEL_VIEWPORT, SETTINGS_VIEWPORT, STORY_VIEWPORT } from "../../demo/browser.ts";
+import { CAPTION_BAND, DEVICE_SCALE, PANEL_VIEWPORT, SETTINGS_VIEWPORT, STORY_VIEWPORT } from "../../demo/browser.ts";
 
 const encode = readFileSync("demo/encode.sh", "utf8");
 const size = (name: string) => Number(encode.match(new RegExp(`${name}=(\\d+)`))?.[1]);
@@ -26,4 +26,13 @@ test("Demo - Layout - encode.sh composes every pane at its recorded viewport", (
 test("Demo - Layout - the panel viewport is the 600×820 app plus the caption band", () => {
   assert.ok(CAPTION_BAND >= 56, "room for one or two caption lines");
   assert.deepEqual({ w: PANEL_VIEWPORT.width, h: PANEL_VIEWPORT.height - CAPTION_BAND }, { w: 600, h: 820 });
+});
+
+test("Demo - Layout - encode.sh composes at the device scale the recorder films at", () => {
+  // the film is shot at DEVICE_SCALE (--force-device-scale-factor) for crisp text; the tiles
+  // encode.sh cuts are the viewports times that scale, so SCALE must follow the flag
+  const browser = readFileSync("demo/browser.ts", "utf8");
+  assert.match(browser, /--force-device-scale-factor=\$\{DEVICE_SCALE\}/, "the flag takes DEVICE_SCALE");
+  assert.equal(size("SCALE"), DEVICE_SCALE);
+  assert.ok(DEVICE_SCALE >= 2, "a 1080p film needs more than 1:1 frames of the 1440 px canvas");
 });

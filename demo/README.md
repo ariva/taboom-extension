@@ -2,18 +2,27 @@
 
 `just demo` builds the extension, boots it in headless Chromium, builds a synthetic world (10
 named and colored windows, 500 tabs — pinned, snoozed, protected, grouped, tagged, duplicated,
-one parked window, two keep-alive marks), plays every scene and encodes two files under
+one parked window, two keep-alive marks), plays every scene and encodes three files under
 `dist/demo/<version>/`:
 
-- `taboom-<version>.mp4` — 1440×868: the side panel (600 px wide) left; right, the story pane
+- `taboom-<version>.mp4` — 1440×940: the side panel (600 px wide) left; right, the story pane
   (scene title, the caption on screen, the captions already shown) over the real Settings page,
   scrolled to the section each scene is about. Every scene in registry order (≈ 3–4 minutes).
+- `taboom-<version>-1080p.mp4` — the same film at 1920×1080 for YouTube: the canvas scaled to
+  1080 px high (1654 wide), centred on the dark background.
 - `taboom-<version>.gif` — the panel alone, 480 px wide, the clips the scenes mark with `gif`
   (≤ 30 s).
 
-Every encode also copies both to `docs/assets/demo/taboom-demo.mp4` / `.gif` (no version in
-the name, so links stay put); `DEMO_PUBLISH=<dir>` sends the copies elsewhere, and an encode of
-a `DEMO_DIR` scratch take copies nothing.
+The pages are filmed at device scale 2 (`DEVICE_SCALE` in `demo/browser.ts`,
+`--force-device-scale-factor`): every frame is twice the viewport, the scenes are composed at
+2× and both films scaled down from there, so text stays sharp at 1080p. The pages themselves see
+`devicePixelRatio` 1 (Playwright's viewport emulation), so layout and the stills are the 1:1
+ones. Takes are about four times the size of 1:1 frames.
+
+Every encode also copies the 1440×940 film and the GIF to `docs/assets/demo/taboom-demo.mp4` /
+`.gif` (no version in the name, so links stay put; the 1080p film stays in `dist/`, too big for
+the repo); `DEMO_PUBLISH=<dir>` sends the copies elsewhere, and an encode of a `DEMO_DIR`
+scratch take copies nothing.
 
 Nothing on screen is real: hosts end in `.test` and are served from a local HTTP server
 (`fixture.ts` holds every title, window name and tag), the profile is a fresh temp directory,
@@ -73,7 +82,7 @@ is a recording to look at.
 | `story.ts` | the story pane (`http://story.test/`): title, current caption, captions already shown |
 | `scenes/` | one module per scene; `index.ts` is the registry (order, `newIn`, `covers`, `gif`) |
 | `record.ts` | the CLI: world → scenes → `scenes.json` |
-| `encode.sh` | ffmpeg: per-stream clips, the panel + story + Settings composite, the GIF |
+| `encode.sh` | ffmpeg: per-stream clips, the panel + story + Settings composite at 2×, the 1440×940 and 1080p films, the GIF |
 
 ## Adding a scene
 
