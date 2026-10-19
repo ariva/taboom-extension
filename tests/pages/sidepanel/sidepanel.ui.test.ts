@@ -907,7 +907,7 @@ test("UI - Sidepanel - Right-click row offers move-to-window menu (selection-awa
       ...(TEST_FEATURES.TAB_GROUPS?.enabled === true ? ["Move to group ▸", "work", "New group…"] : []),
       // SPLIT_VIEW: the row below (Inbox: pinned, other window — brought over on split) as a
       // partner; nothing above the first row. Recently used order is 1, 3, 2
-      ...(SPLIT_ON ? ["Split with next tab"] : []),
+      ...(SPLIT_ON ? ["Split with next tab (next window)"] : []),
     ],
     "bulk actions first, then the Move-to dropdown (own window excluded)",
   );
@@ -3058,7 +3058,10 @@ test("UI - Sidepanel - SPLIT_VIEW: row menu pairs two tabs into Chrome's split v
   q(ctx, ".ctx-close").click();
   rowOf(2).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
   assert.ok(items().includes("Split with previous tab"), "second row: the row above");
-  assert.ok(items().includes("Split with next tab"), "the row below (Inbox, pinned, other window) is brought over");
+  // the row below is Inbox, the last row of window 1 pairs across a window boundary: the
+  // label says so, since that tab will be brought over
+  assert.ok(items().includes("Split with next tab (next window)"), "the row below (Inbox, pinned, other window)");
+  assert.ok(!items().includes("Split with next tab"), "the plain label is for a same-window neighbour");
   q(ctx, ".ctx-close").click();
   rowOf(1).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
   calls.length = 0;
@@ -3148,7 +3151,7 @@ test("UI - Sidepanel - SPLIT_VIEW: row menu pairs two tabs into Chrome's split v
   q<HTMLInputElement>(rowOf(3), "input").click();
   await tick();
   rowOf(1).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
-  assert.ok(items().includes("Split view (2 tabs)"));
+  assert.ok(items().includes("Split 2 selected tabs"));
   // the neighbour items are the clicked row's own: a selection never takes them away
   assert.ok(items().includes("Split with next tab"), "next-tab item beside the ticked-pair item");
   q(ctx, ".ctx-close").click();
@@ -3156,14 +3159,14 @@ test("UI - Sidepanel - SPLIT_VIEW: row menu pairs two tabs into Chrome's split v
   q<HTMLInputElement>(rowOf(2), "input").click();
   await tick();
   rowOf(2).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
-  assert.ok(!items().includes("Split view (2 tabs)"), "three ticked: no pair item");
-  assert.ok(items().includes("Split with previous tab") && items().includes("Split with next tab"));
+  assert.ok(!items().includes("Split 2 selected tabs"), "three ticked: no pair item");
+  assert.ok(items().includes("Split with previous tab") && items().includes("Split with next tab (next window)"));
   q(ctx, ".ctx-close").click();
   q<HTMLInputElement>(rowOf(2), "input").click(); // back to the pair 1 + 3
   await tick();
   rowOf(1).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
   calls.length = 0;
-  must(qa(ctx, ".ctx-item").find((el) => el.textContent === "Split view (2 tabs)")).click();
+  must(qa(ctx, ".ctx-item").find((el) => el.textContent === "Split 2 selected tabs")).click();
   await settle();
   assert.ok(calls.includes('tabs.move 3 {"windowId":1,"index":1}'), "partner moved right after the anchor");
   assert.ok(!calls.some((c) => c.startsWith("tabs.update 3")), "already unpinned by the move: no pin update");
@@ -3193,7 +3196,7 @@ test("UI - Sidepanel - SPLIT_VIEW: row menu pairs two tabs into Chrome's split v
   await tick();
   rowOf(1).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
   calls.length = 0;
-  must(qa(ctx, ".ctx-item").find((el) => el.textContent === "Split view (2 tabs)")).click();
+  must(qa(ctx, ".ctx-item").find((el) => el.textContent === "Split 2 selected tabs")).click();
   await settle();
   assert.deepEqual(
     calls.filter((c) => /^tabs\.(move|update|createSplit)/.test(c)),

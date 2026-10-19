@@ -25,12 +25,19 @@ export function appendSplitItems(ids: number[], clicked: PanelTab | undefined): 
   // (already split); the ticked partner is not listed twice
   const at = state.visible.findIndex((tab) => tab.id === clicked.id);
   const neighbours: [string, PanelTab | undefined][] = [
-    ["Split with previous tab", state.visible[at - 1]],
-    ["Split with next tab", state.visible[at + 1]],
+    ["previous", state.visible[at - 1]],
+    ["next", state.visible[at + 1]],
   ];
-  const items = neighbours.flatMap(([label, tab]) =>
+  // a neighbour across a window boundary (the first / last row of a window) will be brought
+  // over: the label says which window it comes from
+  const items = neighbours.flatMap(([direction, tab]) =>
     tab && tab.id !== partnerId && !("refusal" in splitPlan(asSplitTab(clicked), asSplitTab(tab)))
-      ? [{ label, tab }]
+      ? [
+          {
+            label: `Split with ${direction} tab${tab.windowId === clicked.windowId ? "" : ` (${direction} window)`}`,
+            tab,
+          },
+        ]
       : [],
   );
   if (partnerId === undefined && items.length === 0) {
@@ -38,7 +45,7 @@ export function appendSplitItems(ids: number[], clicked: PanelTab | undefined): 
   }
   ctxAppend(ctxDivider());
   if (partnerId !== undefined) {
-    ctxAppend(ctxItem("Split view (2 tabs)", () => splitTabs(clicked.id, partnerId)));
+    ctxAppend(ctxItem("Split 2 selected tabs", () => splitTabs(clicked.id, partnerId)));
   }
   for (const { label, tab } of items) {
     const item = ctxItem(label, () => splitTabs(clicked.id, tab.id));
