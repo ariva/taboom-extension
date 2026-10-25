@@ -1,5 +1,18 @@
 # CHANGES
 
+## v1.0.7 — 2026-10-25
+
+### Summary
+Tags menu and settings polish, split menu label fixes
+
+### Fixes
+- Clarify the split menu labels when the split is happening across the different windows (9d9e77b)
+
+### Other
+- UI/UX tags improvements - one select/add context menu, add remove tag, sorting in tags list in settings and minor bug fixes (93fd276)
+- Add support section to the `README.md` (87c8bb5)
+- Release tools to have a possibility to record a demo (6215868)
+
 ## v1.0.6 — 2026-10-18
 
 ### Summary
