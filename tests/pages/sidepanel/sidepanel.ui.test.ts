@@ -897,8 +897,8 @@ test("UI - Sidepanel - Right-click row offers move-to-window menu (selection-awa
       "Close",
       // KEEP_ALIVE: the setting defaults to on, so the experimental pass shows the mark item
       ...(KEEP_ALIVE_ON ? ["Keep alive"] : []),
-      // TAGS: the Tags… picker entry and New tag…
-      ...(TAGS_ON ? ["Tags…", "New tag…"] : []),
+      // TAGS: the two picker entries (a new tag is made inside the picker)
+      ...(TAGS_ON ? ["Tag domain…", "Tag URL…"] : []),
       "Move tab to ▸",
       "Window #2",
       "New window",
@@ -2377,7 +2377,7 @@ test("UI - Sidepanel - PARKED_WINDOWS: Park window… asks first; the Parked win
   await tick();
   assert.deepEqual(
     items()
-      .filter((label) => label !== "Tags…" && label !== "New tag…")
+      .filter((label) => label !== "Tag URL…" && label !== "Tag domain…")
       .slice(0, 2),
     ["Copy URL", "Move parked tab to ▸"],
   );
@@ -2688,84 +2688,84 @@ test("UI - Sidepanel - PARKED_WINDOWS: Move tab to ▸ offers the parked windows
   await settle();
 });
 
-test("UI - Sidepanel - TAGS: row menu Tags ▸ creates / toggles tags; badge, chip filter, #search, group by tag", {
+test("UI - Sidepanel - TAGS: row menu Tag URL ▸ creates / toggles tags; badge, chip filter, #search, group by tag", {
   skip: !TAGS_ON,
 }, async () => {
   const menu = byId("ctx-menu");
-  const ask = byId<HTMLDialogElement>("ask-dialog");
   const pick = byId("tag-assign-pop");
   const rowOf = (id: number) => q(document, `.row[data-tab-id="${id}"]`);
-  // Tags… in the row menu opens the checklist picker for that row
+  // Tag URL… in the row menu opens the checklist picker for that row
   const open = (id: number) => {
     rowOf(id).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
     assert.equal(menu.hidden, false);
-    must(qa(menu, ".ctx-item").find((el) => el.textContent === "Tags…")).click();
+    must(qa(menu, ".ctx-item").find((el) => el.textContent === "Tag URL…")).click();
   };
-  const pickRow = (name: string) => must(qa(pick, ".tag-pick").find((el) => q(el, ".tag-name").textContent === name));
-  const newTag = (id: number) => {
-    rowOf(id).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
-    must(qa(menu, ".ctx-item").find((el) => el.textContent === "New tag…")).click();
+  const pickRow = (name: string) =>
+    must(qa(pick, ".tag-pick:not(.tag-new)").find((el) => q(el, ".tag-name").textContent === name));
+  const newRow = () => q(pick, ".tag-new");
+  const addNew = async (name: string) => {
+    q<HTMLInputElement>(newRow(), ".tag-new-name").value = name;
+    q(newRow(), ".tag-new-add").click();
+    await tick();
+    await tick();
+    await tick();
   };
-  // the picker: title, ✕, no tags yet (New tag… is the row menu's own item)
+  // the picker: title, ✕, no tags yet, the new-tag row (tick, nine swatches, name, Add)
   open(1);
   assert.equal(menu.hidden, true, "the menu closes; the picker takes its place");
   assert.equal(q(pick, ".tag-pick-title").textContent, "Tags");
   assert.ok(q(pick, ".tag-pick-close svg"), "a corner ✕ like the menu's");
-  assert.equal(qa(pick, ".tag-pick").length, 0, "no tags yet");
-  assert.equal(pick.querySelector(".tag-new"), null, "no New tag… in the picker");
+  assert.equal(qa(pick, ".tag-pick:not(.tag-new)").length, 0, "no tags yet");
+  const swatches = () => qa(pick, ".tag-new-swatch");
+  assert.equal(swatches().length, 9, "the nine group colors");
+  assert.equal(q(pick, '.tag-new-swatch[aria-pressed="true"]').dataset.color, "blue", "blue preselected");
+  assert.equal(q<HTMLInputElement>(newRow(), ".tag-new-tick").checked, true, "the new tag will come ticked");
   q(pick, ".tag-pick-cancel").click();
   assert.equal(menu.hidden, false, "Cancel brings the row menu back");
   menu.hidden = true;
-  // New tag… from the row menu: name + a color swatch; the new tag lands on the clicked tab
-  newTag(1);
-  assert.equal(ask.open, true, "the new-tag dialog opens");
-  assert.ok(q(ask, ".ask-close svg"), "a corner ✕ like the pickers");
-  const swatches = qa(ask, ".ask-swatch");
-  assert.equal(swatches.length, 9, "the nine group colors");
-  assert.equal(q(ask, '.ask-swatch[aria-pressed="true"]').dataset.color, "blue", "blue preselected");
-  must(swatches.find((el) => el.dataset.color === "green")).click();
-  q<HTMLInputElement>(ask, ".ask-input").value = " Work ";
-  q(ask, ".ask-ok").click();
-  await tick();
-  await tick();
+  // Add writes the tag to the list at once and lists it ticked (staged); the tab waits for Apply
+  open(1);
+  must(swatches().find((el) => el.dataset.color === "green")).click();
+  assert.equal(q(pick, '.tag-new-swatch[aria-pressed="true"]').dataset.color, "green");
+  await addNew(" Work ");
   let stored = await chrome.storage.local.get(["tags", "tagPages"]);
   assert.deepEqual(
     stored.tags?.map((tag) => [tag.name, tag.color]),
     [["Work", "green"]],
   );
+  assert.deepEqual(stored.tagPages ?? [], [], "nothing on the tab before Apply");
+  assert.equal(q<HTMLInputElement>(pickRow("Work"), "input").checked, true, "the new tag comes ticked");
+  assert.equal(q<HTMLInputElement>(newRow(), ".tag-new-name").value, "", "the row is ready for the next one");
+  assert.equal(q<HTMLButtonElement>(pick, ".tag-pick-apply").disabled, false, "a staged tick: Apply is on");
+  assert.equal(rowOf(1).querySelector(".badge.tag"), null);
+  // a duplicate name says so under the row; nothing written
+  await addNew("work");
+  assert.match(q(pick, ".tag-new-error").textContent ?? "", /exists/);
+  assert.equal(q<HTMLElement>(pick, ".tag-new-error").hidden, false);
+  assert.equal((await chrome.storage.local.get("tags")).tags?.length, 1, "no second tag");
+  q<HTMLInputElement>(newRow(), ".tag-new-name").value = "work2";
+  q(newRow(), ".tag-new-name").dispatchEvent(new window.Event("input", { bubbles: true }));
+  assert.equal(q<HTMLElement>(pick, ".tag-new-error").hidden, true, "typing clears the message");
+  // Cancel after Add: the tag stays in the list, the tab is untouched
+  q(pick, ".tag-pick-cancel").click();
+  await tick();
+  assert.equal(menu.hidden, false, "Cancel brings the row menu back");
+  menu.hidden = true;
+  assert.equal((await chrome.storage.local.get("tags")).tags?.length, 1, "the tag exists");
+  assert.equal(rowOf(1).querySelector(".badge.tag"), null, "…but Cancel put nothing on the tab");
+  // ticking it and Apply: the badge appears
+  open(1);
+  assert.equal(q<HTMLInputElement>(pickRow("Work"), "input").checked, false, "Cancel dropped the staged tick");
+  q<HTMLInputElement>(pickRow("Work"), "input").click();
+  q(pick, ".tag-pick-apply").click();
+  await tick();
+  await tick();
+  stored = await chrome.storage.local.get(["tags", "tagPages"]);
   assert.deepEqual(stored.tagPages, [{ url: "https://github.com/pr/1", tagIds: [stored.tags?.[0]?.id] }]);
   const badge = q(rowOf(1), ".badge.tag");
   assert.equal(badge.textContent, "Work");
   assert.equal(badge.style.background, "#188038", "solid fill in the tag color (happy-dom keeps the hex)");
   assert.equal(rowOf(2).querySelector(".badge.tag"), null);
-  // a duplicate name keeps the dialog open and says so under the input; nothing written
-  newTag(2);
-  q<HTMLInputElement>(ask, ".ask-input").value = "work";
-  q(ask, ".ask-ok").click();
-  await tick();
-  await tick();
-  assert.equal(ask.open, true, "the dialog stays open");
-  assert.match(q(ask, ".ask-error").textContent ?? "", /exists/);
-  assert.equal(q<HTMLElement>(ask, ".ask-error").hidden, false);
-  assert.equal((await chrome.storage.local.get("tags")).tags?.length, 1, "no second tag");
-  q<HTMLInputElement>(ask, ".ask-input").value = "work2";
-  q(ask, ".ask-input").dispatchEvent(new window.Event("input", { bubbles: true }));
-  assert.equal(q<HTMLElement>(ask, ".ask-error").hidden, true, "typing clears the message");
-  q(ask, ".ask-cancel").click();
-  await tick();
-  await tick();
-  assert.equal(ask.open, false);
-  assert.equal(menu.hidden, false, "the Cancel button brings the row menu back");
-  menu.hidden = true;
-  // Esc just closes: no menu
-  newTag(2);
-  assert.equal(ask.open, true);
-  ask.dispatchEvent(new window.Event("cancel")); // what Esc fires on a native <dialog>
-  ask.close();
-  await tick();
-  await tick();
-  assert.equal(ask.open, false);
-  assert.equal(menu.hidden, true, "Esc does not bring the menu back");
   // the existing tag is a checkbox: ticked when the tab has it; a tick is staged until Apply
   open(2);
   const workBox = q<HTMLInputElement>(pickRow("Work"), "input");
@@ -2847,6 +2847,135 @@ test("UI - Sidepanel - TAGS: row menu Tags ▸ creates / toggles tags; badge, ch
     stored.tagPages?.map((page) => page.url),
     ["https://youtube.com/watch"],
   );
+  // Tag domain…: the same picker over the row's host; the entry is the bare host and covers every page on it
+  rowOf(1).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+  must(qa(menu, ".ctx-item").find((el) => el.textContent === "Tag domain…")).click();
+  assert.equal(q(pick, ".tag-pick-title").textContent, "Tags for domain github.com");
+  q<HTMLInputElement>(pickRow("Work"), "input").click();
+  q(pick, ".tag-pick-apply").click();
+  await tick();
+  await tick();
+  stored = await chrome.storage.local.get(["tagPages"]);
+  assert.deepEqual(
+    stored.tagPages?.map((page) => page.url),
+    ["https://youtube.com/watch", "github.com"],
+  );
+  assert.equal(q(rowOf(1), ".badge.tag").textContent, "⌂ Work", "the badge says the tag comes from the domain entry");
+  assert.ok(q(rowOf(1), ".badge.tag").classList.contains("domain"));
+  assert.match(rowOf(1).dataset.tipTags ?? "", /⌂ Work/, "the tip's pill says so too");
+  // the page picker shows a tag it gets from the site entry ticked and locked
+  open(1);
+  const inherited = q<HTMLInputElement>(pickRow("Work"), "input");
+  assert.equal(inherited.checked, true);
+  assert.equal(inherited.disabled, true, "unticking the page would change nothing: the site entry keeps it");
+  assert.match(pickRow("Work").title, /github\.com/);
+  q(pick, ".tag-pick-cancel").click();
+  await tick();
+  menu.hidden = true;
+  // unticking in the site picker drops the site entry; the page badge goes with it
+  rowOf(1).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+  must(qa(menu, ".ctx-item").find((el) => el.textContent === "Tag domain…")).click();
+  q<HTMLInputElement>(pickRow("Work"), "input").click();
+  q(pick, ".tag-pick-apply").click();
+  await tick();
+  await tick();
+  assert.equal(rowOf(1).querySelector(".badge.tag"), null);
+  stored = await chrome.storage.local.get(["tagPages"]);
+  assert.deepEqual(
+    stored.tagPages?.map((page) => page.url),
+    ["https://youtube.com/watch"],
+  );
+  // a pattern entry's tag carries ✱ on the badge; the page's own entry wins over the domain's
+  const workId = must(stored.tags?.[0]).id;
+  await chrome.storage.local.set({
+    tags: [...(stored.tags ?? []), { id: "tp", name: "temp", color: "red" }],
+    tagPages: [
+      { url: "https://youtube.com/watch", tagIds: [workId] },
+      { url: "https://github.com/pr/1", tagIds: [workId] },
+      { url: "github.com", tagIds: [workId] },
+      { url: "https://github.com/*", tagIds: ["tp"] },
+    ],
+  });
+  await chrome.storage.onChanged.fire({ tagPages: {} }, "local"); // the mock's set fires nothing itself
+  await new Promise((resolve) => setTimeout(resolve, 200)); // the storage refresh is debounced
+  assert.deepEqual(
+    qa(rowOf(1), ".badge.tag").map((el) => el.textContent),
+    ["Work", "✱ temp"],
+  );
+  // the Tag URL… picker shows where a tag comes from after its name (⌂ domain, ✱ pattern)
+  open(1);
+  assert.deepEqual(
+    qa(pick, ".tag-pick:not(.tag-new)").map(
+      (el) => `${q(el, ".tag-name").textContent}:${el.querySelector(".tag-origin")?.textContent ?? ""}`,
+    ),
+    ["Work:⌂", "temp:✱"],
+  );
+  assert.match(q<HTMLElement>(pickRow("temp"), ".tag-origin").title, /github\.com\/\*/);
+  q(pick, ".tag-pick-cancel").click();
+  await tick();
+  menu.hidden = true;
+  // an untick that takes a tag off more than one open tab asks first: over a selection of two rows,
+  // Cancel brings the picker back with the untick staged; Apply writes it
+  const ask = byId<HTMLDialogElement>("ask-dialog");
+  await chrome.storage.local.set({
+    tagPages: [
+      { url: "https://youtube.com/watch", tagIds: [workId] },
+      { url: "https://github.com/pr/1", tagIds: [workId] },
+      { url: "https://github.com/*", tagIds: ["tp"] },
+    ], // no domain entry: tab 1 would keep Work from it, and one tab losing it asks nothing
+  });
+  await chrome.storage.onChanged.fire({ tagPages: {} }, "local");
+  await new Promise((resolve) => setTimeout(resolve, 200));
+  q(rowOf(1), 'input[type="checkbox"]').click();
+  q(rowOf(2), 'input[type="checkbox"]').click();
+  await tick();
+  open(1);
+  assert.equal(q(pick, ".tag-pick-title").textContent, "Tags for 2 tabs");
+  assert.equal(q<HTMLInputElement>(pickRow("Work"), "input").checked, true, "both rows carry it");
+  q<HTMLInputElement>(pickRow("Work"), "input").click();
+  q(pick, ".tag-pick-apply").click();
+  await tick();
+  await tick();
+  assert.equal(ask.open, true);
+  assert.match(q(ask, ".ask-message").textContent ?? "", /^Unticking "Work" takes it off 2 open tabs:/);
+  assert.equal(q(ask, ".ask-ok").textContent, "Apply");
+  q(ask, ".ask-cancel").click();
+  await tick();
+  await tick();
+  assert.equal(q<HTMLInputElement>(pickRow("Work"), "input").checked, false, "Cancel: the picker is back, untick kept");
+  assert.equal(q<HTMLButtonElement>(pick, ".tag-pick-apply").disabled, false);
+  assert.deepEqual(
+    qa(rowOf(2), ".badge.tag").map((el) => el.textContent),
+    ["Work"],
+    "nothing written",
+  );
+  q(pick, ".tag-pick-apply").click();
+  await tick();
+  await tick();
+  q(ask, ".ask-ok").click();
+  await tick();
+  await tick();
+  await tick();
+  stored = await chrome.storage.local.get(["tagPages"]);
+  assert.deepEqual(
+    stored.tagPages?.map((page) => page.url),
+    ["https://github.com/*"],
+    "both page entries lost their only tag",
+  );
+  assert.equal(rowOf(2).querySelector(".badge.tag"), null);
+  assert.deepEqual(
+    qa(rowOf(1), ".badge.tag").map((el) => el.textContent),
+    ["✱ temp"],
+  );
+  q(rowOf(1), 'input[type="checkbox"]').click();
+  q(rowOf(2), 'input[type="checkbox"]').click();
+  await tick();
+  await chrome.storage.local.set({
+    tags: (await chrome.storage.local.get("tags")).tags?.filter((tag) => tag.id !== "tp"),
+    tagPages: [{ url: "https://youtube.com/watch", tagIds: [workId] }],
+  });
+  await chrome.storage.onChanged.fire({ tagPages: {} }, "local");
+  await new Promise((resolve) => setTimeout(resolve, 200));
 });
 
 test("UI - Sidepanel - TAGS: the Tags chip opens a picker; ticks narrow the filter, label and count follow", {
@@ -2854,12 +2983,16 @@ test("UI - Sidepanel - TAGS: the Tags chip opens a picker; ticks narrow the filt
 }, async () => {
   const menu = byId("ctx-menu");
   const rowOf = (id: number) => q(document, `.row[data-tab-id="${id}"]`);
-  // a second tag on tab 3 (Work is on tab 2 from the test above)
+  // a second tag on tab 3 (Work is on tab 2 from the test above): added in the picker, then Apply
   rowOf(3).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
-  must(qa(menu, ".ctx-item").find((el) => el.textContent === "New tag…")).click();
-  const ask = byId<HTMLDialogElement>("ask-dialog");
-  q<HTMLInputElement>(ask, ".ask-input").value = "bills";
-  q(ask, ".ask-ok").click();
+  must(qa(menu, ".ctx-item").find((el) => el.textContent === "Tag URL…")).click();
+  const pick = byId("tag-assign-pop");
+  q<HTMLInputElement>(pick, ".tag-new-name").value = "bills";
+  q(pick, ".tag-new-add").click();
+  await tick();
+  await tick();
+  await tick();
+  q(pick, ".tag-pick-apply").click();
   await tick();
   await tick();
   const chip = q(document, '#filters button[data-filter="tags"]');
@@ -3013,17 +3146,17 @@ test("UI - Sidepanel - TAGS: quick launch Tags view — rows filter, menu rename
   await tick();
 });
 
-test("UI - Sidepanel - TAGS: window blur closes the New tag dialog (like the context menu)", {
+test("UI - Sidepanel - TAGS: window blur closes the picker with a half-typed new tag (like the context menu)", {
   skip: !TAGS_ON,
 }, async () => {
   const menu = byId("ctx-menu");
-  const ask = byId<HTMLDialogElement>("ask-dialog");
+  const pick = byId("tag-assign-pop");
   q(document, ".row").dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
-  must(qa(menu, ".ctx-item").find((el) => el.textContent === "New tag…")).click();
-  assert.equal(ask.open, true);
+  must(qa(menu, ".ctx-item").find((el) => el.textContent === "Tag URL…")).click();
+  q<HTMLInputElement>(pick, ".tag-new-name").value = "half";
   window.dispatchEvent(new window.Event("blur"));
   await tick();
-  assert.equal(ask.open, false, "the question is dropped when focus leaves the panel");
+  assert.equal(byId<HTMLDialogElement>("ask-dialog").open, false, "no question when focus leaves the panel");
   assert.equal((await chrome.storage.local.get("tags")).tags?.length, 2, "nothing written");
 });
 

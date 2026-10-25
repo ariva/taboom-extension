@@ -1,4 +1,4 @@
-// The Tags… entry of the row menus (live and parked rows) and the quick launch's tag menu
+// The Tag domain… / Tag URL… entries of the row menus (live and parked rows) and the quick launch's tag menu
 // (rename / color / remove / undo).
 import { TAG_COLORS } from "../../../app/tags.ts";
 import {
@@ -12,17 +12,21 @@ import {
 } from "../../../lib/ui/context-menu.ts";
 import { state } from "../foundation/state.ts";
 import { openTagAssignPicker } from "../input/tag-assign-picker.ts";
-import { newTagForTabs, recolorTagById, removeTag, tagPageUrls } from "../ops/tag-ops.ts";
+import { recolorTagById, removeTag, tagPageUrls } from "../ops/tag-ops.ts";
 
-// Tags…: the checklist picker (input/tag-assign-picker.ts) opens at the click — ticking
-// several tags needs no re-opening, like Settings → Tagged pages
+// Tag URL…: the checklist picker (input/tag-assign-picker.ts) opens at the click — ticking
+// several tags needs no re-opening, like Settings → Tagged pages. Tag domain…: the same picker
+// over the row's host, so the tag lands on every page of the site
 export function appendTagItems(ids: number[], at: Pick<MouseEvent, "clientX" | "clientY">, reopen: () => void): void {
   if (tagPageUrls(ids).length === 0) {
     return; // nothing taggable (chrome:// pages)
   }
-  // the menu closes, the picker takes its place; Cancel / ✕ bring the menu back (reopen)
-  ctxAppend(ctxItem("Tags…", () => openTagAssignPicker(at, ids, reopen)));
-  ctxAppend(ctxItem("New tag…", () => newTagForTabs(ids, reopen, at))); // opens where the menu was; Cancel brings the menu back
+  // the menu closes, the picker takes its place; Cancel / ✕ bring the menu back (reopen).
+  // Domain first: the wider label is the usual pick
+  if (tagPageUrls(ids, "site").length > 0) {
+    ctxAppend(ctxItem("Tag domain…", () => openTagAssignPicker(at, ids, reopen, "site")));
+  }
+  ctxAppend(ctxItem("Tag URL…", () => openTagAssignPicker(at, ids, reopen)));
 }
 
 // the quick launch's Tags rows: rename edits the row there

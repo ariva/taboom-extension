@@ -37,11 +37,11 @@ Tags chip opens a picker to show only tabs carrying one of the ticked tags.
 
 ## Tags
 
-Colored labels on a page address: tick as many as you like in the row's **Tags…** checklist,
+Colored labels on a page address: tick as many as you like in the row's **Tag URL…** checklist,
 see them as pills on every tab of that page and in the hover tip, group the list by tag.
 
 <p>
-  <img src="assets/features/tags-assign-popover.png" alt="Tags - the Tags… checklist" width="360">
+  <img src="assets/features/tags-assign-popover.png" alt="Tags - the Tag URL… checklist" width="360">
   <img src="assets/features/tags-row-pills.png" alt="Tags - pills on a row" width="360">
 </p>
 <p>

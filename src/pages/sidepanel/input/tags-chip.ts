@@ -27,7 +27,7 @@ function fillPicker(): void {
   if (tags.length === 0) {
     const empty = document.createElement("div");
     empty.className = "muted tag-pick-empty";
-    empty.textContent = "No tags yet — tag a tab from its row menu (Tags ▸).";
+    empty.textContent = "No tags yet — tag a tab from its row menu (Tag URL ▸).";
     pop.append(empty);
     return;
   }

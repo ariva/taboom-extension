@@ -27,6 +27,7 @@ import {
   removeTags,
   renameTag,
   restoreTagRemoval,
+  setPageEnabled,
   setPageTags,
   setTagEnabled,
   togglePageTags,
@@ -315,6 +316,11 @@ export function toggleTagOnPages(urls: string[], tagId: string, on: boolean): Pr
 // Settings → Tagged pages: a page's whole tag set (empty = the page leaves the list, no trash)
 export function setPageTagIds(url: string, tagIds: string[]): Promise<boolean> {
   return editPages((pages) => setPageTags(pages, url, tagIds));
+}
+
+// Settings → Tagged pages: the entry's on / off switch; false when nothing changed
+export function editTagPage(url: string, patch: { enabled: boolean }): Promise<boolean> {
+  return editPages((pages) => setPageEnabled(pages, url, patch.enabled));
 }
 
 // the one door for dropping tags or tagged pages: what leaves lands in the trash for Undo / Restore

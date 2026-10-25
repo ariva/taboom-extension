@@ -1192,6 +1192,72 @@ test("UI - Options - TAGS card: tag table (add, rename, recolor, remove), tagged
   const pageRows = () => qa<HTMLTableRowElement>(document, "#tag-page-rows tr");
   assert.equal(pageRows().length, 1);
   assert.equal(q(must(pageRows()[0]), ".url").textContent, "https://app.example.com/board");
+  // the Tabs column (after Tags): how many open tabs the entry covers (none yet; the title lists them)
+  assert.equal(q(must(pageRows()[0]), ".tag-page-tabs").textContent, "0");
+  await chrome.tabs.create({ url: "https://app.example.com/board#x" });
+  await chrome.tabs.create({ url: "https://app.example.com/other" });
+  await rerender();
+  assert.equal(q(must(pageRows()[0]), ".tag-page-tabs").textContent, "1", "the fragment is no other page");
+  assert.deepEqual(
+    qa(must(pageRows()[0]), "td").map(
+      (td) => td.querySelector(".tag-page-enabled, .tag-chips, .tag-page-tabs, .remove-page")?.className ?? "",
+    ),
+    ["", "tag-page-enabled", "", "tag-chips", "tag-page-tabs", "remove-page"],
+    "column order: #, on/off, page, tags, tabs, remove",
+  );
+  assert.match(q<HTMLElement>(must(pageRows()[0]), ".tag-page-tabs").title, /app\.example\.com\/board/);
+  // the same address again (another form of it) is a duplicate: an error under the Add row, no write
+  byId<HTMLInputElement>("new-tag-page").value = "app.example.com/board#y";
+  byId<HTMLSelectElement>("new-tag-page-tag").value = bills.id;
+  byId("add-tag-page").click();
+  await settle();
+  assert.equal(byId("tag-page-error").hidden, false);
+  assert.equal(
+    byId("tag-page-error").textContent,
+    '"https://app.example.com/board" is already listed — edit that row instead',
+  );
+  assert.deepEqual(stored.tagPages, [{ url: "https://app.example.com/board", tagIds: [work.id] }], "nothing written");
+  assert.equal(byId<HTMLInputElement>("new-tag-page").value, "app.example.com/board#y", "the text stays");
+  byId<HTMLInputElement>("new-tag-page").value = "*";
+  byId("add-tag-page").click();
+  await settle();
+  assert.equal(byId("tag-page-error").textContent, "Type an address, a host or a pattern");
+  // a good add clears the error; editing that row onto the first row's key is refused the same way
+  byId<HTMLInputElement>("new-tag-page").value = "https://b.test/";
+  byId("add-tag-page").click();
+  await settle();
+  assert.equal(byId("tag-page-error").hidden, true);
+  assert.equal(stored.tagPages.length, 2);
+  await rerender();
+  q(must(pageRows()[1]), ".url").click();
+  await tick();
+  const editUrl = q<HTMLInputElement>(document, "#tag-page-rows .rename-input");
+  editUrl.value = "app.example.com/board";
+  editUrl.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+  await settle();
+  assert.equal(byId("tag-page-error").hidden, false);
+  assert.deepEqual(
+    stored.tagPages.map((page) => page.url),
+    ["https://app.example.com/board", "https://b.test/"],
+    "both rows kept",
+  );
+  // the on/off switch after #: off keeps the row (muted), writes the flag; on again clears the key
+  await rerender();
+  const pageOnOff = q<HTMLInputElement>(must(pageRows()[1]), ".tag-page-enabled");
+  assert.equal(pageOnOff.checked, true);
+  pageOnOff.click();
+  await settle();
+  assert.equal(stored.tagPages[1]?.disabled, true);
+  await rerender();
+  assert.ok(must(pageRows()[1]).classList.contains("off"));
+  q<HTMLInputElement>(must(pageRows()[1]), ".tag-page-enabled").click();
+  await settle();
+  assert.equal(stored.tagPages[1]?.disabled, undefined, "the key is absent when on");
+  await rerender();
+  q(must(pageRows()[1]), ".remove-page").click();
+  await settle();
+  stored.tagTrash = [];
+  await rerender();
   // the page's tags as chips with a ✕ each; the Tags ▾ button opens a picker with one tick per tag
   const chips = () => qa<HTMLElement>(must(pageRows()[0]), ".tag-chip");
   assert.deepEqual(
@@ -1243,6 +1309,48 @@ test("UI - Options - TAGS card: tag table (add, rename, recolor, remove), tagged
   await settle();
   assert.equal(stored.tagPages.length, 0);
   assert.equal(stored.tagTrash.length, 0);
+  // a bare host is a site entry, kept as typed (lowercased); its hint says what it covers
+  byId<HTMLInputElement>("new-tag-page").value = " *.B.test ";
+  byId<HTMLSelectElement>("new-tag-page-tag").value = bills.id;
+  byId("add-tag-page").click();
+  await settle();
+  assert.deepEqual(stored.tagPages, [{ url: "*.b.test", tagIds: [bills.id] }]);
+  await chrome.tabs.create({ url: "https://www.b.test/" });
+  await chrome.tabs.create({ url: "https://b.test/x" });
+  await rerender();
+  assert.match(q<HTMLElement>(must(pageRows()[0]), "td:nth-child(3)").title, /b\.test and its subdomains/);
+  assert.equal(q(must(pageRows()[0]), ".tag-page-tabs").textContent, "2", "the host and its subdomain");
+  // a ✕ (or an untick in the picker) that takes the tag off more than one open tab asks first, naming them
+  const globals = globalThis as { confirm: (message?: string) => boolean }; // `as`: the harness installs confirm
+  const confirmBefore = globals.confirm;
+  let asked = "";
+  globals.confirm = (message = "") => {
+    asked = message;
+    return false;
+  };
+  q(must(pageRows()[0]), ".tag-chip-remove").click();
+  await settle();
+  assert.match(asked, /^Taking "bills" off \*\.b\.test removes it from 2 open tabs:/);
+  assert.match(asked, /b\.test\/x/);
+  assert.equal(stored.tagPages.length, 1, "declined: nothing removed");
+  q(must(pageRows()[0]), ".tag-pick-btn").click();
+  await tick();
+  asked = "";
+  must(qa<HTMLInputElement>(byId("tag-page-pick"), ".tag-pick input")[1]).click();
+  await settle();
+  assert.match(asked, /2 open tabs/);
+  assert.equal(
+    must(qa<HTMLInputElement>(byId("tag-page-pick"), ".tag-pick input")[1]).checked,
+    true,
+    "declined: the tick stays",
+  );
+  assert.equal(stored.tagPages.length, 1);
+  q(byId("tag-page-pick"), ".tag-pick-close").click();
+  globals.confirm = confirmBefore;
+  q(must(pageRows()[0]), ".remove-page").click();
+  await settle();
+  assert.equal(stored.tagPages.length, 0, "a site entry is removed by its pattern");
+  stored.tagTrash = [];
   // Remove a page → trash → Restore last removal
   byId<HTMLInputElement>("new-tag-page").value = "https://b.test/";
   byId<HTMLSelectElement>("new-tag-page-tag").value = bills.id;
@@ -1256,7 +1364,7 @@ test("UI - Options - TAGS card: tag table (add, rename, recolor, remove), tagged
   await rerender();
   const restore = byId<HTMLButtonElement>("restore-tags");
   assert.equal(restore.hidden, false);
-  assert.equal(restore.textContent, "Restore last removal (1 page)");
+  assert.equal(restore.textContent, "Restore last removal (1 rule)");
   restore.click();
   await settle();
   assert.deepEqual(
@@ -1465,6 +1573,44 @@ test("UI - Options - TAGS: click Color / Tag / Pages headers to sort the table (
   await tick();
   assert.deepEqual(names(), ["work", "Alpha", "bills"]);
   assert.equal(header("stored").dataset.dir, "asc");
+  // the tagged-pages table sorts the same way: Page (A–Z) or Tabs (open-tab count); # = stored order
+  await chrome.tabs.create({ url: "https://b.test/" });
+  await chrome.storage.onChanged.fire({ tagPages: {} }, "local");
+  await tick();
+  await tick();
+  const pageUrls = () => qa(document, "#tag-page-rows .url").map((el) => el.textContent);
+  const pageHeader = (key: string) => q<HTMLElement>(document, `#tag-page-table th[data-sort="${key}"]`);
+  assert.deepEqual(pageUrls(), ["https://a.test/", "https://b.test/"]);
+  assert.equal(pageHeader("stored").dataset.dir, "asc");
+  pageHeader("tabs").click();
+  await tick();
+  await tick();
+  assert.deepEqual(pageUrls(), ["https://a.test/", "https://b.test/"], "ascending: 0 tabs, then 1");
+  assert.deepEqual(stored.ui.tagPageSort, { key: "tabs", dir: "asc" }, "saved like the tag sort");
+  pageHeader("tabs").click();
+  await tick();
+  await tick();
+  assert.deepEqual(pageUrls(), ["https://b.test/", "https://a.test/"]);
+  assert.deepEqual(
+    qa(document, "#tag-page-rows td:first-child").map((el) => el.textContent),
+    ["2", "1"],
+    "the # column keeps the stored position",
+  );
+  pageHeader("url").click();
+  await tick();
+  await tick();
+  assert.deepEqual(pageUrls(), ["https://a.test/", "https://b.test/"]);
+  assert.equal(pageHeader("tabs").dataset.dir, undefined, "one arrow at a time");
+  pageHeader("tags").click();
+  await tick();
+  await tick();
+  assert.deepEqual(pageUrls(), ["https://b.test/", "https://a.test/"], "first tag: bills before work");
+  assert.deepEqual(stored.ui.tagPageSort, { key: "tags", dir: "asc" });
+  pageHeader("stored").click();
+  await tick();
+  await tick();
+  assert.equal(stored.ui.tagPageSort, undefined, "stored order = the key is absent");
+  assert.equal(pageHeader("stored").dataset.dir, "asc");
   stored.tags = [];
   stored.tagPages = [];
 });

@@ -12,7 +12,7 @@ export const tags: Scene = {
     const row = stage.awakeRow("Roadmap 2027");
     await stage.click(row, { button: "right" });
     await stage.pause(400);
-    await stage.click(stage.menuItem("Tags…"));
+    await stage.click(stage.menuItem("Tag URL…"));
     await stage.pause(500);
     const ticks = stage.panel.locator("#tag-assign-pop .tag-pick input");
     await stage.click(ticks.nth(0));

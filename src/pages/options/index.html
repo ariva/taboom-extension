@@ -219,11 +219,18 @@
     #tag-table tbody td:nth-child(5) { width: 100%; max-width: 0; overflow: hidden; text-overflow: ellipsis; cursor: text; padding-right: 12px; }
     /* tagged pages: fixed columns — the address takes what the 40 % Tags column leaves; chips wrap inside it */
     #tag-page-table { table-layout: fixed; }
-    #tag-page-table th:nth-child(1) { width: 1.5rem; }
-    #tag-page-table th:nth-child(3) { width: 40%; }
-    #tag-page-table th:nth-child(4) { width: 5.5rem; }
-    #tag-page-table td:nth-child(2) { overflow: hidden; text-overflow: ellipsis; cursor: text; padding-right: 12px; }
-    #tag-page-table td:nth-child(3) { overflow: hidden; }
+    #tag-page-table th:nth-child(1) { width: 2.25rem; } /* the # and its sort arrow */
+    /* the on / off switch is 32px wide (fixed layout: a narrower column lets it run into the address) + a gap */
+    #tag-page-table th:nth-child(2) { width: calc(32px + 1rem); }
+    #tag-page-table td:nth-child(2) { padding-right: 1rem; }
+    #tag-page-table th:nth-child(4) { width: 40%; }
+    #tag-page-table th:nth-child(5) { width: 2.75rem; } /* Tabs: a count */
+    #tag-page-table th:nth-child(6) { width: 5.5rem; }
+    #tag-page-table .tag-page-tabs { font-variant-numeric: tabular-nums; cursor: default; }
+    #tag-page-table td:nth-child(3) { overflow: hidden; text-overflow: ellipsis; cursor: text; padding-right: 12px; }
+    #tag-page-table td:nth-child(4) { overflow: hidden; }
+    /* switched off: the row reads muted, the switch itself stays crisp */
+    #tag-page-rows tr.off td:not(:nth-child(2)) { opacity: 0.5; }
     #tag-page-table .tag-chips { display: flex; align-items: center; gap: 4px; min-width: 0; }
     #tag-page-table .tag-chips .tag-chip { flex: 0 1 auto; min-width: 2.5rem; margin: 0; }
     #tag-page-table .tag-chips .tag-chip-name { flex: 1 1 auto; min-width: 0; }
@@ -284,17 +291,17 @@
     #tag-page-pick .muted { padding: 4px 6px; }
     #tag-table button, #tag-page-table button.remove-page { border: 1px solid var(--border); border-radius: 6px; background: none; color: inherit; font: inherit; font-size: 12px; padding: 2px 8px; cursor: pointer; }
     #tag-table button:hover, #tag-page-table button.remove-page:hover { background: var(--hover); }
-    #tag-error { color: var(--danger, #d93025); margin-top: 4px; }
+    #tag-error, #tag-page-error { color: var(--danger, #d93025); margin-top: 4px; }
     /* drag reorder of the tag rows, like the side panel's tab rows: the dragged row dims, the row
        under the pointer is highlighted whole (dashed accent frame + tint) */
     #tag-rows tr[draggable="true"] { cursor: grab; }
     #tag-rows tr[draggable="false"] .drag-grip { opacity: 0.35; }
     /* sortable headers: a faint ⇅ invites the click, the active one shows ▲ / ▼ */
-    #tag-table th[data-sort] { cursor: pointer; user-select: none; white-space: nowrap; }
-    #tag-table th[data-sort]:hover { color: inherit; }
-    #tag-table th[data-sort] .sort-arrow { font-size: 10px; opacity: 0.45; }
-    #tag-table th[data-sort][data-dir] { color: inherit; }
-    #tag-table th[data-sort][data-dir] .sort-arrow { opacity: 1; color: var(--accent); }
+    /* sortable headers read in the accent in both tables (the tag table did by a comma slip in the old
+       selectors; kept on purpose); the arrow is dim until its sort is active */
+    #tag-table th[data-sort], #tag-page-table th[data-sort] { cursor: pointer; user-select: none; white-space: nowrap; color: var(--accent); }
+    #tag-table th[data-sort] .sort-arrow, #tag-page-table th[data-sort] .sort-arrow { font-size: 10px; opacity: 0.45; }
+    #tag-table th[data-sort][data-dir] .sort-arrow, #tag-page-table th[data-sort][data-dir] .sort-arrow { opacity: 1; }
     #tag-rows .drag-grip { display: inline-flex; color: var(--muted); }
     #tag-rows .drag-grip svg { width: 10px; height: 14px; display: block; }
     #tag-rows tr.dragging td { opacity: 0.4; }
@@ -524,7 +531,7 @@
 
   <section class="card" id="tags-section" hidden>
     <h2>Tags</h2>
-    <p class="muted">A tag is a colored label on a page: tag a tab from its side panel row menu (<strong>Tags ▸</strong>) or the page's right-click menu (<strong>Tag page ▸</strong>), filter the list by tag with the <strong>Tags ▾</strong> chip, search with <code>#name</code>. Tags stick to the page address (without its <code>#fragment</code>), so they survive a restart and cover every tab on that page — any page but the New Tab page, which every new tab shares.</p>
+    <p class="muted">A tag is a colored label on a page: tag a tab from its side panel row menu (<strong>Tag URL ▸</strong>) or the page's right-click menu (<strong>Tag page ▸</strong>), filter the list by tag with the <strong>Tags ▾</strong> chip, search with <code>#name</code>. Tags stick to the page address (without its <code>#fragment</code>), so they survive a restart and cover every tab on that page — any page but the New Tab page, which every new tab shares. <strong>Tag domain…</strong> in the row menu tags the whole host instead; an address ending in <code>/</code> covers every page under it (<code>https://www.example.com/</code> is the whole site); here an entry can also be a host (<code>example.com</code>), a host with its subdomains (<code>*.example.com</code>) or a pattern with <code>*</code> anywhere (<code>https://github.com/ariva/*/test</code>, <code>*</code> matches anything, <code>/</code> included). A tab carries the tags of every entry covering it.</p>
     <p class="muted">Drag a row onto another to reorder: the stored order is the order of the badges on a tab and of the Group by tag headers. Click #, Color, Tag or Pages to sort this table. The switch turns a tag off: it keeps its pages here but shows nowhere else until switched on again.</p>
     <label>Tags order in pickers
       <select id="tagPickOrder">
@@ -536,7 +543,7 @@
     </label>
     <table id="tag-table">
       <!-- Color / Tag / Pages sort the view (asc → desc → stored order); the stored order is what drag changes -->
-      <thead><tr><th></th><th data-sort="stored">#<span class="sort-arrow">⇅</span></th><th></th><th data-sort="color">Color <span class="sort-arrow">⇅</span></th><th data-sort="name">Tag <span class="sort-arrow">⇅</span></th><th data-sort="pages">Pages <span class="sort-arrow">⇅</span></th><th></th></tr></thead>
+      <thead><tr><th></th><th data-sort="stored">#<span class="sort-arrow">⇅</span></th><th></th><th data-sort="color">Color <span class="sort-arrow">⇅</span></th><th data-sort="name">Tag <span class="sort-arrow">⇅</span></th><th data-sort="pages">Page rules <span class="sort-arrow">⇅</span></th><th></th></tr></thead>
       <tbody id="tag-rows"></tbody>
       <!-- the Add row is a table row: "New" under the grip / #, the color under Color, the name under Tag -->
       <tfoot>
@@ -550,18 +557,19 @@
       </tfoot>
     </table>
     <p class="muted" id="tag-error" hidden></p>
-    <h3>Tagged pages</h3>
+    <h3>Tagged page rules</h3>
     <table id="tag-page-table">
-      <thead><tr><th>#</th><th>Page</th><th>Tags</th><th></th></tr></thead>
+      <thead><tr><th data-sort="stored">#<span class="sort-arrow">⇅</span></th><th></th><th data-sort="url">Page / domain / pattern <span class="sort-arrow">⇅</span></th><th data-sort="tags">Tags <span class="sort-arrow">⇅</span></th><th data-sort="tabs">Tabs <span class="sort-arrow">⇅</span></th><th></th></tr></thead>
       <tbody id="tag-page-rows"></tbody>
     </table>
     <!-- one picker for every page row: filled for the row whose Tags ▾ opened it -->
     <div id="tag-page-pick" popover></div>
     <div class="row">
-      <input type="text" id="new-tag-page" placeholder="https://app.example.com/board" />
+      <input type="text" id="new-tag-page" placeholder="https://app.example.com/board, example.com, *.example.com or https://x.com/a/*" />
       <select id="new-tag-page-tag" aria-label="Tag"></select>
       <button id="add-tag-page">Add</button>
     </div>
+    <p class="muted" id="tag-page-error" hidden></p>
     <hr class="card-divider" />
     <p class="muted">Removes every tag and every tagged page. Settings stay unchanged. Any removal (a row's Remove, a menu's Remove tag, Remove all) can be undone, newest first.</p>
     <div class="row">

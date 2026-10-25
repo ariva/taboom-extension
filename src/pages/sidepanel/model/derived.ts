@@ -2,7 +2,7 @@
 // protected / kept-alive flags computed once per refresh. No DOM, no chrome.*.
 import { hostnameOf, isProtected } from "../../../app/core.ts";
 import { keepAliveEntry } from "../../../app/keep-alive.ts";
-import { tagsForUrl } from "../../../app/tags.ts";
+import { type TagOrigin, tagOrigins, tagsForUrl } from "../../../app/tags.ts";
 import type { KeepAliveTab, ProtectionRule, Tag, TagPage } from "../../../app/types.ts";
 
 type Tab = chrome.tabs.Tab;
@@ -17,6 +17,7 @@ export interface DerivedTab {
   protected: boolean;
   keptAlive: boolean;
   tags: Tag[]; // TAGS: the page's tags in tag-list order (empty while the flag is off)
+  tagOrigins: Map<string, TagOrigin>; // tag id → the entry kind it comes from (the badge glyph)
 }
 
 // the tag list and the tagged pages, as refresh() read them
@@ -51,6 +52,7 @@ export function deriveTabs(
           protected: isProtected(tab.url, rules),
           keptAlive: mark !== undefined && !mark.paused, // paused reloads nothing — no badge
           tags,
+          tagOrigins: tags.length > 0 ? tagOrigins(tagging.pages, tab.url) : new Map(),
         },
       ];
     }),

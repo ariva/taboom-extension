@@ -159,7 +159,7 @@ export function parkedActive(): boolean {
   return featureEnabled(state.features, "PARKED_WINDOWS");
 }
 
-// TAGS resolved flag — Tags ▸ in the row menu, the Tags chip, the badges, the quick launch view
+// TAGS resolved flag — Tag URL ▸ in the row menu, the Tags chip, the badges, the quick launch view
 export function tagsActive(): boolean {
   return featureEnabled(state.features, "TAGS");
 }

@@ -1,12 +1,13 @@
 // Tags card: the tag table (color select, click-to-edit name, pages count, Remove), an Add
-// row (name + color), the tagged-pages table (click-to-edit address, one toggle chip per
-// tag, Remove), an Add row (address + tag), Remove all and Restore last removal.
+// row (name + color), the tagged-pages table (click-to-edit address or pattern, one toggle
+// chip per tag, Remove), an Add row (address / pattern + tag), Remove all and Restore last removal.
 import { applyExperimental, featureEnabled } from "../../app/core.ts";
 import { popRemoval } from "../../app/removal-trash.ts";
 import {
   addTag,
   clearTags,
   editTag,
+  editTagPage,
   loadState,
   localStore,
   removeTagPagesToTrash,
@@ -20,14 +21,28 @@ import {
   nextTagSort,
   orderedTags,
   pageCountByTag,
+  sortedTagPages,
   sortedTags,
+  tabsLosingTag,
   TAG_COLORS,
   tagColorHex,
   tagNameError,
-  tagPageUrlFromInput,
+  tagPageError,
   usesDarkText,
 } from "../../app/tags.ts";
-import type { AppState, Removal, Tag, TagPage, TagRemoval, TagSort, TagSortKey, UiPrefs } from "../../app/types.ts";
+import { matchesTagPage, tagPagePatternFromInput, tagPagePatternHint } from "../../app/tag-patterns.ts";
+import type {
+  AppState,
+  Removal,
+  Tag,
+  TagPage,
+  TagPageSort,
+  TagPageSortKey,
+  TagRemoval,
+  TagSort,
+  TagSortKey,
+  UiPrefs,
+} from "../../app/types.ts";
 import { closest, getElementById } from "../../lib/dom.ts";
 import { inlineEdit } from "../../lib/ui/inline-edit.ts";
 import { flashSaved, getFeatures, render } from "./page-state.ts";
@@ -35,6 +50,7 @@ import { flashSaved, getFeatures, render } from "./page-state.ts";
 // header sort of the tag table (ui.tagSort, saved on every click); the stored order (drag) stays.
 // Mirrored here from the last render, with the picker-order prefs the page's own pickers read
 let tagSort: TagSort | null = null;
+let tagPageSort: TagPageSort | null = null; // the tagged-pages table's own sort (ui.tagPageSort)
 let pickerUi: Pick<UiPrefs, "tagSort" | "tagPickOrder"> = { tagPickOrder: "stored" };
 
 function cell(...children: (Node | string)[]): HTMLTableCellElement {
@@ -68,8 +84,9 @@ function colorSelect(current: string): HTMLSelectElement {
   return fillColorOptions(document.createElement("select"), current);
 }
 
-function showError(message: string | undefined): void {
-  const error = getElementById("tag-error");
+// the tag table's message (#tag-error) or the tagged pages' (#tag-page-error, under its Add row)
+function showError(message: string | undefined, id = "tag-error"): void {
+  const error = getElementById(id);
   error.hidden = !message;
   error.textContent = message ?? "";
 }
@@ -81,12 +98,16 @@ export async function renderTags(state: AppState): Promise<void> {
   if (section.hidden) {
     return;
   }
-  const { tags = [], tagPages = [], tagTrash = [] } = await localStore.get(["tags", "tagPages", "tagTrash"]);
+  const [{ tags = [], tagPages = [], tagTrash = [] }, openTabs] = await Promise.all([
+    localStore.get(["tags", "tagPages", "tagTrash"]),
+    chrome.tabs.query({}), // the Open column: counted at render time, so it follows every write and a page open
+  ]);
   tagSort = state.ui.tagSort ?? null;
+  tagPageSort = state.ui.tagPageSort ?? null;
   pickerUi = state.ui;
   renderRestore(tagTrash);
   renderTagRows(tags, tagPages);
-  renderPageRows(tags, tagPages);
+  renderPageRows(tags, tagPages, openTabs);
   fillPagePicker(tags, tagPages); // an open picker follows every write
   // the Add-page tag dropdown lists the current tags
   const pick = getElementById<HTMLSelectElement>("new-tag-page-tag");
@@ -128,7 +149,7 @@ function renderTagRows(tags: Tag[], pages: TagPage[]): void {
     rows.append(emptyRow("No tags yet.", 7));
   }
   const counts = pageCountByTag(pages);
-  renderSortHeaders();
+  renderSortHeaders("tag-table", tagSort);
   // the # column keeps the stored position, so a sorted view still tells where a row lives
   const stored = new Map(tags.map((tag, index) => [tag.id, index + 1]));
   for (const tag of sortedTags(tags, counts, tagSort)) {
@@ -207,13 +228,13 @@ function renderTagRows(tags: Tag[], pages: TagPage[]): void {
   }
 }
 
-// the sortable headers carry the arrow of the active sort (data-dir) and a hint
-function renderSortHeaders(): void {
-  for (const header of document.querySelectorAll<HTMLElement>("#tag-table th[data-sort]")) {
+// the sortable headers of a table carry the arrow of the active sort (data-dir) and a hint
+function renderSortHeaders(tableId: string, sort: { key: string; dir: "asc" | "desc" } | null): void {
+  for (const header of document.querySelectorAll<HTMLElement>(`#${tableId} th[data-sort]`)) {
     // the # header stands for the stored order: active while no column sort is on
     const stored = header.dataset.sort === "stored";
-    const active = stored ? tagSort === null : tagSort !== null && tagSort.key === header.dataset.sort;
-    const dir = stored ? "asc" : tagSort?.dir;
+    const active = stored ? sort === null : sort !== null && sort.key === header.dataset.sort;
+    const dir = stored ? "asc" : sort?.dir;
     if (active && dir) {
       header.dataset.dir = dir;
     } else {
@@ -224,7 +245,8 @@ function renderSortHeaders(): void {
       arrow.textContent = active ? (dir === "asc" ? "▲" : "▼") : "⇅";
     }
     if (stored) {
-      header.title = active ? "The stored order (drag rows to change it)" : "Click for the stored order";
+      const drag = tableId === "tag-table" ? " (drag rows to change it)" : "";
+      header.title = active ? `The stored order${drag}` : "Click for the stored order";
     } else {
       header.title = active
         ? dir === "asc"
@@ -287,6 +309,25 @@ function initTagReorder(): void {
   });
 }
 
+// taking a tag off an entry that covers more than one open tab is confirmed first, naming them
+async function confirmedUntick(url: string, tag: Tag): Promise<boolean> {
+  const [{ tagPages = [] }, tabs] = await Promise.all([localStore.get("tagPages"), chrome.tabs.query({})]);
+  const losing = tabsLosingTag(tagPages, [url], tag.id, tabs);
+  if (losing.length < 2) {
+    return true;
+  }
+  const names = losing.slice(0, 5).map((tab) => `• ${tab.title || tab.url}`);
+  const more = losing.length > 5 ? [`• … and ${losing.length - 5} more`] : [];
+  return confirm(
+    [
+      `Taking "${tag.name}" off ${url} removes it from ${losing.length} open tabs:`,
+      ...names,
+      ...more,
+      "Continue?",
+    ].join("\n"),
+  );
+}
+
 // a page's tag as a solid chip with a ✕ (the last one off drops the page — no trash)
 function pageChip(tag: Tag, page: TagPage): HTMLSpanElement {
   const chip = document.createElement("span");
@@ -306,10 +347,11 @@ function pageChip(tag: Tag, page: TagPage): HTMLSpanElement {
   remove.title = remove.ariaLabel = `Remove "${tag.name}" from this page`;
   remove.addEventListener("click", async () => {
     if (
-      await setPageTagIds(
+      (await confirmedUntick(page.url, tag)) &&
+      (await setPageTagIds(
         page.url,
         page.tagIds.filter((id) => id !== tag.id),
-      )
+      ))
     ) {
       flashSaved();
       render();
@@ -392,6 +434,10 @@ function fillPagePicker(tags: Tag[], pages: TagPage[]): void {
     box.type = "checkbox";
     box.checked = current.includes(tag.id);
     box.addEventListener("change", async () => {
+      if (!box.checked && !(await confirmedUntick(url, tag))) {
+        box.checked = true; // declined: the tick stays
+        return;
+      }
       const next = box.checked ? [...current, tag.id] : current.filter((id) => id !== tag.id);
       if (await setPageTagIds(url, next)) {
         flashSaved();
@@ -425,44 +471,88 @@ async function openPagePicker(anchor: HTMLElement, url: string): Promise<void> {
   pick.style.left = `${Math.max(8, Math.min(rect.left, window.innerWidth - pick.offsetWidth - 8))}px`;
 }
 
-function renderPageRows(tags: Tag[], pages: TagPage[]): void {
+// the Tabs column: how many open tabs the entry covers — the number tells whether a domain or
+// pattern is the one meant; the tooltip names them
+function openTabsCell(page: TagPage, openTabs: chrome.tabs.Tab[]): HTMLTableCellElement {
+  const covered = openTabs.filter((tab) => matchesTagPage(page.url, tab.url));
+  const count = document.createElement("span");
+  count.className = "tag-page-tabs";
+  count.textContent = String(covered.length);
+  const names = covered.map((tab) => tab.title || tab.url || "");
+  count.title =
+    covered.length === 0
+      ? "No open tab is covered by this entry"
+      : ["Open tabs covered:", ...names.slice(0, 10), ...(names.length > 10 ? ["…"] : [])].join("\n");
+  return cell(count);
+}
+
+function renderPageRows(tags: Tag[], pages: TagPage[], openTabs: chrome.tabs.Tab[]): void {
   const rows = getElementById("tag-page-rows");
   rows.textContent = "";
   if (pages.length === 0) {
-    rows.append(emptyRow("No tagged pages yet.", 4));
+    rows.append(emptyRow("No tagged page rules yet.", 6));
   }
-  pages.forEach((page, index) => {
+  renderSortHeaders("tag-page-table", tagPageSort);
+  // the # column keeps the stored position, like the tag table
+  const stored = new Map(pages.map((page, index) => [page.url, index]));
+  const tabCounts = new Map(
+    pages.map((page) => [page.url, openTabs.filter((tab) => matchesTagPage(page.url, tab.url)).length]),
+  );
+  for (const page of sortedTagPages(pages, tabCounts, tagPageSort, tags)) {
+    const index = stored.get(page.url) ?? 0;
     const url = document.createElement("span");
     url.className = "url";
     url.textContent = page.url;
     const pageCell = cell(url);
-    pageCell.title = `${page.url}\nClick to edit the address`;
+    pageCell.title = `${tagPagePatternHint(page.url)}: ${page.url}\nClick to edit — an address, a host, *.host or a pattern with *`;
     pageCell.addEventListener("click", () => {
       if (pageCell.querySelector(".rename-input")) {
         return;
       }
       inlineEdit(url, {
         initial: page.url,
-        placeholder: "https://app.example.com/board",
-        // re-keyed in two writes (the old entry leaves, the new one takes its tags); junk or
-        // the same address changes nothing
+        placeholder: "https://app.example.com/board or example.com or https://x.com/a/*",
+        // re-keyed in two writes (the old entry leaves, the new one takes its tags and its switch);
+        // the same pattern changes nothing; junk or another row's key is refused with a message
         commit: async (value) => {
-          const next = tagPageUrlFromInput(value);
-          if (next === "" || next === page.url) {
+          const next = tagPagePatternFromInput(value);
+          if (next === page.url) {
+            return;
+          }
+          const error = tagPageError(pages, value, page.url);
+          showError(error, "tag-page-error");
+          if (error) {
             return;
           }
           await setPageTagIds(page.url, []);
           await setPageTagIds(next, page.tagIds);
+          if (page.disabled) {
+            await editTagPage(next, { enabled: false });
+          }
           flashSaved();
         },
         finish: render,
       });
     });
     const chips = pageTagsCell(tags, page);
+    // on / off: off keeps the entry here and makes it cover no tab until switched on
+    const enabled = document.createElement("input");
+    enabled.type = "checkbox";
+    enabled.className = "tag-page-enabled";
+    enabled.checked = !page.disabled;
+    enabled.title = page.disabled
+      ? "Off: covers no tab — switch on to tag its pages again"
+      : "On — switch off to keep the entry without tagging its pages";
+    enabled.addEventListener("change", async () => {
+      if (await editTagPage(page.url, { enabled: enabled.checked })) {
+        flashSaved();
+      }
+      render();
+    });
     const remove = document.createElement("button");
     remove.className = "remove-page";
     remove.textContent = "Remove";
-    remove.title = "Remove this page from the tagged pages";
+    remove.title = "Remove this rule from the tagged page rules";
     remove.addEventListener("click", async () => {
       if (await removeTagPagesToTrash([page.url])) {
         flashSaved();
@@ -470,12 +560,15 @@ function renderPageRows(tags: Tag[], pages: TagPage[]): void {
       }
     });
     const row = document.createElement("tr");
-    row.append(cell(String(index + 1)), pageCell, chips, cell(remove));
+    if (page.disabled) {
+      row.classList.add("off");
+    }
+    row.append(cell(String(index + 1)), cell(enabled), pageCell, chips, openTabsCell(page, openTabs), cell(remove));
     rows.append(row);
-  });
+  }
 }
 
-// "Restore last removal (N tags)" / "(N pages)" — only while an action exists
+// "Restore last removal (N tags)" / "(N rules)" — only while an action exists
 function renderRestore(trash: Removal<TagRemoval>[]): void {
   const button = getElementById<HTMLButtonElement>("restore-tags");
   const newest = popRemoval(trash)?.newest;
@@ -486,7 +579,7 @@ function renderRestore(trash: Removal<TagRemoval>[]): void {
   const tagCount = newest.items.reduce((sum, removal) => sum + removal.tags.length, 0);
   const pageCount = newest.items.reduce((sum, removal) => sum + removal.pages.length, 0);
   const what =
-    tagCount > 0 ? `${tagCount} tag${tagCount === 1 ? "" : "s"}` : `${pageCount} page${pageCount === 1 ? "" : "s"}`;
+    tagCount > 0 ? `${tagCount} tag${tagCount === 1 ? "" : "s"}` : `${pageCount} rule${pageCount === 1 ? "" : "s"}`;
   button.textContent = `Restore last removal (${what})`;
   const names = newest.items.flatMap((removal) => [
     ...removal.tags.map((tag) => tag.name),
@@ -510,17 +603,18 @@ async function addTypedTag(): Promise<void> {
   }
 }
 
-// a page tagged by its address without opening it (like the keep-alive Add row). Junk stays in the input.
+// a page tagged by its address — or a site / pattern — without opening it (like the keep-alive
+// Add row). Junk or an address already listed is refused with a message and stays in the input.
 async function addTypedPage(): Promise<void> {
   const input = getElementById<HTMLInputElement>("new-tag-page");
   const tagId = getElementById<HTMLSelectElement>("new-tag-page-tag").value;
-  const url = tagPageUrlFromInput(input.value);
-  if (url === "" || tagId === "") {
+  const { tagPages = [] } = await localStore.get("tagPages");
+  const error = tagPageError(tagPages, input.value);
+  showError(error, "tag-page-error");
+  if (error || tagId === "") {
     return;
   }
-  const { tagPages = [] } = await localStore.get("tagPages");
-  const current = tagPages.find((page) => page.url === url)?.tagIds ?? [];
-  if (await setPageTagIds(url, current.includes(tagId) ? current : [...current, tagId])) {
+  if (await setPageTagIds(tagPagePatternFromInput(input.value), [tagId])) {
     input.value = "";
     flashSaved();
     render();
@@ -531,7 +625,7 @@ async function clearAllTags(): Promise<void> {
   const { tags = [], tagPages = [] } = await localStore.get(["tags", "tagPages"]);
   if (
     (tags.length === 0 && tagPages.length === 0) ||
-    !confirm("Remove ALL tags and tagged pages? You can restore them afterwards.")
+    !confirm("Remove ALL tags and tagged page rules? You can restore them afterwards.")
   ) {
     return;
   }
@@ -556,6 +650,19 @@ export function initTags(): void {
     await saveState({ ui: next ? { ...rest, tagSort: next } : rest }); // saved at once; absent = stored order
     flashSaved();
     render(); // the storage listener re-renders too; this one is for the page that wrote
+  });
+  getElementById("tag-page-table").addEventListener("click", async (event) => {
+    const header = closest(event.target, "th[data-sort]");
+    if (!header) {
+      return;
+    }
+    const next =
+      header.dataset.sort === "stored" ? null : nextTagSort(tagPageSort, header.dataset.sort as TagPageSortKey);
+    const { ui } = await loadState();
+    const { tagPageSort: _previous, ...rest } = ui;
+    await saveState({ ui: next ? { ...rest, tagPageSort: next } : rest });
+    flashSaved();
+    render();
   });
   // light dismiss closed the picker: forget its page so a re-render does not refill a closed box
   getElementById("tag-page-pick").addEventListener("toggle", (event) => {

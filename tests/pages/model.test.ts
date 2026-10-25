@@ -741,6 +741,24 @@ test("Model - TAGS: deriveTabs attaches a tab's tags (tag-list order) and search
   assert.deepEqual(derived.get(1)?.tags, [work, bills], "fragment ignored, tag-list order");
   assert.deepEqual(derived.get(2)?.tags, [bills]);
   assert.deepEqual(derived.get(3)?.tags, []);
+  assert.deepEqual(
+    derived.get(1)?.tagOrigins,
+    new Map([
+      ["t2", "page"],
+      ["t1", "page"],
+    ]),
+    "its own entry",
+  );
+  assert.deepEqual(derived.get(3)?.tagOrigins, new Map());
+  const site = { ...tagging, pages: [...tagging.pages, { url: "example.com", tagIds: ["t1"] }] };
+  assert.deepEqual(
+    deriveTabs(tabs, [], [], site).get(1)?.tagOrigins,
+    new Map([
+      ["t2", "page"],
+      ["t1", "page"],
+    ]),
+    "the page's own entry wins over the domain's",
+  );
   assert.match(derived.get(1)?.haystack ?? "", / work bills$/, "plain words find tagged tabs");
   assert.deepEqual(deriveTabs(tabs, []).get(1)?.tags, [], "no tagging = no tags");
   const offList = { ...tagging, tags: [{ ...work, disabled: true }, bills] };
@@ -755,6 +773,16 @@ test("Model - TAGS: badges carry the tag as a solid pill after the plain states 
     ["pinned", ""],
     ["bills", "tag dark hit", "#f9ab00"], // the hit comes first
     ["Work", "tag", "#1a73e8"],
+  ]);
+  // a tag from a domain or pattern entry says so in the pill: a glyph before the name (part of the
+  // label, so fitTagPills measures it) and the origin in the kind
+  const origins = new Map<string, "page" | "domain" | "pattern">([
+    ["t1", "domain"],
+    ["t2", "pattern"],
+  ]);
+  assert.deepEqual(badges(tab(), false, false, [work, bills], new Set(), origins), [
+    ["⌂ Work", "tag domain", "#1a73e8"],
+    ["✱ bills", "tag dark pattern", "#f9ab00"],
   ]);
   // every tag is a pill here (fitTagPills trims to the line) — a search hit moves to the front
   const many: Tag[] = [

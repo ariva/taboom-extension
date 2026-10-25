@@ -11,6 +11,7 @@ import {
   removeTags,
   renameTag,
   restoreTagRemoval,
+  setPageEnabled,
   setPageTags,
   setTagEnabled,
   splitTagQuery,
@@ -19,8 +20,13 @@ import {
   tagColorHex,
   tagMatches,
   tagNameError,
-  tagPageKey,
-  tagPageUrlFromInput,
+  tabsLosingTag,
+  tagOriginSets,
+  tagOrigins,
+  tagPageError,
+  inheritedTagIds,
+  nextTagSort,
+  sortedTagPages,
   tagsForUrl,
   togglePageTags,
   usesDarkText,
@@ -87,26 +93,33 @@ test("Tags - renameTag / recolorTag: undefined for no change, unknown id or an i
   assert.equal(recolorTag(TAGS, "t1", "mauve"), undefined);
 });
 
-test("Tags - page keys: fragment dropped, internal pages allowed, New Tab and junk are empty, typed addresses normalized", () => {
-  assert.equal(tagPageKey("https://a.test/x#frag"), "https://a.test/x");
-  assert.equal(
-    tagPageKey("chrome://extensions/"),
-    "chrome://extensions/",
-    "a label needs no reload: internal pages count",
+test("Tags - tagsForUrl unions every matching entry; inheritedTagIds are the ones not on the exact page", () => {
+  const pages: TagPage[] = [
+    { url: "https://a.test/x", tagIds: ["t1"] },
+    { url: "a.test", tagIds: ["t2"] },
+    { url: "https://a.test/*", tagIds: ["t1", "t2"] },
+  ];
+  assert.deepEqual(
+    tagsForUrl(pages, TAGS, "https://a.test/x").map((tag) => tag.id),
+    ["t1", "t2"],
+    "deduped, tag-list order",
   );
-  assert.equal(
-    tagPageKey("chrome-extension://abc/src/pages/options/index.html"),
-    "chrome-extension://abc/src/pages/options/index.html",
+  assert.deepEqual(
+    tagsForUrl(pages, TAGS, "https://a.test/y").map((tag) => tag.id),
+    ["t1", "t2"],
   );
-  assert.equal(tagPageKey("chrome://newtab/"), "", "every new tab shares it");
-  assert.equal(tagPageKey("chrome://new-tab-page/"), "");
-  assert.equal(tagPageKey("about:blank"), "");
-  assert.equal(tagPageKey(undefined), "");
-  assert.equal(tagPageKey("garbage"), "", "no scheme, no page");
-  assert.equal(tagPageUrlFromInput(" a.test/x#frag "), "https://a.test/x");
-  assert.equal(tagPageUrlFromInput("chrome://settings/"), "chrome://settings/", "an internal address as typed");
-  assert.equal(tagPageUrlFromInput("not a url"), "", "spaces: URL() refuses it");
-  assert.equal(tagPageUrlFromInput("   "), "");
+  assert.deepEqual(tagsForUrl(pages, TAGS, "https://b.test/"), []);
+  assert.deepEqual(
+    inheritedTagIds(pages, ["https://a.test/x"]),
+    new Set(["t1", "t2"]),
+    "t1 is on the page itself too, but the glob keeps it there whatever the page's own entry says",
+  );
+  assert.deepEqual(
+    inheritedTagIds(pages, ["https://a.test/x", "https://b.test/"]),
+    new Set(),
+    "inherited on every url only",
+  );
+  assert.deepEqual(inheritedTagIds(pages, []), new Set());
 });
 
 test("Tags - tagsForUrl: tag-list order, vanished ids skipped, fragment ignored", () => {
@@ -163,6 +176,8 @@ test("Tags - removeTags drops the tags and their ids from pages; the removal hol
 });
 
 test("Tags - removeTagPages drops whole pages into a removal without tags", () => {
+  const site = removeTagPages([...PAGES, { url: "a.test", tagIds: ["t2"] }], ["a.test"]);
+  assert.deepEqual(site?.removed.pages, [{ url: "a.test", tagIds: ["t2"] }], "a site entry goes by its pattern");
   const removed = removeTagPages(PAGES, ["https://a.test/x", "https://zz.test/"]);
   assert.deepEqual(
     removed?.pages.map((page) => page.url),
@@ -238,4 +253,167 @@ test("Tags - setTagEnabled: a disabled tag keeps its pages but leaves enabledTag
   assert.equal(setTagEnabled(TAGS, "t1", true), undefined);
   assert.equal(setTagEnabled(TAGS, "zz", false), undefined);
   assert.deepEqual(enabledTags(TAGS), TAGS);
+});
+
+test("Tags - tagPageError: junk, a key already listed (own row excepted), normalized before the check", () => {
+  assert.equal(tagPageError(PAGES, "https://c.test/"), undefined);
+  assert.equal(tagPageError(PAGES, "   "), "Type an address, a host or a pattern");
+  assert.equal(tagPageError(PAGES, "*"), "Type an address, a host or a pattern");
+  assert.equal(
+    tagPageError(PAGES, "b.test/#frag"),
+    '"https://b.test/" is already listed — edit that row instead',
+    "the typed form normalizes onto the stored key",
+  );
+  assert.equal(tagPageError(PAGES, "https://b.test/", "https://b.test/"), undefined, "a row keeps its own key");
+  assert.equal(tagPageError(PAGES, "https://a.test/x", "https://b.test/")?.startsWith('"https://a.test/x"'), true);
+});
+
+test("Tags - setPageEnabled: an off entry stays listed but tags nothing; the key is absent when on", () => {
+  const off = setPageEnabled(PAGES, "https://b.test/", false);
+  assert.deepEqual(off?.[1], { url: "https://b.test/", tagIds: ["t1", "t2"], disabled: true });
+  assert.deepEqual(tagsForUrl(off ?? [], TAGS, "https://b.test/x"), [], "off: covers nothing");
+  assert.deepEqual(inheritedTagIds(off ?? [], ["https://b.test/x"]), new Set(), "off: hands nothing down");
+  assert.equal(setPageEnabled(off ?? [], "https://b.test/", false), undefined, "already off");
+  assert.deepEqual(setPageEnabled(off ?? [], "https://b.test/", true)?.[1], PAGES[1], "back on: no disabled key");
+  assert.equal(setPageEnabled(PAGES, "https://b.test/", true), undefined);
+  assert.equal(setPageEnabled(PAGES, "https://zz.test/", false), undefined);
+  // rewriting the entry keeps the switch: new tag ids, a tag removal, a restore
+  assert.deepEqual(setPageTags(off ?? [], "https://b.test/", ["t2"])?.[1], {
+    url: "https://b.test/",
+    tagIds: ["t2"],
+    disabled: true,
+  });
+  const removal = removeTags(TAGS, off ?? [], ["t1"]);
+  assert.deepEqual(removal?.pages, [{ url: "https://b.test/", tagIds: ["t2"], disabled: true }], "a.test/x left whole");
+  const restored = restoreTagRemoval(
+    removal?.tags ?? [],
+    removal?.pages ?? [],
+    recordRemoval([], removal ? [removal.removed] : [], 1),
+  );
+  assert.deepEqual(restored?.tagPages, [
+    { url: "https://b.test/", tagIds: ["t2", "t1"], disabled: true },
+    { url: "https://a.test/x", tagIds: ["t1"] },
+  ]);
+});
+
+test("Tags - tagOrigins: where a tab's tag comes from — its own page entry first, then a domain entry, else a pattern", () => {
+  const pages: TagPage[] = [
+    { url: "https://a.test/x", tagIds: ["t1"] },
+    { url: "a.test", tagIds: ["t1", "t2"] },
+    { url: "*.a.test", tagIds: ["t3"] },
+    { url: "https://a.test/", tagIds: ["t4"] },
+    { url: "https://a.test/*", tagIds: ["t2", "t5"] },
+    { url: "https://a.test/y", tagIds: ["t6"], disabled: true },
+  ];
+  assert.deepEqual(
+    tagOrigins(pages, "https://a.test/x#frag"),
+    new Map([
+      ["t1", "page"],
+      ["t2", "domain"],
+      ["t3", "domain"],
+      ["t4", "pattern"],
+      ["t5", "pattern"],
+    ]),
+    "a prefix entry is a pattern; the host and *.host are the domain",
+  );
+  assert.deepEqual(
+    tagOrigins(pages, "https://a.test/y"),
+    new Map([
+      ["t1", "domain"],
+      ["t2", "domain"],
+      ["t3", "domain"],
+      ["t4", "pattern"],
+      ["t5", "pattern"],
+    ]),
+    "an off entry gives nothing",
+  );
+  assert.deepEqual(
+    tagOriginSets(pages, "https://a.test/x"),
+    new Map([
+      ["t1", new Set(["page", "domain"])],
+      ["t2", new Set(["domain", "pattern"])],
+      ["t3", new Set(["domain"])],
+      ["t4", new Set(["pattern"])],
+      ["t5", new Set(["pattern"])],
+    ]),
+    "every entry kind behind a tag — the glyph after a name in the picker",
+  );
+  assert.deepEqual(tagOrigins(pages, "https://b.test/"), new Map());
+  assert.deepEqual(tagOrigins(pages, undefined), new Map());
+});
+
+test("Tags - tabsLosingTag: the open tabs that carry the tag now and would not once it is unticked on these entries", () => {
+  const pages: TagPage[] = [
+    { url: "a.test", tagIds: ["t1"] },
+    { url: "https://a.test/x", tagIds: ["t1", "t2"] },
+    { url: "https://b.test/", tagIds: ["t1"], disabled: true },
+  ];
+  const tabs = [
+    { id: 1, url: "https://a.test/x", title: "x" },
+    { id: 2, url: "https://a.test/y", title: "y" },
+    { id: 3, url: "https://b.test/", title: "b" },
+    { id: 4, url: "https://c.test/", title: "c" },
+  ];
+  assert.deepEqual(
+    tabsLosingTag(pages, ["a.test"], "t1", tabs).map((tab) => tab.id),
+    [2],
+    "the page entry keeps t1 on x; y had it from the domain alone",
+  );
+  assert.deepEqual(tabsLosingTag(pages, ["https://a.test/x"], "t1", tabs), [], "the domain still covers x");
+  assert.deepEqual(
+    tabsLosingTag(pages, ["https://a.test/x"], "t2", tabs).map((tab) => tab.id),
+    [1],
+  );
+  assert.deepEqual(
+    tabsLosingTag(pages, ["a.test", "https://a.test/x"], "t1", tabs).map((tab) => tab.id),
+    [1, 2],
+    "both entries unticked: every a.test tab",
+  );
+  assert.deepEqual(tabsLosingTag(pages, ["https://b.test/"], "t1", tabs), [], "an off entry tags nothing to lose");
+  assert.deepEqual(tabsLosingTag(pages, ["https://zz.test/"], "t1", tabs), [], "no such entry: nothing changes");
+});
+
+test("Tags - sortedTagPages: stored order, by address (A–Z), by open-tab count or by first tag; nextTagSort takes page keys too", () => {
+  const pages: TagPage[] = [
+    { url: "https://b.test/", tagIds: ["t1"] },
+    { url: "*.a.test", tagIds: ["t2"] },
+    { url: "https://a.test/x", tagIds: ["t1"] },
+  ];
+  const counts = new Map([
+    ["https://b.test/", 2],
+    ["https://a.test/x", 1],
+  ]);
+  const urls = (sort: Parameters<typeof sortedTagPages>[2]) =>
+    sortedTagPages(pages, counts, sort, TAGS).map((page) => page.url);
+  assert.deepEqual(urls(null), ["https://b.test/", "*.a.test", "https://a.test/x"], "no sort: as stored");
+  assert.deepEqual(urls({ key: "url", dir: "asc" }), ["*.a.test", "https://a.test/x", "https://b.test/"]);
+  assert.deepEqual(urls({ key: "url", dir: "desc" }), ["https://b.test/", "https://a.test/x", "*.a.test"]);
+  assert.deepEqual(
+    urls({ key: "tabs", dir: "asc" }),
+    ["*.a.test", "https://a.test/x", "https://b.test/"],
+    "a missing count is 0",
+  );
+  assert.deepEqual(urls({ key: "tabs", dir: "desc" }), ["https://b.test/", "https://a.test/x", "*.a.test"]);
+  // by tags: the first tag as the chips show it (tag-list order), case-insensitive; no tag sorts first
+  const tagged: TagPage[] = [
+    { url: "https://w.test/", tagIds: ["t1"] },
+    { url: "https://none.test/", tagIds: ["gone"] },
+    { url: "https://b.test/", tagIds: ["t2", "t1"] },
+  ];
+  assert.deepEqual(
+    sortedTagPages(tagged, counts, { key: "tags", dir: "asc" }, TAGS).map((page) => page.url),
+    ["https://none.test/", "https://w.test/", "https://b.test/"],
+    "b.test's first tag in tag-list order is Work too — equal keys keep the stored order",
+  );
+  assert.deepEqual(
+    sortedTagPages(
+      [...tagged, { url: "https://c.test/", tagIds: ["t2"] }],
+      counts,
+      { key: "tags", dir: "desc" },
+      TAGS,
+    ).map((page) => page.url),
+    ["https://w.test/", "https://b.test/", "https://c.test/", "https://none.test/"],
+  );
+  assert.deepEqual(nextTagSort(null, "tabs"), { key: "tabs", dir: "asc" });
+  assert.equal(nextTagSort({ key: "tabs", dir: "desc" }, "tabs"), null);
 });

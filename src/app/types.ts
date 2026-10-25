@@ -36,9 +36,10 @@ export interface Removal<T> {
 export type KeepAliveRemoval = Removal<KeepAliveTab>;
 
 // ---------- tags (storage.local.tags[] + tagPages[]) ----------
-// A tag is a colored label; a page carries tag ids. Keyed by page address without the
-// fragment (tagPageKey) — like keep-alive, so a tag survives a restart and covers every
-// tab on that page, parked copies included.
+// A tag is a colored label; a tagged-page entry carries tag ids. Keyed by page address
+// without the fragment (tagPageKey) — like keep-alive, so a tag survives a restart and covers
+// every tab on that page, parked copies included — or by a site / glob pattern
+// (tagPagePatternFromInput) that covers every page under it.
 
 export interface Tag {
   id: string;
@@ -48,8 +49,9 @@ export interface Tag {
 }
 
 export interface TagPage {
-  url: string; // tagPageKey of the page
+  url: string; // tagPageKey of the page, a host, *.host, or an address with * (matchesTagPage)
   tagIds: string[]; // never empty — a page with no tags leaves the list
+  disabled?: boolean; // absent = on; off = kept in Settings, covers no tab until switched on
 }
 
 // Settings → Tags header sort: a view order every tag list follows (dropdowns, pickers, quick
@@ -60,8 +62,16 @@ export interface TagSort {
   dir: "asc" | "desc";
 }
 
+// Settings → Tagged pages header sort: by address, by first tag (as the chips show it) or by
+// open-tab count; the stored order (the order entries were added) is the default. Only the table follows it
+export type TagPageSortKey = "url" | "tags" | "tabs";
+export interface TagPageSort {
+  key: TagPageSortKey;
+  dir: "asc" | "desc";
+}
+
 // Settings → Tags → "Tags order in pickers": how every tag list the user picks from is ordered
-// (the Tags… checklist, the Tags ▾ picker, the quick launch view, the page menu, the Add-page dropdown)
+// (the Tag URL… checklist, the Tags ▾ picker, the quick launch view, the page menu, the Add-page dropdown)
 export type TagPickOrder = "stored" | "name" | "used" | "table";
 
 // one undoable tag removal: whole tags (and the page ids they took with them) or whole pages
@@ -135,6 +145,7 @@ export interface UiPrefs {
   // not in DEFAULTS: experimental_-prefixed opt-out, read as true when absent (FUZZY_SEARCH)
   experimental_fuzzySearch?: boolean;
   tagSort?: TagSort; // not in DEFAULTS: absent = no table sort (the stored tag order)
+  tagPageSort?: TagPageSort; // not in DEFAULTS: absent = the tagged-pages table in stored order
   tagPickOrder: TagPickOrder;
 }
 

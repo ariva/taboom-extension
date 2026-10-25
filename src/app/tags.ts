@@ -1,9 +1,11 @@
 // Tags as pure functions: the color table, the name rules, the tag list and tagged-page
 // edits, the undo stack hooks and the search token split. No DOM, no chrome.* — the side
 // panel, the options page and the worker all go through here.
-import { duplicateKey, NEW_TAB_KEY } from "./duplicates.ts";
 import { popRemoval } from "./removal-trash.ts";
-import type { Removal, Tag, TagPage, TagPickOrder, TagRemoval, TagSort, TagSortKey } from "./types.ts";
+import { matchesTagPage, tagPageKey, tagPagePatternFromInput, tagPatternKind } from "./tag-patterns.ts";
+import type { Removal, Tag, TagPage, TagPageSort, TagPickOrder, TagRemoval, TagSort } from "./types.ts";
+
+export { tagPageKey }; // the page side of a tag lives here; the pattern rules in tag-patterns.ts
 
 // Chrome's 9 fixed tab-group colors (chrome.tabGroups.Color → hex) — tags reuse them, so a
 // tag badge, a group header and the color menus share one palette
@@ -124,57 +126,114 @@ export function moveTagTo(list: Tag[], draggedId: string, targetId: string): Tag
   return next;
 }
 
-// the key a page is tagged by: the address without its fragment. Any page with an address —
-// chrome:// and extension pages included (a label needs no reload, unlike keep-alive) — except
-// the New Tab page: every new tab shares that address, so a tag there would land on all of them
-export function tagPageKey(url: string | undefined): string {
-  const key = duplicateKey(url);
-  return key === NEW_TAB_KEY || !key.includes(":") ? "" : key;
-}
-
-// a typed address (options Add row): URL() normalizes as Chrome reports tab urls (lowercased
-// host, trailing slash), a bare host gets https; the fragment goes like for a tab
-export function tagPageUrlFromInput(text: string): string {
-  const trimmed = text.trim();
-  if (trimmed === "") {
-    return "";
-  }
-  try {
-    return tagPageKey(new URL(/^[a-z][a-z0-9+.-]*:/i.test(trimmed) ? trimmed : `https://${trimmed}`).href);
-  } catch {
-    return "";
-  }
-}
-
-function pageOf(pages: TagPage[], url: string | undefined): TagPage | undefined {
-  const key = tagPageKey(url);
+// the stored entry for a url or pattern (a tab url keys like a typed address; a stored pattern
+// is its own key) — the writers edit entries, never what a pattern covers
+function pageOf(pages: TagPage[], url: string): TagPage | undefined {
+  const key = tagPagePatternFromInput(url);
   return key === "" ? undefined : pages.find((page) => page.url === key);
 }
 
-// the tags behind a url, in tag-list order (a vanished or disabled id is skipped)
-export function tagsForUrl(pages: TagPage[], tags: Tag[], url: string | undefined): Tag[] {
-  const ids = pageOf(pages, url)?.tagIds;
-  return ids ? enabledTags(tags).filter((tag) => ids.includes(tag.id)) : [];
+// why an address / pattern cannot be added as a new entry — undefined when it can. `exceptUrl`:
+// the row being edited (its own key is not a clash). Mirrors tagNameError
+export function tagPageError(pages: TagPage[], text: string, exceptUrl?: string): string | undefined {
+  const key = tagPagePatternFromInput(text);
+  if (key === "") {
+    return "Type an address, a host or a pattern";
+  }
+  const clash = pages.find((page) => page.url === key && page.url !== exceptUrl);
+  return clash ? `"${clash.url}" is already listed — edit that row instead` : undefined;
 }
 
-// replace a page's tag ids; an empty set drops the page. undefined when nothing changes
-export function setPageTags(pages: TagPage[], url: string, tagIds: string[]): TagPage[] | undefined {
+// the entries in force: an off one is kept (Settings) but covers no tab
+function enabledPages(pages: TagPage[]): TagPage[] {
+  return pages.filter((page) => !page.disabled);
+}
+
+// the Settings switch on an entry; the key is absent when on, like a tag's
+export function setPageEnabled(pages: TagPage[], url: string, enabled: boolean): TagPage[] | undefined {
+  const page = pageOf(pages, url);
+  if (!page || (page.disabled ?? false) === !enabled) {
+    return undefined;
+  }
+  const { disabled: _previous, ...on } = page;
+  const next = enabled ? on : { ...page, disabled: true };
+  return pages.map((candidate) => (candidate === page ? next : candidate));
+}
+
+// the tags behind a url: every entry covering it, deduped, in tag-list order (a vanished or
+// disabled id is skipped, an off entry too)
+export function tagsForUrl(pages: TagPage[], tags: Tag[], url: string | undefined): Tag[] {
+  const ids = new Set(
+    enabledPages(pages)
+      .filter((page) => matchesTagPage(page.url, url))
+      .flatMap((page) => page.tagIds),
+  );
+  return ids.size === 0 ? [] : enabledTags(tags).filter((tag) => ids.has(tag.id));
+}
+
+// where a tab's tag comes from — the badge glyph and the pickers' hints: its own page entry
+// ("page", an exact key), a domain entry, or a pattern (a prefix or a glob). Every entry kind
+// that hands the tag down, per tag id
+export type TagOrigin = "page" | "domain" | "pattern";
+
+export function tagOriginSets(pages: TagPage[], url: string | undefined): Map<string, Set<TagOrigin>> {
   const key = tagPageKey(url);
+  const origins = new Map<string, Set<TagOrigin>>();
+  for (const page of enabledPages(pages)) {
+    if (!matchesTagPage(page.url, url)) {
+      continue;
+    }
+    const origin: TagOrigin = page.url === key ? "page" : tagPatternKind(page.url);
+    for (const id of page.tagIds) {
+      origins.set(id, (origins.get(id) ?? new Set()).add(origin));
+    }
+  }
+  return origins;
+}
+
+// the one origin a badge shows: the page's own entry wins, then a domain's, else a pattern's
+const ORIGIN_RANK: TagOrigin[] = ["page", "domain", "pattern"];
+
+export function tagOrigins(pages: TagPage[], url: string | undefined): Map<string, TagOrigin> {
+  return new Map(
+    [...tagOriginSets(pages, url)].map(([id, set]) => [id, ORIGIN_RANK.find((origin) => set.has(origin)) ?? "page"]),
+  );
+}
+
+// the tag ids every one of these pages gets from a site or glob entry rather than its own
+// entry — the picker shows them ticked and locked (the entry is edited in Settings)
+export function inheritedTagIds(pages: TagPage[], urls: string[]): Set<string> {
+  const perUrl = urls.map(
+    (url) =>
+      new Set(
+        enabledPages(pages)
+          .filter((page) => page.url !== url && matchesTagPage(page.url, url))
+          .flatMap((page) => page.tagIds),
+      ),
+  );
+  const [first, ...rest] = perUrl;
+  return first ? new Set([...first].filter((id) => rest.every((ids) => ids.has(id)))) : new Set();
+}
+
+// replace an entry's tag ids (url: a page address or a pattern); an empty set drops the
+// entry. undefined when nothing changes
+export function setPageTags(pages: TagPage[], url: string, tagIds: string[]): TagPage[] | undefined {
+  const key = tagPagePatternFromInput(url);
   if (key === "") {
     return undefined;
   }
-  const page = pages.find((candidate) => candidate.url === key);
+  const page = pageOf(pages, key);
   if (tagIds.length === 0) {
     return page ? pages.filter((candidate) => candidate !== page) : undefined;
   }
   if (page && page.tagIds.length === tagIds.length && page.tagIds.every((id, index) => id === tagIds[index])) {
     return undefined;
   }
-  const next = { url: key, tagIds: [...tagIds] };
+  const next = { ...page, url: key, tagIds: [...tagIds] }; // the switch survives a tag change
   return page ? pages.map((candidate) => (candidate === page ? next : candidate)) : [...pages, next];
 }
 
-// one tag on / off over several pages (row menu over a selection). undefined when no page changed
+// one tag on / off over several entries (row menu over a selection). undefined when none changed
 export function togglePageTags(pages: TagPage[], urls: string[], tagId: string, on: boolean): TagPage[] | undefined {
   let next: TagPage[] | undefined;
   for (const url of urls) {
@@ -185,7 +244,25 @@ export function togglePageTags(pages: TagPage[], urls: string[], tagId: string, 
   return next;
 }
 
-// every one of these pages carries the tag — the ✓ in the row menu over a selection
+// the open tabs that carry the tag now and would not once it is unticked on these entries (a
+// page entry's tab may still get it from the domain's) — the pickers ask before a change that
+// reaches more than one tab
+export function tabsLosingTag<T extends { url?: string }>(
+  pages: TagPage[],
+  urls: string[],
+  tagId: string,
+  tabs: T[],
+): T[] {
+  const next = togglePageTags(pages, urls, tagId, false);
+  if (!next) {
+    return [];
+  }
+  const tagged = (list: TagPage[], url: string | undefined): boolean =>
+    enabledPages(list).some((page) => page.tagIds.includes(tagId) && matchesTagPage(page.url, url));
+  return tabs.filter((tab) => tagged(pages, tab.url) && !tagged(next, tab.url));
+}
+
+// every one of these entries carries the tag itself — the ✓ in the row menu over a selection
 export function hasTagEverywhere(pages: TagPage[], urls: string[], tagId: string): boolean {
   return urls.length > 0 && urls.every((url) => pageOf(pages, url)?.tagIds.includes(tagId));
 }
@@ -218,10 +295,10 @@ export function removeTags(
     const taken = page.tagIds.filter((id) => goneIds.has(id));
     const kept = page.tagIds.filter((id) => !goneIds.has(id));
     if (taken.length > 0) {
-      removedPages.push({ url: page.url, tagIds: taken });
+      removedPages.push({ ...page, tagIds: taken });
     }
     if (kept.length > 0) {
-      remaining.push(kept.length === page.tagIds.length ? page : { url: page.url, tagIds: kept });
+      remaining.push(kept.length === page.tagIds.length ? page : { ...page, tagIds: kept });
     }
   }
   return {
@@ -231,12 +308,12 @@ export function removeTags(
   };
 }
 
-// drop whole pages (Settings → Tagged pages → Remove): one removal without tags
+// drop whole entries by their pattern (Settings → Tagged pages → Remove): one removal without tags
 export function removeTagPages(
   pages: TagPage[],
   urls: string[],
 ): { pages: TagPage[]; removed: TagRemoval } | undefined {
-  const keys = new Set(urls.map(tagPageKey));
+  const keys = new Set(urls.map(tagPagePatternFromInput));
   const gone = pages.filter((page) => keys.has(page.url));
   if (gone.length === 0) {
     return undefined;
@@ -268,6 +345,9 @@ export function restoreTagRemoval(
     const current = nextPages.find((candidate) => candidate.url === page.url)?.tagIds ?? [];
     const merged = [...current, ...page.tagIds.filter((id) => live.has(id) && !current.includes(id))];
     nextPages = setPageTags(nextPages, page.url, merged) ?? nextPages;
+    if (page.disabled) {
+      nextPages = setPageEnabled(nextPages, page.url, false) ?? nextPages; // a whole entry comes back as it left
+    }
   }
   return { tags: nextTags, tagPages: nextPages, tagTrash: popped.rest };
 }
@@ -297,12 +377,48 @@ export function tagMatches(tag: Tag, token: string): boolean {
 
 // ---------- Settings header sort: the view order every tag list follows ----------
 
-// a header click: none → asc → desc → none on the same header; another header starts asc
-export function nextTagSort(current: TagSort | null, key: TagSortKey): TagSort | null {
+// a header click: none → asc → desc → none on the same header; another header starts asc.
+// Generic over the key: the tag table (TagSort) and the tagged-pages table (TagPageSort) share it
+export function nextTagSort<K extends string>(
+  current: { key: K; dir: "asc" | "desc" } | null,
+  key: K,
+): { key: K; dir: "asc" | "desc" } | null {
   if (!current || current.key !== key) {
     return { key, dir: "asc" };
   }
   return current.dir === "asc" ? { key, dir: "desc" } : null;
+}
+
+// the tagged-pages rows in view order: the stored list, or by address (A–Z), by the first tag as
+// the row's chips show it (tag-list order, case-insensitive; no tag sorts first) or by how many
+// open tabs the entry covers (tabCounts, a missing entry = 0); equal keys keep the stored order
+export function sortedTagPages(
+  pages: TagPage[],
+  tabCounts: ReadonlyMap<string, number>,
+  sort: TagPageSort | null,
+  tags: Tag[],
+): TagPage[] {
+  if (!sort) {
+    return pages;
+  }
+  const firstTag = (page: TagPage): string =>
+    tags.find((tag) => page.tagIds.includes(tag.id))?.name.toLocaleLowerCase() ?? "";
+  const keyOf = (page: TagPage): number | string => {
+    switch (sort.key) {
+      case "tabs":
+        return tabCounts.get(page.url) ?? 0;
+      case "tags":
+        return firstTag(page);
+      default:
+        return page.url;
+    }
+  };
+  const sign = sort.dir === "asc" ? 1 : -1;
+  return [...pages].sort((a, b) => {
+    const x = keyOf(a);
+    const y = keyOf(b);
+    return sign * (typeof x === "number" && typeof y === "number" ? x - y : String(x).localeCompare(String(y)));
+  });
 }
 
 // the rows in view order: the stored list, or sorted by color (palette order), name (A–Z,

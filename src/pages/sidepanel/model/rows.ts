@@ -1,7 +1,7 @@
 // Pure row-level view models: what one tab row shows (badges, highlights, favicon, dot),
 // the bulk-selection summary and the empty-list message. No DOM, no chrome.*.
 import { formatAge, isSupportedUrl } from "../../../app/core.ts";
-import { tagColorHex, tagMatches, usesDarkText } from "../../../app/tags.ts";
+import { type TagOrigin, tagColorHex, tagMatches, usesDarkText } from "../../../app/tags.ts";
 import type { Tag } from "../../../app/types.ts";
 import { isUnloaded } from "../../../app/core.ts";
 import { isSplit, type SplitEdge } from "../../../app/split.ts";
@@ -17,9 +17,17 @@ type Tab = chrome.tabs.Tab;
 export type Badge = [label: string, kind: string, color?: string, maxWidth?: number];
 
 export interface TipTag {
-  name: string;
+  name: string; // the pill label: glyph-prefixed when the tag comes from a domain or pattern entry
   color: string; // hex
   dark: boolean; // dark text on the light fills
+}
+
+// the glyph before a pill's name says the tag is not the page's own: ⌂ a domain entry, ✱ a
+// pattern — part of the label, so the fit measures what is drawn
+export const ORIGIN_GLYPH: Record<TagOrigin, string> = { page: "", domain: "⌂ ", pattern: "✱ " };
+
+export function tagLabel(tag: Tag, origins: ReadonlyMap<string, TagOrigin>): string {
+  return `${ORIGIN_GLYPH[origins.get(tag.id) ?? "page"]}${tag.name}`;
 }
 
 export interface RowContext {
@@ -97,6 +105,7 @@ export function badges(
   isKeptAliveTab = false,
   tags: Tag[] = [],
   hitTagIds: ReadonlySet<string> = new Set(),
+  origins: ReadonlyMap<string, TagOrigin> = new Map(),
 ): Badge[] {
   const list: Badge[] = [];
   if (isUnloaded(tab)) {
@@ -116,8 +125,14 @@ export function badges(
   const shown = [...tags.filter((tag) => hitTagIds.has(tag.id)), ...tags.filter((tag) => !hitTagIds.has(tag.id))];
   for (const tag of shown) {
     // solid fill in the tag's color: tinted pastels of nine colors look alike
-    const kind = ["tag", ...(usesDarkText(tag.color) ? ["dark"] : []), ...(hitTagIds.has(tag.id) ? ["hit"] : [])];
-    list.push([tag.name, kind.join(" "), tagColorHex(tag.color)]);
+    const origin = origins.get(tag.id) ?? "page";
+    const kind = [
+      "tag",
+      ...(usesDarkText(tag.color) ? ["dark"] : []),
+      ...(hitTagIds.has(tag.id) ? ["hit"] : []),
+      ...(origin === "page" ? [] : [origin]),
+    ];
+    list.push([tagLabel(tag, origins), kind.join(" "), tagColorHex(tag.color)]);
   }
   if (tab.audible) {
     list.push(["🔊", ""]);
@@ -206,7 +221,7 @@ export function emptyMessage(query: string, filter: string, parked = false): str
     return "No protected tabs. Use the shield button on a tab to protect its site.";
   }
   if (filter === "tags") {
-    return "No tagged tabs. Tag one from its row menu (Tags ▸).";
+    return "No tagged tabs. Tag one from its row menu (Tag URL ▸).";
   }
   return "No open tabs.";
 }
@@ -255,7 +270,7 @@ export function rowViewModel(
   const badgeList = fitTagPills(
     [
       ...(parked ? [["parked", ""] satisfies Badge] : []),
-      ...badges(tab, d.protected, d.keptAlive, d.tags, hitTagIds),
+      ...badges(tab, d.protected, d.keptAlive, d.tags, hitTagIds, d.tagOrigins),
       ...(urlOnlyMatch ? [["url match", ""] satisfies Badge] : []),
     ],
     age,
@@ -289,7 +304,11 @@ export function rowViewModel(
     badges: badgeList,
     tip: tab.url ?? "",
     tipBadges,
-    tipTags: d.tags.map((tag) => ({ name: tag.name, color: tagColorHex(tag.color), dark: usesDarkText(tag.color) })),
+    tipTags: d.tags.map((tag) => ({
+      name: tagLabel(tag, d.tagOrigins),
+      color: tagColorHex(tag.color),
+      dark: usesDarkText(tag.color),
+    })),
     canSnooze,
     protected: d.protected,
     protectLabel: d.protected ? "Unprotect site" : "Protect site",
