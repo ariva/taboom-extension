@@ -1,7 +1,8 @@
 // Tag operations of the side panel: the entry keys behind rows, the tag filter, recolor and
 // remove. Tags stick to page addresses, so a live tab and a parked row are tagged the same
 // way; the storage writers do the list edits. A new tag is made inside the picker.
-import { hostnameOf, isSupportedUrl } from "../../../app/core.ts";
+import { isSupportedUrl } from "../../../app/core.ts";
+import { siteOf } from "../../../app/tag-patterns.ts";
 import { editTag, removeTagsToTrash } from "../../../app/storage.ts";
 import { TAG_COLORS, type TagOrigin, tagOriginSets, tagPageKey } from "../../../app/tags.ts";
 import { refresh, render } from "../foundation/scheduler.ts";
@@ -10,7 +11,7 @@ import { persistUiPrefs } from "../input/toolbar-events.ts";
 
 export const TAG_SWATCHES = Object.entries(TAG_COLORS) as [name: string, hex: string][];
 
-// what the Tag URL… / Tag domain… pickers edit: the page entry, or the site entry (the bare host)
+// what the Tag URL… / Tag domain… pickers edit: the page entry, or the site entry (the host, no www.)
 export type TagScope = "page" | "site";
 
 // the entry keys behind row ids (live or parked), deduped; unsupported urls drop out — a
@@ -22,7 +23,7 @@ export function tagPageUrls(tabIds: number[], scope: TagScope = "page"): string[
       return [];
     }
     const url = tab.url || tab.pendingUrl;
-    const key = scope === "site" ? (isSupportedUrl(url) ? hostnameOf(url) : "") : tagPageKey(url);
+    const key = scope === "site" ? (isSupportedUrl(url) ? siteOf(url) : "") : tagPageKey(url);
     return key === "" ? [] : [key];
   });
   return [...new Set(keys)];

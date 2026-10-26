@@ -1300,15 +1300,23 @@ test("UI - Options - TAGS card: tag table (add, rename, recolor, remove), tagged
   stored.tags.splice(2, 2);
   stored.tagPages[0]!.tagIds.splice(2, 2);
   await rerender();
-  // ✕ on a chip takes that tag off; the last one gone drops the page (no trash — nothing to undo)
+  // ✕ on a chip takes that tag off; the last one gone keeps the rule (address, switch) with no chip —
+  // Remove is the button that drops a rule
   q(must(chips()[0]), ".tag-chip-remove").click();
   await settle();
   assert.deepEqual(stored.tagPages[0]?.tagIds, [bills.id]);
   await rerender();
   q(must(chips()[0]), ".tag-chip-remove").click();
   await settle();
-  assert.equal(stored.tagPages.length, 0);
+  assert.deepEqual(stored.tagPages, [{ url: "https://app.example.com/board", tagIds: [] }]);
   assert.equal(stored.tagTrash.length, 0);
+  await rerender();
+  assert.equal(chips().length, 0);
+  assert.equal(pageRows().length, 1, "the row stays, ready for a tag");
+  q(must(pageRows()[0]), ".remove-page").click();
+  await settle();
+  assert.equal(stored.tagPages.length, 0);
+  stored.tagTrash = [];
   // a bare host is a site entry, kept as typed (lowercased); its hint says what it covers
   byId<HTMLInputElement>("new-tag-page").value = " *.B.test ";
   byId<HTMLSelectElement>("new-tag-page-tag").value = bills.id;

@@ -215,16 +215,17 @@ export function inheritedTagIds(pages: TagPage[], urls: string[]): Set<string> {
   return first ? new Set([...first].filter((id) => rest.every((ids) => ids.has(id)))) : new Set();
 }
 
-// replace an entry's tag ids (url: a page address or a pattern); an empty set drops the
-// entry. undefined when nothing changes
+// replace an entry's tag ids (url: a page address or a pattern). An empty set keeps the entry
+// without tags: in Settings the rule (its address, its switch) is the user's, and Remove is the
+// button that drops it. undefined when nothing changes (an empty set on no entry included)
 export function setPageTags(pages: TagPage[], url: string, tagIds: string[]): TagPage[] | undefined {
   const key = tagPagePatternFromInput(url);
   if (key === "") {
     return undefined;
   }
   const page = pageOf(pages, key);
-  if (tagIds.length === 0) {
-    return page ? pages.filter((candidate) => candidate !== page) : undefined;
+  if (!page && tagIds.length === 0) {
+    return undefined;
   }
   if (page && page.tagIds.length === tagIds.length && page.tagIds.every((id, index) => id === tagIds[index])) {
     return undefined;
@@ -233,13 +234,31 @@ export function setPageTags(pages: TagPage[], url: string, tagIds: string[]): Ta
   return page ? pages.map((candidate) => (candidate === page ? next : candidate)) : [...pages, next];
 }
 
-// one tag on / off over several entries (row menu over a selection). undefined when none changed
+// Settings → Tagged page rules: the address edit re-keys an entry, its tags and switch kept.
+// undefined when the row is missing, the key is the same, junk, or another row's
+export function renameTagPage(pages: TagPage[], from: string, to: string): TagPage[] | undefined {
+  const page = pageOf(pages, from);
+  const key = tagPagePatternFromInput(to);
+  if (!page || key === "" || key === page.url || pageOf(pages, key)) {
+    return undefined;
+  }
+  return pages.map((candidate) => (candidate === page ? { ...page, url: key } : candidate));
+}
+
+// one tag on / off over several entries (row menu over a selection). undefined when none changed.
+// The last tag off drops the entry here: the panel's user never saw a rule, so none is left behind
 export function togglePageTags(pages: TagPage[], urls: string[], tagId: string, on: boolean): TagPage[] | undefined {
   let next: TagPage[] | undefined;
   for (const url of urls) {
-    const ids = pageOf(next ?? pages, url)?.tagIds ?? [];
+    const current = next ?? pages;
+    const page = pageOf(current, url);
+    const ids = page?.tagIds ?? [];
     const wanted = on ? (ids.includes(tagId) ? ids : [...ids, tagId]) : ids.filter((id) => id !== tagId);
-    next = setPageTags(next ?? pages, url, wanted) ?? next;
+    if (page && ids.length > 0 && wanted.length === 0) {
+      next = current.filter((candidate) => candidate !== page);
+    } else {
+      next = setPageTags(current, url, wanted) ?? next;
+    }
   }
   return next;
 }
@@ -297,7 +316,7 @@ export function removeTags(
     if (taken.length > 0) {
       removedPages.push({ ...page, tagIds: taken });
     }
-    if (kept.length > 0) {
+    if (kept.length > 0 || taken.length === 0) {
       remaining.push(kept.length === page.tagIds.length ? page : { ...page, tagIds: kept });
     }
   }

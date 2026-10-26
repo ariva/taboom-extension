@@ -26,6 +26,7 @@ import {
   removeTagPages,
   removeTags,
   renameTag,
+  renameTagPage,
   restoreTagRemoval,
   setPageEnabled,
   setPageTags,
@@ -313,9 +314,14 @@ export function toggleTagOnPages(urls: string[], tagId: string, on: boolean): Pr
   return editPages((pages) => togglePageTags(pages, urls, tagId, on));
 }
 
-// Settings → Tagged pages: a page's whole tag set (empty = the page leaves the list, no trash)
+// Settings → Tagged pages: a page's whole tag set (empty keeps the rule without tags; Remove drops it)
 export function setPageTagIds(url: string, tagIds: string[]): Promise<boolean> {
   return editPages((pages) => setPageTags(pages, url, tagIds));
+}
+
+// Settings → Tagged pages: the address edit, one write (tags and switch travel with the entry)
+export function renameStoredTagPage(from: string, to: string): Promise<boolean> {
+  return editPages((pages) => renameTagPage(pages, from, to));
 }
 
 // Settings → Tagged pages: the entry's on / off switch; false when nothing changed

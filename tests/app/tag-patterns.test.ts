@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
-import { matchesTagPage, tagPageKey, tagPagePatternFromInput, tagPagePatternHint } from "../../src/app/tag-patterns.ts";
+import {
+  matchesTagPage,
+  siteOf,
+  tagPageKey,
+  tagPagePatternFromInput,
+  tagPagePatternHint,
+  tagPatternKind,
+} from "../../src/app/tag-patterns.ts";
 
 test("Tag patterns - page keys: fragment dropped, internal pages allowed, New Tab and junk are empty, typed addresses normalized", () => {
   assert.equal(tagPageKey("https://a.test/x#frag"), "https://a.test/x");
@@ -62,7 +69,20 @@ test("Tag patterns - matchesTagPage: exact page, site, subdomains, globs anywher
   );
   assert.equal(matchesTagPage("https://a.test/", "https://a.test.evil/"), false);
   assert.equal(matchesTagPage("a.test", "https://a.test/any/path?q=1"), true, "a site covers every page");
-  assert.equal(matchesTagPage("a.test", "https://sub.a.test/"), false, "a bare host is not its subdomains");
+  assert.equal(matchesTagPage("a.test", "https://sub.a.test/"), true, "a bare host covers its subdomains too");
+  assert.equal(matchesTagPage("a.test", "https://www.a.test/x"), true);
+  assert.equal(matchesTagPage("a.test", "https://nota.test/"), false, "a suffix match stops at a dot");
+  assert.equal(matchesTagPage("youtube", "https://www.youtube.com/watch"), true, "a word: any host containing it");
+  assert.equal(matchesTagPage("tube", "https://www.youtube.com/"), true);
+  assert.equal(matchesTagPage("youtube", "https://youtu.be/x"), false);
+  assert.equal(matchesTagPage("settings", "chrome://settings/"), true, "internal pages have a host too");
+  assert.equal(
+    matchesTagPage("youtube.com", "https://example.com/?ref-url=youtube.com"),
+    false,
+    "a host entry looks at the host only, never the path or query",
+  );
+  assert.equal(matchesTagPage("youtube", "https://example.com/youtube/youtube.com"), false);
+  assert.equal(matchesTagPage("youtube.com", "https://youtube.com.evil.test/"), false, "a suffix, not a prefix");
   assert.equal(matchesTagPage("*.a.test", "https://sub.a.test/"), true);
   assert.equal(matchesTagPage("*.a.test", "https://a.test/"), true, "*.host covers the host itself, like protection");
   assert.equal(matchesTagPage("*.a.test", "https://nota.test/"), false);
@@ -82,7 +102,19 @@ test("Tag patterns - matchesTagPage: exact page, site, subdomains, globs anywher
 test("Tag patterns - pattern hints name the kind", () => {
   assert.match(tagPagePatternHint("https://a.test/x"), /^Exact page/);
   assert.match(tagPagePatternHint("https://a.test/docs/"), /^Every page under/);
-  assert.match(tagPagePatternHint("a.test"), /^Every page on a\.test$/);
-  assert.match(tagPagePatternHint("*.a.test"), /subdomains/);
+  assert.match(tagPagePatternHint("a.test"), /^a\.test and its subdomains$/);
+  assert.match(tagPagePatternHint("*.a.test"), /^a\.test and its subdomains$/);
+  assert.match(tagPagePatternHint("youtube"), /^Hosts containing youtube$/);
   assert.match(tagPagePatternHint("https://a.test/*"), /^Pages matching/);
+  assert.equal(tagPatternKind("youtube"), "pattern", "a word is a pattern, not a domain");
+  assert.equal(tagPatternKind("a.test"), "domain");
+});
+
+test("Tag patterns - siteOf: the host without a leading www., what Tag domain… writes", () => {
+  assert.equal(siteOf("https://www.youtube.com/watch?v=1"), "youtube.com");
+  assert.equal(siteOf("https://WWW.A.test/"), "a.test");
+  assert.equal(siteOf("https://www2.a.test/"), "www2.a.test");
+  assert.equal(siteOf("https://www.com/"), "www.com", "nothing left to name the site: kept");
+  assert.equal(siteOf("https://a.test/"), "a.test");
+  assert.equal(siteOf(undefined), "");
 });

@@ -12,6 +12,7 @@ import {
   localStore,
   removeTagPagesToTrash,
   removeTagsToTrash,
+  renameStoredTagPage,
   reorderTags,
   restoreTags,
   saveState,
@@ -328,7 +329,7 @@ async function confirmedUntick(url: string, tag: Tag): Promise<boolean> {
   );
 }
 
-// a page's tag as a solid chip with a ✕ (the last one off drops the page — no trash)
+// a page's tag as a solid chip with a ✕ (the last one off leaves the rule without chips — Remove drops it)
 function pageChip(tag: Tag, page: TagPage): HTMLSpanElement {
   const chip = document.createElement("span");
   chip.className = usesDarkText(tag.color) ? "tag-chip dark" : "tag-chip";
@@ -417,7 +418,7 @@ function fillPagePicker(tags: Tag[], pages: TagPage[]): void {
   });
   head.append(title, close);
   pick.append(head);
-  // the page may have left the list (its last tag unticked): the picker then offers every tag unticked
+  // a rule whose last tag was unticked stays listed: the picker then offers every tag unticked
   const current = pages.find((page) => page.url === url)?.tagIds ?? [];
   if (orderedTags(tags, pages, pickerUi).length === 0) {
     const empty = document.createElement("div");
@@ -504,7 +505,7 @@ function renderPageRows(tags: Tag[], pages: TagPage[], openTabs: chrome.tabs.Tab
     url.className = "url";
     url.textContent = page.url;
     const pageCell = cell(url);
-    pageCell.title = `${tagPagePatternHint(page.url)}: ${page.url}\nClick to edit — an address, a host, *.host or a pattern with *`;
+    pageCell.title = `${tagPagePatternHint(page.url)}: ${page.url}\nClick to edit — an address, a host (subdomains included), a word any host contains, or a pattern with *`;
     pageCell.addEventListener("click", () => {
       if (pageCell.querySelector(".rename-input")) {
         return;
@@ -512,24 +513,17 @@ function renderPageRows(tags: Tag[], pages: TagPage[], openTabs: chrome.tabs.Tab
       inlineEdit(url, {
         initial: page.url,
         placeholder: "https://app.example.com/board or example.com or https://x.com/a/*",
-        // re-keyed in two writes (the old entry leaves, the new one takes its tags and its switch);
-        // the same pattern changes nothing; junk or another row's key is refused with a message
+        // re-keyed in one write (tags and switch travel with the entry); the same pattern changes
+        // nothing; junk or another row's key is refused with a message
         commit: async (value) => {
-          const next = tagPagePatternFromInput(value);
-          if (next === page.url) {
-            return;
-          }
           const error = tagPageError(pages, value, page.url);
           showError(error, "tag-page-error");
           if (error) {
             return;
           }
-          await setPageTagIds(page.url, []);
-          await setPageTagIds(next, page.tagIds);
-          if (page.disabled) {
-            await editTagPage(next, { enabled: false });
+          if (await renameStoredTagPage(page.url, value)) {
+            flashSaved();
           }
-          flashSaved();
         },
         finish: render,
       });

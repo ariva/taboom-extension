@@ -140,6 +140,7 @@ test("Core - Storage - Tags: add, edit, page tags, remove to trash, clear, resto
     editTag,
     removeTagPagesToTrash,
     removeTagsToTrash,
+    renameStoredTagPage,
     restoreTags,
     setPageTagIds,
     toggleTagOnPages,
@@ -163,6 +164,10 @@ test("Core - Storage - Tags: add, edit, page tags, remove to trash, clear, resto
   ]);
   assert.equal(await setPageTagIds("https://a.test/", [work.id, bills.id]), true);
   assert.deepEqual(stored.tagPages?.[0]?.tagIds, [work.id, bills.id]);
+  assert.equal(await renameStoredTagPage("https://a.test/", "a.test"), true);
+  assert.deepEqual(stored.tagPages?.[0], { url: "a.test", tagIds: [work.id, bills.id] });
+  assert.equal(await renameStoredTagPage("https://a.test/", "a.test"), false, "no such row, no write");
+  assert.equal(await renameStoredTagPage("a.test", "https://a.test/"), true);
 
   assert.equal(await removeTagPagesToTrash(["https://b.test/"]), true);
   assert.deepEqual(

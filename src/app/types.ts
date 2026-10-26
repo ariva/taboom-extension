@@ -50,7 +50,7 @@ export interface Tag {
 
 export interface TagPage {
   url: string; // tagPageKey of the page, a host, *.host, or an address with * (matchesTagPage)
-  tagIds: string[]; // never empty — a page with no tags leaves the list
+  tagIds: string[]; // may be empty: a Settings rule keeps its row after its last tag is taken off
   disabled?: boolean; // absent = on; off = kept in Settings, covers no tab until switched on
 }
 

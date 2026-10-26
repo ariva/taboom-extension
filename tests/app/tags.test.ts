@@ -10,6 +10,7 @@ import {
   removeTagPages,
   removeTags,
   renameTag,
+  renameTagPage,
   restoreTagRemoval,
   setPageEnabled,
   setPageTags,
@@ -132,17 +133,31 @@ test("Tags - tagsForUrl: tag-list order, vanished ids skipped, fragment ignored"
   assert.deepEqual(tagsForUrl(PAGES, TAGS, undefined), []);
 });
 
-test("Tags - setPageTags: adds, replaces, drops the page when empty, undefined when unchanged", () => {
+test("Tags - setPageTags: adds, replaces, keeps the entry with no tags when empty, undefined when unchanged", () => {
   const added = setPageTags(PAGES, "https://c.test/", ["t2"]);
   assert.deepEqual(added?.[2], { url: "https://c.test/", tagIds: ["t2"] });
   assert.deepEqual(setPageTags(PAGES, "https://a.test/x", ["t2"])?.[0], { url: "https://a.test/x", tagIds: ["t2"] });
-  assert.deepEqual(
-    setPageTags(PAGES, "https://a.test/x", [])?.map((page) => page.url),
-    ["https://b.test/"],
-  );
+  // Settings: the last tag off keeps the rule (its address, its switch) — Remove is the button for that
+  const bare = setPageTags([{ ...PAGES[0], disabled: true } as TagPage, PAGES[1] as TagPage], "https://a.test/x", []);
+  assert.deepEqual(bare?.[0], { url: "https://a.test/x", tagIds: [], disabled: true });
+  assert.equal(bare?.length, 2);
+  assert.equal(setPageTags(bare ?? [], "https://a.test/x", []), undefined, "already without tags");
   assert.equal(setPageTags(PAGES, "https://a.test/x", ["t1"]), undefined);
-  assert.equal(setPageTags(PAGES, "https://zz.test/", []), undefined);
+  assert.equal(setPageTags(PAGES, "https://zz.test/", []), undefined, "no entry to keep");
   assert.equal(setPageTags(PAGES, "", ["t1"]), undefined, "an unsupported page gets no tags");
+});
+
+test("Tags - renameTagPage re-keys one entry, tags and switch kept; undefined when nothing changes or the key is taken", () => {
+  const pages: TagPage[] = [{ ...PAGES[0], disabled: true } as TagPage, PAGES[1] as TagPage];
+  assert.deepEqual(renameTagPage(pages, "https://a.test/x", "A.test")?.[0], {
+    url: "a.test",
+    tagIds: ["t1"],
+    disabled: true,
+  });
+  assert.equal(renameTagPage(pages, "https://a.test/x", "https://a.test/x#frag"), undefined, "same key");
+  assert.equal(renameTagPage(pages, "https://a.test/x", "https://b.test/"), undefined, "another row's key");
+  assert.equal(renameTagPage(pages, "https://zz.test/", "https://c.test/"), undefined, "no such row");
+  assert.equal(renameTagPage(pages, "https://a.test/x", ""), undefined, "junk");
 });
 
 test("Tags - togglePageTags over several urls; hasTagEverywhere drives the ✓", () => {
@@ -163,6 +178,11 @@ test("Tags - togglePageTags over several urls; hasTagEverywhere drives the ✓",
 
 test("Tags - removeTags drops the tags and their ids from pages; the removal holds what left", () => {
   const removed = removeTags(TAGS, PAGES, ["t1"]);
+  assert.deepEqual(
+    removeTags(TAGS, [...PAGES, { url: "https://e.test/", tagIds: [] }], ["t1"])?.pages.map((page) => page.url),
+    ["https://b.test/", "https://e.test/"],
+    "a rule without tags is not what left",
+  );
   assert.deepEqual(removed?.tags, [bills]);
   assert.deepEqual(removed?.pages, [{ url: "https://b.test/", tagIds: ["t2"] }]);
   assert.deepEqual(removed?.removed, {

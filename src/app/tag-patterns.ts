@@ -14,9 +14,10 @@ export function tagPageKey(url: string | undefined): string {
 // ---------- tagged-page patterns ----------
 // An entry's `url` is a pattern: an address (exact page, `https://a.test/x`; ending in `/` it
 // covers everything under it — `https://a.test/` is the whole site without typing `*`), a site
-// (`a.test`: every page on that host), a site with its subdomains (`*.a.test`, like a
-// protection rule) or a glob — `*` anywhere, matching anything, `/` and `?` included
-// (`https://github.com/ariva/*/test`). Entries saved before patterns existed are addresses.
+// (`a.test`: the host and its subdomains — www, m, public… — unlike a protection rule's exact
+// host; `*.a.test` says the same and stays for entries saved that way), a word (`youtube`, no
+// dot: every host containing it) or a glob — `*` anywhere, matching anything, `/` and `?`
+// included (`https://github.com/ariva/*/test`). Entries saved before patterns existed are addresses.
 
 function isAddressPattern(pattern: string): boolean {
   return pattern.includes("://");
@@ -28,11 +29,18 @@ export function tagPatternKind(pattern: string): "page" | "domain" | "pattern" {
   if (isAddressPattern(pattern)) {
     return pattern.includes("*") || pattern.endsWith("/") ? "pattern" : "page";
   }
-  return pattern.startsWith("*.") && !pattern.slice(2).includes("*")
-    ? "domain"
-    : pattern.includes("*")
-      ? "pattern"
-      : "domain";
+  if (pattern.startsWith("*.") && !pattern.slice(2).includes("*")) {
+    return "domain";
+  }
+  return pattern.includes("*") || !pattern.includes(".") ? "pattern" : "domain";
+}
+
+// the host a row's Tag domain… tags: a leading www. is dropped so the entry names the site and
+// covers www and bare alike (kept when nothing else would be left, `www.com`)
+export function siteOf(url: string | undefined): string {
+  const host = hostnameOf(url);
+  const bare = host.replace(/^www\./, "");
+  return bare.includes(".") ? bare : host;
 }
 
 const SCHEME = /^[a-z][a-z0-9+.-]*:/i;
@@ -70,10 +78,12 @@ export function tagPagePatternHint(pattern: string): string {
     }
     return pattern.endsWith("/") ? "Every page under" : "Exact page";
   }
-  if (pattern.startsWith("*.")) {
-    return `${pattern.slice(2)} and its subdomains`;
+  if (pattern.includes("*")) {
+    return pattern.startsWith("*.") && !pattern.slice(2).includes("*")
+      ? `${pattern.slice(2)} and its subdomains`
+      : "Hosts matching the pattern";
   }
-  return pattern.includes("*") ? "Hosts matching the pattern" : `Every page on ${pattern}`;
+  return pattern.includes(".") ? `${pattern} and its subdomains` : `Hosts containing ${pattern}`;
 }
 
 function escapeRegExp(text: string): string {
@@ -106,5 +116,11 @@ export function matchesTagPage(pattern: string, url: string | undefined): boolea
     return pattern.endsWith("/") ? key.startsWith(pattern) : pattern === key;
   }
   const host = hostnameOf(key);
-  return host !== "" && (matchesRule(host, { pattern }) || (pattern.includes("*") && globMatches(pattern, host)));
+  if (host === "") {
+    return false;
+  }
+  if (pattern.includes("*")) {
+    return matchesRule(host, { pattern }) || globMatches(pattern, host);
+  }
+  return pattern.includes(".") ? matchesRule(host, { pattern: `*.${pattern}` }) : host.includes(pattern);
 }
