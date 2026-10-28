@@ -3,7 +3,7 @@
 // groups and the active tab; move = open picked parked tabs somewhere live.
 import type { ParkedTarget } from "../app/messages.ts";
 import { restorePlan, snapshotWindow } from "../app/parked.ts";
-import { addParkedWindow, dropParkedTabs, localStore, takeParkedWindow } from "../app/storage.ts";
+import { addParkedWindow, dropParkedTabs, localStore } from "../app/storage.ts";
 import { capabilities } from "../lib/platform/capabilities.ts";
 import { patchWindowProfiles, windowProfileOf } from "./window-profiles.ts";
 
@@ -36,16 +36,24 @@ interface OpenedTabs {
 }
 
 // One path for every reopen: into `windowId`, or into a new window built around the first
-// address (windows.create takes a url list but rejects the whole call on one bad address and
-// cannot pin — so one tab at a time, each failure on its own).
+// address Chrome accepts (windows.create takes a url list but rejects the whole call on one bad
+// address — file:// without permission, data:, odd schemes — and cannot pin; so one tab at a
+// time, each failure on its own, and a refused seed address tries the next one).
 async function openTabs(urls: string[], pinned: number[], windowId: number | undefined): Promise<OpenedTabs> {
   const ids: (number | undefined)[] = [];
   let start = 0;
-  if (windowId === undefined) {
-    const win = await chrome.windows.create({ url: urls[0], focused: true });
+  let seed: number | undefined;
+  while (windowId === undefined && start < urls.length) {
+    const win = await chrome.windows.create({ url: urls[start], focused: true }).catch(() => undefined);
     windowId = win?.id;
-    ids[0] = win?.tabs?.[0]?.id;
-    start = 1;
+    if (windowId !== undefined) {
+      seed = start;
+      ids[start] = win?.tabs?.[0]?.id;
+    }
+    start++;
+  }
+  if (windowId === undefined) {
+    return { windowId, ids }; // every address refused: nothing opened
   }
   for (let index = start; index < urls.length; index++) {
     const tab = await chrome.tabs
@@ -54,8 +62,8 @@ async function openTabs(urls: string[], pinned: number[], windowId: number | und
     ids[index] = tab?.id;
   }
   // the window's first tab came from windows.create, which cannot pin
-  if (start === 1 && pinned.includes(0) && ids[0] !== undefined) {
-    await chrome.tabs.update(ids[0], { pinned: true }).catch(() => {});
+  if (seed !== undefined && pinned.includes(seed) && ids[seed] !== undefined) {
+    await chrome.tabs.update(ids[seed], { pinned: true }).catch(() => {});
   }
   return { windowId, ids };
 }
@@ -87,13 +95,21 @@ async function openedWindowOf(tabId: number | undefined): Promise<number | undef
   return (await chrome.tabs.get(tabId).catch(() => undefined))?.windowId;
 }
 
+// The snapshot is consumed AFTER the tabs exist, and only the tabs that opened leave it: a
+// refused address or a target window closed meanwhile keeps its tabs parked instead of losing
+// the window with nothing to undo (park does the mirror image: snapshot first, close after)
 export async function restoreParked(id: string, intoWindowId?: number): Promise<void> {
-  const parked = await takeParkedWindow(id);
+  const { parkedWindows = [] } = await localStore.get("parkedWindows");
+  const parked = parkedWindows.find((entry) => entry.id === id);
   if (!parked) {
     return;
   }
   const plan = restorePlan(parked);
   const { windowId, ids } = await openTabs(plan.urls, plan.pinned, intoWindowId);
+  const opened = ids.flatMap((tabId, index) => (tabId === undefined ? [] : [index]));
+  if (opened.length > 0) {
+    await dropParkedTabs(id, opened);
+  }
   if (windowId === undefined) {
     return;
   }

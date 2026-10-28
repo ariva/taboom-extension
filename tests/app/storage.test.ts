@@ -52,7 +52,6 @@ test("Core - Storage - Parked windows: add, rename, drop tabs, take, forget to t
     renameParkedGroupTitle,
     removeParkedTabsToTrash,
     restoreParkedWindows,
-    takeParkedWindow,
   } = await import("../../src/app/storage.ts");
   const one = {
     id: "p1",
@@ -124,10 +123,6 @@ test("Core - Storage - Parked windows: add, rename, drop tabs, take, forget to t
   );
   assert.deepEqual(stored.parkedTrash, []);
   assert.equal(await restoreParkedWindows(), false, "empty trash");
-
-  assert.equal((await takeParkedWindow("p1"))?.name, "Work", "take = remove without trash (restore)");
-  assert.equal(stored.parkedWindows?.length, 0);
-  assert.equal(await takeParkedWindow("p1"), undefined);
 });
 
 test("Core - Storage - Tags: add, edit, page tags, remove to trash, clear, restore last removal", async () => {
