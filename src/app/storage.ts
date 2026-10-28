@@ -219,17 +219,6 @@ export async function removeParkedTabsToTrash(id: string, indexes: number[]): Pr
   return true;
 }
 
-// Restore: the window comes back to life, so the entry simply goes (parking again recreates it)
-export async function takeParkedWindow(id: string): Promise<ParkedWindow | undefined> {
-  const { parkedWindows = [] } = await localStore.get("parkedWindows");
-  const parked = parkedWindows.find((entry) => entry.id === id);
-  if (!parked) {
-    return undefined;
-  }
-  await localStore.set({ parkedWindows: parkedWindows.filter((entry) => entry !== parked) });
-  return parked;
-}
-
 // Remove parked window: the one door that drops one on purpose — it lands in the trash for Undo remove
 export async function forgetParkedWindow(id: string): Promise<boolean> {
   const { parkedWindows = [], parkedTrash = [] } = await localStore.get(["parkedWindows", "parkedTrash"]);

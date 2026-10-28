@@ -211,3 +211,75 @@ test("Service Worker - Parked: move-parked-tabs asGroup recreates the parked gro
     "the group's tabs left the snapshot",
   );
 });
+
+// T-0006: a restore must not consume the snapshot before the tabs exist — a refused address or a
+// vanished target window used to lose the whole parked window with nothing to undo
+test("Service Worker - Parked: restore-parked keeps the tabs Chrome refused; the window is built from the first address that opens", async () => {
+  stored.parkedWindows = [
+    {
+      id: "p-refused",
+      parkedAt: NOW,
+      name: "Files",
+      tabs: [
+        { url: "file:///home/me/notes.html", title: "notes", active: true },
+        { url: "https://ok1.example.com/", title: "ok1" },
+        { url: "https://ok2.example.com/", title: "ok2" },
+      ],
+      groups: [],
+    },
+  ];
+  const realCreate = chrome.windows.create;
+  chrome.windows.create = async (opts: chrome.windows.CreateData = {}) => {
+    if (String(opts.url).startsWith("file:")) {
+      throw new Error("Cannot open file URLs without permission");
+    }
+    return realCreate(opts);
+  };
+  calls.length = 0;
+  try {
+    await send({ type: "restore-parked", id: "p-refused" });
+  } finally {
+    chrome.windows.create = realCreate;
+  }
+  await tick();
+  assert.deepEqual(
+    stored.parkedWindows?.map((parked) => parked.tabs.map((tab) => tab.title)),
+    [["notes"]],
+    "the refused tab stays parked, the opened ones left the snapshot",
+  );
+  assert.equal(stored.parkedWindows?.[0]?.name, "Files", "the entry keeps its identity");
+  const opened = tabs.filter((tab) => /ok[12]\.example/.test(tab.url ?? ""));
+  assert.equal(opened.length, 2, "the window was built from the first address that opened");
+  assert.equal(new Set(opened.map((tab) => tab.windowId)).size, 1);
+});
+
+test("Service Worker - Parked: restore-parked into a window that is gone leaves the snapshot untouched", async () => {
+  stored.parkedWindows = [
+    {
+      id: "p-gone",
+      parkedAt: NOW,
+      tabs: [
+        { url: "https://x1.example.com/", title: "x1" },
+        { url: "https://x2.example.com/", title: "x2" },
+      ],
+      groups: [],
+    },
+  ];
+  const realCreate = chrome.tabs.create;
+  chrome.tabs.create = async (opts: chrome.tabs.CreateProperties = {}) => {
+    if (opts.windowId === 777) {
+      throw new Error("No window with id: 777.");
+    }
+    return realCreate(opts);
+  };
+  const before = tabs.length;
+  try {
+    await send({ type: "restore-parked", id: "p-gone", intoWindowId: 777 });
+  } finally {
+    chrome.tabs.create = realCreate;
+  }
+  await tick();
+  assert.equal(stored.parkedWindows?.length, 1, "nothing opened, nothing dropped");
+  assert.equal(stored.parkedWindows?.[0]?.tabs.length, 2);
+  assert.equal(tabs.length, before, "no tab was created");
+});
