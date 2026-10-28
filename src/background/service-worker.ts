@@ -4,7 +4,12 @@
 // Same-event listeners run in registration order; keep the order below.
 import type { Message } from "../app/messages.ts";
 import { runCommand, runMenuClick } from "./gestures.ts";
-import { onKeepAliveAlarm, syncKeepAliveMenu, syncKeepAliveMenuOnNavigation } from "./keep-alive.ts";
+import {
+  onKeepAliveAlarm,
+  staggerOverdueKeepAlive,
+  syncKeepAliveMenu,
+  syncKeepAliveMenuOnNavigation,
+} from "./keep-alive.ts";
 import { init, noteUpdateAvailable } from "./lifecycle.ts";
 import { handleMessage } from "./messages.ts";
 import { reprotectOnNavigation, syncProtectMenu } from "./protection.ts";
@@ -34,6 +39,7 @@ chrome.alarms.onAlarm.addListener(onAlarm);
 // ---------- keep-it-alive sweep ----------
 
 chrome.alarms.onAlarm.addListener(onKeepAliveAlarm);
+chrome.runtime.onStartup.addListener(staggerOverdueKeepAlive); // marks due while Chrome was closed: one every 30–60 s
 
 // ---------- messages from side panel / options ----------
 

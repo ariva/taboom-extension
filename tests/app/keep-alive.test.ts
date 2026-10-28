@@ -19,6 +19,7 @@ import {
   setKeepAlivePaused,
   setKeepAliveReloadAll,
   setKeepAliveUrl,
+  staggerKeepAlive,
   unmarkKeepAlive,
 } from "../../src/app/keep-alive.ts";
 import { DEFAULTS } from "../../src/app/core.ts";
@@ -176,6 +177,53 @@ test("Keep alive - dueKeepAlive returns the entries whose time has come, paused 
     ["https://dash.example.com/board"],
   );
   assert.deepEqual(dueKeepAlive(list, NOW + 2 * MINUTE).length, 2);
+});
+
+test("Keep alive - dueKeepAlive: a mark more than one of its own intervals past its time is missed (sleep, Chrome closed), not due", () => {
+  // `later`: the 25 min mark is exactly one interval past its time (still due), one ms more and
+  // it is missed; the 5 min mark 2 min past its time stays due either way
+  const later = NOW - 1 + 25 * MINUTE;
+  const slept = [
+    ...list,
+    { url: "https://short.example.com/", title: "Short", minutes: 5, nextReload: later - 2 * MINUTE },
+  ];
+  assert.deepEqual(
+    dueKeepAlive(slept, later).map((entry) => entry.url),
+    ["https://dash.example.com/board", "https://short.example.com/"],
+    "exactly one interval overdue is still due; the 5 min mark 24 min past its time is missed",
+  );
+  assert.deepEqual(
+    dueKeepAlive(slept, later + 1).map((entry) => entry.url),
+    ["https://short.example.com/"],
+  );
+});
+
+test("Keep alive - staggerKeepAlive re-times the overdue marks 30–60 s apart in list order; future and paused ones keep their time; undefined when none", () => {
+  const overdue: KeepAliveTab[] = [
+    { url: "https://a.example.com/", title: "A", minutes: 25, nextReload: NOW - 2 * 60 * MINUTE },
+    { url: "https://b.example.com/", title: "B", minutes: 5, nextReload: NOW + MINUTE },
+    { url: "https://c.example.com/", title: "C", minutes: 1, paused: true, nextReload: 0 },
+    { url: "https://d.example.com/", title: "D", minutes: 5, nextReload: NOW },
+  ];
+  const next = staggerKeepAlive(overdue, NOW, () => 0.5);
+  assert.ok(next);
+  assert.deepEqual(
+    next.map((entry) => entry.nextReload),
+    [NOW + 45_000, NOW + MINUTE, 0, NOW + 90_000],
+    "A first at now + 45 s, D 45 s after A; B (ahead) and C (paused) untouched",
+  );
+  assert.equal(next[1], overdue[1], "untouched entry keeps its identity");
+  const spread = staggerKeepAlive(overdue, NOW, () => 1);
+  assert.ok(spread);
+  assert.deepEqual(
+    [spread[0]?.nextReload, spread[3]?.nextReload],
+    [NOW + 60_000, NOW + 120_000],
+    "random 1 = 60 s gaps",
+  );
+  const tight = staggerKeepAlive(overdue, NOW, () => 0);
+  assert.ok(tight);
+  assert.deepEqual([tight[0]?.nextReload, tight[3]?.nextReload], [NOW + 30_000, NOW + 60_000], "random 0 = 30 s gaps");
+  assert.equal(staggerKeepAlive(overdue, NOW - 3 * 60 * MINUTE), undefined, "nothing overdue: no write");
 });
 
 test("Keep alive - rearmKeepAlive takes the open tab's title along, so a mark's name catches up with the page", () => {

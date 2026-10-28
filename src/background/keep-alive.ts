@@ -11,6 +11,7 @@ import {
   nextReloadAt,
   rearmAllKeepAlive,
   rearmKeepAlive,
+  staggerKeepAlive,
 } from "../app/keep-alive.ts";
 import { loadState, localStore, removeKeepAlive } from "../app/storage.ts";
 import type { KeepAliveTab, Settings } from "../app/types.ts";
@@ -59,10 +60,7 @@ export async function keepAlivePass(): Promise<void> {
   const list = await activeKeepAliveList();
   const now = Date.now();
   const due = dueKeepAlive(list, now);
-  if (due.length === 0) {
-    return;
-  }
-  const tabs = await chrome.tabs.query({});
+  const tabs = due.length > 0 ? await chrome.tabs.query({}) : [];
   let next = list;
   for (const entry of due) {
     // a mark whose page is closed stays armed (and quiet) until the user removes it in Options
@@ -76,7 +74,22 @@ export async function keepAlivePass(): Promise<void> {
     // the reloaded tab names the mark from now on (Settings table, Alive view)
     next = rearmKeepAlive(next, entry.url, nextReloadAt(entry.minutes, now), targets[0]?.title);
   }
-  await localStore.set({ keepAlive: next });
+  // whatever is still overdue was missed by the machine (sleep), not the sweep: one every 30–60 s
+  const staggered = staggerKeepAlive(next, now);
+  if (due.length === 0 && staggered === undefined) {
+    return;
+  }
+  await localStore.set({ keepAlive: staggered ?? next });
+}
+
+// runtime.onStartup: the marks that came due while Chrome was closed reload one every 30–60 s
+// from now, not all in the first sweep; the rest keep their time
+export async function staggerOverdueKeepAlive(): Promise<void> {
+  const { keepAlive = [] } = await localStore.get("keepAlive");
+  const next = staggerKeepAlive(keepAlive, Date.now());
+  if (next) {
+    await localStore.set({ keepAlive: next });
+  }
 }
 
 async function markTabs(tabs: chrome.tabs.Tab[]): Promise<boolean> {
