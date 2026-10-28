@@ -793,6 +793,69 @@ test("Service Worker - Keep alive: sweep reloads due, unpaused pages only and re
   assert.equal(stored.keepAlive[2]?.nextReload, 0, "paused entry neither reloaded nor re-armed");
 });
 
+test("Service Worker - Keep alive: marks overdue by more than their interval (sleep) are staggered 30–60 s apart instead of reloaded — no burst on the first sweep after waking", {
+  skip: !KEEP_ALIVE_ON,
+}, async () => {
+  const before = Date.now();
+  stored.keepAlive = [
+    { url: "https://old.example.com/a", title: "Old A", minutes: 25, nextReload: before - 2 * HOUR },
+    { url: "https://mail.google.com/inbox", title: "Mail", minutes: 5, nextReload: before - 2 * HOUR },
+    // due the ordinary way: 10 s past, well inside its interval → reloads
+    { url: "https://work.example.com/doc", title: "Doc", minutes: 5, nextReload: before - 10_000 },
+  ];
+  calls.length = 0;
+  await chrome.alarms.onAlarm.fire({ name: "keep-alive" });
+  await tick();
+  await tick();
+  await tick();
+  assert.deepEqual(
+    calls.filter((c) => c.startsWith("tabs.reload")),
+    ["tabs.reload 1"],
+    "only the mark due within its interval reloads",
+  );
+  const [first, second, doc] = stored.keepAlive;
+  assert.ok(first && second && doc);
+  assert.ok(
+    first.nextReload >= before + 30_000 && first.nextReload <= Date.now() + 60_000,
+    "first missed mark: 30–60 s from now",
+  );
+  assert.ok(
+    second.nextReload - first.nextReload >= 30_000 && second.nextReload - first.nextReload <= 60_000,
+    "second 30–60 s after the first",
+  );
+  assert.ok(doc.nextReload >= before + 5 * MINUTE - 55_000, "the reloaded mark re-armed around its own interval");
+});
+
+test("Service Worker - Keep alive: a browser start staggers the marks that came due while Chrome was closed, one every 30–60 s; the rest keep their time", {
+  skip: !KEEP_ALIVE_ON,
+}, async () => {
+  const before = Date.now();
+  stored.keepAlive = [
+    { url: "https://old.example.com/a", title: "Old A", minutes: 25, nextReload: before - 2 * HOUR },
+    { url: "https://work.example.com/doc", title: "Doc", minutes: 5, nextReload: before + HOUR },
+    { url: "https://mail.google.com/inbox", title: "Mail", minutes: 5, nextReload: before - 10_000 },
+    { url: "https://lone.example.com/", title: "Lone", minutes: 1, paused: true, nextReload: 0 },
+  ];
+  calls.length = 0;
+  await chrome.runtime.onStartup.fire();
+  await tick();
+  await tick();
+  await tick();
+  assert.ok(!calls.some((c) => c.startsWith("tabs.reload")), "a launch reloads nothing by itself");
+  const [old, doc, mail, lone] = stored.keepAlive;
+  assert.ok(old && doc && mail && lone);
+  assert.ok(
+    old.nextReload >= before + 30_000 && old.nextReload <= Date.now() + 60_000,
+    "first overdue mark: 30–60 s from launch",
+  );
+  assert.ok(
+    mail.nextReload - old.nextReload >= 30_000 && mail.nextReload - old.nextReload <= 60_000,
+    "next one 30–60 s later, list order",
+  );
+  assert.equal(doc.nextReload, before + HOUR, "a mark still ahead keeps its time");
+  assert.equal(lone.nextReload, 0, "paused mark untouched");
+});
+
 test("Service Worker - Keep alive: a mark typed with a fragment reloads that exact address only", {
   skip: !KEEP_ALIVE_ON,
 }, async () => {
@@ -801,8 +864,8 @@ test("Service Worker - Keep alive: a mark typed with a fragment reloads that exa
   const original = tab.url;
   tab.url = "https://old.example.com/a#/dash";
   stored.keepAlive = [
-    { url: "https://old.example.com/a#/dash", title: "Dash", minutes: 25, nextReload: 0 },
-    { url: "https://old.example.com/a#/mail", title: "Mail", minutes: 25, nextReload: 0 },
+    { url: "https://old.example.com/a#/dash", title: "Dash", minutes: 25, nextReload: Date.now() - 1 },
+    { url: "https://old.example.com/a#/mail", title: "Mail", minutes: 25, nextReload: Date.now() - 1 },
   ];
   calls.length = 0;
   await chrome.alarms.onAlarm.fire({ name: "keep-alive" });
@@ -826,7 +889,7 @@ test("Service Worker - Keep alive: one tab per mark — the pinned one, else the
     { ...tabs[1], id: 21, windowId: 2, pinned: true, title: "Old A (pinned)" },
   ];
   tabs.push(...extra);
-  stored.keepAlive = [{ url: "https://old.example.com/a", title: "stale", minutes: 25, nextReload: 0 }];
+  stored.keepAlive = [{ url: "https://old.example.com/a", title: "stale", minutes: 25, nextReload: Date.now() - 1 }];
   calls.length = 0;
   await chrome.alarms.onAlarm.fire({ name: "keep-alive" });
   await tick();
@@ -842,7 +905,7 @@ test("Service Worker - Keep alive: one tab per mark — the pinned one, else the
   const pinned = tabs.find((t) => t.id === 21);
   assert.ok(pinned);
   pinned.pinned = false;
-  stored.keepAlive = [{ url: "https://old.example.com/a", title: "stale", minutes: 25, nextReload: 0 }];
+  stored.keepAlive = [{ url: "https://old.example.com/a", title: "stale", minutes: 25, nextReload: Date.now() - 1 }];
   calls.length = 0;
   await chrome.alarms.onAlarm.fire({ name: "keep-alive" });
   await tick();
@@ -855,7 +918,7 @@ test("Service Worker - Keep alive: one tab per mark — the pinned one, else the
   );
 
   stored.keepAlive = [
-    { url: "https://old.example.com/a", title: "stale", minutes: 25, nextReload: 0, reloadAll: true },
+    { url: "https://old.example.com/a", title: "stale", minutes: 25, nextReload: Date.now() - 1, reloadAll: true },
   ];
   calls.length = 0;
   await chrome.alarms.onAlarm.fire({ name: "keep-alive" });
@@ -872,7 +935,7 @@ test("Service Worker - Keep alive: one tab per mark — the pinned one, else the
 });
 
 test("Service Worker - Keep alive: sweep does nothing while the setting is off", { skip: !KEEP_ALIVE_ON }, async () => {
-  stored.keepAlive = [{ url: "https://old.example.com/a", title: "Old A", minutes: 25, nextReload: 0 }];
+  stored.keepAlive = [{ url: "https://old.example.com/a", title: "Old A", minutes: 25, nextReload: Date.now() - 1 }];
   stored.settings.keepAliveEnabled = false;
   calls.length = 0;
   await chrome.alarms.onAlarm.fire({ name: "keep-alive" });
@@ -1034,7 +1097,7 @@ test("Service Worker - Keep alive: options-page list edits re-arm the sweep thro
 });
 
 test("Service Worker - KEEP_ALIVE off: sweep alarm and menu click are inert", { skip: KEEP_ALIVE_ON }, async () => {
-  stored.keepAlive = [{ url: "https://old.example.com/a", title: "Old A", minutes: 25, nextReload: 0 }];
+  stored.keepAlive = [{ url: "https://old.example.com/a", title: "Old A", minutes: 25, nextReload: Date.now() - 1 }];
   calls.length = 0;
   await chrome.alarms.onAlarm.fire({ name: "keep-alive" });
   await chrome.contextMenus.onClicked.fire(

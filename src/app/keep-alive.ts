@@ -97,8 +97,39 @@ export function keepAliveTargets<T extends { id?: number; pinned?: boolean; url?
   return first ? [first] : [];
 }
 
+// A running mark more than one of its own intervals past its time was not skipped by the
+// 30 s sweep but by the machine: lid closed, or Chrome not running. Those are not due — the
+// sweep hands them to staggerKeepAlive instead of reloading them all at once. A mark inside
+// its interval (a quick restart included) still reloads on time: a session timeout does not wait.
 export function dueKeepAlive(list: KeepAliveTab[], now: number): KeepAliveTab[] {
-  return list.filter((entry) => !entry.paused && entry.nextReload <= now);
+  return list.filter(
+    (entry) => !entry.paused && entry.nextReload <= now && now - entry.nextReload <= entry.minutes * 60_000,
+  );
+}
+
+const STAGGER_MS = 30_000;
+
+// Every running mark whose time has passed is re-timed 30–60 s after the previous one, in list
+// order, the first 30–60 s from `now`: after a browser start or a long sleep the kept pages
+// catch up one at a time instead of in one burst (the network may still be coming up, and five
+// "Leave site?" prompts at once help nobody). Marks still ahead of `now` and paused ones keep
+// their time. undefined when nothing was overdue — callers skip the write.
+export function staggerKeepAlive(
+  list: KeepAliveTab[],
+  now: number,
+  random: () => number = Math.random,
+): KeepAliveTab[] | undefined {
+  let at = now;
+  let changed = false;
+  const next = list.map((entry) => {
+    if (entry.paused || entry.nextReload > now) {
+      return entry;
+    }
+    at += STAGGER_MS + Math.round(random() * STAGGER_MS);
+    changed = true;
+    return { ...entry, nextReload: at };
+  });
+  return changed ? next : undefined;
 }
 
 // the sweep passes the reloaded tab's title: a mark named at mark time (or by hostname
