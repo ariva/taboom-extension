@@ -48,6 +48,7 @@ async function initNow(): Promise<void> {
   }
   await localStore.remove(["updateAvailable", "dismissedUpdate"]); // running the new version now
   // history persists across extension reloads — just prune tabs that vanished meanwhile
+  // (a browser start empties it first: resetHistoryOnStartup, same chain)
   const openIds = new Set((await chrome.tabs.query({})).map((tab) => tab.id));
   await withHistory((hist) => filterHistory(hist, (id) => openIds.has(id)));
 }

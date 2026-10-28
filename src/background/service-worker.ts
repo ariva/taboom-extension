@@ -10,7 +10,13 @@ import { handleMessage } from "./messages.ts";
 import { reprotectOnNavigation, syncProtectMenu } from "./protection.ts";
 import { onAlarm } from "./snooze.ts";
 import { onStorageChanged } from "./storage-changes.ts";
-import { dropClosedTabs, recordActivation, recordWindowFocus, replaceTabId } from "./tab-history.ts";
+import {
+  dropClosedTabs,
+  recordActivation,
+  recordWindowFocus,
+  replaceTabId,
+  resetHistoryOnStartup,
+} from "./tab-history.ts";
 import { syncTagMenu, syncTagMenuOnNavigation } from "./tags.ts";
 import { refreshOnTabChange, scheduleProfileRefresh, trackPanelPort } from "./window-profiles.ts";
 
@@ -51,6 +57,7 @@ chrome.tabs.onActivated.addListener(async ({ tabId }) => {
 
 // ---------- tab history (back/forward across tabs) ----------
 
+chrome.runtime.onStartup.addListener(resetHistoryOnStartup); // before init's prune: both run on the history chain
 chrome.tabs.onActivated.addListener(({ tabId }) => recordActivation(tabId));
 chrome.windows.onFocusChanged.addListener(recordWindowFocus);
 chrome.tabs.onRemoved.addListener(dropClosedTabs);

@@ -1093,3 +1093,22 @@ test("Service Worker - TAGS: Tag page ▸ items follow the tag list, a click tog
   assert.ok(calls.includes("contextMenus.remove tag-page"));
   assert.ok(!calls.includes("contextMenus.create tag-page"));
 });
+
+// Tab ids are per browser session and reassigned from small numbers, so a trail kept
+// in storage.local across a restart points at whatever tab got an old id — the startup prune
+// by "is this id open" cannot tell a survivor from a newcomer
+test("Service Worker - Tab history: a browser start clears the trail; an extension reload only prunes it", async () => {
+  // ids 1 and 2 are open in the fixture — after a restart they would be new tabs wearing old ids
+  await chrome.storage.local.set({ tabHistory: { stack: [1, 2], cursor: 1 } });
+  await chrome.runtime.onStartup.fire();
+  await tick();
+  await tick();
+  let { tabHistory } = await chrome.storage.local.get("tabHistory");
+  assert.deepEqual(tabHistory, { stack: [], cursor: -1 }, "startup: ids from the previous session mean nothing");
+  await chrome.storage.local.set({ tabHistory: { stack: [1, 2, 555], cursor: 1 } });
+  await chrome.runtime.onInstalled.fire(); // reload / update: same session, same ids
+  await tick();
+  await tick();
+  ({ tabHistory } = await chrome.storage.local.get("tabHistory"));
+  assert.deepEqual(tabHistory, { stack: [1, 2], cursor: 1 }, "reload: only the closed id goes");
+});

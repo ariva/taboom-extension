@@ -11,7 +11,8 @@ import { localStore } from "../app/storage.ts";
 import type { TabHistory } from "../app/types.ts";
 import { navMode } from "./nav-mode.ts";
 
-// storage.local: history survives worker sleeps, extension reloads, and browser restarts
+// storage.local: history survives worker sleeps and extension reloads; a browser start empties
+// it (resetHistoryOnStartup) — the ids in it belong to the session that wrote them
 export async function loadHistory(): Promise<TabHistory> {
   const { tabHistory } = await localStore.get("tabHistory");
   return tabHistory ?? { stack: [], cursor: -1 };
@@ -61,6 +62,15 @@ export async function recordWindowFocus(windowId: number): Promise<void> {
   if (tab?.id) {
     await recordActivation(tab.id);
   }
+}
+
+// runtime.onStartup
+// Tab ids are per browser session, handed out again from small numbers: after a restart an id
+// in the trail points at whichever new tab got it, and a prune by "is it open" cannot tell. The
+// trail is a session thing — it starts empty. (onInstalled — reload / update — keeps the
+// session and its ids, so lifecycle's init only prunes there.)
+export function resetHistoryOnStartup(): Promise<void> {
+  return withHistory((hist) => (hist.stack.length === 0 ? null : { stack: [], cursor: -1 }));
 }
 
 // tabs.onRemoved
