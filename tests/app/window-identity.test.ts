@@ -2,7 +2,14 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
 import type { FingerprintTab } from "../../src/app/types.ts";
-import { buildFingerprint, hashKey, matchProfiles, scoreMatch, urlKey } from "../../src/app/window-identity.ts";
+import {
+  assignLogicalIds,
+  buildFingerprint,
+  hashKey,
+  matchProfiles,
+  scoreMatch,
+  urlKey,
+} from "../../src/app/window-identity.ts";
 
 const tab = (url: string, pinned = false): FingerprintTab => ({ url, pinned });
 
@@ -60,4 +67,52 @@ test("Identity - matchProfiles: unrelated window stays unmatched, one profile as
   ]);
   assert.equal(assigned.get(5), "w-1", "best candidate wins the profile");
   assert.equal(assigned.has(6), false, "unrelated window gets no stored id");
+});
+
+test("Identity - assignLogicalIds recovers per window: a window arriving late into a half-filled map still finds its profile", () => {
+  const work = [tab("https://jira.dev/board", true), tab("https://github.com/pr/1")];
+  const play = [tab("https://youtube.com/w", true), tab("https://reddit.com/r/x")];
+  const profiles = {
+    "w-work": { ...buildFingerprint(work, null, 1), chromeWindowId: 101, name: "Work" },
+    "w-play": { ...buildFingerprint(play, null, 1), chromeWindowId: 102, name: "Play" },
+  };
+  let minted = 0;
+  const mint = () => `w-new-${++minted}`;
+  // restart: session restore brings the first window alone; the map fills from an empty one
+  const first = assignLogicalIds({}, profiles, [[7, buildFingerprint(work, null, 2)]], mint);
+  assert.deepEqual(first, { 7: "w-work" });
+  // the second window lands later: the map is no longer empty, its profile is still found
+  const second = assignLogicalIds(
+    first,
+    profiles,
+    [
+      [7, buildFingerprint(work, null, 3)],
+      [8, buildFingerprint(play, null, 3)],
+    ],
+    mint,
+  );
+  assert.deepEqual(second, { 7: "w-work", 8: "w-play" });
+  assert.equal(minted, 0, "nothing minted");
+  // a window nothing matches gets a fresh id; a closed window leaves the map; a held profile is not reused
+  const third = assignLogicalIds(
+    second,
+    profiles,
+    [
+      [8, buildFingerprint(play, null, 4)],
+      [9, buildFingerprint([tab("https://unrelated.dev/")], null, 4)],
+      [10, buildFingerprint(work, null, 4)],
+    ],
+    mint,
+  );
+  assert.deepEqual(third, { 8: "w-play", 9: "w-new-1", 10: "w-work" }, "7 gone, w-work free again for 10");
+});
+
+test("Identity - matchProfiles prefers a named profile when two fit a window equally", () => {
+  const content = [tab("https://a.dev/", true), tab("https://b.dev/")];
+  const profiles = {
+    "w-plain": { ...buildFingerprint(content, null, 1) },
+    "w-named": { ...buildFingerprint(content, null, 1), name: "Research" },
+  };
+  const assigned = matchProfiles(profiles, [[5, buildFingerprint(content, null, 2)]]);
+  assert.equal(assigned.get(5), "w-named", "a stranded named profile wins the tie over its unnamed twin");
 });

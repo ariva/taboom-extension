@@ -85,25 +85,32 @@ export function scoreMatch(profile: WindowProfile, candidate: Partial<WindowFing
   return score;
 }
 
+// what the user gave a window — worth keeping past the TTL, worth winning a tie
+function customized(profile: WindowProfile): boolean {
+  return Boolean(profile.name || profile.color || profile.pinnedWindow);
+}
+
 // After a restart: assign stored logical ids to live windows by best score,
 // greedy, threshold-gated (a window below the threshold is a new window, not a
 // bad match). candidates: [chromeWindowId, fingerprint][]. Returns
-// Map chromeWindowId → logicalId; unmatched windows are simply absent.
+// Map chromeWindowId → logicalId; unmatched windows are simply absent. On a
+// tie a customized profile wins: a named profile stranded by an earlier bad
+// pass scores the same as the unnamed twin minted in its place
 export function matchProfiles(
   profiles: Record<string, WindowProfile>,
   candidates: [number, Partial<WindowFingerprint>][],
   threshold = 0.4,
 ): Map<number, string> {
-  const pairs: [number, string, number][] = [];
+  const pairs: [number, string, number, boolean][] = [];
   for (const [logicalId, profile] of Object.entries(profiles)) {
     for (const [chromeId, candidate] of candidates) {
       const score = scoreMatch(profile, candidate);
       if (score >= threshold) {
-        pairs.push([score, logicalId, chromeId]);
+        pairs.push([score, logicalId, chromeId, customized(profile)]);
       }
     }
   }
-  pairs.sort((a, b) => (a[0] === b[0] ? 0 : b[0] - a[0]));
+  pairs.sort((a, b) => (a[0] === b[0] ? Number(b[3]) - Number(a[3]) : b[0] - a[0]));
   const usedLogical = new Set<string>();
   const assigned = new Map<number, string>();
   for (const [, logicalId, chromeId] of pairs) {
@@ -116,6 +123,39 @@ export function matchProfiles(
   return assigned;
 }
 
+// The logical id of every live window: the session map pruned of closed windows, then each
+// window still without an id tried against the profiles no window holds, and a fresh id only
+// for a window nothing matches. Recovery is per window, never "once while the map is empty":
+// session restore brings windows one by one, so a window arriving after the first pass meets a
+// half-filled map — a one-shot pass minted it a new id and stranded its name forever. A
+// side effect worth having: "Reopen closed window" finds its old profile again
+export function assignLogicalIds(
+  map: WindowSessionMap,
+  profiles: WindowProfiles,
+  candidates: [number, Partial<WindowFingerprint>][],
+  mint: () => string,
+): WindowSessionMap {
+  const live = new Set(candidates.map(([chromeId]) => chromeId));
+  const next: WindowSessionMap = Object.fromEntries(
+    Object.entries(map).filter(([chromeId]) => live.has(Number(chromeId))),
+  );
+  const unmapped = candidates.filter(([chromeId]) => !next[chromeId]);
+  if (unmapped.length === 0) {
+    return next;
+  }
+  const held = new Set(Object.values(next));
+  const free = Object.fromEntries(Object.entries(profiles).filter(([logicalId]) => !held.has(logicalId)));
+  for (const [chromeId, logicalId] of matchProfiles(free, unmapped)) {
+    next[chromeId] = logicalId;
+  }
+  for (const [chromeId] of unmapped) {
+    if (!next[chromeId]) {
+      next[chromeId] = mint();
+    }
+  }
+  return next;
+}
+
 // TTL sweep — the only path that removes a stored profile (closed windows keep
 // theirs on purpose, see refreshWindowProfiles in the service worker).
 export function expireProfiles(profiles: WindowProfiles, now: number, ttlMs: number): WindowProfiles {
@@ -123,7 +163,7 @@ export function expireProfiles(profiles: WindowProfiles, now: number, ttlMs: num
     Object.entries(profiles).filter(([, profile]) => {
       // user-customized windows (name or color) are exempt — losing a name to
       // the sweep after two weeks of vacation would feel like data loss
-      if (profile.name || profile.color || profile.pinnedWindow) {
+      if (customized(profile)) {
         return true;
       }
       return !(now - (profile.updatedAt ?? 0) > ttlMs);

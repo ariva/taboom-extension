@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { test } from "vitest";
 import type { Message, MessageError, MessageResponses } from "../../src/app/messages.ts";
 import type { KeepAliveTab, LocalStorageSchema, ProtectionRule, Removal, Settings } from "../../src/app/types.ts";
+import { buildFingerprint } from "../../src/app/window-identity.ts";
 import type { ChromeMockOptions } from "../helpers/chrome-mock.ts";
 import { makeChrome, tick, TEST_EXPERIMENTAL, TEST_FEATURES } from "../helpers/ui.ts";
 
@@ -607,6 +608,32 @@ test("Service Worker - Window identity: profiles follow tab changes under stable
 
   tabs.splice(removedIndex, 0, removed); // restore fixture
   await chrome.tabs.onCreated.fire(removed);
+  await new Promise((resolve) => setTimeout(resolve, 600));
+});
+
+test("Service Worker - Window identity: after a restart a window restored late still gets its name back", async () => {
+  // the stored profile of a named window whose tabs session restore brings only after the first pass
+  const late = [
+    { id: 701, windowId: 70, index: 0, active: true, pinned: true, url: "https://jira.dev/board" },
+    { id: 702, windowId: 70, index: 1, active: false, pinned: false, url: "https://github.com/pr/1" },
+  ];
+  const { windowProfiles: before = {} } = await chrome.storage.local.get("windowProfiles");
+  await chrome.storage.local.set({
+    windowProfiles: { ...before, "w-late": { ...buildFingerprint(late, null, 1), chromeWindowId: 999, name: "Work" } },
+  });
+  await chrome.storage.session.set({ windowSessionMap: {} }); // browser restart: the session map is gone
+  await chrome.tabs.onCreated.fire(tabs[0]); // the first restored window's pass
+  await new Promise((resolve) => setTimeout(resolve, 600));
+  tabs.push(...late);
+  await chrome.tabs.onCreated.fire(late[0]); // the named window arrives into a half-filled map
+  await new Promise((resolve) => setTimeout(resolve, 600));
+  const { windowSessionMap = {} } = await chrome.storage.session.get("windowSessionMap");
+  assert.equal(windowSessionMap[70], "w-late", "recovered by fingerprint, not minted");
+  const { windowProfiles = {} } = await chrome.storage.local.get("windowProfiles");
+  assert.equal(windowProfiles["w-late"]?.name, "Work");
+  assert.equal(windowProfiles["w-late"]?.chromeWindowId, 70);
+  tabs.splice(tabs.length - late.length, late.length); // fixture back
+  await chrome.tabs.onRemoved.fire(701, { windowId: 70, isWindowClosing: true });
   await new Promise((resolve) => setTimeout(resolve, 600));
 });
 

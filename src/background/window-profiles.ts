@@ -1,23 +1,36 @@
 // Window identity (logical ids stable across restarts), the per-window profile
 // patches (name / color / pin / panelOpen), and panel-open tracking + restore.
 import { localStore, sessionStore } from "../app/storage.ts";
-import { buildFingerprint, expireProfiles, matchProfiles, windowsToRestore } from "../app/window-identity.ts";
+import { assignLogicalIds, buildFingerprint, expireProfiles, windowsToRestore } from "../app/window-identity.ts";
 import type { WindowFingerprint, WindowProfile } from "../app/types.ts";
 
 // ---------- window identity (logical ids stable across restarts) ----------
 // Every window gets a logical id kept in storage.session (chromeWindowId →
 // logicalId); its content fingerprint lives in storage.local.windowProfiles.
-// Chrome wipes storage.session on browser restart but not on extension
-// reload — an empty map with stored profiles means "restart": recover the
-// ids by fingerprint matching before minting fresh ones.
+// Chrome wipes storage.session on browser restart (an extension reload may
+// too) — a window missing from the map is matched against the stored
+// profiles by fingerprint before a fresh id is minted (assignLogicalIds).
 
 const PROFILE_DEBOUNCE_MS = 400;
 const PROFILE_TTL_MS = 14 * 24 * 3_600_000;
 let profileTimer: ReturnType<typeof setTimeout> | null = null;
 
+// Every read-modify-write of windowProfiles runs on this one chain — a refresh
+// (tab events, panel open) interleaving with a rename would otherwise write its
+// stale copy over the name (last writer wins)
+let profileChain = Promise.resolve();
+function queued<T>(work: () => Promise<T>): Promise<T> {
+  const run = profileChain.then(work);
+  profileChain = run.then(
+    () => {},
+    () => {}, // one failure must not jam the queue
+  );
+  return run;
+}
+
 export function scheduleProfileRefresh(): void {
   clearTimeout(profileTimer ?? undefined); // clearTimeout's typing rejects null
-  profileTimer = setTimeout(() => refreshWindowProfiles().catch(() => {}), PROFILE_DEBOUNCE_MS);
+  profileTimer = setTimeout(() => queued(refreshWindowProfiles).catch(() => {}), PROFILE_DEBOUNCE_MS);
 }
 
 // tabs.onUpdated
@@ -45,19 +58,7 @@ async function refreshWindowProfiles(): Promise<void> {
 
   const { windowSessionMap = {} } = await sessionStore.get("windowSessionMap");
   const { windowProfiles = {} } = await localStore.get("windowProfiles");
-
-  let map = windowSessionMap;
-  if (Object.keys(map).length === 0 && Object.keys(windowProfiles).length > 0) {
-    // fresh browser session: recover logical ids by fingerprint
-    map = Object.fromEntries(matchProfiles(windowProfiles, candidates));
-  }
-  // drop entries for windows that no longer exist, mint ids for new ones
-  map = Object.fromEntries(Object.entries(map).filter(([id]) => byWindow.has(Number(id))));
-  for (const [windowId] of candidates) {
-    if (!map[windowId]) {
-      map[windowId] = `w-${crypto.randomUUID()}`;
-    }
-  }
+  const map = assignLogicalIds(windowSessionMap, windowProfiles, candidates, () => `w-${crypto.randomUUID()}`);
 
   // upsert current windows; profiles of closed windows are kept on purpose —
   // browser shutdown fires close events too, and deleting then would break
@@ -98,21 +99,18 @@ export function setPanelOpen(windowIds: number[], open: boolean): Promise<void> 
   return patchWindowProfiles(windowIds, { panelOpen: open });
 }
 
-// One read + one write for the whole batch, and every batch serialized on one
-// chain — a panel connecting while another panel's restore-dismiss is mid-write
-// would otherwise clobber it (last writer wins). `undefined` values in the
-// patch drop the key on the storage write (clear name/color).
-let profileChain = Promise.resolve();
+// One read + one write for the whole batch, on the profile chain — a panel
+// connecting while another panel's restore-dismiss is mid-write would otherwise
+// clobber it. `undefined` values in the patch drop the key on the storage write
+// (clear name/color).
 export function patchWindowProfiles(windowIds: number[], patch: Partial<WindowProfile>): Promise<void> {
-  const run = profileChain.then(() => patchWindowProfilesNow(windowIds, patch));
-  profileChain = run.catch(() => {}); // one failure must not jam the queue
-  return run;
+  return queued(() => patchWindowProfilesNow(windowIds, patch));
 }
 
 async function patchWindowProfilesNow(windowIds: number[], patch: Partial<WindowProfile>): Promise<void> {
   let { windowSessionMap = {} } = await sessionStore.get("windowSessionMap");
   if (windowIds.some((id) => !windowSessionMap[id])) {
-    await refreshWindowProfiles(); // window not mapped yet (fresh window / fresh session)
+    await refreshWindowProfiles(); // window not mapped yet (fresh window / fresh session); already on the chain
     ({ windowSessionMap = {} } = await sessionStore.get("windowSessionMap"));
   }
   const { windowProfiles = {} } = await localStore.get("windowProfiles");
@@ -143,7 +141,7 @@ export async function windowProfileOf(windowId: number): Promise<WindowProfile |
 // Which windows to offer a panel restore for (see windowsToRestore).
 // Runs an immediate profile refresh first so restart recovery has happened.
 export async function panelsToRestore(excludeWindowId: number): Promise<{ windows: number[] }> {
-  await refreshWindowProfiles();
+  await queued(refreshWindowProfiles);
   const { windowSessionMap = {} } = await sessionStore.get("windowSessionMap");
   const { windowProfiles = {} } = await localStore.get("windowProfiles");
   return { windows: windowsToRestore(windowSessionMap, windowProfiles, excludeWindowId, connectedPanelWindows) };
