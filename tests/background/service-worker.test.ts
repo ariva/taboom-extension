@@ -160,6 +160,14 @@ test("Service Worker - Manual wake (tabs-woken) protects a tab from the next pas
   tab.discarded = true; // restore the state the earlier pass left
 });
 
+test("Service Worker - Two manual wakes landing together both survive (wakeTimes writes are serialized)", async () => {
+  await chrome.storage.session.set({ wakeTimes: {} });
+  await Promise.all([send({ type: "tabs-woken", tabIds: [2] }), send({ type: "tabs-woken", tabIds: [3] })]);
+  const { wakeTimes } = await chrome.storage.session.get();
+  assert.deepEqual(Object.keys(wakeTimes ?? {}).sort(), ["2", "3"], "neither wake overwrote the other");
+  await chrome.storage.session.set({ wakeTimes: {} }); // reset for later tests
+});
+
 test("Service Worker - Alarm with different name does nothing", async () => {
   calls.length = 0;
   await chrome.alarms.onAlarm.fire({ name: "unrelated" });
@@ -298,6 +306,17 @@ test("Service Worker - Protect-urls adds exact rules, unprotect-urls removes the
     "both dropped rules in one restorable action",
   );
   stored.protectionRules.push({ id: "r1", type: "host", pattern: "mail.google.com" }); // restore fixture
+});
+
+test("Service Worker - A host rule and a url rule added at the same moment both land (rule writes are serialized)", async () => {
+  await Promise.all([
+    send({ type: "protect-hosts", hosts: ["race-host.example.net"] }),
+    send({ type: "protect-urls", urls: ["https://race-url.example.net/board"] }),
+  ]);
+  const patterns = stored.protectionRules.map((r) => r.pattern);
+  assert.ok(patterns.includes("race-host.example.net"), "host rule kept");
+  assert.ok(patterns.includes("https://race-url.example.net/board"), "url rule kept");
+  stored.protectionRules = stored.protectionRules.filter((r) => !r.pattern.includes("race-"));
 });
 
 test("Service Worker - Unknown message type returns an error", async () => {
@@ -854,6 +873,50 @@ test("Service Worker - Keep alive: a browser start staggers the marks that came 
   );
   assert.equal(doc.nextReload, before + HOUR, "a mark still ahead keeps its time");
   assert.equal(lone.nextReload, 0, "paused mark untouched");
+});
+
+test("Service Worker - Keep alive: a mark removed in Settings while the sweep awaits its reloads stays removed", {
+  skip: !KEEP_ALIVE_ON,
+}, async () => {
+  const before = Date.now();
+  stored.keepAlive = [
+    { url: "https://old.example.com/a", title: "Old A", minutes: 25, nextReload: before - 1 },
+    { url: "https://work.example.com/doc", title: "Doc", minutes: 5, nextReload: before + HOUR },
+  ];
+  const reload = chrome.tabs.reload;
+  let release: (() => void) | undefined;
+  chrome.tabs.reload = async (id: number) => {
+    const logged = calls.push(`tabs.reload ${id}`);
+    await new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    return logged;
+  };
+  try {
+    calls.length = 0;
+    const sweep = chrome.alarms.onAlarm.fire({ name: "keep-alive" });
+    while (!release) {
+      await tick();
+    }
+    // Settings' Remove lands while the reload is in flight
+    stored.keepAlive = stored.keepAlive.filter((entry) => entry.url !== "https://work.example.com/doc");
+    release();
+    await sweep;
+    await tick();
+    await tick();
+  } finally {
+    chrome.tabs.reload = reload;
+  }
+  assert.deepEqual(
+    calls.filter((c) => c.startsWith("tabs.reload")),
+    ["tabs.reload 2"],
+  );
+  assert.deepEqual(
+    stored.keepAlive.map((entry) => entry.url),
+    ["https://old.example.com/a"],
+    "the removed mark is not written back by the sweep",
+  );
+  assert.ok((stored.keepAlive[0]?.nextReload ?? 0) >= before + 25 * MINUTE - 55_000, "the reloaded mark re-armed");
 });
 
 test("Service Worker - Keep alive: a mark typed with a fragment reloads that exact address only", {

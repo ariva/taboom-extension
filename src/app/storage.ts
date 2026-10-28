@@ -141,24 +141,59 @@ export async function restoreKeepAlive(): Promise<boolean> {
 // The one door for dropping protection rules (chip ✕, Clear all, menu "Remove site
 // protection", panel Unprotect): what leaves the list lands in the trash for Settings →
 // Restore. Resolves to the rules now in force so the worker can reapply tab flags.
-export async function dropProtectionRules(
-  keep: (rules: ProtectionRule[]) => ProtectionRule[],
+// Every protectionRules write in a context runs through one chain: the context menu toggle
+// and a panel message land in the worker together, both read the list, the second write drops
+// the first rule. Chains are per context — a Settings write racing the worker is still
+// last-writer-wins (chrome.storage has no transactions), the window is a storage round trip.
+let ruleChain: Promise<unknown> = Promise.resolve();
+function queuedRules<T>(work: () => Promise<T>): Promise<T> {
+  const run = ruleChain.then(work);
+  ruleChain = run.catch(() => {}); // one failure must not jam the queue
+  return run;
+}
+
+// Add / replace rules (worker protect paths, Settings Add row and chip edit). `edit` returns the
+// new list or undefined for no change; an equal list (same rules, same order) is not written.
+// Resolves with the list as stored afterwards.
+export function editProtectionRules(
+  edit: (rules: ProtectionRule[]) => ProtectionRule[] | undefined,
 ): Promise<ProtectionRule[]> {
-  const { protectionRules = [], protectionTrash = [] } = await localStore.get(["protectionRules", "protectionTrash"]);
-  const remaining = keep(protectionRules);
-  const removed = protectionRules.filter((rule) => !remaining.includes(rule));
-  if (removed.length === 0) {
-    return protectionRules;
-  }
-  await localStore.set({
-    protectionRules: remaining,
-    protectionTrash: recordRemoval(protectionTrash, removed, Date.now()),
+  return queuedRules(async () => {
+    const { protectionRules = [] } = await localStore.get("protectionRules");
+    const next = edit(protectionRules);
+    if (
+      !next ||
+      (next.length === protectionRules.length && next.every((rule, index) => rule === protectionRules[index]))
+    ) {
+      return protectionRules;
+    }
+    await localStore.set({ protectionRules: next });
+    return next;
   });
-  return remaining;
+}
+
+export function dropProtectionRules(keep: (rules: ProtectionRule[]) => ProtectionRule[]): Promise<ProtectionRule[]> {
+  return queuedRules(async () => {
+    const { protectionRules = [], protectionTrash = [] } = await localStore.get(["protectionRules", "protectionTrash"]);
+    const remaining = keep(protectionRules);
+    const removed = protectionRules.filter((rule) => !remaining.includes(rule));
+    if (removed.length === 0) {
+      return protectionRules;
+    }
+    await localStore.set({
+      protectionRules: remaining,
+      protectionTrash: recordRemoval(protectionTrash, removed, Date.now()),
+    });
+    return remaining;
+  });
 }
 
 // Options "Restore last removal" (Protected Sites). False when the trash is empty.
-export async function restoreProtectionRules(): Promise<boolean> {
+export function restoreProtectionRules(): Promise<boolean> {
+  return queuedRules(restoreProtectionRulesNow);
+}
+
+async function restoreProtectionRulesNow(): Promise<boolean> {
   const { protectionRules = [], protectionTrash = [] } = await localStore.get(["protectionRules", "protectionTrash"]);
   const restored = restoreRuleRemoval(protectionRules, protectionTrash);
   if (!restored) {

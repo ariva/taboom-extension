@@ -2,7 +2,7 @@
 // one tab, and the manual-wake timestamps that reset the inactivity clock.
 import { isSupportedUrl, isUnloaded, selectAutoSnoozeTargets } from "../app/core.ts";
 import { loadState, sessionStore } from "../app/storage.ts";
-import type { Settings } from "../app/types.ts";
+import type { Settings, WakeTimes } from "../app/types.ts";
 import { activeKeepAliveList } from "./keep-alive.ts";
 
 const ALARM_NAME = "auto-snooze";
@@ -30,12 +30,11 @@ export async function autoSnoozePass(onDemand = false): Promise<number> {
   const [tabs, keepAlive] = await Promise.all([chrome.tabs.query({}), activeKeepAliveList()]);
   // manual wakes reset the inactivity clock (storage.session: survives SW
   // idle-death, gone with the browser session like the tabs themselves)
-  const { wakeTimes = {} } = await sessionStore.get("wakeTimes");
   const openIds = new Set(tabs.map((tab) => tab.id));
-  const pruned = Object.fromEntries(Object.entries(wakeTimes).filter(([tabId]) => openIds.has(Number(tabId))));
-  if (Object.keys(pruned).length !== Object.keys(wakeTimes).length) {
-    await sessionStore.set({ wakeTimes: pruned });
-  }
+  const pruned = await withWakeTimes((wakeTimes) => {
+    const kept = Object.fromEntries(Object.entries(wakeTimes).filter(([tabId]) => openIds.has(Number(tabId))));
+    return Object.keys(kept).length === Object.keys(wakeTimes).length ? undefined : kept;
+  });
   const targets = selectAutoSnoozeTargets(tabs, settings, state.protectionRules, Date.now(), pruned, keepAlive);
   await Promise.allSettled(
     targets.map((tabId) => chrome.tabs.discard(tabId).catch((error) => console.debug("discard failed", tabId, error))),
@@ -43,14 +42,31 @@ export async function autoSnoozePass(onDemand = false): Promise<number> {
   return targets.length;
 }
 
+// Every wakeTimes mutation runs through one chain: the panel reports each woken tab
+// with its own message, and two landing together both read the map before either
+// writes — the last one wins and a wake is lost. Resolves with the map as written
+// (or as read when `mutate` returned undefined — no write).
+let wakeChain = Promise.resolve();
+function withWakeTimes(mutate: (wakeTimes: WakeTimes) => WakeTimes | undefined): Promise<WakeTimes> {
+  const run = wakeChain.then(async () => {
+    const { wakeTimes = {} } = await sessionStore.get("wakeTimes");
+    const next = mutate(wakeTimes);
+    if (next) {
+      await sessionStore.set({ wakeTimes: next });
+    }
+    return next ?? wakeTimes;
+  });
+  wakeChain = run.then(
+    () => {},
+    () => {}, // one failure must not jam the queue
+  );
+  return run;
+}
+
 // manual wake — restart the inactivity clock for these tabs
 export async function recordWakes(tabIds: number[]): Promise<void> {
-  const { wakeTimes = {} } = await sessionStore.get("wakeTimes");
   const now = Date.now();
-  for (const tabId of tabIds) {
-    wakeTimes[tabId] = now;
-  }
-  return sessionStore.set({ wakeTimes });
+  await withWakeTimes((wakeTimes) => ({ ...wakeTimes, ...Object.fromEntries(tabIds.map((tabId) => [tabId, now])) }));
 }
 
 export async function snoozeTab(tabId: number): Promise<void> {

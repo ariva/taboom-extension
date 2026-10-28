@@ -58,10 +58,13 @@ export function onKeepAliveAlarm(alarm: chrome.alarms.Alarm): void {
 
 export async function keepAlivePass(): Promise<void> {
   const list = await activeKeepAliveList();
+  if (list.length === 0) {
+    return;
+  }
   const now = Date.now();
   const due = dueKeepAlive(list, now);
   const tabs = due.length > 0 ? await chrome.tabs.query({}) : [];
-  let next = list;
+  const reloaded: { url: string; title: string | undefined }[] = [];
   for (const entry of due) {
     // a mark whose page is closed stays armed (and quiet) until the user removes it in Options
     const targets = keepAliveTargets(tabs, entry.url, entry.reloadAll ?? false);
@@ -72,11 +75,22 @@ export async function keepAlivePass(): Promise<void> {
       ),
     );
     // the reloaded tab names the mark from now on (Settings table, Alive view)
-    next = rearmKeepAlive(next, entry.url, nextReloadAt(entry.minutes, now), targets[0]?.title);
+    reloaded.push({ url: entry.url, title: targets[0]?.title });
+  }
+  // The reloads took a while: a Settings edit (Remove, Add, Pause, interval) may have landed
+  // meanwhile. Re-arm against the list as it is now, not as it was read — a stale write would
+  // resurrect a removed mark or drop a new one; a mark gone meanwhile is simply not re-armed.
+  const { keepAlive = [] } = await localStore.get("keepAlive");
+  let next = keepAlive;
+  for (const { url, title } of reloaded) {
+    const current = next.find((entry) => entry.url === url);
+    if (current) {
+      next = rearmKeepAlive(next, url, nextReloadAt(current.minutes, now), title);
+    }
   }
   // whatever is still overdue was missed by the machine (sleep), not the sweep: one every 30–60 s
   const staggered = staggerKeepAlive(next, now);
-  if (due.length === 0 && staggered === undefined) {
+  if (next === keepAlive && staggered === undefined) {
     return;
   }
   await localStore.set({ keepAlive: staggered ?? next });
