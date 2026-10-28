@@ -71,7 +71,7 @@ Which copy survives, in order: a pinned one, a kept-alive page, the tab in front
 
 A confirmation lists how many tabs close and names any window that would close with them (its only tabs were duplicates). There is no undo inside Taboom; Chrome's `Ctrl+Shift+T` reopens closed tabs.
 
-Tab history works from any tab, no panel needed: `Ctrl+Shift+,` back · `Ctrl+Shift+.` forward (`Cmd` on Mac). Same trail as the panel's ◀ ▶ buttons and the History context menu. When the active tab changes outside the panel (these shortcuts, Ctrl+Tab, a click in the tab strip), when the panel opens, and when the view changes (filter, scope or sort), the list scrolls so the current row sits at the top — with its **Split** or tab-group header above it — as far as the list can scroll. Activating a row from the list itself only scrolls as little as needed, so the list never jumps under the click.
+Tab history works from any tab, no panel needed: `Ctrl+Shift+,` back · `Ctrl+Shift+.` forward (`Cmd` on Mac). Same trail as the panel's ◀ ▶ buttons and the History context menu. When the active tab changes outside the panel (these shortcuts, Ctrl+Tab, a click in the tab strip), when the panel opens, and when the view changes (filter, scope or sort), the list scrolls so the current row sits at the top — with its **Split** or tab-group header above it — as far as the list can scroll. Activating a row from the list itself only scrolls as little as needed, so the list never jumps under the click. The trail belongs to one browser session: a Chrome restart starts it empty (tab ids are handed out again, so an old trail would point at the wrong tabs); an extension reload or update keeps it.
 
 ### Parked windows
 

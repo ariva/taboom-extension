@@ -212,7 +212,7 @@ test("Service Worker - Parked: move-parked-tabs asGroup recreates the parked gro
   );
 });
 
-// T-0006: a restore must not consume the snapshot before the tabs exist — a refused address or a
+// A restore must not consume the snapshot before the tabs exist — a refused address or a
 // vanished target window used to lose the whole parked window with nothing to undo
 test("Service Worker - Parked: restore-parked keeps the tabs Chrome refused; the window is built from the first address that opens", async () => {
   stored.parkedWindows = [
