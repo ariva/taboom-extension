@@ -3,7 +3,7 @@
 import { makeRule } from "../../app/core.ts";
 import { setRulePattern } from "../../app/protection-rules.ts";
 import { popRemoval } from "../../app/removal-trash.ts";
-import { dropProtectionRules, loadState, localStore, restoreProtectionRules, saveState } from "../../app/storage.ts";
+import { dropProtectionRules, editProtectionRules, localStore, restoreProtectionRules } from "../../app/storage.ts";
 import type { AppState, ProtectionRule, Removal } from "../../app/types.ts";
 import { getElementById } from "../../lib/dom.ts";
 import { inlineEdit } from "../../lib/ui/inline-edit.ts";
@@ -55,7 +55,7 @@ function ruleChip(rules: ProtectionRule[], rule: ProtectionRule): HTMLLIElement 
       commit: async (value) => {
         const next = setRulePattern(rules, rule.id, value);
         if (next) {
-          await saveState({ protectionRules: next });
+          await editProtectionRules(() => next);
           flashSaved();
         }
       },
@@ -95,9 +95,8 @@ async function addRule(): Promise<void> {
   if (!rule) {
     return;
   }
-  const state = await loadState();
-  if (!hasRule(state.protectionRules, rule.pattern)) {
-    await saveState({ protectionRules: [...state.protectionRules, rule] });
+  const after = await editProtectionRules((rules) => (hasRule(rules, rule.pattern) ? undefined : [...rules, rule]));
+  if (after.includes(rule)) {
     flashSaved();
   }
   input.value = "";

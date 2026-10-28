@@ -2,7 +2,7 @@
 // protect menu item's title.
 import { hostnameOf, isProtected, isSupportedUrl } from "../app/core.ts";
 import { addHostRules, addUrlRules, removeRulesFor } from "../app/protection-rules.ts";
-import { dropProtectionRules, loadState, saveState } from "../app/storage.ts";
+import { dropProtectionRules, editProtectionRules, loadState } from "../app/storage.ts";
 import type { ProtectionRule } from "../app/types.ts";
 import { enqueueMenuOp } from "./context-menus.ts";
 
@@ -30,29 +30,21 @@ export async function toggleSiteProtection(tab: chrome.tabs.Tab): Promise<{ prot
   if (!url || !hostnameOf(url)) {
     return { protected: false };
   }
-  const state = await loadState();
-  if (isProtected(url, state.protectionRules)) {
+  const { protectionRules } = await loadState();
+  if (isProtected(url, protectionRules)) {
     await applyAutoDiscardable(await dropProtectionRules((rules) => removeRulesFor(rules, [url])));
     return { protected: false };
   }
-  const rules = addHostRules(state.protectionRules, [hostnameOf(url)]);
-  await saveState({ protectionRules: rules });
-  await applyAutoDiscardable(rules);
+  await protectHosts([hostnameOf(url)]);
   return { protected: true };
 }
 
 export async function protectHosts(hosts: string[]): Promise<void> {
-  const state = await loadState();
-  const rules = addHostRules(state.protectionRules, hosts);
-  await saveState({ protectionRules: rules });
-  await applyAutoDiscardable(rules);
+  await applyAutoDiscardable(await editProtectionRules((rules) => addHostRules(rules, hosts)));
 }
 
 export async function protectUrls(urls: string[]): Promise<void> {
-  const state = await loadState();
-  const rules = addUrlRules(state.protectionRules, urls);
-  await saveState({ protectionRules: rules });
-  await applyAutoDiscardable(rules);
+  await applyAutoDiscardable(await editProtectionRules((rules) => addUrlRules(rules, urls)));
 }
 
 // drops host rules covering the pages as well as exact url rules for them
