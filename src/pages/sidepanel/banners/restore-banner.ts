@@ -13,9 +13,14 @@ import { openPanel } from "../../../lib/platform/panel.ts";
 async function trackPanelOpen(): Promise<number> {
   const win = await chrome.windows.getCurrent();
   const connect = () => {
+    const since = Date.now();
     const port = chrome.runtime.connect({ name: `sidepanel:${win.id}` });
-    // the worker gets idle-killed routinely — reconnect so the flag stays live
-    port.onDisconnect.addListener(() => setTimeout(connect, 1000));
+    // The worker gets idle-killed routinely — reconnect so the flag stays live, and at
+    // once: a panel opening in another window right then asks the fresh worker who has
+    // a panel, and this window must not be offered as "closed". The connect itself
+    // wakes the worker, so there is no loop — unless the port died within a second of
+    // connecting (worker failing to start): then wait, or this would spin.
+    port.onDisconnect.addListener(() => setTimeout(connect, Date.now() - since < 1000 ? 1000 : 0));
   };
   connect();
   return win.id!; // live windows always have an id (only sessions-API windows lack one)
