@@ -109,11 +109,16 @@ export function patchWindowProfiles(windowIds: number[], patch: Partial<WindowPr
 
 async function patchWindowProfilesNow(windowIds: number[], patch: Partial<WindowProfile>): Promise<void> {
   let { windowSessionMap = {} } = await sessionStore.get("windowSessionMap");
-  if (windowIds.some((id) => !windowSessionMap[id])) {
-    await refreshWindowProfiles(); // window not mapped yet (fresh window / fresh session); already on the chain
+  let { windowProfiles = {} } = await localStore.get("windowProfiles");
+  // window not mapped yet (fresh window / fresh session), or mapped but its profile gone
+  // (Settings → Delete all clears storage.local while storage.session keeps the map): refresh
+  // first — it recreates the profile under the mapped id — else the patch has nothing to land on
+  const idOf = (id: number): string | undefined => windowSessionMap[id];
+  if (windowIds.some((id) => !windowProfiles[idOf(id) ?? ""])) {
+    await refreshWindowProfiles(); // already on the chain
     ({ windowSessionMap = {} } = await sessionStore.get("windowSessionMap"));
+    ({ windowProfiles = {} } = await localStore.get("windowProfiles"));
   }
-  const { windowProfiles = {} } = await localStore.get("windowProfiles");
   let changed = false;
   for (const windowId of windowIds) {
     const logicalId = windowSessionMap[windowId];

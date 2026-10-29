@@ -757,6 +757,21 @@ test("Service Worker - Window rename/color write to the logical profile; empty c
   assert.equal(windowProfiles[logical1].pinnedWindow, undefined, "unpin clears");
 });
 
+test("Service Worker - Window rename lands when the profile was wiped (Reset everything) but the session map lived on", async () => {
+  const { windowSessionMap = {} } = await chrome.storage.session.get("windowSessionMap");
+  const logical1 = windowSessionMap[1];
+  assert.ok(logical1, "window 1 is mapped");
+  // Danger zone → Delete all: storage.local.clear() takes windowProfiles, storage.session keeps the map
+  await chrome.storage.local.set({ windowProfiles: {} });
+  await send({ type: "window-rename", windowId: 1, name: "After reset" });
+  const { windowProfiles } = await chrome.storage.local.get("windowProfiles");
+  const profile = windowProfiles[logical1];
+  assert.ok(profile, "profile recreated under the mapped id");
+  assert.equal(profile.name, "After reset", "the rename is not dropped");
+  assert.equal(profile.chromeWindowId, 1, "fingerprint refreshed alongside");
+  await send({ type: "window-rename", windowId: 1, name: "" }); // leave the fixture as it was
+});
+
 test("Service Worker - TTL sweep keeps customized profiles, drops stale plain ones", async () => {
   const { windowProfiles } = await chrome.storage.local.get("windowProfiles");
   const stale = Date.now() - 15 * 24 * 3_600_000; // past the 14d TTL
