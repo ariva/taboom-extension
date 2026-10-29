@@ -53,16 +53,15 @@ export const sessionStore = createStorage<SessionStorageSchema>("session");
 
 // features.json at extension root is the single source of truth — flip flags
 // there while developing, then reload. Pass a features object to skip the fetch.
+// A failed fetch (hectic startup, the files swapped under an update) rejects: the
+// caller decides what fail-closed means — a page boots with {} (every flag off until
+// its next load), the worker answers {} for that one call and fetches again next time.
 export async function loadFeatures(testFeatures?: Features): Promise<Features> {
   if (testFeatures) {
     return testFeatures;
   }
-  try {
-    const response = await fetch(chrome.runtime.getURL("features.json"));
-    return await response.json();
-  } catch {
-    return {}; // fail-closed: unknown flags read as disabled
-  }
+  const response = await fetch(chrome.runtime.getURL("features.json"));
+  return await response.json();
 }
 
 // One targeted read of the state keys with defaults merged in — not get(null),
