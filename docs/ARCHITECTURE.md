@@ -159,7 +159,7 @@ flowchart LR
   pipeline -->|DOM| screen
 ```
 
-Not drawn, to keep it readable: the side panel also writes its own UI prefs to storage (`src/pages/sidepanel/input/toolbar-events.ts`), and it holds a `runtime.connect` port named `sidepanel:<windowId>` so the worker knows which windows have a panel open (`src/background/window-profiles.ts`, `src/pages/sidepanel/banners/restore-banner.ts`).
+Not drawn, to keep it readable: the side panel also writes its own UI prefs to storage (`src/pages/sidepanel/input/toolbar-events.ts`), and it holds a `runtime.connect` port named `sidepanel:<windowId>` so the worker knows which windows have a panel open (`src/background/window-profiles.ts`, `src/pages/sidepanel/banners/restore-banner.ts`); the port is reconnected at once when the worker is idle-killed — the worker's set of connected panels is memory, and a panel opening elsewhere in that gap would be offered this window as closed — with a 1 s back-off only for a port that died within a second of connecting (a worker that fails to start).
 
 One round trip, end to end — the user snoozes a tab from the list:
 
