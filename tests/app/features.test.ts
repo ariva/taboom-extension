@@ -37,6 +37,21 @@ test("Features - loadFeatures returns an injected features object verbatim", asy
   assert.deepEqual(await loadFeatures(injected), injected);
 });
 
+test("Features - loadFeatures rejects when the fetch fails, so callers decide what fail-closed means for them", async () => {
+  const { loadFeatures } = await import("../../src/app/storage.ts");
+  const { makeChrome } = await import("../helpers/ui.ts");
+  Object.assign(globalThis, { chrome: makeChrome({ stored: {} }) }); // runtime.getURL for the fetch url
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async () => {
+    throw new TypeError("Failed to fetch");
+  };
+  try {
+    await assert.rejects(loadFeatures(), TypeError);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
+
 test("Features - applyExperimental flips experimental features on only when both gates pass", async () => {
   const { applyExperimental } = await import("../../src/app/core.ts");
   const base = {

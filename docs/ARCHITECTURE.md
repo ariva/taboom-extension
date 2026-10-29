@@ -48,7 +48,7 @@ The manifest is code: `src/manifest.ts` exports `manifest(version, target = "chr
 | `parked.ts` | parked windows: `park-window` (snapshot written first, then `windows.remove`), `restore-parked` (one `openTabs` path for a new window or an existing one — one `tabs.create` per address so a refused address costs one tab, a refused seed address tries the next one for `windows.create`; the snapshot is consumed only after the tabs exist and only the tabs that opened leave it, so a refused address or a target window closed meanwhile stays parked instead of being lost; then pins / groups / active tab, identity re-applied through the window profile), `move-parked-tabs` |
 | `messages.ts` | `handleMessage`: exhaustive `switch` over the `Message` union |
 | `gestures.ts` | keyboard commands and context-menu clicks |
-| `nav-mode.ts` | cached feature flags and effective navigation mode |
+| `nav-mode.ts` | cached feature flags (a failed `features.json` fetch is retried once after 500 ms inside the call; still failing, it is answered fail-closed once and fetched again on the next call, never kept for the worker's life) and effective navigation mode |
 | `storage-changes.ts` | reaction to `chrome.storage.onChanged` |
 
 The worker is stateless across suspensions: everything is recoverable from storage plus the Tabs API, and alarms are recreated on startup.

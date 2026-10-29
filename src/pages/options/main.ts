@@ -2,6 +2,7 @@
 // Entry of the options page: boot, the page render, then the feature modules' init*()
 // calls in the order this file used to register their listeners.
 import { loadFeatures, loadState } from "../../app/storage.ts";
+import type { Features } from "../../app/types.ts";
 import { getReleaseVersion, markDevPage } from "../../app/env.ts";
 import { closest, getElementById } from "../../lib/dom.ts";
 import { aboutText, settingsTitle } from "./model.ts";
@@ -20,7 +21,7 @@ import { initWhatsNew } from "./whats-new.ts";
 // before markDevPage: the dev prefix goes in front of the final heading
 getElementById("page-title").textContent = settingsTitle(getReleaseVersion());
 markDevPage();
-const FEATURES = await loadFeatures();
+const FEATURES = await loadFeatures().catch((): Features => ({})); // fail-closed for this page load: every flag off
 setFeatures(FEATURES);
 
 async function render() {

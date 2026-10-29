@@ -9,6 +9,7 @@ import "../../lib/ui/context-menu.ts";
 import "../../lib/ui/ask-dialog.ts";
 import "../../lib/ui/inline-edit.ts";
 import { loadFeatures, loadState } from "../../app/storage.ts";
+import type { Features } from "../../app/types.ts";
 import { DEV_PREFIX, getAppName, getReleaseVersion, markDevPage } from "../../app/env.ts";
 import { scopeSelect, sortSelect } from "./foundation/elements.ts";
 import { state } from "./foundation/state.ts";
@@ -48,7 +49,7 @@ registerPanel({ render: renderImpl, refresh: refreshImpl });
 markDevPage();
 // state read races the features fetch instead of queuing behind the top-level await
 const initialStatePromise = loadState();
-const FEATURES = await loadFeatures();
+const FEATURES = await loadFeatures().catch((): Features => ({})); // fail-closed for this page load: every flag off
 state.features = FEATURES; // state.ts cannot await the flags itself — see its `features` note
 state.rawFeatures = FEATURES;
 
