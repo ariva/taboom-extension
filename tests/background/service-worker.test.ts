@@ -129,6 +129,25 @@ test("Service Worker - Concurrent onInstalled + onStartup coalesce into one init
   assert.equal(calls.filter((c) => c.startsWith("alarms.create")).length, 1, "alarm ensured once");
 });
 
+test("Service Worker - Init finishes the remaining steps when one rejects (old Chrome without setPanelBehavior)", async () => {
+  const setPanelBehavior = chrome.sidePanel.setPanelBehavior;
+  chrome.sidePanel.setPanelBehavior = async () => {
+    throw new Error("setPanelBehavior is not a function");
+  };
+  stored.updateAvailable = "9.9.9"; // the banner for the version that is now running
+  calls.length = 0;
+  try {
+    await chrome.runtime.onInstalled.fire();
+    await tick();
+    await tick();
+  } finally {
+    chrome.sidePanel.setPanelBehavior = setPanelBehavior;
+  }
+  assert.ok(calls.includes("contextMenus.create root"), "steps before the failing one ran");
+  assert.equal(stored.updateAvailable, undefined, "the update note is still cleared");
+  assert.ok(calls.includes("storage.remove updateAvailable,dismissedUpdate"), "step after the failing one ran");
+});
+
 test("Service Worker - Alarm pass discards inactive unprotected tabs only", async () => {
   calls.length = 0;
   // the onAlarm listener kicks off autoSnoozePass without awaiting it

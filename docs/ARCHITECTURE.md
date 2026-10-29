@@ -37,7 +37,7 @@ The manifest is code: `src/manifest.ts` exports `manifest(version, target = "chr
 | Module | Owns |
 |---|---|
 | `service-worker.ts` | entry: all listener registrations + boot, no logic |
-| `lifecycle.ts` | coalesced init pass (`onInstalled` / `onStartup`), update-available note |
+| `lifecycle.ts` | coalesced init pass (`onInstalled` / `onStartup`; each step isolated — one rejecting step is logged, the rest still run), update-available note |
 | `snooze.ts` | the alarm, the auto-snooze pass, manual snooze, wake-time recording (`wakeTimes` writes on one chain, `withWakeTimes`) |
 | `protection.ts` | protection rules → `autoDiscardable`, toggle / bulk protect (rule writes through `editProtectionRules` / `dropProtectionRules` in `src/app/storage.ts`), protect menu sync |
 | `keep-alive.ts` | keep-it-alive: one 30 s sweep alarm (armed only while enabled and marks exist) reloads due pages and re-arms them with ±55 s jitter; overdue marks after a browser start (`runtime.onStartup`) or a sleep longer than their interval are staggered 30–60 s apart (`staggerKeepAlive`) instead of reloaded in one burst; the sweep re-reads the list after its reloads and re-arms against that, so a Settings edit made meanwhile survives; mark / unmark from menu and panel; checkbox menu item sync |
