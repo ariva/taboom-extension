@@ -99,6 +99,22 @@ test("Tag patterns - matchesTagPage: exact page, site, subdomains, globs anywher
   assert.equal(matchesTagPage("a.test", undefined), false);
 });
 
+// a glob is matched segment by segment, never through a backtracking RegExp: a pattern with a
+// dozen stars against a page that does not match used to hang every surface that matches urls
+test("Tag patterns - a glob with many stars against a non-matching page answers at once", () => {
+  const pattern = `https://a.test/${"*a".repeat(12)}*b`;
+  const url = `https://a.test/${"a".repeat(40)}`;
+  const started = performance.now();
+  assert.equal(matchesTagPage(pattern, url), false);
+  assert.equal(matchesTagPage(`${"*a".repeat(12)}*b`, `https://${"a".repeat(40)}.test/`), false, "host globs too");
+  assert.ok(performance.now() - started < 100, "linear time");
+  // the segment walk keeps the RegExp's meaning at the edges
+  assert.equal(matchesTagPage("https://a.test/ab*ba", "https://a.test/aba"), false, "head and tail do not overlap");
+  assert.equal(matchesTagPage("https://a.test/ab*ba", "https://a.test/abba"), true);
+  assert.equal(matchesTagPage("https://a.test/x*", "https://a.test/x"), true, "a trailing star may be empty");
+  assert.equal(matchesTagPage("https://a.test/**x", "https://a.test/yx"), true, "star runs behave as one star");
+});
+
 test("Tag patterns - pattern hints name the kind", () => {
   assert.match(tagPagePatternHint("https://a.test/x"), /^Exact page/);
   assert.match(tagPagePatternHint("https://a.test/docs/"), /^Every page under/);

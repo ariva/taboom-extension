@@ -86,20 +86,29 @@ export function tagPagePatternHint(pattern: string): string {
   return pattern.includes(".") ? `${pattern} and its subdomains` : `Hosts containing ${pattern}`;
 }
 
-function escapeRegExp(text: string): string {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-// one RegExp per glob, built once: tagsForUrl runs over every tab × every entry per refresh
-const globs = new Map<string, RegExp>();
-
+// `*` matches anything, so the glob is walked segment by segment: the first segment must open
+// the text, the last must close it, the ones between are found in order (the leftmost place is
+// always right). A RegExp built from the same stars (`a.*b.*c`) backtracks exponentially on a
+// page that does not match — a dozen stars froze the panel, Settings and the worker.
 function globMatches(pattern: string, text: string): boolean {
-  let regExp = globs.get(pattern);
-  if (!regExp) {
-    regExp = new RegExp(`^${pattern.split("*").map(escapeRegExp).join(".*")}$`);
-    globs.set(pattern, regExp);
+  const segments = pattern.split("*");
+  const first = segments[0] ?? "";
+  const last = segments[segments.length - 1] ?? "";
+  if (segments.length === 1) {
+    return text === first;
   }
-  return regExp.test(text);
+  if (!text.startsWith(first)) {
+    return false;
+  }
+  let position = first.length;
+  for (const segment of segments.slice(1, -1)) {
+    const found = text.indexOf(segment, position);
+    if (found === -1) {
+      return false;
+    }
+    position = found + segment.length;
+  }
+  return text.length - position >= last.length && text.endsWith(last);
 }
 
 // the one rule for "is this page under the pattern" — every surface (badges, menus, the
