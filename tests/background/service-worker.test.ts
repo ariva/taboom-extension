@@ -1232,6 +1232,32 @@ test("Service Worker - Keep alive: turning the setting off rebuilds the menu wit
   stored.keepAlive = [];
 });
 
+// Settings → Delete all: storage.local.clear() fires one change with old values only. The pass
+// must still finish (the keep-alive branch clears a sweep alarm that has no marks left) and the
+// defaults follow-up must not need a keepAlive key to do it
+test("Service Worker - Delete all: a clear event with old values only completes the pass and clears the sweep", async () => {
+  const oldSettings = { ...stored.settings };
+  const oldMarks = [{ url: "https://work.example.com/doc", title: "Doc", minutes: 25, nextReload: 1 }];
+  stored.keepAlive = [];
+  calls.length = 0;
+  await chrome.storage.onChanged.fire(
+    {
+      settings: { oldValue: oldSettings },
+      keepAlive: { oldValue: oldMarks },
+      protectionRules: { oldValue: [{ id: "r1", type: "host", pattern: "a.test" }] },
+      ui: { oldValue: { historyNav: "traditional" } },
+    },
+    "local",
+  );
+  await tick();
+  await tick();
+  assert.ok(
+    calls.includes('alarms.create auto-snooze {"periodInMinutes":5}'),
+    "the snooze alarm falls back to the default interval instead of throwing",
+  );
+  assert.ok(calls.includes("alarms.clear keep-alive"), "the keep-alive branch ran: no marks, no sweep");
+});
+
 test("Service Worker - Keep alive: options-page list edits re-arm the sweep through storage.onChanged", {
   skip: !KEEP_ALIVE_ON,
 }, async () => {

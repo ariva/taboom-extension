@@ -200,4 +200,4 @@ Right-click any page → **Taboom - Tabs Manager**: Snooze this tab · Protect s
 
 ## Privacy
 
-Everything runs locally: no server, no telemetry, no content scripts, no host permissions. **Settings → Delete all Extension data** wipes everything stored (settings, protected sites, keep-alive marks, parked windows, tags, undo data); **Restore default settings** resets only settings and appearance and keeps those.
+Everything runs locally: no server, no telemetry, no content scripts, no host permissions. **Settings → Delete all Extension data** wipes everything stored (settings, protected sites, keep-alive marks, parked windows, tags, window names and colors, tab history, undo data); **Restore default settings** resets only settings and appearance and keeps those.

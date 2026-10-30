@@ -44,7 +44,11 @@ export function initDangerZone(): void {
   });
 
   getElementById("danger").addEventListener("click", async () => {
-    if (!confirm("Delete all Taboom data — settings, protected sites, keep-alive marks, parked windows and tags?")) {
+    if (
+      !confirm(
+        "Delete all Taboom data — settings, protected sites, keep-alive marks, parked windows, tags, window names and colors, tab history and undo data?",
+      )
+    ) {
       return;
     }
     await chrome.storage.local.clear();

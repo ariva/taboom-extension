@@ -27,24 +27,18 @@ export async function onStorageChanged(
     }
   }
   if (changes.settings) {
+    // StorageChange values are `unknown`; "settings" is only ever written as Settings (saveState).
+    // A cleared store (Settings → Delete all) sends old values only: the pass must still finish
+    // (the keepAlive branch below clears a sweep with no marks left), so no new value reads as the defaults
+    const previous = changes.settings.oldValue as Partial<Settings> | undefined;
+    const next = (changes.settings.newValue as Settings | undefined) ?? DEFAULTS.settings;
     // recreate only when the interval actually changed — any settings save hits this
-    // StorageChange values are `unknown`; "settings" is only ever written as Settings (saveState)
-    const oldInterval = (changes.settings.oldValue as Partial<Settings> | undefined)?.checkIntervalMinutes;
-    const newInterval = (changes.settings.newValue as Partial<Settings> | undefined)?.checkIntervalMinutes;
-    if (oldInterval !== newInterval) {
-      await ensureAlarm(changes.settings.newValue as Settings);
+    if (previous?.checkIntervalMinutes !== next.checkIntervalMinutes) {
+      await ensureAlarm(next);
     }
-    if (
-      keepAliveSettingChanged(
-        changes.settings.oldValue as Partial<Settings> | undefined,
-        changes.settings.newValue as Partial<Settings> | undefined,
-      )
-    ) {
+    if (keepAliveSettingChanged(previous, next)) {
       await createContextMenus(); // the checkbox item exists only while enabled
-      const enabled =
-        (changes.settings.newValue as Partial<Settings> | undefined)?.keepAliveEnabled ??
-        DEFAULTS.settings.keepAliveEnabled;
-      if (enabled) {
+      if (next.keepAliveEnabled) {
         await restartKeepAlive();
       }
       await ensureKeepAliveAlarm();
