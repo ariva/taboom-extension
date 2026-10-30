@@ -74,6 +74,7 @@ export async function snoozeTab(tabId: number): Promise<void> {
   if (isUnloaded(tab) || !isSupportedUrl(tab.url)) {
     return;
   }
+  let helperId: number | undefined;
   if (tab.active) {
     // Chrome refuses to discard the active tab; activate a neighbor first.
     const tabs = await chrome.tabs.query({ windowId: tab.windowId });
@@ -82,9 +83,22 @@ export async function snoozeTab(tabId: number): Promise<void> {
       await chrome.tabs.update(other.id, { active: true });
     } else {
       // lone tab in window — open a new tab to take focus so the snooze still happens
-      await chrome.tabs.create({ windowId: tab.windowId, active: true });
+      helperId = (await chrome.tabs.create({ windowId: tab.windowId, active: true })).id;
     }
   }
+  try {
+    await discardTab(tabId);
+  } catch (error) {
+    if (helperId !== undefined) {
+      // the helper only existed to take focus: a refused snooze must not leave it
+      // behind (closing it hands focus back to the lone tab, the window's only other one)
+      await chrome.tabs.remove(helperId).catch(() => {});
+    }
+    throw error;
+  }
+}
+
+async function discardTab(tabId: number): Promise<void> {
   // discard() resolves with the post-discard Tab (its id may change!)
   let result: chrome.tabs.Tab | undefined;
   try {

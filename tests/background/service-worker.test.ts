@@ -281,6 +281,26 @@ test("Service Worker - Snooze-tab reports refusal as error response", async () =
   assert.match(response.error, /refused to discard/);
 });
 
+// A lone active tab needs a helper New Tab to take focus; a refused discard used to
+// leave that helper behind, next to the tab that is still awake
+test("Service Worker - Snooze-tab: a refused snooze of a lone tab removes the helper New Tab", async () => {
+  tabs.push({ id: 60, windowId: 6, active: true, discarded: false, audible: true, url: "https://radio.example.com/" });
+  const original = chrome.tabs.discard;
+  chrome.tabs.discard = async (id) => ({ id, discarded: false }); // playing audio: Chrome refuses
+  calls.length = 0;
+  let response: Reply<{ type: "snooze-tab"; tabId: number }>;
+  try {
+    response = await send({ type: "snooze-tab", tabId: 60 });
+  } finally {
+    chrome.tabs.discard = original;
+  }
+  assert.ok("error" in response);
+  const helper = tabs.find((t) => t.windowId === 6 && t.id !== 60);
+  assert.ok(helper, "a New Tab took focus first");
+  assert.ok(calls.includes(`tabs.remove ${helper.id}`), "the helper is removed again");
+  tabs.splice(0, tabs.length, ...tabs.filter((t) => t.windowId !== 6));
+});
+
 test("Service Worker - Toggle-site-protection adds then removes a rule and reapplies flags", async () => {
   calls.length = 0;
   let response = await send({ type: "toggle-site-protection", tabId: 1 });
