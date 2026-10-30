@@ -187,6 +187,9 @@ export interface LocalStorageSchema {
 export interface SessionStorageSchema {
   wakeTimes: WakeTimes;
   windowSessionMap: WindowSessionMap;
+  // when this browser session's worker first built the window map — a profile written after
+  // it belongs to a window of this session (see refreshWindowProfiles)
+  identitySessionStart: number;
 }
 
 // ---------- feature flags (features.json at extension root) ----------

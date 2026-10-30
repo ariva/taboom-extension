@@ -56,7 +56,10 @@ async function refreshWindowProfiles(): Promise<void> {
     buildFingerprint(windowTabs, boundsOf.get(windowId) ?? null, now),
   ]);
 
-  const { windowSessionMap = {} } = await sessionStore.get("windowSessionMap");
+  const { windowSessionMap = {}, identitySessionStart = now } = await sessionStore.get([
+    "windowSessionMap",
+    "identitySessionStart",
+  ]);
   const { windowProfiles = {} } = await localStore.get("windowProfiles");
   const map = assignLogicalIds(windowSessionMap, windowProfiles, candidates, () => `w-${crypto.randomUUID()}`);
 
@@ -67,9 +70,21 @@ async function refreshWindowProfiles(): Promise<void> {
   for (const [windowId, fingerprint] of candidates) {
     // merge, don't replace — panelOpen (and future per-window flags) survive
     // map[windowId]!: every candidate window got an id in the loop above
-    profiles[map[windowId]!] = { ...profiles[map[windowId]!], ...fingerprint, chromeWindowId: windowId };
+    const stored = profiles[map[windowId]!];
+    // …except on a profile this session already wrote (updatedAt at or after the session
+    // start) that lands on a window the map did not know: that window was closed and
+    // reopened (Ctrl+Shift+T), and the close left panelOpen behind — no worker alive to see
+    // the port drop, or a flag carried over a restart that nothing cleared. The name is
+    // wanted back, a restore offer is not. A restart's late-restored window carries a
+    // pre-session profile and keeps its flag: that is the case the banner exists for.
+    const reopened =
+      stored !== undefined &&
+      windowSessionMap[windowId] === undefined &&
+      (stored.updatedAt ?? 0) >= identitySessionStart;
+    const kept = reopened ? { ...stored, panelOpen: undefined } : stored; // undefined drops the key on write
+    profiles[map[windowId]!] = { ...kept, ...fingerprint, chromeWindowId: windowId };
   }
-  await sessionStore.set({ windowSessionMap: map });
+  await sessionStore.set({ windowSessionMap: map, identitySessionStart });
   await localStore.set({ windowProfiles: expireProfiles(profiles, now, PROFILE_TTL_MS) });
 }
 

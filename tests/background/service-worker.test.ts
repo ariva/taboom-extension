@@ -745,6 +745,39 @@ test("Service Worker - Panel tracking: connect marks panelOpen, disconnect clear
   assert.deepEqual(response.windows, [], "dismissed windows no longer offered");
 });
 
+// A window closed while its profile still said panelOpen (no worker alive to see the port
+// drop, or a flag carried over a restart and never cleared) and reopened with Ctrl+Shift+T
+// gets its profile back by fingerprint — the name is wanted, a phantom restore offer is not
+test("Service Worker - Panel tracking: a window closed and reopened in this session is not offered for restore", async () => {
+  let { windowProfiles } = await chrome.storage.local.get("windowProfiles");
+  const logical2 = Object.entries(windowProfiles).find(([, p]) => p.chromeWindowId === 2)?.[0];
+  assert.ok(logical2);
+  windowProfiles[logical2] = { ...windowProfiles[logical2], panelOpen: true, name: "Second" };
+  await chrome.storage.local.set({ windowProfiles });
+
+  const closed = tabs.filter((tab) => tab.windowId === 2);
+  tabs.splice(0, tabs.length, ...tabs.filter((tab) => tab.windowId !== 2));
+  await chrome.tabs.onRemoved.fire(closed[0]?.id ?? 0, { windowId: 2, isWindowClosing: true });
+  await new Promise((resolve) => setTimeout(resolve, 600));
+  const reopened = closed.map((tab) => ({ ...tab, id: (tab.id ?? 0) + 5000, windowId: 77 }));
+  tabs.push(...reopened);
+  await chrome.tabs.onCreated.fire(reopened[0]);
+  await new Promise((resolve) => setTimeout(resolve, 600));
+
+  const { windowSessionMap = {} } = await chrome.storage.session.get("windowSessionMap");
+  assert.equal(windowSessionMap[77], logical2, "the reopened window found its profile");
+  ({ windowProfiles } = await chrome.storage.local.get("windowProfiles"));
+  assert.equal(windowProfiles[logical2]?.name, "Second", "and its name");
+  const response = await send({ type: "panels-to-restore", excludeWindowId: 1 });
+  assert.ok("windows" in response);
+  assert.deepEqual(response.windows, [], "a reopened window had no panel to restore");
+
+  // fixture back: window 2 again
+  tabs.splice(0, tabs.length, ...tabs.filter((tab) => tab.windowId !== 77), ...closed);
+  await chrome.tabs.onRemoved.fire(reopened[0]?.id ?? 0, { windowId: 77, isWindowClosing: true });
+  await new Promise((resolve) => setTimeout(resolve, 600));
+});
+
 test("Service Worker - Profile patches are serialized: concurrent writes never clobber", async () => {
   let { windowProfiles } = await chrome.storage.local.get("windowProfiles");
   const logicalOf = (chromeId: number) =>
