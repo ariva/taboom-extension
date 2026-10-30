@@ -52,12 +52,12 @@ export async function moveTabsToWindow(tabIds: number[], windowId: number | null
 }
 
 export async function setWindowPin(windowId: number, pinned: boolean): Promise<void> {
-  await send({ type: "window-pin", windowId, pinned }).catch(() => {});
+  await send({ type: "window-pin", windowId, pinned });
   refresh(true);
 }
 
 export async function setWindowColor(windowId: number, color: string | null): Promise<void> {
-  await send({ type: "window-set-color", windowId, color }).catch(() => {});
+  await send({ type: "window-set-color", windowId, color });
   refresh(true);
 }
 
@@ -70,7 +70,7 @@ export function startRenameWindow(windowId: number): void {
     initial: state.liveWindowMeta.get(windowId)?.name ?? "",
     placeholder: "Window name",
     // empty commits too — it clears the name back to the default label
-    commit: (name) => send({ type: "window-rename", windowId, name }).catch(() => {}),
+    commit: (name) => send({ type: "window-rename", windowId, name }),
     finish: () => refresh(false),
   });
 }

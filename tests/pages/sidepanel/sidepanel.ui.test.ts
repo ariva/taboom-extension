@@ -3374,3 +3374,34 @@ test("UI - Sidepanel - SPLIT_VIEW: row menu pairs two tabs into Chrome's split v
   await chrome.tabs.onUpdated.fire(3, { pinned: true });
   await settle();
 });
+
+// the worker is gone (extension just reloaded, the panel page outliving its context):
+// every sendMessage rejects. The panel must still report and finish, never leak a rejection.
+test("UI - Sidepanel - A rejecting worker: bulk snooze reports and finishes every tab, row and history buttons stay quiet", async () => {
+  const original = chrome.runtime.sendMessage;
+  chrome.runtime.sendMessage = async (msg: { type: string }) => {
+    calls.push(`sendMessage ${msg.type}`);
+    throw new Error("Could not establish connection. Receiving end does not exist.");
+  };
+  try {
+    q(document, '#filters button[data-filter="all"]').click();
+    const selectAll = byId<HTMLInputElement>("select-all");
+    selectAll.checked = true;
+    selectAll.dispatchEvent(new window.Event("change", { bubbles: true }));
+    const selected = Number(must(byId("bulk-count").textContent.match(/(\d+) selected/))[1]);
+    assert.ok(selected > 1, "test needs a multi-selection");
+    calls.length = 0;
+    byId("bulk-snooze").click();
+    await tick();
+    await tick();
+    assert.equal(calls.filter((c) => c === "sendMessage snooze-tab").length, selected, "the loop asks for every tab");
+    assert.match(byId("toast").textContent, new RegExp(`Could not snooze ${selected} tab`));
+
+    q(document, '[data-action="toggle-protect"]').click();
+    byId("hist-back").click();
+    byId("hist-forward").click();
+    await tick(); // an unhandled rejection here fails the run
+  } finally {
+    chrome.runtime.sendMessage = original;
+  }
+});

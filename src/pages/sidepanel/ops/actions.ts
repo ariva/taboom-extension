@@ -61,7 +61,7 @@ export async function wake(tabIds: number[]): Promise<void> {
   await Promise.all(snoozed.map((tabId) => chrome.tabs.reload(tabId).catch(() => {})));
   if (snoozed.length > 0) {
     // reload keeps the old lastAccessed — tell the SW to restart their clocks
-    send({ type: "tabs-woken", tabIds: snoozed }).catch(() => {});
+    send({ type: "tabs-woken", tabIds: snoozed });
   }
   unselect(tabIds);
   refresh(true);

@@ -61,7 +61,7 @@ export async function parkWindowPrompt(windowId: number): Promise<void> {
       return;
     }
   }
-  await send({ type: "park-window", windowId }).catch(() => {});
+  await send({ type: "park-window", windowId });
   refresh(true);
 }
 
@@ -71,7 +71,7 @@ export async function restoreParked(syntheticWindowId: number, intoCurrentWindow
     return;
   }
   const into = intoCurrentWindow && state.currentWindowId != null ? { intoWindowId: state.currentWindowId } : {};
-  await send({ type: "restore-parked", id: parked.id, ...into }).catch(() => {});
+  await send({ type: "restore-parked", id: parked.id, ...into });
   refresh(true);
 }
 
@@ -139,7 +139,7 @@ export async function moveParkedTabs(
   asGroup = false,
 ): Promise<void> {
   for (const [id, indexes] of byParkedWindow(tabIds)) {
-    await send({ type: "move-parked-tabs", id, indexes, target, keep, asGroup }).catch(() => {});
+    await send({ type: "move-parked-tabs", id, indexes, target, keep, asGroup });
   }
   for (const tabId of tabIds) {
     state.selected.delete(tabId);

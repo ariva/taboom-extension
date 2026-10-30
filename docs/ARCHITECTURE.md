@@ -87,7 +87,7 @@ Two things worth knowing before changing this folder:
 
 | Module | What it is |
 |---|---|
-| `messaging.ts` | `createMessenger<Message, Responses>()` → typed `send()`. A message type without a response entry does not compile. |
+| `messaging.ts` | `createMessenger<Message, Responses>()` → typed `send()`. A message type without a response entry does not compile. `send()` never rejects: a worker that cannot be reached comes back as the same `{ error }` answer a throwing handler gives, so callers handle one shape and a fire-and-forget send cannot leak an unhandled rejection. |
 | `storage.ts` | `createStorage<Schema>(area)` → typed `get` / `set` / `remove` over `chrome.storage[area]`. |
 | `platform/capabilities.ts`, `platform/favicon.ts`, `platform/panel.ts` | The one browser-specific seam: feature detection, `_favicon/` URLs, side-panel open / toolbar behaviour. Chromium implementation only; app code asks for a capability, never for a browser name. |
 | `ui/ask-dialog.ts` | confirm / prompt on the native `<dialog>`, optional swatches and a `validate` hook (a message keeps it open) |

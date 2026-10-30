@@ -356,7 +356,7 @@ function startRenameWindowInList(windowId: number): void {
   inlineEdit(title, {
     initial: state.liveWindowMeta.get(windowId)?.name ?? "",
     placeholder: "Window name",
-    commit: (name) => send({ type: "window-rename", windowId, name }).catch(() => {}),
+    commit: (name) => send({ type: "window-rename", windowId, name }),
     finish: () => {
       fillWindowsPopover(); // fresh name in place, popover stays open
       refresh(false);

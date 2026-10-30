@@ -120,7 +120,7 @@ async function fillHistoryPopover(): Promise<void> {
     removeBtn.title = removeBtn.ariaLabel = "Remove from history";
     removeBtn.innerHTML = ICONS.close;
     removeBtn.addEventListener("click", () => {
-      send({ type: "history-remove", index }).catch(() => {});
+      send({ type: "history-remove", index });
     });
 
     const item = document.createElement("div");
@@ -161,7 +161,7 @@ export function initHistoryNav(): void {
   // closes any open popup; both transitions are announced — no consumer yet,
   // hook points for future focus-aware behavior.
   window.addEventListener("focus", () => {
-    send({ type: "sidebar-focused" }).catch(() => {}); // SW may be asleep
+    send({ type: "sidebar-focused" });
   });
   window.addEventListener("blur", () => {
     try {
@@ -170,7 +170,7 @@ export function initHistoryNav(): void {
     try {
       winPop.hidePopover?.();
     } catch {} // already hidden
-    send({ type: "sidebar-no-focus" }).catch(() => {});
+    send({ type: "sidebar-no-focus" });
   });
 
   // navigation mode switched (options page, any window): close an open popup —

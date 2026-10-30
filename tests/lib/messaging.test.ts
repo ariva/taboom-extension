@@ -41,13 +41,17 @@ test("Lib - Messaging - An error answer and a missing listener come back as they
   assert.equal(await send({ type: "boom" }), undefined, "no listener answered");
 });
 
-test("Lib - Messaging - A rejection reaches the caller (no catching, no retry)", async () => {
+// a sleeping worker or an invalidated extension context rejects sendMessage — the
+// caller sees that as one more error answer, never as an unhandled rejection
+test("Lib - Messaging - A rejection comes back as an error answer (no retry)", async () => {
   let attempts = 0;
   fakeChrome(async () => {
     attempts++;
     throw new Error("Could not establish connection");
   });
   const { send } = createMessenger<Msg, Responses>();
-  await assert.rejects(send({ type: "boom" }), /Could not establish connection/);
+  const failed = await send({ type: "boom" });
+  assert.ok(failed && "error" in failed);
+  assert.match(failed.error, /Could not establish connection/);
   assert.equal(attempts, 1);
 });

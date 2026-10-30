@@ -29,14 +29,14 @@ async function trackPanelOpen(): Promise<number> {
 export function initRestoreBanner(): void {
   trackPanelOpen().then(async (windowId) => {
     // an error answer (or none at all) has no windows
-    const response = await send({ type: "panels-to-restore", excludeWindowId: windowId }).catch(() => null);
+    const response = await send({ type: "panels-to-restore", excludeWindowId: windowId });
     const windows = response && "windows" in response ? response.windows : [];
     if (windows.length === 0) {
       return;
     }
     const { ui } = await localStore.get("ui");
     const mode = ui?.onExtensionUpdate ?? "banner";
-    const forget = () => send({ type: "panels-restore-dismiss", windowIds: windows }).catch(() => {});
+    const forget = () => send({ type: "panels-restore-dismiss", windowIds: windows });
     if (mode === "none") {
       forget(); // same as dismissing the banner — those windows aren't offered again
       return;
