@@ -283,3 +283,78 @@ test("Service Worker - Parked: restore-parked into a window that is gone leaves 
   assert.equal(stored.parkedWindows?.[0]?.tabs.length, 2);
   assert.equal(tabs.length, before, "no tab was created");
 });
+
+// Move must consume only what opened, like restore: a target window closed after the menu was
+// built, or an address Chrome refuses, used to drop the picked tabs with nothing opened
+test("Service Worker - Parked: move-parked-tabs into a window that is gone keeps the picked tabs parked", async () => {
+  stored.parkedWindows = [
+    {
+      id: "p-move-gone",
+      parkedAt: NOW,
+      tabs: [
+        { url: "https://m1.example.com/", title: "m1" },
+        { url: "https://m2.example.com/", title: "m2" },
+      ],
+      groups: [],
+    },
+  ];
+  const realCreate = chrome.tabs.create;
+  chrome.tabs.create = async (opts: chrome.tabs.CreateProperties = {}) => {
+    if (opts.windowId === 777) {
+      throw new Error("No window with id: 777.");
+    }
+    return realCreate(opts);
+  };
+  try {
+    await send({
+      type: "move-parked-tabs",
+      id: "p-move-gone",
+      indexes: [0, 1],
+      target: { windowId: 777 },
+      keep: false,
+    });
+  } finally {
+    chrome.tabs.create = realCreate;
+  }
+  await tick();
+  assert.equal(stored.parkedWindows?.[0]?.tabs.length, 2, "nothing opened, nothing dropped");
+});
+
+test("Service Worker - Parked: move-parked-tabs keeps the tab Chrome refused and drops the one that opened", async () => {
+  stored.parkedWindows = [
+    {
+      id: "p-move-refused",
+      parkedAt: NOW,
+      tabs: [
+        { url: "file:///home/me/notes.html", title: "notes" },
+        { url: "https://ok.example.com/", title: "ok" },
+        { url: "https://stay.example.com/", title: "stay" },
+      ],
+      groups: [],
+    },
+  ];
+  const realCreate = chrome.tabs.create;
+  chrome.tabs.create = async (opts: chrome.tabs.CreateProperties = {}) => {
+    if (String(opts.url).startsWith("file:")) {
+      throw new Error("Cannot open file URLs without permission");
+    }
+    return realCreate(opts);
+  };
+  try {
+    await send({
+      type: "move-parked-tabs",
+      id: "p-move-refused",
+      indexes: [0, 1],
+      target: { windowId: 1 },
+      keep: false,
+    });
+  } finally {
+    chrome.tabs.create = realCreate;
+  }
+  await tick();
+  assert.deepEqual(
+    stored.parkedWindows?.[0]?.tabs.map((tab) => tab.title),
+    ["notes", "stay"],
+    "the refused tab stays parked, the opened one left",
+  );
+});

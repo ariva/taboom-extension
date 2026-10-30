@@ -179,7 +179,10 @@ export async function moveParkedTabs(
   if (groupId === undefined && group && created.length > 0 && targetWindow !== undefined && capabilities.tabGroups) {
     await recreateGroup(created as TabIdList, targetWindow, group);
   }
-  if (!keep) {
-    await dropParkedTabs(id, indexes);
+  // only what opened leaves the snapshot (restore does the same): a target window closed
+  // after the menu was built, or an address Chrome refused, keeps its tab parked
+  const opened = indexes.filter((_, position) => ids[position] !== undefined);
+  if (!keep && opened.length > 0) {
+    await dropParkedTabs(id, opened);
   }
 }
