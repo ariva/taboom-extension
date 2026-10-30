@@ -32,11 +32,11 @@ document.addEventListener(
   true,
 );
 
-// swap the header label for an input; Enter/blur commit, Esc cancels.
-// An event-driven re-render mid-edit rebuilds the header and ends the edit —
-// rare and harmless (rename again), not worth pausing renders for.
 // swap `label` for a text input; Enter/blur commit (empty commits too), Esc
 // cancels. `commit(value)` persists; `finish()` re-renders whatever hosts it.
+// An event-driven re-render mid-edit rebuilds the host and ends the edit: Chrome fires
+// blur on the removed input, and that blur must not save the half-typed value (the
+// render that removed it already shows the stored one) — rename again, nothing lost.
 export interface InlineEditOptions {
   initial: string;
   placeholder: string;
@@ -72,6 +72,9 @@ export function inlineEdit(label: Element, { initial, placeholder, commit, finis
     }
   });
   input.addEventListener("blur", async () => {
+    if (!input.isConnected) {
+      return; // the host re-rendered under the edit: not a commit, and no finish — it is rendered already
+    }
     swallowNextClick = pressInFlight; // blurred by a press: that click is spent on ending the edit
     if (!cancelled) {
       await commit(input.value);

@@ -152,6 +152,20 @@ test("UI - Options - Protected site chip: click the pattern to edit it in place;
     assert.ok(!calls.some((c) => c.startsWith("storage.set")), `${value} via ${how}: no write`);
     assert.equal(q(chip(), "span").textContent, "*.github.com", `${value} via ${how}: text back`);
   }
+  // a rule added elsewhere between the render and the commit (side panel, worker) must survive
+  // the commit: the edit is applied to the stored list, not to the one the chip was rendered from
+  q(chip(), "span").click();
+  const stale = q<HTMLInputElement>(chip(), "input.rename-input");
+  stored.protectionRules = [...stored.protectionRules, { id: "r3", type: "host", pattern: "late.example.com" }];
+  stale.value = "docs.example.com";
+  stale.dispatchEvent(new window.Event("blur"));
+  await tick();
+  await tick();
+  assert.deepEqual(
+    stored.protectionRules.map((rule) => rule.pattern),
+    ["docs.example.com", "mail.google.com", "late.example.com"],
+    "the edit lands and the rule added meanwhile stays",
+  );
   stored.protectionRules = []; // as the removal test above left it — the add test expects its rule first
   await chrome.storage.onChanged.fire({ protectionRules: {} }, "local");
   await tick();
@@ -953,6 +967,23 @@ test("UI - Options - Keep-alive url: click turns it into an input; blur / Enter 
     assert.ok(!calls.some((c) => c.startsWith("storage.set")), `${value} via ${how}: no write`);
     assert.equal(q(row(), ".url").textContent, "https://dash.example.com/board", `${value} via ${how}: text back`);
   }
+  // a mark added elsewhere between the render and the commit (panel row menu, worker) must
+  // survive the commit: the edit is applied to the stored list, not to the rendered one
+  q(row(), ".url").click();
+  const stale = q<HTMLInputElement>(row(), "input.rename-input");
+  stored.keepAlive = [
+    ...stored.keepAlive,
+    { url: "https://late.example.com/", title: "Late", minutes: 5, nextReload: 2 },
+  ];
+  stale.value = "https://dash.example.com/board#/late";
+  stale.dispatchEvent(new window.Event("blur"));
+  await tick();
+  await tick();
+  assert.deepEqual(
+    stored.keepAlive.map((mark) => mark.url),
+    ["https://dash.example.com/board#/late", "https://mail.example.com/", "https://late.example.com/"],
+    "the edit lands and the mark added meanwhile stays",
+  );
   stored.keepAlive = [];
 });
 

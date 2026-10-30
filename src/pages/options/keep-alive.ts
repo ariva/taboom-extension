@@ -106,7 +106,7 @@ function cell(...children: (Node | string)[]): HTMLTableCellElement {
 // address becomes an input (lib/ui/inline-edit): the only way to add a fragment to a
 // mark made from a tab. Blur / Enter commit, Escape cancels; the table re-renders
 // either way so an ignored value snaps back to the stored url
-function pageCell(list: KeepAliveTab[], entry: KeepAliveTab): HTMLTableCellElement {
+function pageCell(entry: KeepAliveTab): HTMLTableCellElement {
   const url = document.createElement("span");
   url.className = "url";
   url.textContent = entry.url;
@@ -120,7 +120,9 @@ function pageCell(list: KeepAliveTab[], entry: KeepAliveTab): HTMLTableCellEleme
       initial: entry.url,
       placeholder: "https://app.example.com/board",
       commit: async (value) => {
-        const next = setKeepAliveUrl(list, entry.url, keepAliveUrlFromInput(value));
+        // applied to the stored list, not the rendered one: a mark added meanwhile must survive
+        const { keepAlive = [] } = await localStore.get("keepAlive");
+        const next = setKeepAliveUrl(keepAlive, entry.url, keepAliveUrlFromInput(value));
         if (next) {
           await localStore.set({ keepAlive: next });
           flashSaved();
@@ -185,7 +187,7 @@ function keepAliveRow(list: KeepAliveTab[], entry: KeepAliveTab, number: number)
   row.append(
     cell(String(number)),
     cell(running),
-    pageCell(list, entry),
+    pageCell(entry),
     cell(select),
     cell(tabsSelect),
     cell(countdown),

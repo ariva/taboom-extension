@@ -22,7 +22,7 @@ export async function renderRules(state: AppState): Promise<void> {
     list.append(li);
   }
   for (const rule of state.protectionRules) {
-    list.append(ruleChip(state.protectionRules, rule));
+    list.append(ruleChip(rule));
   }
   const { protectionTrash = [] } = await localStore.get("protectionTrash");
   renderRestore(protectionTrash);
@@ -38,7 +38,7 @@ const RULE_KIND: Record<ProtectionRule["type"], string> = {
   url: "Exact page",
 };
 
-function ruleChip(rules: ProtectionRule[], rule: ProtectionRule): HTMLLIElement {
+function ruleChip(rule: ProtectionRule): HTMLLIElement {
   const li = document.createElement("li");
   const span = document.createElement("span");
   span.textContent = rule.pattern;
@@ -53,9 +53,9 @@ function ruleChip(rules: ProtectionRule[], rule: ProtectionRule): HTMLLIElement 
       initial: rule.pattern,
       placeholder: "*.example.com",
       commit: async (value) => {
-        const next = setRulePattern(rules, rule.id, value);
-        if (next) {
-          await editProtectionRules(() => next);
+        // applied to the stored list, not the rendered one: a rule added meanwhile must survive
+        const after = await editProtectionRules((rules) => setRulePattern(rules, rule.id, value));
+        if (after.find((candidate) => candidate.id === rule.id)?.pattern !== rule.pattern) {
           flashSaved();
         }
       },

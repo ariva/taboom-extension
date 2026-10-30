@@ -84,6 +84,18 @@ test("Lib - UI - Inline edit - Blur commits, an empty value included", async () 
   assert.equal(edit.finished(), 1);
 });
 
+// Chrome fires blur on a focused input that leaves the DOM: a host re-rendered mid-edit must
+// not save the half-typed value (and needs no finish — the render that removed it is the state)
+test("Lib - UI - Inline edit - An input removed from the DOM mid-edit commits nothing", async () => {
+  const edit = startEdit();
+  edit.input.value = "Ha";
+  document.body.replaceChildren(); // the host re-rendered
+  edit.input.dispatchEvent(new Event("blur"));
+  await tick();
+  assert.deepEqual(edit.committed, []);
+  assert.equal(edit.finished(), 0);
+});
+
 test("Lib - UI - Inline edit - Keys and clicks inside the input do not reach the host", () => {
   const host = document.createElement("div");
   document.body.append(host);
