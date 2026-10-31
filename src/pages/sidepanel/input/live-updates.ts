@@ -1,7 +1,8 @@
 // Live updates: chrome.tabs / tabGroups / windows / storage events → one debounced refresh.
 import { capabilities } from "../../../lib/platform/capabilities.ts";
 import { refresh } from "../foundation/scheduler.ts";
-import type { UiPrefs } from "../../../app/types.ts";
+import type { UiPrefs, WindowProfiles } from "../../../app/types.ts";
+import { identityChanged } from "../../../app/window-identity.ts";
 import { adoptStoredView, clearOwnUiWrite, ownUiWrite } from "./toolbar-events.ts";
 
 // Tab/storage events → debounced refresh. Querying Chrome fresh each time
@@ -45,10 +46,19 @@ chrome.storage.onChanged.addListener((changes) => {
     "tabHistory",
     "updateAvailable",
     "dismissedUpdate",
-    "windowProfiles",
     "windowSessionMap", // identity bookkeeping churns on every tab event
   ];
-  const relevant = Object.keys(changes).filter((key) => !ignored.includes(key));
+  // windowProfiles churns the same way (fingerprints rewritten per tab event) but also carries the
+  // names / colors / pins another panel or the worker's restart recovery may change: refresh on those only
+  const relevant = Object.keys(changes).filter((key) =>
+    key === "windowProfiles"
+      ? // StorageChange values are `unknown`; the key is only ever written as WindowProfiles
+        identityChanged(
+          changes.windowProfiles?.oldValue as WindowProfiles | undefined,
+          changes.windowProfiles?.newValue as WindowProfiles | undefined,
+        )
+      : !ignored.includes(key),
+  );
   if (relevant.length === 0) {
     return;
   }

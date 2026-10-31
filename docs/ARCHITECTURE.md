@@ -68,7 +68,7 @@ The worker is stateless across suspensions: everything is recoverable from stora
 | `dnd/` | `tab-dnd.ts`, `drop-target.ts`, and the pure `dnd-model.ts` (`dropSpecFor`, `reorderedGroupTitles`) |
 | `history/` | `history-nav.ts` (back / forward buttons, history popover, long-press) |
 | `banners/` | `update-banner.ts`, `restore-banner.ts` |
-| `input/` | `list-events.ts`, `toolbar-events.ts`, `quick-actions.ts` (☰ button; its own file because `menus.ts` imports `toolbar-events.ts`), `tags-chip.ts` (the Tags chip's picker popover: ticks drive `state.tagFilter`), `tag-assign-picker.ts` (the row menu's Tag URL… checklist popover: one checkbox per tag for the clicked rows, ticks staged behind Cancel / Apply, refilled on render), `keyboard-nav.ts`, `global-keys.ts` (capture-phase Esc), `live-updates.ts` (chrome tab / storage events → debounced refresh) |
+| `input/` | `list-events.ts`, `toolbar-events.ts`, `quick-actions.ts` (☰ button; its own file because `menus.ts` imports `toolbar-events.ts`), `tags-chip.ts` (the Tags chip's picker popover: ticks drive `state.tagFilter`), `tag-assign-picker.ts` (the row menu's Tag URL… checklist popover: one checkbox per tag for the clicked rows, ticks staged behind Cancel / Apply, refilled on render), `keyboard-nav.ts`, `global-keys.ts` (capture-phase Esc), `live-updates.ts` (chrome tab / storage events → debounced refresh; a `windowProfiles` write counts only when `identityChanged` says a name / color / pin moved — the fingerprint rewrite on every tab event does not render) |
 
 Dependency direction: `foundation` ← `model` ← `ops` ← `menus` ← `windows-popover` / `dnd` / `input` ← `main.ts`.
 

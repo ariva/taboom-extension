@@ -6,6 +6,7 @@ import {
   assignLogicalIds,
   buildFingerprint,
   hashKey,
+  identityChanged,
   matchProfiles,
   scoreMatch,
   urlKey,
@@ -115,4 +116,26 @@ test("Identity - matchProfiles prefers a named profile when two fit a window equ
   };
   const assigned = matchProfiles(profiles, [[5, buildFingerprint(content, null, 2)]]);
   assert.equal(assigned.get(5), "w-named", "a stranded named profile wins the tie over its unnamed twin");
+});
+
+// the panel refreshes on a windowProfiles write only when something it shows changed: the
+// fingerprint bookkeeping rewrites every profile on every tab event
+test("Identity - identityChanged: name / color / pin differences count, fingerprint churn does not", () => {
+  const before = { "w-1": { name: "Work", updatedAt: 1, tabCount: 3 }, "w-2": { color: "#123456", updatedAt: 1 } };
+  assert.equal(identityChanged(before, { ...before, "w-1": { ...before["w-1"], updatedAt: 2, tabCount: 4 } }), false);
+  assert.equal(identityChanged(before, { ...before, "w-1": { ...before["w-1"], name: "Play" } }), true, "rename");
+  assert.equal(
+    identityChanged(before, { ...before, "w-2": { ...before["w-2"], color: undefined } }),
+    true,
+    "color cleared",
+  );
+  assert.equal(identityChanged(before, { ...before, "w-2": { ...before["w-2"], pinnedWindow: true } }), true, "pinned");
+  assert.equal(identityChanged(before, { "w-1": before["w-1"] }), true, "a profile gone");
+  assert.equal(
+    identityChanged(before, { ...before, "w-3": { updatedAt: 1 } }),
+    false,
+    "a new nameless profile shows nothing",
+  );
+  assert.equal(identityChanged(undefined, before), true, "first write with names");
+  assert.equal(identityChanged(before, undefined), true, "cleared");
 });

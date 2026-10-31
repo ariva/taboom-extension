@@ -3682,3 +3682,47 @@ test("UI - Sidepanel - Shared view follows a foreign filter / scope / sort chang
   assert.equal(sort.value, "recent");
   assert.equal(scope.value, "all-windows");
 });
+
+// window names / colors / pins written elsewhere (another panel's rename, the worker's restart
+// recovery) must reach this panel; the fingerprint rewrite on every tab event must not re-render it
+test("UI - Sidepanel - WINDOW_NAMES: a profile rename elsewhere refreshes the headers; a fingerprint-only rewrite does not render", {
+  skip: TEST_FEATURES.WINDOW_NAMES?.enabled !== true,
+}, async () => {
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 200));
+  const sort = byId<HTMLSelectElement>("sort");
+  const previousSort = sort.value;
+  const NOWISH = Date.now();
+  const profiles = {
+    "w-n1": { chromeWindowId: 1, name: "First", updatedAt: NOWISH },
+    "w-n2": { chromeWindowId: 2, name: "Second", updatedAt: NOWISH },
+  };
+  await chrome.storage.session.set({ windowSessionMap: { 1: "w-n1", 2: "w-n2" } });
+  await chrome.storage.local.set({ windowProfiles: profiles });
+  sort.value = "window";
+  sort.dispatchEvent(new window.Event("change", { bubbles: true }));
+  await chrome.tabs.onActivated.fire({});
+  await settle();
+  const labelOf = (windowId: number) =>
+    q(document, `.group-header[data-window-id="${windowId}"] .group-label`).textContent;
+  assert.match(labelOf(2), /^Second/);
+
+  const renamed = { ...profiles, "w-n2": { ...profiles["w-n2"], name: "Renamed", updatedAt: NOWISH + 1 } };
+  await chrome.storage.local.set({ windowProfiles: renamed });
+  await chrome.storage.onChanged.fire({ windowProfiles: { oldValue: profiles, newValue: renamed } }, "local");
+  await settle();
+  assert.match(labelOf(2), /^Renamed/, "a rename elsewhere reached this panel without a tab event");
+
+  const churned = { ...renamed, "w-n1": { ...renamed["w-n1"], updatedAt: NOWISH + 2, tabCount: 9 } };
+  const firstRow = document.querySelector(".row");
+  await chrome.storage.local.set({ windowProfiles: churned });
+  await chrome.storage.onChanged.fire({ windowProfiles: { oldValue: renamed, newValue: churned } }, "local");
+  await settle();
+  assert.equal(document.querySelector(".row"), firstRow, "fingerprint bookkeeping: no render");
+
+  sort.value = previousSort;
+  sort.dispatchEvent(new window.Event("change", { bubbles: true }));
+  await chrome.storage.local.set({ windowProfiles: {} });
+  await chrome.storage.session.set({ windowSessionMap: {} });
+  await chrome.tabs.onActivated.fire({});
+  await settle();
+});

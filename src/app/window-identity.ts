@@ -191,3 +191,13 @@ export function windowsToRestore(
   }
   return windows;
 }
+
+// did a write to the profiles change anything a panel shows — a name, a color, a pin — or only
+// the fingerprint bookkeeping that rewrites every profile on every tab event? An open panel
+// refreshes on the former only (chrome ids never carry identity, so they are not compared)
+export function identityChanged(before: WindowProfiles | undefined, after: WindowProfiles | undefined): boolean {
+  const shown = (profile: WindowProfile | undefined) =>
+    `${profile?.name ?? ""}\u0000${profile?.color ?? ""}\u0000${profile?.pinnedWindow ? 1 : 0}`;
+  const ids = new Set([...Object.keys(before ?? {}), ...Object.keys(after ?? {})]);
+  return [...ids].some((id) => shown(before?.[id]) !== shown(after?.[id]));
+}
