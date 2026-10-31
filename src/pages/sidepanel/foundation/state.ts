@@ -69,6 +69,7 @@ export interface PanelState {
   tags: Tag[];
   tagPages: TagPage[];
   tagFilter: Set<string>;
+  pendingUiWrites: Set<string>; // JSON of each ui object this panel wrote and has not seen echoed yet
 }
 
 // the single mutable state of the panel — handlers write here, render reads
@@ -121,6 +122,7 @@ export const state: PanelState = {
   tags: [], // storage.local.tags
   tagPages: [], // storage.local.tagPages
   tagFilter: new Set(), // session only: the ticked tags of the Tags chip (empty = any tagged tab)
+  pendingUiWrites: new Set(),
 };
 
 // TAB_GROUPS flag + API present (permission granted, Chrome supports it)

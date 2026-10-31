@@ -3939,3 +3939,65 @@ test("UI - Sidepanel - The update banner does not re-read storage for an unrelat
     chrome.storage.local.get = realGet;
   }
 });
+
+// an own ui write races a refresh that was already reading storage: the refresh must not put the
+// pre-write ui back (the fuzzy toggle flipped back, Tabs Order reverted until the next event)
+test("UI - Sidepanel - A refresh in flight during an own ui write keeps the written pref", async () => {
+  const toggle = byId<HTMLInputElement>("fuzzy-toggle");
+  const realGet = chrome.storage.local.get;
+  let release: () => void = () => {};
+  let held = false;
+  chrome.storage.local.get = (async (...args: Parameters<typeof realGet>) => {
+    const keys = JSON.stringify(args[0] ?? "");
+    const result = await realGet(...args); // read now (the pre-write state) …
+    if (!held && keys.includes('"ui"')) {
+      held = true;
+      await new Promise<void>((resolve) => {
+        release = resolve; // … delivered only after the click wrote: the real race
+      });
+    }
+    return result;
+  }) as typeof realGet;
+  try {
+    await chrome.tabs.onActivated.fire({}); // a refresh starts (debounced) and blocks on its state read
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    const before = toggle.checked;
+    toggle.click(); // persists ui.experimental_fuzzySearch = !before
+    await tick();
+    release();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    assert.equal(toggle.checked, !before, "the refresh that was in flight did not revert the click");
+    const written = calls.filter((c) => c.startsWith("storage.set")).at(-1) ?? "";
+    const { ui } = JSON.parse(written.slice("storage.set ".length));
+    await chrome.storage.onChanged.fire({ ui: { newValue: ui } }, "local"); // the own echo
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    assert.equal(toggle.checked, !before);
+    toggle.click(); // back to the fixture's value
+    await tick();
+  } finally {
+    chrome.storage.local.get = realGet;
+  }
+});
+
+// two own writes inside one storage round trip: the first echo must not look foreign and re-apply
+// the first write's view over the second
+test("UI - Sidepanel - Two own ui writes before their echoes: neither echo is adopted as foreign", async () => {
+  const pressed = () => q(document, '#filters button[aria-pressed="true"]').dataset.filter;
+  calls.length = 0;
+  q(document, '#filters button[data-filter="awake"]').click();
+  q(document, '#filters button[data-filter="snoozed"]').click();
+  await tick();
+  assert.equal(pressed(), "snoozed");
+  const writes = calls
+    .filter((c) => c.startsWith("storage.set"))
+    .map((c) => JSON.parse(c.slice("storage.set ".length)).ui);
+  assert.equal(writes.length, 2, "two ui writes");
+  await chrome.storage.onChanged.fire({ ui: { oldValue: {}, newValue: writes[0] } }, "local");
+  await new Promise((resolve) => setTimeout(resolve, 200));
+  assert.equal(pressed(), "snoozed", "the first echo is this panel's own write, not a foreign change");
+  await chrome.storage.onChanged.fire({ ui: { oldValue: writes[0], newValue: writes[1] } }, "local");
+  await new Promise((resolve) => setTimeout(resolve, 200));
+  assert.equal(pressed(), "snoozed");
+  q(document, '#filters button[data-filter="all"]').click();
+  await tick();
+});

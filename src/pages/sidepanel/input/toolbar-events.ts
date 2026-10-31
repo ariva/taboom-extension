@@ -169,19 +169,11 @@ export function adoptStoredView(ui: Partial<UiPrefs>): void {
   }
 }
 
-// JSON of the ui object this panel just persisted — its storage echo is skipped
-// (the click handler already rendered that state; without this every filter/
-// scope/sort click renders twice and re-queries all tabs 150ms later)
-let lastOwnUiWrite: string | null = null;
-
-// live-updates.ts compares the storage echo against it, then spends it
-export function ownUiWrite(): string | null {
-  return lastOwnUiWrite;
-}
-
-export function clearOwnUiWrite(): void {
-  lastOwnUiWrite = null;
-}
+// Every ui object this panel persists is remembered (state.pendingUiWrites) until its storage
+// echo arrives: the echo is skipped — the click handler already rendered that state; without
+// this every filter / scope / sort click renders twice and re-queries all tabs 150 ms later —
+// and a refresh that was already reading storage keeps the panel's own ui instead of the
+// pre-write one it read. A set, not one slot: two clicks inside one round trip echo twice.
 
 export function persistUiPrefs(): void {
   const ui = {
@@ -194,7 +186,7 @@ export function persistUiPrefs(): void {
     sortDirections: { ...(state.ui.sortDirections ?? {}), [state.sort]: state.sortDir },
   };
   state.ui = ui;
-  lastOwnUiWrite = JSON.stringify(ui);
+  state.pendingUiWrites.add(JSON.stringify(ui));
   saveState({ ui });
 }
 

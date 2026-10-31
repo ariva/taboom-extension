@@ -3,7 +3,8 @@ import { capabilities } from "../../../lib/platform/capabilities.ts";
 import { refresh } from "../foundation/scheduler.ts";
 import type { UiPrefs, WindowProfiles } from "../../../app/types.ts";
 import { identityChanged } from "../../../app/window-identity.ts";
-import { adoptStoredView, clearOwnUiWrite, ownUiWrite } from "./toolbar-events.ts";
+import { state } from "../foundation/state.ts";
+import { adoptStoredView } from "./toolbar-events.ts";
 
 // Tab/storage events → debounced refresh. Querying Chrome fresh each time
 // avoids incremental-cache sync bugs; cheap for a few hundred tabs.
@@ -70,10 +71,14 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (
     relevant.length === 1 &&
     relevant[0] === "ui" &&
-    JSON.stringify(changes.ui!.newValue) === ownUiWrite() // relevant[0] === "ui": the key is present
+    state.pendingUiWrites.delete(JSON.stringify(changes.ui?.newValue))
   ) {
-    clearOwnUiWrite();
     return;
+  }
+  if (changes.ui) {
+    // a foreign ui write supersedes whatever this panel still had in flight: storage is the truth
+    // again from here (and no stale entry can keep refresh() from reading it)
+    state.pendingUiWrites.clear();
   }
   if (changes.ui?.newValue) {
     // StorageChange values are `unknown`; "ui" is only ever written whole, as UiPrefs

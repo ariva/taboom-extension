@@ -71,7 +71,11 @@ export async function refresh(animate = false, preloaded: AppState | null = null
   state.rules = persisted.protectionRules;
   state.keepAlive = keepAlive;
   state.keepAliveEnabled = persisted.settings.keepAliveEnabled;
-  state.ui = persisted.ui;
+  // a write of this panel's own may have landed after this refresh read storage: until its echo
+  // arrives the panel's ui is the newer one (the fuzzy toggle, Tabs Order must not flip back)
+  if (state.pendingUiWrites.size === 0) {
+    state.ui = persisted.ui;
+  }
   document.documentElement.style.fontSize = `${state.ui.fontSize ?? 1}rem`;
   // light-dark() colors resolve via color-scheme, so forcing it flips the palette
   document.documentElement.style.colorScheme = resolveColorScheme(state.ui.theme);
