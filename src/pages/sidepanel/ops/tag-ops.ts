@@ -6,7 +6,7 @@ import { siteOf } from "../../../app/tag-patterns.ts";
 import { editTag, removeTagsToTrash } from "../../../app/storage.ts";
 import { TAG_COLORS, type TagOrigin, tagOriginSets, tagPageKey } from "../../../app/tags.ts";
 import { refresh, render } from "../foundation/scheduler.ts";
-import { state } from "../foundation/state.ts";
+import { actionableTabs, state } from "../foundation/state.ts";
 import { persistUiPrefs } from "../input/toolbar-events.ts";
 
 export const TAG_SWATCHES = Object.entries(TAG_COLORS) as [name: string, hex: string][];
@@ -18,7 +18,7 @@ export type TagScope = "page" | "site";
 // site needs a web host (chrome://settings has a hostname "settings", no site to tag)
 export function tagPageUrls(tabIds: number[], scope: TagScope = "page"): string[] {
   const ids = new Set(tabIds);
-  const keys = state.allTabs.flatMap((tab) => {
+  const keys = actionableTabs().flatMap((tab) => {
     if (!ids.has(tab.id)) {
       return [];
     }
@@ -34,7 +34,7 @@ export function tagPageUrls(tabIds: number[], scope: TagScope = "page"): string[
 export function rowTagOrigins(tabIds: number[]): Map<string, Set<TagOrigin>> {
   const ids = new Set(tabIds);
   const origins = new Map<string, Set<TagOrigin>>();
-  for (const tab of state.allTabs) {
+  for (const tab of actionableTabs()) {
     if (!ids.has(tab.id)) {
       continue;
     }

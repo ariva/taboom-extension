@@ -61,7 +61,7 @@ export function openSplitMenu(
   splitViewId: number,
   appendActions: (ids: number[], alwaysCount: boolean) => void,
 ): void {
-  const members = state.allTabs.filter((tab) => tab.splitViewId === splitViewId);
+  const members = state.liveTabs.filter((tab) => tab.splitViewId === splitViewId);
   const [first] = members;
   if (!first) {
     return;

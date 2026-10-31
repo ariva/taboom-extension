@@ -3565,3 +3565,59 @@ test("UI - Sidepanel - TAGS: a ticked tag removed elsewhere leaves the Tags filt
   await chrome.storage.onChanged.fire({ tags: {}, tagPages: {} }, "local");
   await settle();
 });
+
+// the quick launch stays live in the Parked windows scope, so its Pins / Groups menus must act
+// on the live sets: state.allTabs / tabGroups hold the parked snapshot there
+test("UI - Sidepanel - PARKED_WINDOWS: quick launch Pins and Groups menus act on live tabs while the list shows parked windows", {
+  skip: !PARKED_ON,
+}, async () => {
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 200));
+  await chrome.storage.local.set({
+    parkedWindows: [
+      { id: "p-live", parkedAt: Date.now(), tabs: [{ url: "https://p.example.com/", title: "P" }], groups: [] },
+    ],
+    parkedTrash: [],
+  });
+  await chrome.storage.onChanged.fire({ parkedWindows: {} }, "local");
+  await settle();
+  const scope = byId<HTMLSelectElement>("scope");
+  scope.value = "parked-windows";
+  scope.dispatchEvent(new window.Event("change", { bubbles: true }));
+  await settle();
+  const pop = byId("windows-pop");
+  const ctx = byId("ctx-menu");
+  byId("win-list-btn").click();
+  await tick();
+  must(qa(pop, ".win-view").find((el) => el.textContent.startsWith("Pins"))).click();
+  await tick();
+  const pinRow = must(pop.querySelector<HTMLElement>('.win-row[data-tab-id="3"]'));
+  const pinTitle = q(pinRow, ".win-title").textContent;
+  q(must(pinRow.parentElement), ".win-menu-btn").click();
+  await tick();
+  assert.equal(q(ctx, ".ctx-title").textContent, pinTitle, 'the live tab\'s own title, not "Tab"');
+  const liveWindows = new Set(tabs.map((tab) => tab.windowId));
+  const moveTargets = qa(q(ctx, ".ctx-submenu:not(.tags)"), ".ctx-item").map((el) => el.textContent ?? "");
+  assert.ok(
+    moveTargets.filter((label) => /^Window/.test(label)).length === liveWindows.size - 1,
+    `live windows as Move-to targets (own window skipped): ${moveTargets.join(" | ")}`,
+  );
+  assert.ok(!moveTargets.some((label) => /^Parked window/.test(label)), "no synthetic parked window as a target");
+  q(ctx, ".ctx-close").click();
+
+  must(qa(pop, ".win-view").find((el) => el.textContent.startsWith("Groups"))).click();
+  await tick();
+  const groupRow = must(pop.querySelector<HTMLElement>('.win-row[data-tab-group-id="7"]'));
+  q(must(groupRow.parentElement), ".win-menu-btn").click();
+  await tick();
+  assert.equal(ctx.hidden, false, "the group menu opens");
+  assert.equal(q(ctx, ".ctx-title").textContent, q(groupRow, ".win-title").textContent);
+  q(ctx, ".ctx-close").click();
+  document.body.click();
+
+  scope.value = "all-windows";
+  scope.dispatchEvent(new window.Event("change", { bubbles: true }));
+  await settle();
+  await chrome.storage.local.set({ parkedWindows: [], parkedTrash: [] });
+  await chrome.storage.onChanged.fire({ parkedWindows: {} }, "local");
+  await settle();
+});

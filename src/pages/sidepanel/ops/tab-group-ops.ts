@@ -13,7 +13,7 @@ export type TabIdList = [number, ...number[]];
 // rename commit shared by both rename entry points — the group keeps its
 // dragged slot in the quick-launch order, which is keyed by title
 export function commitTabGroupTitle(groupId: number, title: string): Promise<unknown> {
-  const old = state.tabGroups.get(groupId)?.title ?? "";
+  const old = state.liveTabGroups.get(groupId)?.title ?? "";
   const order = state.ui.quickLaunchGroupOrder ?? [];
   if (old !== title && order.includes(old)) {
     state.ui = { ...state.ui, quickLaunchGroupOrder: order.map((slot) => (slot === old ? title : slot)) };
@@ -32,7 +32,7 @@ export function startRenameTabGroup(groupId: number): void {
     return;
   }
   inlineEdit(label, {
-    initial: state.tabGroups.get(groupId)?.title ?? "",
+    initial: state.liveTabGroups.get(groupId)?.title ?? "",
     placeholder: "Group name",
     commit: (title) => commitTabGroupTitle(groupId, title),
     finish: () => refresh(false),
@@ -51,8 +51,8 @@ export async function moveTabsToGroup(tabIds: number[], groupId: number | null, 
   try {
     if (groupId != null) {
       // Chrome refuses to group across windows — move foreign tabs over first
-      const group = state.tabGroups.get(groupId);
-      const foreign = tabIds.filter((id) => state.allTabs.find((tab) => tab.id === id)?.windowId !== group?.windowId);
+      const group = state.liveTabGroups.get(groupId); // live ids: the group targets are Chrome groups
+      const foreign = tabIds.filter((id) => state.liveTabs.find((tab) => tab.id === id)?.windowId !== group?.windowId);
       if (group && foreign.length > 0) {
         await chrome.tabs.move(foreign, { windowId: group.windowId, index: -1 });
       }

@@ -174,6 +174,13 @@ export function parkedScope(): boolean {
   return parkedActive() && state.scope === "parked-windows";
 }
 
+// every row id an action may name: the shown set (the parked snapshot in the Parked scope) plus
+// the live tabs the quick launch still offers there; outside that scope the two are one list.
+// Id spaces never collide — parked rows are negative, live ids positive
+export function actionableTabs(): PanelTab[] {
+  return parkedScope() ? [...state.allTabs, ...state.liveTabs] : state.allTabs;
+}
+
 // sorts that only exist while their feature flag is on (option hidden + a
 // stored preference falls back to the window grouping)
 export const FLAG_GATED_SORTS: Record<string, FeatureName> = {

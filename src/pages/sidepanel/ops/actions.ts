@@ -8,7 +8,7 @@ import { pauseKeepAlive } from "../../../app/storage.ts";
 import { toast, toastFailure } from "../../../lib/ui/toast.ts";
 import { refresh } from "../foundation/scheduler.ts";
 import { reportAnswer } from "./answer.ts";
-import { state } from "../foundation/state.ts";
+import { actionableTabs, state } from "../foundation/state.ts";
 import type { PanelTab } from "../foundation/state.ts";
 import { hostsOf, urlsOf } from "../model/tab-hosts.ts";
 
@@ -62,7 +62,7 @@ export async function snooze(tabIds: number[]): Promise<void> {
 // non-discarded tabs are skipped so a mixed selection never force-reloads live pages
 export async function wake(tabIds: number[]): Promise<void> {
   const snoozed = tabIds.filter((tabId) => {
-    const tab = state.allTabs.find((candidate) => candidate.id === tabId);
+    const tab = actionableTabs().find((candidate) => candidate.id === tabId);
     return tab !== undefined && isUnloaded(tab);
   });
   await Promise.all(snoozed.map((tabId) => chrome.tabs.reload(tabId).catch(() => {})));
@@ -112,21 +112,21 @@ export async function pinTabs(tabIds: number[], pinned: boolean): Promise<void> 
 }
 
 export async function protectTabs(tabIds: number[]): Promise<void> {
-  reportAnswer(await send({ type: "protect-hosts", hosts: hostsOf(state.allTabs, tabIds) }), "protect the site");
+  reportAnswer(await send({ type: "protect-hosts", hosts: hostsOf(actionableTabs(), tabIds) }), "protect the site");
   unselect(tabIds);
   refresh(true);
 }
 
 // exact addresses, so two tabs on one host can differ; the host stays snoozable
 export async function protectUrls(tabIds: number[]): Promise<void> {
-  reportAnswer(await send({ type: "protect-urls", urls: urlsOf(state.allTabs, tabIds) }), "protect the page");
+  reportAnswer(await send({ type: "protect-urls", urls: urlsOf(actionableTabs(), tabIds) }), "protect the page");
   unselect(tabIds);
   refresh(true);
 }
 
 // by url: removes the host rule covering the page and its exact url rule alike
 export async function unprotectTabs(tabIds: number[]): Promise<void> {
-  reportAnswer(await send({ type: "unprotect-urls", urls: urlsOf(state.allTabs, tabIds) }), "unprotect");
+  reportAnswer(await send({ type: "unprotect-urls", urls: urlsOf(actionableTabs(), tabIds) }), "unprotect");
   unselect(tabIds);
   refresh(true);
 }
@@ -139,14 +139,14 @@ export async function keepAlive(tabIds: number[], kept: boolean): Promise<void> 
 
 // pause / resume: a storage write the worker follows (alarm, menu checkbox) like an options edit
 export async function keepAlivePause(tabIds: number[], paused: boolean): Promise<void> {
-  await pauseKeepAlive(urlsOf(state.allTabs, tabIds), paused);
+  await pauseKeepAlive(urlsOf(actionableTabs(), tabIds), paused);
   refresh(true);
 }
 
 // Must run synchronously from the click: clipboard writes in an extension page ride
 // on the user activation, no clipboardWrite permission needed.
 export async function copyUrls(tabIds: number[]): Promise<void> {
-  const urls = tabIds.map((tabId) => state.allTabs.find((tab) => tab.id === tabId)?.url).filter(Boolean);
+  const urls = tabIds.map((tabId) => actionableTabs().find((tab) => tab.id === tabId)?.url).filter(Boolean);
   try {
     await navigator.clipboard.writeText(urls.join("\n"));
     toast(urls.length === 1 ? "URL copied" : `${urls.length} URLs copied`);

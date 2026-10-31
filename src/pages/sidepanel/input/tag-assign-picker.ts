@@ -17,7 +17,7 @@ import {
 } from "../../../app/tags.ts";
 import { askDialog } from "../../../lib/ui/ask-dialog.ts";
 import { refresh } from "../foundation/scheduler.ts";
-import { state } from "../foundation/state.ts";
+import { actionableTabs, state } from "../foundation/state.ts";
 import { ORIGIN_GLYPH } from "../model/rows.ts";
 import { rowTagOrigins, TAG_SWATCHES, type TagScope, tagPageUrls } from "../ops/tag-ops.ts";
 
@@ -425,7 +425,7 @@ export function openTagAssignPicker(
 // renders happen on every tab / storage event — keep an open picker current (its rows may be gone)
 export function refillTagAssignPickerIfOpen(): void {
   if (pickerIds !== null && pickerOpen()) {
-    const live = new Set(state.allTabs.map((tab) => tab.id));
+    const live = new Set(actionableTabs().map((tab) => tab.id));
     const ids = pickerIds.filter((id) => live.has(id));
     if (ids.length === 0) {
       pop.hidePopover?.();

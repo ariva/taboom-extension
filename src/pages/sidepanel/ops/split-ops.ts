@@ -33,8 +33,8 @@ export function asSplitTab(tab: PanelTab): SplitTab {
 // the anchor (clicked tab) stays put; the partner is brought beside it, matched to its pin
 // state and group, then the two are split. Chrome's own refusals surface as a toast.
 export async function splitTabs(anchorId: number, partnerId: number): Promise<void> {
-  const anchor = state.allTabs.find((tab) => tab.id === anchorId);
-  const partner = state.allTabs.find((tab) => tab.id === partnerId);
+  const anchor = state.liveTabs.find((tab) => tab.id === anchorId); // split view pairs live tabs
+  const partner = state.liveTabs.find((tab) => tab.id === partnerId);
   if (!anchor || !partner) {
     return;
   }
@@ -75,7 +75,7 @@ export async function splitTabs(anchorId: number, partnerId: number): Promise<vo
 }
 
 export async function unsplitTab(tabId: number): Promise<void> {
-  const tab = state.allTabs.find((candidate) => candidate.id === tabId);
+  const tab = state.liveTabs.find((candidate) => candidate.id === tabId);
   if (!tab || !isSplit(tab) || tab.splitViewId === undefined) {
     return;
   }

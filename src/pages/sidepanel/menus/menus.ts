@@ -30,9 +30,11 @@ import {
 import { TAB_GROUP_COLORS, WINDOW_DOT_COLORS, windowGroupName, windowMaps } from "../model/index.ts";
 import { refresh, render } from "../foundation/scheduler.ts";
 import {
+  actionableTabs,
   keepAliveActive,
   namesActive,
   parkedActive,
+  parkedScope,
   pinActive,
   state,
   tabGroupsActive,
@@ -63,7 +65,7 @@ type TabGroup = chrome.tabGroups.TabGroup;
 // bare labels (the clicked tab is unambiguous there)
 export function appendCtxActions(ids: number[], alwaysCount = false): void {
   // filter(Boolean) drops the misses — TS cannot see that through the Boolean constructor
-  const targets = ids.map((id) => state.allTabs.find((tab) => tab.id === id)).filter(Boolean) as PanelTab[];
+  const targets = ids.map((id) => actionableTabs().find((tab) => tab.id === id)).filter(Boolean) as PanelTab[];
   const actions: [label: string, run: () => void][] = [
     ["Snooze", () => snooze(ids)],
     ["Wake", () => wake(ids)],
@@ -87,10 +89,12 @@ export function openRowMenu(event: MouseEvent, tabId: number): void {
     return;
   }
   const ids = actionIds(tabId);
-  const sourceWindows = new Set(ids.map((id) => state.allTabs.find((tab) => tab.id === id)?.windowId));
-  const maps = windowMaps(state.allTabs, state.currentWindowId, state.windowMeta);
+  // live sets: in the Parked windows scope the list shows snapshots, but this menu serves the quick
+  // launch's live rows there too, and its Move-to targets are live windows either way
+  const sourceWindows = new Set(ids.map((id) => state.liveTabs.find((tab) => tab.id === id)?.windowId));
+  const maps = windowMaps(state.liveTabs, state.currentWindowId, state.liveWindowMeta);
   clearCtxMenu();
-  const clicked = state.allTabs.find((tab) => tab.id === tabId);
+  const clicked = state.liveTabs.find((tab) => tab.id === tabId);
   ctxAppend(ctxTitle(ids.length > 1 ? `${ids.length} tabs selected` : clicked?.title || "Tab"), ctxDivider());
   ctxAppend(ctxItem(ids.length > 1 ? `Copy ${ids.length} URLs` : "Copy URL", () => copyUrls(ids)));
   appendCtxActions(ids);
@@ -143,7 +147,7 @@ export function openRowMenu(event: MouseEvent, tabId: number): void {
   if (tabGroupsActive()) {
     const groupMenu = ctxSubmenu(ids.length > 1 ? `Move ${ids.length} tabs to group` : "Move to group");
     ctxAppend(groupMenu.btn, groupMenu.submenu);
-    for (const [groupId, group] of state.tabGroups) {
+    for (const [groupId, group] of state.liveTabGroups) {
       const item = ctxItem(group.title || "(unnamed group)", () => moveTabsToGroup(ids, groupId));
       const dot = document.createElement("span");
       dot.className = "win-dot";
@@ -161,7 +165,7 @@ export function openRowMenu(event: MouseEvent, tabId: number): void {
         moveTabsToGroup(ids, null, title.trim());
       }),
     );
-    const grouped = ids.filter((id) => (state.allTabs.find((tab) => tab.id === id)?.groupId ?? -1) !== -1);
+    const grouped = ids.filter((id) => (state.liveTabs.find((tab) => tab.id === id)?.groupId ?? -1) !== -1);
     if (grouped.length > 0) {
       ctxAppend(ctxItem("Remove from group", () => ungroupTabs(grouped)));
     }
@@ -213,11 +217,13 @@ export function openTabGroupMenu(
     openParkedGroupMenu(event, groupId); // Parked windows scope: a snapshot's group, not a Chrome group
     return;
   }
-  const group = state.tabGroups.get(groupId);
+  const group = state.liveTabGroups.get(groupId); // live: the quick launch's Groups view opens this in the Parked scope too
   if (!group) {
     return;
   }
-  const ids = state.fullVisible.filter((tab) => tab.groupId === groupId).map((tab) => tab.id);
+  // the shown members (a search narrows them) — or, while the list shows parked windows, the whole group
+  const members = parkedScope() ? state.liveTabs : state.fullVisible;
+  const ids = members.filter((tab) => tab.groupId === groupId).map((tab) => tab.id);
   clearCtxMenu();
   ctxAppend(ctxTitle(group.title || "(unnamed group)"), ctxDivider());
   ctxAppend(ctxItem("Rename group…", () => startRename(groupId)));
@@ -258,13 +264,13 @@ export function appendWindowIdentityItems(
 ): void {
   // "Pin window" — pinned windows sort to the top of the windows list
   if (pinActive()) {
-    const isPinned = state.windowMeta.get(windowId)?.pinnedWindow ?? false;
+    const isPinned = state.liveWindowMeta.get(windowId)?.pinnedWindow ?? false; // live window ids only (parked windows have their own menu)
     ctxAppend(ctxItem(isPinned ? "Unpin window" : "Pin window", () => setWindowPin(windowId, !isPinned)));
   }
   ctxAppend(ctxItem("Rename window…", () => startRename(windowId)));
   const color = ctxSubmenu("Window color");
   ctxAppend(color.btn, color.submenu);
-  const currentColor = state.windowMeta.get(windowId)?.color;
+  const currentColor = state.liveWindowMeta.get(windowId)?.color;
   WINDOW_DOT_COLORS.forEach((swatch, index) => {
     const item = ctxItem(WINDOW_DOT_COLOR_NAMES[index] ?? swatch, () => setWindowColor(windowId, swatch));
     const dot = document.createElement("span");
