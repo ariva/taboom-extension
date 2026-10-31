@@ -1,7 +1,8 @@
 // Live updates: chrome.tabs / tabGroups / windows / storage events → one debounced refresh.
 import { capabilities } from "../../../lib/platform/capabilities.ts";
 import { refresh } from "../foundation/scheduler.ts";
-import { clearOwnUiWrite, ownUiWrite } from "./toolbar-events.ts";
+import type { UiPrefs } from "../../../app/types.ts";
+import { adoptStoredView, clearOwnUiWrite, ownUiWrite } from "./toolbar-events.ts";
 
 // Tab/storage events → debounced refresh. Querying Chrome fresh each time
 // avoids incremental-cache sync bugs; cheap for a few hundred tabs.
@@ -59,6 +60,10 @@ chrome.storage.onChanged.addListener((changes) => {
   ) {
     clearOwnUiWrite();
     return;
+  }
+  if (changes.ui?.newValue) {
+    // StorageChange values are `unknown`; "ui" is only ever written whole, as UiPrefs
+    adoptStoredView(changes.ui.newValue as Partial<UiPrefs>); // a foreign write: shared view follows it (a cleared store has no new value)
   }
   scheduleRefresh();
 });

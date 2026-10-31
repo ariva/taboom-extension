@@ -49,7 +49,7 @@ Panel position (left or right) is a global Chrome setting: `chrome://settings/ap
 
 - **Search** — focused on open; matches title, URL, hostname and tag names; multiple words all must match (`github rust`). A `#word` token matches tags only, by prefix (`#wo` finds *work*) — see **Tags** below.
 - **Filters** — All / Awake / Snoozed / Protected, with live counts, and the **Tags ▾** dropdown chip (see **Tags**).
-- **Scope & sort** — **All open windows**, **Current window** or **Parked windows** (see below); recent / oldest / title / domain.
+- **Scope & sort** — **All open windows**, **Current window** or **Parked windows** (see below); recent / oldest / title / domain. The chosen filter, scope and sort are remembered. With two or more panels open they are **shared** by default: a change in one panel, or **Restore default settings**, reaches every open panel. **Settings → Customizations → Filter, scope and sort across side panels → Independent** lets each panel keep its own view instead (the last choice anywhere still seeds the next panel you open).
 - **Row click** — focuses the window and activates the tab (snoozed tabs reload).
 - **Visual states** — each window's active tab has an accent left edge + bold title; snoozed tabs are dimmed with a ⏸ title prefix and `SNOOZED` badge. Hovering a row shows its full address, under it its state badges in their colors (snoozed, protected, kept alive, pinned, 🔊) and, when it has tags, a **Tags:** line of colored pills.
 - **Hover actions** — ⏸ snooze, 🛡 protect/unprotect site, ✕ close.

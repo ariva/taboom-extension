@@ -2,6 +2,7 @@
 // toggle, select-all, settings and the bulk buttons — with the per-filter scroll
 // memory and the ui-prefs persistence those handlers share.
 import { featureEnabled } from "../../../app/core.ts";
+import type { UiPrefs } from "../../../app/types.ts";
 import { saveState } from "../../../app/storage.ts";
 import { closest, getElementById } from "../../../lib/dom.ts";
 import { closeTabs, protectTabs, snooze, wake } from "../ops/actions.ts";
@@ -20,7 +21,7 @@ import type { FilterName } from "../model/index.ts";
 import { refresh, render } from "../foundation/scheduler.ts";
 import { canonicalDir, SORT_DIRECTIONS } from "../model/sort-direction.ts";
 import { initialDirFor } from "../render/sorting.ts";
-import { effectiveSort, parkedActive, state } from "../foundation/state.ts";
+import { effectiveSort, parkedActive, parkedScope, state } from "../foundation/state.ts";
 
 // Scroll positions are remembered per filter — in two separate worlds, so they
 // can't clobber each other: scrollByFilter holds normal-browsing positions
@@ -131,6 +132,42 @@ sortDirBtn.addEventListener("click", () => {
   persistUiPrefs();
   render(!state.query);
 });
+
+// Shared view (ui.panelView, the default): a filter / scope / sort written elsewhere — Settings'
+// Restore defaults, a click in another panel — lands here as if clicked here, without being
+// written back. The independent view keeps this panel's own choice; the store still seeds the
+// next panel to open. Own writes never reach this (the storage echo is skipped).
+export function adoptStoredView(ui: Partial<UiPrefs>): void {
+  if ((ui.panelView ?? state.ui.panelView ?? "shared") !== "shared") {
+    return;
+  }
+  state.ui = { ...state.ui, ...ui }; // initialDirFor reads sortDirMode / sortDirections from it (a partial write keeps the rest)
+  let changed = false;
+  if (ui.defaultFilter !== undefined && ui.defaultFilter !== state.filter) {
+    state.filter = ui.defaultFilter;
+    changed = true;
+  }
+  if (ui.scope !== undefined && ui.scope !== state.scope) {
+    const wasParked = parkedScope();
+    state.scope = ui.scope;
+    scopeSelect.value = ui.scope;
+    if (wasParked !== parkedScope()) {
+      state.selected.clear(); // ids of one set mean nothing in the other
+    }
+    changed = true;
+  }
+  if (ui.sort !== undefined && ui.sort !== state.sort) {
+    state.sort = ui.sort;
+    sortSelect.value = ui.sort;
+    state.sortDir = initialDirFor(ui.sort);
+    state.collapsedGroups.clear(); // keys from another grouping are meaningless
+    state.searchCollapsedGroups.clear();
+    changed = true;
+  }
+  if (changed) {
+    resetScrollPositions();
+  }
+}
 
 // JSON of the ui object this panel just persisted — its storage echo is skipped
 // (the click handler already rendered that state; without this every filter/

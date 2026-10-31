@@ -3621,3 +3621,54 @@ test("UI - Sidepanel - PARKED_WINDOWS: quick launch Pins and Groups menus act on
   await chrome.storage.onChanged.fire({ parkedWindows: {} }, "local");
   await settle();
 });
+
+// Filter, scope and sort written elsewhere (Settings → Restore defaults, another panel): with the
+// default shared view this panel takes them over; with the independent view it keeps its own
+test("UI - Sidepanel - Shared view follows a foreign filter / scope / sort change; the independent view keeps its own", async () => {
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 200));
+  const sort = byId<HTMLSelectElement>("sort");
+  const scope = byId<HTMLSelectElement>("scope");
+  const pressed = () => q(document, '#filters button[aria-pressed="true"]').dataset.filter;
+  const { ui: before } = await chrome.storage.local.get("ui");
+  const base = { ...before, defaultFilter: "all", scope: "all-windows", sort: "recent" };
+  await chrome.storage.local.set({ ui: base });
+  await chrome.storage.onChanged.fire({ ui: { newValue: base } }, "local");
+  await settle();
+  assert.equal(sort.value, "recent");
+
+  const foreign = { ...base, defaultFilter: "snoozed", scope: "current-window", sort: "title" };
+  await chrome.storage.local.set({ ui: foreign });
+  await chrome.storage.onChanged.fire({ ui: { newValue: foreign } }, "local");
+  await settle();
+  assert.equal(pressed(), "snoozed", "shared: the filter followed");
+  assert.equal(scope.value, "current-window", "shared: the scope followed");
+  assert.equal(sort.value, "title", "shared: the sort followed");
+  calls.length = 0;
+  q(document, '#filters button[data-filter="all"]').click();
+  await tick();
+  const written = calls.filter((c) => c.startsWith("storage.set")).at(-1) ?? "";
+  assert.match(written, /"scope":"current-window"/, "the next click persists the adopted view, not the boot one");
+  assert.match(written, /"sort":"title"/);
+
+  const independent = {
+    ...foreign,
+    defaultFilter: "awake",
+    scope: "all-windows",
+    sort: "recent",
+    panelView: "independent",
+  };
+  await chrome.storage.local.set({ ui: independent });
+  await chrome.storage.onChanged.fire({ ui: { newValue: independent } }, "local");
+  await settle();
+  assert.equal(pressed(), "all", "independent: the filter stays");
+  assert.equal(scope.value, "current-window", "independent: the scope stays");
+  assert.equal(sort.value, "title", "independent: the sort stays");
+
+  // back to the fixture's view for the tests after this one
+  const restore = { ...base, panelView: "shared" };
+  await chrome.storage.local.set({ ui: restore });
+  await chrome.storage.onChanged.fire({ ui: { newValue: restore } }, "local");
+  await settle();
+  assert.equal(sort.value, "recent");
+  assert.equal(scope.value, "all-windows");
+});

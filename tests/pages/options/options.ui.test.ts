@@ -664,6 +664,21 @@ test("UI - Options - Hidden-matches dropdown visible only with SEARCH_AUTO_SELEC
   );
 });
 
+test("UI - Options - Panel view dropdown: shared by default, persists ui.panelView", async () => {
+  const select = byId<HTMLSelectElement>("panelView");
+  assert.equal(select.value, stored.ui?.panelView ?? "shared", "shared across panels by default");
+  select.value = "independent";
+  select.dispatchEvent(new window.Event("change", { bubbles: true }));
+  await tick();
+  await tick();
+  assert.equal(stored.ui.panelView, "independent");
+  select.value = "shared";
+  select.dispatchEvent(new window.Event("change", { bubbles: true }));
+  await tick();
+  await tick();
+  assert.equal(stored.ui.panelView, "shared");
+});
+
 test("UI - Options - Hide update banner checkbox persists ui.hideUpdateBanner", async () => {
   const box = byId<HTMLInputElement>("hideUpdateBanner");
   assert.equal(box.checked, false, "default: banner not hidden");

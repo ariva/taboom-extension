@@ -141,6 +141,7 @@ export interface UiPrefs {
   hideUpdateBanner: boolean;
   windowNamesEnabled: boolean;
   onExtensionUpdate: "auto" | "banner" | "none";
+  panelView: "shared" | "independent"; // do open side panels follow a filter / scope / sort change made elsewhere
   showExperimental: boolean;
   // not in DEFAULTS: experimental_-prefixed opt-out, read as true when absent (FUZZY_SEARCH)
   experimental_fuzzySearch?: boolean;

@@ -48,6 +48,7 @@ export const DEFAULTS = {
     hideUpdateBanner: false, // suppress the new-version banner in the side panel
     windowNamesEnabled: true, // WINDOW_NAMES flag: show custom window names/colors (user toggle)
     onExtensionUpdate: "banner", // "auto" | "banner" | "none" — reopen side panels lost to an update/restart
+    panelView: "shared", // "shared" | "independent" — open panels follow a filter / scope / sort change made elsewhere, or keep their own
     showExperimental: false, // opt into experimental features (needs ALLOW_EXPERIMENTAL flag)
   },
 } satisfies AppState;
