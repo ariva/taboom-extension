@@ -1,7 +1,7 @@
 // Parked windows: park = snapshot the window and close it; restore = open the tabs again
 // (a new window with the old identity, or appended into a live one) and recreate pins,
 // groups and the active tab; move = open picked parked tabs somewhere live.
-import type { ParkedTarget } from "../app/messages.ts";
+import type { MessageError, ParkedTarget } from "../app/messages.ts";
 import { restorePlan, snapshotWindow } from "../app/parked.ts";
 import { addParkedWindow, dropParkedTabs, localStore } from "../app/storage.ts";
 import { capabilities } from "../lib/platform/capabilities.ts";
@@ -9,14 +9,16 @@ import { patchWindowProfiles, windowProfileOf } from "./window-profiles.ts";
 
 type TabIdList = [number, ...number[]]; // what chrome.tabs.group is typed to take
 
-export async function parkWindow(windowId: number): Promise<void> {
+// Every "nothing happened" path answers a reason: the dispatcher turns undefined into { ok }, and the
+// panel toasts an { error } — a silent ok after a click is what these used to be
+export async function parkWindow(windowId: number): Promise<MessageError | undefined> {
   const [tabs, groups, profile] = await Promise.all([
     chrome.tabs.query({ windowId }),
     capabilities.tabGroups ? chrome.tabGroups.query({ windowId }).catch(() => []) : [],
     windowProfileOf(windowId),
   ]);
   if (tabs.length === 0) {
-    return; // no such window (or nothing to keep)
+    return { error: "the window is gone or has no tabs" };
   }
   const parked = snapshotWindow(
     tabs,
@@ -28,6 +30,7 @@ export async function parkWindow(windowId: number): Promise<void> {
   // the snapshot is on disk before the window goes — a crash in between loses nothing
   await addParkedWindow(parked);
   await chrome.windows.remove(windowId);
+  return undefined;
 }
 
 interface OpenedTabs {
@@ -98,11 +101,11 @@ async function openedWindowOf(tabId: number | undefined): Promise<number | undef
 // The snapshot is consumed AFTER the tabs exist, and only the tabs that opened leave it: a
 // refused address or a target window closed meanwhile keeps its tabs parked instead of losing
 // the window with nothing to undo (park does the mirror image: snapshot first, close after)
-export async function restoreParked(id: string, intoWindowId?: number): Promise<void> {
+export async function restoreParked(id: string, intoWindowId?: number): Promise<MessageError | undefined> {
   const { parkedWindows = [] } = await localStore.get("parkedWindows");
   const parked = parkedWindows.find((entry) => entry.id === id);
   if (!parked) {
-    return;
+    return { error: "the parked window is no longer there" };
   }
   const plan = restorePlan(parked);
   const { windowId, ids } = await openTabs(plan.urls, plan.pinned, intoWindowId);
@@ -111,7 +114,7 @@ export async function restoreParked(id: string, intoWindowId?: number): Promise<
     await dropParkedTabs(id, opened);
   }
   if (windowId === undefined) {
-    return;
+    return { error: "none of its addresses could be opened" };
   }
   for (const group of plan.groups) {
     const tabIds = group.indexes.map((index) => ids[index]).filter((tabId): tabId is number => tabId !== undefined);
@@ -132,6 +135,7 @@ export async function restoreParked(id: string, intoWindowId?: number): Promise<
       pinnedWindow: parked.pinnedWindow,
     });
   }
+  return undefined;
 }
 
 // Open the picked parked tabs in a live window / group / a new window; `keep` leaves them
@@ -142,15 +146,15 @@ export async function moveParkedTabs(
   target: ParkedTarget,
   keep: boolean,
   asGroup: boolean,
-): Promise<void> {
+): Promise<MessageError | undefined> {
   const { parkedWindows = [] } = await localStore.get("parkedWindows");
   const parked = parkedWindows.find((entry) => entry.id === id);
   if (!parked) {
-    return;
+    return { error: "the parked window is no longer there" };
   }
   const picked = indexes.flatMap((index) => parked.tabs[index] ?? []);
   if (picked.length === 0) {
-    return;
+    return { error: "those tabs are no longer in the snapshot" };
   }
   let windowId: number | undefined;
   let groupId: number | undefined;
@@ -158,7 +162,7 @@ export async function moveParkedTabs(
     groupId = target.groupId;
     windowId = (await chrome.tabGroups.get(groupId).catch(() => undefined))?.windowId;
     if (windowId === undefined) {
-      return; // the group is gone — the menu was stale
+      return { error: "the target group is gone" }; // the menu was stale
     }
   } else {
     windowId = target.windowId ?? undefined;
@@ -185,4 +189,5 @@ export async function moveParkedTabs(
   if (!keep && opened.length > 0) {
     await dropParkedTabs(id, opened);
   }
+  return opened.length === 0 ? { error: "none of the addresses could be opened" } : undefined;
 }

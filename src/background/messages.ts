@@ -1,7 +1,7 @@
 // The runtime.onMessage dispatcher: one exhaustive switch over the Message
 // union, delegating to the feature modules.
 import { removeHistoryAt } from "../app/core.ts";
-import type { Message } from "../app/messages.ts";
+import type { Message, MessageError } from "../app/messages.ts";
 import { setTabsKeepAlive } from "./keep-alive.ts";
 import { moveParkedTabs, parkWindow, restoreParked } from "./parked.ts";
 import { protectHosts, protectUrls, toggleSiteProtection, unprotectUrls } from "./protection.ts";
@@ -9,9 +9,10 @@ import { autoSnoozePass, recordWakes, snoozeTab } from "./snooze.ts";
 import { historyJump, historyStep, withHistory } from "./tab-history.ts";
 import { panelsToRestore, patchWindowProfiles, setPanelOpen } from "./window-profiles.ts";
 
+// a handler answers its result, nothing (→ { ok }), or a MessageError reason when nothing happened
 export async function handleMessage(
   message: Message,
-): Promise<{ protected: boolean } | { windows: number[] } | { snoozed: number } | void> {
+): Promise<{ protected: boolean } | { windows: number[] } | { snoozed: number } | MessageError | void> {
   switch (message.type) {
     case "snooze-tab":
       return snoozeTab(message.tabId);

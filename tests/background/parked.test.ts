@@ -98,11 +98,12 @@ test("Service Worker - Parked: park-window snapshots the window (order, pins, gr
   );
 });
 
-test("Service Worker - Parked: park-window on an unknown window parks nothing", async () => {
+test("Service Worker - Parked: park-window on an unknown window parks nothing and says so", async () => {
   calls.length = 0;
-  await send({ type: "park-window", windowId: 99 });
+  const answer = await send({ type: "park-window", windowId: 99 });
   assert.equal(stored.parkedWindows?.length, 1);
   assert.ok(!calls.some((c) => c.startsWith("windows.remove")));
+  assert.ok(answer && "error" in answer, "the panel gets a reason, not an ok");
 });
 
 test("Service Worker - Parked: restore-parked rebuilds a new window — tabs in order, pins, group, active tab, name", async () => {
@@ -357,4 +358,45 @@ test("Service Worker - Parked: move-parked-tabs keeps the tab Chrome refused and
     ["notes", "stay"],
     "the refused tab stays parked, the opened one left",
   );
+});
+
+// every "nothing happened" path answers a reason: the panel toasts an { error } and stays quiet on ok
+test("Service Worker - Parked: restore and move answer an error when nothing could be done", async () => {
+  stored.parkedWindows = [
+    {
+      id: "p-nothing",
+      parkedAt: NOW,
+      tabs: [{ url: "file:///home/me/a.html", title: "a" }],
+      groups: [],
+    },
+  ];
+  const unknown = await send({ type: "restore-parked", id: "no-such-id" });
+  assert.ok(unknown && "error" in unknown, "unknown id");
+  const realCreate = chrome.windows.create;
+  chrome.windows.create = async () => {
+    throw new Error("Cannot open file URLs without permission");
+  };
+  try {
+    const refused = await send({ type: "restore-parked", id: "p-nothing" });
+    assert.ok(refused && "error" in refused, "every address refused");
+  } finally {
+    chrome.windows.create = realCreate;
+  }
+  assert.equal(stored.parkedWindows?.length, 1, "nothing consumed");
+  const goneGroup = await send({
+    type: "move-parked-tabs",
+    id: "p-nothing",
+    indexes: [0],
+    target: { groupId: 4242 },
+    keep: false,
+  });
+  assert.ok(goneGroup && "error" in goneGroup, "the target group is gone");
+  const nothingPicked = await send({
+    type: "move-parked-tabs",
+    id: "p-nothing",
+    indexes: [7],
+    target: { windowId: 1 },
+    keep: false,
+  });
+  assert.ok(nothingPicked && "error" in nothingPicked, "no such tab in the snapshot");
 });
