@@ -111,10 +111,25 @@ function globMatches(pattern: string, text: string): boolean {
   return text.length - position >= last.length && text.endsWith(last);
 }
 
+// what one url resolves to for matching — computed once per tab, not once per (tab, entry) pair:
+// deriveTabs matches every tab against every entry on each refresh, and the url parse is the cost
+export interface PageKey {
+  key: string; // the page key ("" = never tagged)
+  host: string; // its hostname ("" when the key has none)
+}
+
+export function pageKeyOf(url: string | undefined): PageKey {
+  const key = tagPageKey(url);
+  return { key, host: key === "" ? "" : hostnameOf(key) };
+}
+
 // the one rule for "is this page under the pattern" — every surface (badges, menus, the
 // search haystack, the picker's inherited ticks) compares through here
 export function matchesTagPage(pattern: string, url: string | undefined): boolean {
-  const key = tagPageKey(url);
+  return matchesTagPageKey(pattern, pageKeyOf(url));
+}
+
+export function matchesTagPageKey(pattern: string, { key, host }: PageKey): boolean {
   if (key === "" || pattern === "") {
     return false;
   }
@@ -124,7 +139,6 @@ export function matchesTagPage(pattern: string, url: string | undefined): boolea
     }
     return pattern.endsWith("/") ? key.startsWith(pattern) : pattern === key;
   }
-  const host = hostnameOf(key);
   if (host === "") {
     return false;
   }

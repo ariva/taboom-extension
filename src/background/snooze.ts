@@ -98,6 +98,20 @@ export async function snoozeTab(tabId: number): Promise<void> {
   }
 }
 
+// the panel's bulk snooze: one message for the batch, one tab at a time inside (two active tabs of
+// one window must not both get a helper New Tab); the refusals come back for one toast
+export async function snoozeTabs(tabIds: number[]): Promise<{ failures: string[] }> {
+  const failures: string[] = [];
+  for (const tabId of tabIds) {
+    try {
+      await snoozeTab(tabId);
+    } catch (error) {
+      failures.push(error instanceof Error ? error.message : String(error));
+    }
+  }
+  return { failures };
+}
+
 async function discardTab(tabId: number): Promise<void> {
   // discard() resolves with the post-discard Tab (its id may change!)
   let result: chrome.tabs.Tab | undefined;

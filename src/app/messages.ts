@@ -8,6 +8,7 @@ export type { MessageError } from "../lib/messaging.ts";
 
 export type Message =
   | { type: "snooze-tab"; tabId: number }
+  | { type: "snooze-tabs"; tabIds: number[] } // the panel's bulk snooze: one round trip, the refusals back
   | { type: "toggle-site-protection"; tabId: number }
   | { type: "protect-hosts"; hosts: string[] }
   | { type: "protect-urls"; urls: string[] }
@@ -56,6 +57,7 @@ export interface MessageAck {
 // Message member without an entry here fails createMessenger's constraint.
 export interface MessageResponses {
   "snooze-tab": MessageAck;
+  "snooze-tabs": { failures: string[] };
   "toggle-site-protection": { protected: boolean };
   "protect-hosts": MessageAck;
   "protect-urls": MessageAck;

@@ -147,22 +147,27 @@ export function selectVisible<T extends Tab>(tabs: T[], view: SelectView): T[] {
       const maps = windowMaps(tabs, currentWindowId, meta ?? null);
       const labelOf = (windowId: number): string =>
         windowGroupName(windowId, { currentWindowId, indexes: maps.indexes, names: maps.names });
-      const band = (tab: Tab): number =>
-        tab.windowId === currentWindowId ? 0 : meta?.get(tab.windowId)?.pinnedWindow ? 1 : 2;
       const sizes = new Map<number, number>();
       for (const tab of result) {
         sizes.set(tab.windowId, (sizes.get(tab.windowId) ?? 0) + 1);
       }
       const bySize = sortDir === "desc" ? -1 : sortDir === "asc" ? 1 : 0;
       const within = windowTabComparator(view.ui?.groupByWindowTabsOrder, last);
-      result.sort(
+      // rank the windows once (W labels, one collator), then tabs compare ranks: building two labels
+      // and a locale compare per tab comparison cost ~25 ms per render at 1000 tabs
+      const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+      const windowBand = (windowId: number): number =>
+        windowId === currentWindowId ? 0 : meta?.get(windowId)?.pinnedWindow ? 1 : 2;
+      const rankedIds = [...sizes.keys()].sort(
         (a, b) =>
-          band(a) - band(b) ||
-          // sizes.get()!: every windowId of result was counted above
-          bySize * (sizes.get(a.windowId)! - sizes.get(b.windowId)!) ||
-          labelOf(a.windowId).localeCompare(labelOf(b.windowId), undefined, { numeric: true, sensitivity: "base" }) ||
-          within(a, b),
+          windowBand(a) - windowBand(b) ||
+          // sizes.get()!: every key of sizes was counted above
+          bySize * (sizes.get(a)! - sizes.get(b)!) ||
+          collator.compare(labelOf(a), labelOf(b)),
       );
+      const rank = new Map(rankedIds.map((windowId, index) => [windowId, index]));
+      // rank.get()!: every windowId of result is a key of sizes, so it was ranked
+      result.sort((a, b) => rank.get(a.windowId)! - rank.get(b.windowId)! || within(a, b));
       break;
     }
   }

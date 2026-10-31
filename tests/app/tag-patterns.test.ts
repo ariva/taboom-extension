@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "vitest";
 import {
   matchesTagPage,
+  matchesTagPageKey,
+  pageKeyOf,
   siteOf,
   tagPageKey,
   tagPagePatternFromInput,
@@ -113,6 +115,54 @@ test("Tag patterns - a glob with many stars against a non-matching page answers 
   assert.equal(matchesTagPage("https://a.test/ab*ba", "https://a.test/abba"), true);
   assert.equal(matchesTagPage("https://a.test/x*", "https://a.test/x"), true, "a trailing star may be empty");
   assert.equal(matchesTagPage("https://a.test/**x", "https://a.test/yx"), true, "star runs behave as one star");
+});
+
+// deriveTabs matches every tab against every tagged-page entry on each refresh: the url is parsed
+// once per tab, not once per (tab, entry) pair — 1000 tabs x 100 entries must stay well under a frame
+test("Tag patterns - matching 1000 tabs against 100 entries parses each url once", () => {
+  const urls = Array.from({ length: 1000 }, (_, i) => `https://site${i % 50}.example.com/path/${i}/page?q=${i}#f`);
+  const patterns = [
+    ...Array.from({ length: 40 }, (_, i) => `site${i}.example.com`),
+    ...Array.from({ length: 30 }, (_, i) => `https://site${i}.example.com/path/`),
+    ...Array.from({ length: 30 }, (_, i) => `https://site${i}.example.com/*/page*`),
+  ];
+  const pass = (): number => {
+    let hits = 0;
+    for (const url of urls) {
+      const page = pageKeyOf(url);
+      for (const pattern of patterns) {
+        if (matchesTagPageKey(pattern, page)) {
+          hits++;
+        }
+      }
+    }
+    return hits;
+  };
+  const perUrl = (): number => {
+    let hits = 0;
+    for (const url of urls) {
+      for (const pattern of patterns) {
+        if (matchesTagPage(pattern, url)) {
+          hits++;
+        }
+      }
+    }
+    return hits;
+  };
+  pass();
+  perUrl(); // warm both
+  const startedKey = performance.now();
+  const hits = pass();
+  const perKeyMs = performance.now() - startedKey;
+  const startedUrl = performance.now();
+  const hitsUrl = perUrl();
+  const perUrlMs = performance.now() - startedUrl;
+  assert.equal(hits, 2000, "same answers as the per-url rule");
+  assert.equal(hitsUrl, hits);
+  // a ratio, not a budget: the machine's load moves both the same way (3–4× here)
+  assert.ok(perKeyMs * 2 < perUrlMs, `per tab ${perKeyMs.toFixed(1)} ms vs per pair ${perUrlMs.toFixed(1)} ms`);
+  assert.equal(matchesTagPageKey("site1.example.com", pageKeyOf("https://site1.example.com/x")), true);
+  assert.equal(matchesTagPageKey("site1.example.com", pageKeyOf("chrome://newtab/")), false);
 });
 
 test("Tag patterns - pattern hints name the kind", () => {

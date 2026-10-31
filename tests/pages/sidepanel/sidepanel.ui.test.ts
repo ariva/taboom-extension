@@ -438,7 +438,7 @@ test("UI - Sidepanel - Row action buttons dispatch per-tab actions without activ
 
   q(row(1), '[data-action="snooze"]').click();
   await tick();
-  assert.ok(calls.includes("sendMessage snooze-tab"), "snooze message sent");
+  assert.ok(calls.includes("sendMessage snooze-tabs"), "snooze message sent");
 
   q(row(1), '[data-action="toggle-protect"]').click();
   await tick();
@@ -978,7 +978,7 @@ test("UI - Sidepanel - Context menu actions act on the clicked tab / whole selec
   pick("Snooze");
   await tick();
   await tick();
-  assert.ok(calls.includes("sendMessage snooze-tab"), "snooze via service worker");
+  assert.ok(calls.includes("sendMessage snooze-tabs"), "snooze via service worker");
   assert.equal(menu.hidden, true, "menu closes after action");
 
   calls.length = 0;
@@ -3404,7 +3404,7 @@ test("UI - Sidepanel - A rejecting worker: bulk snooze reports and finishes ever
     byId("bulk-snooze").click();
     await tick();
     await tick();
-    assert.equal(calls.filter((c) => c === "sendMessage snooze-tab").length, selected, "the loop asks for every tab");
+    assert.equal(calls.filter((c) => c === "sendMessage snooze-tabs").length, 1, "one message for the whole batch");
     assert.match(byId("toast").textContent, new RegExp(`Could not snooze ${selected} tab`));
 
     q(document, '[data-action="toggle-protect"]').click();

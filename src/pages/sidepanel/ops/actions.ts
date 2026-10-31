@@ -43,14 +43,12 @@ function unselect(tabIds: number[]): void {
 }
 
 export async function snooze(tabIds: number[]): Promise<void> {
-  const failures: string[] = [];
-  for (const tabId of tabIds) {
-    // undefined: no listener answered
-    const response = await send({ type: "snooze-tab", tabId });
-    if (response && "error" in response) {
-      failures.push(response.error);
-    }
-  }
+  // one round trip for the batch; a worker that is gone answers { error } for the whole of it
+  const response = await send({ type: "snooze-tabs", tabIds });
+  const failures =
+    response && "failures" in response
+      ? response.failures
+      : tabIds.map(() => (response && "error" in response ? response.error : "no answer"));
   if (failures.length > 0) {
     toast(`Could not snooze ${failures.length} tab(s): ${failures[0]}`);
   }

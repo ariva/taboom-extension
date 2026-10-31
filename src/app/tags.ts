@@ -2,7 +2,14 @@
 // edits, the undo stack hooks and the search token split. No DOM, no chrome.* — the side
 // panel, the options page and the worker all go through here.
 import { popRemoval } from "./removal-trash.ts";
-import { matchesTagPage, tagPageKey, tagPagePatternFromInput, tagPatternKind } from "./tag-patterns.ts";
+import {
+  matchesTagPage,
+  matchesTagPageKey,
+  pageKeyOf,
+  tagPageKey,
+  tagPagePatternFromInput,
+  tagPatternKind,
+} from "./tag-patterns.ts";
 import type { Removal, Tag, TagPage, TagPageSort, TagPickOrder, TagRemoval, TagSort } from "./types.ts";
 
 export { tagPageKey }; // the page side of a tag lives here; the pattern rules in tag-patterns.ts
@@ -163,10 +170,11 @@ export function setPageEnabled(pages: TagPage[], url: string, enabled: boolean):
 // the tags behind a url: every entry covering it, deduped, in tag-list order (a vanished or
 // disabled id is skipped, an off entry too)
 export function tagsForUrl(pages: TagPage[], tags: Tag[], url: string | undefined): Tag[] {
+  const page = pageKeyOf(url); // parsed once, matched against every entry
   const ids = new Set(
     enabledPages(pages)
-      .filter((page) => matchesTagPage(page.url, url))
-      .flatMap((page) => page.tagIds),
+      .filter((entry) => matchesTagPageKey(entry.url, page))
+      .flatMap((entry) => entry.tagIds),
   );
   return ids.size === 0 ? [] : enabledTags(tags).filter((tag) => ids.has(tag.id));
 }
@@ -177,13 +185,13 @@ export function tagsForUrl(pages: TagPage[], tags: Tag[], url: string | undefine
 export type TagOrigin = "page" | "domain" | "pattern";
 
 export function tagOriginSets(pages: TagPage[], url: string | undefined): Map<string, Set<TagOrigin>> {
-  const key = tagPageKey(url);
+  const resolved = pageKeyOf(url);
   const origins = new Map<string, Set<TagOrigin>>();
   for (const page of enabledPages(pages)) {
-    if (!matchesTagPage(page.url, url)) {
+    if (!matchesTagPageKey(page.url, resolved)) {
       continue;
     }
-    const origin: TagOrigin = page.url === key ? "page" : tagPatternKind(page.url);
+    const origin: TagOrigin = page.url === resolved.key ? "page" : tagPatternKind(page.url);
     for (const id of page.tagIds) {
       origins.set(id, (origins.get(id) ?? new Set()).add(origin));
     }

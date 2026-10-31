@@ -995,3 +995,39 @@ test("Model - Options - Tag table sort: a header cycles none → asc → desc �
     "switched-off tags are left out",
   );
 });
+
+// the window grouping is re-sorted on every render (a keystroke, a tick): the comparator must not
+// build display labels per comparison — 1000 tabs across 40 windows well under a frame
+test("Model - selectVisible window sort ranks the windows once, not per comparison", () => {
+  const many: Tab[] = Array.from({ length: 1000 }, (_, i) =>
+    tab({
+      id: i + 1,
+      windowId: (i % 40) + 1,
+      index: i,
+      title: `T${i}`,
+      url: `https://t${i}.example.com/`,
+      lastAccessed: NOW - i,
+    }),
+  );
+  const names = new Map(Array.from({ length: 40 }, (_, w) => [w + 1, { name: `Window ${40 - w}` }]));
+  const v = view(many, { sort: "window", windowMeta: names });
+  const plain = view(many, { sort: "recent" }); // a one-number comparator: the yardstick
+  selectVisible(many, v);
+  selectVisible(many, plain); // warm both
+  const startedPlain = performance.now();
+  selectVisible(many, plain);
+  const plainMs = performance.now() - startedPlain;
+  const started = performance.now();
+  const sorted = selectVisible(many, v);
+  const elapsed = performance.now() - started;
+  assert.equal(sorted.length, 1000);
+  assert.equal(sorted[0]?.windowId, 1, "the current window first");
+  // after the current window: ABC by display name, numeric-aware — "Window 1" (chrome id 40), "Window 2" (39), …
+  const order = [...new Set(sorted.map((t) => t.windowId))];
+  assert.deepEqual(order.slice(0, 3), [1, 40, 39]);
+  // a ratio, not a budget (the machine's load moves both): the label-per-comparison version was ~70× the plain sort
+  assert.ok(
+    elapsed < Math.max(2, plainMs * 15),
+    `window sort ${elapsed.toFixed(2)} ms vs plain ${plainMs.toFixed(2)} ms`,
+  );
+});

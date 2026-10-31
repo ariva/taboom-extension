@@ -1415,3 +1415,42 @@ test("Service Worker - A navigation whose discard flag is already right writes n
     "unprotected page already discardable: no update",
   );
 });
+
+test("Service Worker - snooze-tabs: one message snoozes a batch and answers how many were refused", async () => {
+  // three awake, inactive, snoozable tabs of their own — the suite before may have discarded the fixture's
+  const batch = [9001, 9002, 9003].map((id) => ({
+    id,
+    windowId: 1,
+    index: 50 + (id % 10),
+    active: false,
+    discarded: false,
+    pinned: false,
+    audible: false,
+    autoDiscardable: true,
+    url: `https://batch${id}.example.com/`,
+    title: `B${id}`,
+    lastAccessed: Date.now(),
+  }));
+  tabs.push(...batch);
+  const realDiscard = chrome.tabs.discard;
+  chrome.tabs.discard = async (tabId: number) => {
+    if (tabId === 9002) {
+      throw new Error("Tabs cannot be discarded while audible");
+    }
+    return realDiscard(tabId);
+  };
+  try {
+    const answer = await send({ type: "snooze-tabs", tabIds: [9001, 9002, 9003] });
+    assert.ok(answer && "failures" in answer, "answers the failures");
+    assert.equal(answer.failures.length, 1, "two snoozed, one refused");
+    assert.match(answer.failures[0] ?? "", /audible/);
+  } finally {
+    chrome.tabs.discard = realDiscard;
+    for (const extra of batch) {
+      const at = tabs.findIndex((tab) => tab.id === extra.id);
+      if (at !== -1) {
+        tabs.splice(at, 1);
+      }
+    }
+  }
+});
