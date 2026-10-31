@@ -6,6 +6,7 @@ import { popRemoval } from "../../app/removal-trash.ts";
 import { dropProtectionRules, editProtectionRules, localStore, restoreProtectionRules } from "../../app/storage.ts";
 import type { AppState, ProtectionRule, Removal } from "../../app/types.ts";
 import { getElementById } from "../../lib/dom.ts";
+import { onBusyClick } from "../../lib/ui/busy-button.ts";
 import { inlineEdit } from "../../lib/ui/inline-edit.ts";
 import { hasRule } from "./model.ts";
 import { flashSaved, render } from "./page-state.ts";
@@ -123,5 +124,5 @@ async function restoreLastRemoval(): Promise<void> {
 export function initRules(): void {
   getElementById("add-rule").addEventListener("click", addRule);
   getElementById("clear-protected").addEventListener("click", clearAllRules);
-  getElementById("restore-protected").addEventListener("click", restoreLastRemoval);
+  onBusyClick(getElementById<HTMLButtonElement>("restore-protected"), restoreLastRemoval);
 }

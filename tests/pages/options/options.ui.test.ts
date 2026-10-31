@@ -514,6 +514,28 @@ test("UI - Options - Clear protected sites empties rules but keeps settings; Res
   assert.equal(restore.hidden, true, "stack empty: button gone");
   assert.equal(qa(document, "#rules li").length, 2, "chips re-rendered");
 
+  // a double-click must pop one removal, not two: the button is busy until the first write lands
+  stored.protectionRules = [];
+  stored.protectionTrash = [
+    { at: 1, items: [{ id: "d1", type: "host", pattern: "first.example.com" }] },
+    { at: 2, items: [{ id: "d2", type: "host", pattern: "second.example.com" }] },
+  ];
+  await chrome.storage.onChanged.fire({ protectionTrash: {} }, "local");
+  await tick();
+  await tick();
+  restore.click();
+  restore.click();
+  await tick();
+  await tick();
+  await tick();
+  assert.deepEqual(
+    stored.protectionRules.map((rule) => rule.pattern),
+    ["second.example.com"],
+    "one click, one removal back",
+  );
+  assert.equal(stored.protectionTrash.length, 1, "the older removal is still there to restore");
+  assert.equal(restore.disabled, false, "clickable again after the render");
+
   // a many-rule action: tooltip lists 10 patterns then an ellipsis line
   const patterns = Array.from({ length: 12 }, (_, index) => `s${index}.example.com`);
   stored.protectionTrash = [

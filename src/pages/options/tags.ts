@@ -45,6 +45,7 @@ import type {
   UiPrefs,
 } from "../../app/types.ts";
 import { closest, getElementById } from "../../lib/dom.ts";
+import { onBusyClick } from "../../lib/ui/busy-button.ts";
 import { inlineEdit } from "../../lib/ui/inline-edit.ts";
 import { flashSaved, getFeatures, render } from "./page-state.ts";
 
@@ -667,7 +668,7 @@ export function initTags(): void {
   getElementById("add-tag").addEventListener("click", addTypedTag);
   getElementById("add-tag-page").addEventListener("click", addTypedPage);
   getElementById("clear-tags").addEventListener("click", clearAllTags);
-  getElementById("restore-tags").addEventListener("click", async () => {
+  onBusyClick(getElementById<HTMLButtonElement>("restore-tags"), async () => {
     if (await restoreTags()) {
       flashSaved();
       render();

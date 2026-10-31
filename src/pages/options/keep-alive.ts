@@ -24,6 +24,7 @@ import {
 import { popRemoval } from "../../app/removal-trash.ts";
 import type { AppState, KeepAliveRemoval, KeepAliveTab } from "../../app/types.ts";
 import { getElementById } from "../../lib/dom.ts";
+import { onBusyClick } from "../../lib/ui/busy-button.ts";
 import { inlineEdit } from "../../lib/ui/inline-edit.ts";
 import { flashSaved, getFeatures, render } from "./page-state.ts";
 
@@ -244,6 +245,6 @@ export function initKeepAlive(): void {
   minuteOptions(getElementById<HTMLSelectElement>("keepAliveMinutes"));
   getElementById("add-keep-alive").addEventListener("click", addTypedMark);
   getElementById("clear-keep-alive").addEventListener("click", clearAllMarks);
-  getElementById("restore-keep-alive").addEventListener("click", restoreLastRemoval);
+  onBusyClick(getElementById<HTMLButtonElement>("restore-keep-alive"), restoreLastRemoval);
   setInterval(tickCountdowns, 1000);
 }
