@@ -31,6 +31,8 @@ just test-disabled       # … every flag off
 just test-browser   # real-browser tier
 just test-e2e       # build dist/prod, then the Playwright smoke
 just typecheck      # tsc --noEmit (strict)
+just test-perf      # performance tier, 2000 tabs (minutes) — see "Performance tier"
+just perf-refs      # the last release tag vs HEAD, then the comparison
 ```
 
 Single file / filtered run:
@@ -69,11 +71,44 @@ Tests that do not depend on flags (tooling, release packaging, changelog format)
 | `tests/e2e/` | Playwright on the built extension: `smoke.spec.ts`, `behaviour.spec.ts`; `fixtures.ts` is a generic "one unpacked MV3 extension" fixture. Sites are faked with `context.route` on `*.test` hosts — no network. Keep this tier small (seconds, under ~10 tests): UI behaviour belongs in `tests/browser/` |
 | `tests/helpers/` | `chrome-mock.ts` — the typed `chrome.*` stub (capturing events, flat call log), browser-safe, shared by the ui and browser tiers; `ui.ts` — happy-dom harness: `loadPage("src/pages/…/index.html")` (repo-root-relative), binds the mock to the current flag scenario |
 | `tests/fixtures/` | `release-snapshot.json` |
+| `tests/perf/` | The performance tier (`just test-perf`, see below): `run.ts` / `scenarios.ts` / `probes.ts` / `world.ts` are a tool, not tests; `stats.ts` is pure and `stats.test.ts` runs in `just check` |
 | `tests/demo/` | `registry.test.ts` — the demo recorder's scene registry: unique ids, every `### New Features` bullet of the current `CHANGES.md` entry has a scene that covers it (a bullet saying "experimental" is exempt — experimental features are not filmed), the GIF clips fit the 30 s budget, every scene's Settings anchor is an id of the options page |
 
 Which tests run per flag scenario and which run once is decided in `vitest.config.ts` (`FLAG_DEPENDENT` / `FLAG_INDEPENDENT`): `lib/`, `tooling/`, `structure/`, `demo/` and the pure page units run once; `app/`, `background/` and the rest of `pages/` run three times.
 
 Not a test tier but built on the same Playwright setup: `demo/` records the feature demos (`just demo`, [`demo/README.md`](../demo/README.md)). It drives the built extension like `tests/e2e/` does and found two shipped bugs on its first run (a merged CSS selector, a Space keyup activating the quick launch row under a rename input) — when a scene looks wrong, suspect the extension before the scene.
+
+## Performance tier
+
+`just test-perf` builds `dist/prod`, launches it in headless Chromium through the demo's world builder with 2000 tabs (`just test-perf 1000 3` = 1000 tabs, 3 repetitions; `just perf-quick` = 500 tabs, 3 repetitions, a few minutes less), opens the side panel and Settings, and measures nine things, each `repeat` times (medians, p95, the raw samples; 15 by default — with five, the median of a scenario moved by half between two runs of the same commit):
+
+| scenario | what is timed |
+|---|---|
+| `boot` | panel reload → first list row painted |
+| `refresh` | a tab in another window navigates → the list has re-rendered (the 150 ms debounce included, as the user feels it) |
+| `search` | typing a 4-letter query → the filtered list |
+| `scroll` | p95 frame interval over five synthesized wheel gestures down the list (trusted input over the DevTools protocol) |
+| `sort` | sort switch to the window grouping |
+| `scope` | scope switch to the current window |
+| `selectAll` | select all shown tabs → bulk bar, unselect |
+| `settings` | Settings page reload → the rule tables painted |
+| `worker` | a tab switch in another window → the worker's history write lands (worker clock) |
+
+Every run writes `.private/perf/data/<version>-<stamp>-<label>.json` (commit — `+dirty` when `src` has uncommitted changes —, date, tab count, machine, repetitions, the summaries) and rebuilds `.private/perf/HISTORY.md` from every stored run: one line per run (dates in local time, the medians — smaller is better in every column), an `overall` verdict against the latest earlier run of the same tab count (the median of the per-scenario deltas in words: within 5 % "≈ same", else "N% faster" / "N% slower"), and the scenarios that moved by 10 % or more. `just perf-compare` prints the deltas between the two newest runs of the same tab count (or two files given) and the same overall verdict; a median more than 25 % above the older run is marked SLOWER. It is never a gate: numbers depend on the machine and its load, so compare runs of the same count on the same machine, and read a single SLOWER as a reason to look, not a verdict. The tier is not part of `just check` (minutes, not seconds); run it before a release.
+
+```bash
+just test-perf                    # this working tree: 2000 tabs, 15 repetitions → .private/perf/data/<version>-<stamp>-full.json
+just test-perf 1000 3             # other size / repetitions
+just perf-quick                   # 500 tabs, 3 repetitions
+just perf-compare                 # deltas between the two newest runs of the same tab count
+just perf-compare a.json b.json   # or two files
+just perf-at release-v1.0.6       # one other commit, built in a throwaway worktree, measured with today's scenarios
+just perf-refs                    # last release tag vs HEAD, back to back, then the comparison
+just perf-refs dff3a8e            # a given previous hash vs HEAD
+just perf-refs dff3a8e abc1234 1000 3
+```
+
+Two commits against each other: `just perf-refs` measures the last release tag and `HEAD` back to back and prints the comparison (`just perf-refs release-v1.0.7 HEAD 1000 3` for other refs, 1000 tabs, 3 repetitions); `just perf-at <ref>` does one of them. Each ref is built in a throwaway git worktree (`tests/perf/at-ref.sh`, this checkout's `node_modules` linked in) and measured with the CURRENT scenarios, so the two numbers are produced the same way; the run is labelled with the ref's short hash and its version comes from the built manifest.
 
 ## Conventions
 

@@ -51,6 +51,32 @@ test-e2e:
     npx vite build --logLevel warn
     npx playwright test
 
+# Performance tier (docs/TESTING.md "Performance tier"): the production build in headless Chromium
+# with a synthetic world, nine measurements, medians of `repeat` runs → .private/perf/data/<version>-<stamp>-<label>.json
+# and .private/perf/HISTORY.md rebuilt from every run. Not a gate; run before a release, compare on the same machine.
+test-perf tabs="2000" repeat="15":
+    npx vite build --logLevel warn
+    node tests/perf/run.ts --tabs {{ tabs }} --repeat {{ repeat }} --label full
+
+# the quick version: 500 tabs, 3 repetitions (a few minutes less; compare only with other quick runs)
+perf-quick:
+    npx vite build --logLevel warn
+    node tests/perf/run.ts --tabs 500 --repeat 3 --label quick
+
+# deltas between two runs (default: the two newest of the same tab count); > +25 % is marked SLOWER
+perf-compare older="" newer="":
+    node tests/perf/compare.ts {{ older }} {{ newer }}
+
+# measure another commit with today's scenarios: built in a throwaway worktree, labelled with its hash
+perf-at ref="HEAD" tabs="2000" repeat="15":
+    tests/perf/at-ref.sh {{ ref }} {{ tabs }} {{ repeat }}
+
+# two commits back to back, then the comparison — base defaults to the last release tag
+perf-refs base="" head="HEAD" tabs="2000" repeat="15":
+    tests/perf/at-ref.sh {{ if base == "" { "$(git describe --tags --abbrev=0)" } else { base } }} {{ tabs }} {{ repeat }}
+    tests/perf/at-ref.sh {{ head }} {{ tabs }} {{ repeat }}
+    node tests/perf/compare.ts
+
 # First time: chrome://extensions → Load unpacked → dist/dev. The loaded extension then
 # reloads itself after each rebuild (tooling/dev-reload-plugin.ts); type errors stream alongside.
 # development loop: rebuild dist/dev on every save (source maps, dev icons) + tsc --watch

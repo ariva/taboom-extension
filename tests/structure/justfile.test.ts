@@ -27,6 +27,23 @@ test("Tooling - Justfile - build minify=true really turns minification on", () =
   }
 });
 
+test("Tooling - Justfile - the performance tier builds first, defaults to 2000 tabs, and the quick form to 500", () => {
+  assert.match(dryRun("test-perf"), /vite build[\s\S]*run\.ts --tabs 2000 --repeat 15 --label full/, "defaults");
+  assert.match(dryRun("test-perf", "1000", "3"), /--tabs 1000 --repeat 3 --label full/, "positional overrides");
+  assert.match(dryRun("perf-quick"), /--tabs 500 --repeat 3 --label quick/);
+  assert.match(dryRun("perf-compare"), /node tests\/perf\/compare\.ts\s*$/m, "no args: the two newest runs");
+  assert.match(dryRun("perf-at", "release-v1.0.7"), /at-ref\.sh release-v1\.0\.7 2000 15/, "a ref, the defaults");
+  assert.match(
+    dryRun("perf-refs"),
+    /at-ref\.sh \$\(git describe --tags --abbrev=0\) 2000 15\n.*at-ref\.sh HEAD 2000 15\n.*compare\.ts/,
+    "base = the last release tag, head = HEAD, then the comparison",
+  );
+  assert.match(
+    dryRun("perf-refs", "abc1234", "def5678", "500", "2"),
+    /at-ref\.sh abc1234 500 2\n.*at-ref\.sh def5678 500 2/,
+  );
+});
+
 test("Tooling - Justfile - demo-stills takes the stills without filming, all by default", () => {
   assert.match(dryRun("demo-stills"), /node demo\/record\.ts --stills all\n.*encode\.sh --stills/, "no arg: all");
   assert.match(dryRun("demo-stills", "readme"), /node demo\/record\.ts --stills readme\n/, "readme only");
