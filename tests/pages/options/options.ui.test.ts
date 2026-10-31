@@ -763,7 +763,7 @@ test("UI - Options - Window-names toggle visible only with WINDOW_NAMES; persist
   );
 });
 
-// ---------- keep-it-alive (T-0002) ----------
+// ---------- keep-it-alive (T-0102) ----------
 
 test("UI - Options - Keep-alive card visible iff KEEP_ALIVE resolves on; enabled by default, body follows the toggle", async () => {
   const { applyExperimental, featureEnabled } = await import("../../../src/app/core.ts");

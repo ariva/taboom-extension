@@ -1791,7 +1791,7 @@ test("UI - Sidepanel - Tab groups: move to group / new group / remove from group
   await new Promise((resolve) => setTimeout(resolve, 200));
 });
 
-// ---------- keep-it-alive (T-0002) ----------
+// ---------- keep-it-alive (T-0102) ----------
 
 test("UI - Sidepanel - KEEP_ALIVE: row menu marks / unmarks the page, quick launch gains an Alive view", {
   skip: !KEEP_ALIVE_ON,

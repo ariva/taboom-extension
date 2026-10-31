@@ -868,7 +868,7 @@ test("Service Worker - TTL sweep keeps customized profiles, drops stale plain on
   await chrome.storage.local.set({ windowProfiles: after }); // restore fixture
 });
 
-// ---------- keep-it-alive (T-0002) ----------
+// ---------- keep-it-alive (T-0102) ----------
 
 const MINUTE = 60_000;
 
