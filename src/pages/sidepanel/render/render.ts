@@ -116,7 +116,7 @@ function renderList(): void {
   if (state.fullVisible.length === 0) {
     const empty = document.createElement("div");
     empty.className = "empty";
-    empty.textContent = emptyMessage(state.query, state.filter, parkedScope());
+    empty.textContent = emptyMessage(state.query, state.filter, parkedScope(), state.tagFilter.size > 0);
     frag.append(empty);
   }
 

@@ -1793,3 +1793,58 @@ test("UI - Options - A ui write that moves only the panel's view renders nothing
     chrome.tabs.query = realQuery;
   }
 });
+
+// feedback and accessibility gaps: the Add row says why nothing happened, status regions are
+// announced, sortable headers work from the keyboard, row controls carry a name
+test("UI - Options - Protected Sites Add explains junk and duplicates; status regions, header buttons and row controls are accessible", async () => {
+  const input = byId<HTMLInputElement>("new-rule");
+  const error = byId("rule-error");
+  input.value = "   "; // makeRule refuses only a blank: anything else is read as a host pattern
+  byId("add-rule").click();
+  await tick();
+  await tick();
+  assert.equal(error.hidden, false, "a blank entry: the line says what to type");
+  assert.match(error.textContent, /host|domain|address/);
+  stored.protectionRules = [{ id: "dup", type: "domain", pattern: "*.dupe.example.com" }];
+  await chrome.storage.onChanged.fire({ protectionRules: {} }, "local");
+  await tick();
+  await tick();
+  input.value = "*.dupe.example.com";
+  byId("add-rule").click();
+  await tick();
+  await tick();
+  assert.match(error.textContent, /already protected/);
+  input.value = "fresh.example.com";
+  byId("add-rule").click();
+  await tick();
+  await tick();
+  assert.equal(error.hidden, true, "a good add clears the line");
+  assert.equal(stored.protectionRules.length, 2);
+
+  assert.equal(byId("saved").getAttribute("role"), "status");
+  assert.equal(byId("toast").getAttribute("role"), "status");
+  const header = q<HTMLElement>(document, '#tag-table th[data-sort="name"]');
+  assert.ok(header.querySelector("button"), "a sortable header is a button for the keyboard");
+  assert.ok(["none", "ascending", "descending"].includes(header.getAttribute("aria-sort") ?? ""), "aria-sort set");
+  const { applyExperimental, featureEnabled } = await import("../../../src/app/core.ts");
+  if (featureEnabled(applyExperimental(RAW_FEATURES, stored.ui?.showExperimental ?? false), "KEEP_ALIVE")) {
+    stored.keepAlive = [{ url: "https://named.example.com/", title: "Named", minutes: 25, nextReload: 123 }];
+    await chrome.storage.onChanged.fire({ keepAlive: {} }, "local");
+    await tick();
+    await tick();
+    const selects = qa<HTMLSelectElement>(byId("keep-alive-rows"), "select");
+    assert.ok(selects.length >= 2);
+    assert.ok(
+      selects.every((select) => (select.getAttribute("aria-label") ?? "").includes("Named")),
+      "row selects name their row",
+    );
+    stored.keepAlive = [];
+    await chrome.storage.onChanged.fire({ keepAlive: {} }, "local");
+    await tick();
+    await tick();
+  }
+  stored.protectionRules = [];
+  await chrome.storage.onChanged.fire({ protectionRules: {} }, "local");
+  await tick();
+  await tick();
+});

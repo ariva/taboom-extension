@@ -31,6 +31,14 @@ export function render(): Promise<void> {
   return renderPage();
 }
 
+// a card's message line under its Add row (#rule-error, #tag-error, #tag-page-error): shown with a
+// reason, hidden when the next attempt lands
+export function showError(message: string | undefined, id: string): void {
+  const error = getElementById(id);
+  error.hidden = !message;
+  error.textContent = message ?? "";
+}
+
 let savedTimer: ReturnType<typeof setTimeout> | undefined;
 export function flashSaved() {
   const el = getElementById("saved");

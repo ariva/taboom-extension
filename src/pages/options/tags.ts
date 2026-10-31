@@ -49,7 +49,7 @@ import type {
 import { closest, getElementById } from "../../lib/dom.ts";
 import { onBusyClick } from "../../lib/ui/busy-button.ts";
 import { inlineEdit } from "../../lib/ui/inline-edit.ts";
-import { flashSaved, getFeatures, render } from "./page-state.ts";
+import { flashSaved, getFeatures, render, showError } from "./page-state.ts";
 import { pluralize } from "../../app/plural.ts";
 
 // header sort of the tag table (ui.tagSort, saved on every click); the stored order (drag) stays.
@@ -87,13 +87,6 @@ function fillColorOptions(select: HTMLSelectElement, current: string): HTMLSelec
 
 function colorSelect(current: string): HTMLSelectElement {
   return fillColorOptions(document.createElement("select"), current);
-}
-
-// the tag table's message (#tag-error) or the tagged pages' (#tag-page-error, under its Add row)
-function showError(message: string | undefined, id = "tag-error"): void {
-  const error = getElementById(id);
-  error.hidden = !message;
-  error.textContent = message ?? "";
 }
 
 export async function renderTags(state: AppState): Promise<void> {
@@ -163,6 +156,7 @@ function renderTagRows(tags: Tag[], pages: TagPage[]): void {
   for (const tag of sortedTags(tags, counts, tagSort)) {
     const index = (stored.get(tag.id) ?? 1) - 1;
     const color = colorSelect(tag.color);
+    color.setAttribute("aria-label", `Color of ${tag.name}`);
     color.addEventListener("change", async () => {
       if (await editTag(tag.id, { color: color.value })) {
         flashSaved();
@@ -183,7 +177,7 @@ function renderTagRows(tags: Tag[], pages: TagPage[]): void {
         placeholder: "Tag name",
         commit: async (value) => {
           const error = value.trim() === tag.name ? undefined : tagNameError(tags, value, tag.id);
-          showError(error);
+          showError(error, "tag-error");
           if (!error && (await editTag(tag.id, { name: value }))) {
             flashSaved();
           }
@@ -248,6 +242,7 @@ function renderSortHeaders(tableId: string, sort: { key: string; dir: "asc" | "d
     } else {
       delete header.dataset.dir;
     }
+    header.setAttribute("aria-sort", active && dir ? (dir === "asc" ? "ascending" : "descending") : "none");
     const arrow = header.querySelector(".sort-arrow");
     if (arrow) {
       arrow.textContent = active ? (dir === "asc" ? "▲" : "▼") : "⇅";
@@ -593,7 +588,7 @@ async function addTypedTag(): Promise<void> {
   const input = getElementById<HTMLInputElement>("new-tag-name");
   const { tags = [] } = await localStore.get("tags");
   const error = tagNameError(tags, input.value);
-  showError(error);
+  showError(error, "tag-error");
   if (error) {
     return;
   }

@@ -207,7 +207,7 @@ export function fitTagPills(
   return trimmed(1, [cut]);
 }
 
-export function emptyMessage(query: string, filter: string, parked = false): string {
+export function emptyMessage(query: string, filter: string, parked = false, tagsTicked = false): string {
   if (query) {
     return "No tabs match — press Esc to clear the search.";
   }
@@ -216,6 +216,12 @@ export function emptyMessage(query: string, filter: string, parked = false): str
   }
   if (filter === "snoozed") {
     return "Nothing snoozed yet. Hover a tab and use the pause button.";
+  }
+  if (filter === "awake") {
+    return "Nothing awake — every tab is snoozed.";
+  }
+  if (filter === "tags" && tagsTicked) {
+    return "No open tab carries the ticked tags. Untick some in the Tags chip.";
   }
   if (filter === "protected") {
     return "No protected tabs. Use the shield button on a tab to protect its site.";

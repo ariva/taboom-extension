@@ -351,6 +351,7 @@ export function makeChrome<
     action: {
       setBadgeText: async (opts: chrome.action.BadgeTextDetails) =>
         calls.push(`action.setBadgeText ${JSON.stringify(opts)}`),
+      getBadgeText: async () => "",
       setBadgeBackgroundColor: async () => {},
       setIcon: async () => {},
     },

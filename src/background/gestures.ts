@@ -24,7 +24,11 @@ export async function runCommand(command: string): Promise<void> {
       await openPanel(tab.windowId);
       break;
     case "snooze-current-tab":
-      await snoozeTab(tab.id!); // tabs from tabs.query always carry an id (only sessions-API tabs lack one)
+      try {
+        await snoozeTab(tab.id!); // tabs from tabs.query always carry an id (only sessions-API tabs lack one)
+      } catch {
+        await flashBadge("!"); // no page to toast on: the toolbar icon says the snooze was refused
+      }
       break;
     case "toggle-protection":
       await toggleSiteProtection(tab);
@@ -69,4 +73,14 @@ export async function runMenuClick(info: chrome.contextMenus.OnClickData, tab?: 
       }
       break;
   }
+}
+
+// a short mark on the action badge, then whatever was there (the dev build's "dev", else nothing)
+const BADGE_FLASH_MS = 2000;
+async function flashBadge(text: string): Promise<void> {
+  const previous = await chrome.action.getBadgeText({}).catch(() => "");
+  await chrome.action.setBadgeText({ text }).catch(() => {});
+  setTimeout(() => {
+    chrome.action.setBadgeText({ text: previous }).catch(() => {});
+  }, BADGE_FLASH_MS);
 }

@@ -49,7 +49,7 @@ async function fillHistoryPopover(): Promise<void> {
   const { stack, cursor } = await getTabHistory();
   const allTabs = await chrome.tabs.query({});
   const byId = new Map(allTabs.map((t) => [t.id, t]));
-  const { dotColors } = windowMaps(allTabs, state.currentWindowId, state.windowMeta);
+  const { dotColors } = windowMaps(allTabs, state.currentWindowId, state.liveWindowMeta); // live: the Parked scope swaps windowMeta
   histPop.textContent = "";
 
   const head = document.createElement("div");

@@ -146,6 +146,7 @@ function keepAliveRow(entry: KeepAliveTab, number: number): HTMLTableRowElement 
   const select = document.createElement("select");
   minuteOptions(select);
   select.value = String(entry.minutes);
+  select.setAttribute("aria-label", `Reload interval for ${entry.title || entry.url}`);
   select.addEventListener("change", () => {
     const minutes = Number(select.value);
     save((list) => setKeepAliveMinutes(list, entry.url, minutes, nextReloadAt(minutes, Date.now())));
@@ -160,6 +161,7 @@ function keepAliveRow(entry: KeepAliveTab, number: number): HTMLTableRowElement 
     tabsSelect.append(choice);
   }
   tabsSelect.value = entry.reloadAll ? "all" : "one";
+  tabsSelect.setAttribute("aria-label", `Tabs to reload for ${entry.title || entry.url}`);
   tabsSelect.title =
     "One tab: the pinned one, else the first found across windows. All tabs: every open tab on this page";
   tabsSelect.addEventListener("change", () => {

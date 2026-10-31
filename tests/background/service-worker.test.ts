@@ -1454,3 +1454,23 @@ test("Service Worker - snooze-tabs: one message snoozes a batch and answers how 
     }
   }
 });
+
+// a keyboard command has no page to toast on: a refused snooze flashes the action badge
+test("Service Worker - Keyboard snooze that is refused flashes the action badge", async () => {
+  const realDiscard = chrome.tabs.discard;
+  chrome.tabs.discard = async () => {
+    throw new Error("Tabs cannot be discarded while audible");
+  };
+  calls.length = 0;
+  try {
+    await chrome.commands.onCommand.fire("snooze-current-tab");
+    await tick();
+    await tick();
+  } finally {
+    chrome.tabs.discard = realDiscard;
+  }
+  assert.ok(
+    calls.some((c) => c.startsWith("action.setBadgeText") && !c.includes('"text":""')),
+    `badge flashed: ${calls.filter((c) => c.startsWith("action.")).join(" | ")}`,
+  );
+});

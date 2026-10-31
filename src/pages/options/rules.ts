@@ -10,7 +10,7 @@ import { getElementById } from "../../lib/dom.ts";
 import { onBusyClick } from "../../lib/ui/busy-button.ts";
 import { inlineEdit } from "../../lib/ui/inline-edit.ts";
 import { hasRule } from "./model.ts";
-import { flashSaved, render } from "./page-state.ts";
+import { flashSaved, render, showError } from "./page-state.ts";
 import { pluralize } from "../../app/plural.ts";
 
 export async function renderRules(state: AppState): Promise<void> {
@@ -91,12 +91,16 @@ async function addRule(): Promise<void> {
   const input = getElementById("new-rule");
   const rule = makeRule(input.value);
   if (!rule) {
-    return;
+    showError("Type a host (mail.google.com), a domain (*.example.com) or an address (https://…)", "rule-error");
+    return; // the text stays to be fixed
   }
   const after = await editProtectionRules((rules) => (hasRule(rules, rule.pattern) ? undefined : [...rules, rule]));
-  if (after.includes(rule)) {
-    flashSaved();
+  if (!after.includes(rule)) {
+    showError(`${rule.pattern} is already protected`, "rule-error");
+    return;
   }
+  showError(undefined, "rule-error");
+  flashSaved();
   input.value = "";
   render();
 }

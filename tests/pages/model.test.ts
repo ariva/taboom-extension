@@ -258,6 +258,9 @@ test("Model - Group-title sort: natural = alphabetical, desc = biggest groups fi
 test("Model - EmptyMessage picks the right hint", () => {
   assert.match(emptyMessage("xyz", "all"), /No tabs match/);
   assert.match(emptyMessage("", "snoozed"), /Nothing snoozed/);
+  assert.match(emptyMessage("", "awake"), /awake/, "an awake branch: everything is snoozed");
+  assert.match(emptyMessage("", "tags", false, true), /ticked/, "ticked tags with no match say so");
+  assert.match(emptyMessage("", "tags"), /No tagged tabs/);
   assert.match(emptyMessage("", "protected"), /No protected tabs/);
   assert.equal(emptyMessage("", "all"), "No open tabs.");
 });

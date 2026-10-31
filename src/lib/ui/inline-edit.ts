@@ -49,6 +49,7 @@ export function inlineEdit(label: Element, { initial, placeholder, commit, finis
   input.className = "rename-input";
   input.value = initial;
   input.placeholder = placeholder;
+  input.setAttribute("aria-label", placeholder); // a label replaced by an input keeps a name
   input.addEventListener("click", (event) => event.stopPropagation()); // header click = collapse
   let cancelled = false;
   input.addEventListener("keydown", (event) => {

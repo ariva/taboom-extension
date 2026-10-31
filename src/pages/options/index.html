@@ -291,7 +291,7 @@
     #tag-page-pick .muted { padding: 4px 6px; }
     #tag-table button, #tag-page-table button.remove-page { border: 1px solid var(--border); border-radius: 6px; background: none; color: inherit; font: inherit; font-size: 12px; padding: 2px 8px; cursor: pointer; }
     #tag-table button:hover, #tag-page-table button.remove-page:hover { background: var(--hover); }
-    #tag-error, #tag-page-error { color: var(--danger, #d93025); margin-top: 4px; }
+    #rule-error, #tag-error, #tag-page-error { color: var(--danger, #d93025); margin-top: 4px; }
     /* drag reorder of the tag rows, like the side panel's tab rows: the dragged row dims, the row
        under the pointer is highlighted whole (dashed accent frame + tint) */
     #tag-rows tr[draggable="true"] { cursor: grab; }
@@ -300,6 +300,7 @@
     /* sortable headers read in the accent in both tables (the tag table did by a comma slip in the old
        selectors; kept on purpose); the arrow is dim until its sort is active */
     #tag-table th[data-sort], #tag-page-table th[data-sort] { cursor: pointer; user-select: none; white-space: nowrap; color: var(--accent); }
+    .sort-button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
     #tag-table th[data-sort] .sort-arrow, #tag-page-table th[data-sort] .sort-arrow { font-size: 10px; opacity: 0.45; }
     #tag-table th[data-sort][data-dir] .sort-arrow, #tag-page-table th[data-sort][data-dir] .sort-arrow { opacity: 1; }
     #tag-rows .drag-grip { display: inline-flex; color: var(--muted); }
@@ -503,6 +504,7 @@
     <div class="row">
       <input type="text" id="new-rule" placeholder="*.example.com" />
       <button id="add-rule">Add</button>
+      <p class="muted" id="rule-error" hidden></p>
     </div>
     <hr class="card-divider" />
     <p class="muted">Removes every protected site. Settings stay unchanged. Any removal (a chip's ✕, an unprotect from the side panel or page menu, Remove all) can be undone, newest first.</p>
@@ -549,7 +551,7 @@
     </label>
     <table id="tag-table">
       <!-- Color / Tag / Pages sort the view (asc → desc → stored order); the stored order is what drag changes -->
-      <thead><tr><th></th><th data-sort="stored">#<span class="sort-arrow">⇅</span></th><th></th><th data-sort="color">Color <span class="sort-arrow">⇅</span></th><th data-sort="name">Tag <span class="sort-arrow">⇅</span></th><th data-sort="pages">Page rules <span class="sort-arrow">⇅</span></th><th></th></tr></thead>
+      <thead><tr><th></th><th data-sort="stored" aria-sort="none"><button type="button" class="sort-button">#<span class="sort-arrow">⇅</span></button></th><th></th><th data-sort="color" aria-sort="none"><button type="button" class="sort-button">Color <span class="sort-arrow">⇅</span></button></th><th data-sort="name" aria-sort="none"><button type="button" class="sort-button">Tag <span class="sort-arrow">⇅</span></button></th><th data-sort="pages" aria-sort="none"><button type="button" class="sort-button">Page rules <span class="sort-arrow">⇅</span></button></th><th></th></tr></thead>
       <tbody id="tag-rows"></tbody>
       <!-- the Add row is a table row: "New" under the grip / #, the color under Color, the name under Tag -->
       <tfoot>
@@ -565,7 +567,7 @@
     <p class="muted" id="tag-error" hidden></p>
     <h3>Tagged page rules</h3>
     <table id="tag-page-table">
-      <thead><tr><th data-sort="stored">#<span class="sort-arrow">⇅</span></th><th></th><th data-sort="url">Page / domain / pattern <span class="sort-arrow">⇅</span></th><th data-sort="tags">Tags <span class="sort-arrow">⇅</span></th><th data-sort="tabs">Tabs <span class="sort-arrow">⇅</span></th><th></th></tr></thead>
+      <thead><tr><th data-sort="stored" aria-sort="none"><button type="button" class="sort-button">#<span class="sort-arrow">⇅</span></button></th><th></th><th data-sort="url" aria-sort="none"><button type="button" class="sort-button">Page / domain / pattern <span class="sort-arrow">⇅</span></button></th><th data-sort="tags" aria-sort="none"><button type="button" class="sort-button">Tags <span class="sort-arrow">⇅</span></button></th><th data-sort="tabs" aria-sort="none"><button type="button" class="sort-button">Tabs <span class="sort-arrow">⇅</span></button></th><th></th></tr></thead>
       <tbody id="tag-page-rows"></tbody>
     </table>
     <!-- one picker for every page row: filled for the row whose Tags ▾ opened it -->
@@ -622,8 +624,8 @@
     <div id="whats-new" hidden></div>
   </section>
 
-  <div id="saved" hidden>Saved ✓</div>
-  <div id="toast" hidden></div>
+  <div id="saved" role="status" hidden>Saved ✓</div>
+  <div id="toast" role="status" hidden></div>
 
   <script type="module" src="main.ts"></script>
 </body>
