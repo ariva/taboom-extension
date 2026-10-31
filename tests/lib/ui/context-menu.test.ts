@@ -78,12 +78,20 @@ test("Lib - UI - Context menu - A click elsewhere and a window blur dismiss the 
   assert.equal(isCtxMenuOpen(), false);
 });
 
-test("Lib - UI - Context menu - A host re-render closes a menu unless it was shown as surviving renders", () => {
+test("Lib - UI - Context menu - A host re-render closes a menu unless its staysWhile still holds", () => {
   showCtxMenu(at(0, 0));
   hideCtxMenuForRender();
-  assert.equal(isCtxMenuOpen(), false, "a list-bound menu goes: its ids are stale");
+  assert.equal(isCtxMenuOpen(), false, "a menu shown without staysWhile goes: its ids may be stale");
   clearCtxMenu();
-  showCtxMenu(at(0, 0), "Close", { survivesRender: true });
+  let rowsThere = true;
+  showCtxMenu(at(0, 0), undefined, { staysWhile: () => rowsThere });
+  hideCtxMenuForRender();
+  assert.equal(isCtxMenuOpen(), true, "its rows survived: the menu stays");
+  rowsThere = false;
+  hideCtxMenuForRender();
+  assert.equal(isCtxMenuOpen(), false, "a row gone: the menu goes");
+  clearCtxMenu();
+  showCtxMenu(at(0, 0), "Close", { staysWhile: () => true });
   hideCtxMenuForRender();
   assert.equal(isCtxMenuOpen(), true, "a menu that depends on nothing in the list stays");
   hideCtxMenu();

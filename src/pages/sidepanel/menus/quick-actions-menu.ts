@@ -71,5 +71,5 @@ export function openQuickActionsMenu(at: Pick<MouseEvent, "clientX" | "clientY">
   // a small panel, not a right-click menu: text Close like the quick launch. Nothing in it names
   // a row, so the refresh that follows a click into an unfocused window's panel (Chrome's
   // windows.onFocusChanged) must not close it
-  showCtxMenu(at, "Close", { survivesRender: true });
+  showCtxMenu(at, "Close", { staysWhile: () => true }); // names no row: nothing in it goes stale
 }

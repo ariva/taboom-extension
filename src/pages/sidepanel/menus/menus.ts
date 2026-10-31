@@ -83,6 +83,15 @@ export function appendCtxActions(ids: number[], alwaysCount = false): void {
   }
 }
 
+// a list menu stays open across renders (a title tick, a favicon) while every row it names is
+// still there; the first missing one closes it — its actions would hit the wrong tabs
+function rowsStillThere(ids: number[]): () => boolean {
+  return () => {
+    const present = new Set(actionableTabs().map((tab) => tab.id));
+    return ids.every((id) => present.has(id));
+  };
+}
+
 export function openRowMenu(event: MouseEvent, tabId: number): void {
   if (parkedRef(tabId)) {
     openParkedTabMenu(event, tabId); // Parked windows scope: a snapshot row, not a tab
@@ -171,7 +180,7 @@ export function openRowMenu(event: MouseEvent, tabId: number): void {
     }
   }
   appendSplitItems(ids, clicked);
-  showCtxMenu(event);
+  showCtxMenu(event, undefined, { staysWhile: rowsStillThere(ids) });
 }
 
 const WINDOW_TAB_ORDERS: [UiPrefs["groupByWindowTabsOrder"], string][] = [
@@ -253,7 +262,7 @@ export function openTabGroupMenu(
     ctxAppend(ctxDivider());
     appendCtxActions(ids, true);
   }
-  showCtxMenu(event);
+  showCtxMenu(event, undefined, { staysWhile: () => state.liveTabGroups.has(groupId) && rowsStillThere(ids)() });
 }
 
 // Rename + Window color entries (shared by the header menu and the
@@ -348,5 +357,5 @@ export function openWindowHeaderMenu(event: MouseEvent, windowId: number): void 
     submenu.append(item);
   }
 
-  showCtxMenu(event);
+  showCtxMenu(event, undefined, { staysWhile: rowsStillThere(ids) });
 }

@@ -2052,11 +2052,21 @@ test("UI - Sidepanel - Quick actions (☰): Open Settings opens the options page
   assert.equal(menu.hidden, false, "the quick-actions menu survives the refresh");
   document.body.click();
   await tick();
+  // a row menu stays across a refresh as long as every row it names is still there (a title
+  // tick must not pull the menu from under the pointer); it closes once one of them is gone
   q(document, '.row[data-tab-id="1"]').dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
   assert.equal(menu.hidden, false);
   await chrome.windows.onFocusChanged.fire(1);
   await new Promise((resolve) => setTimeout(resolve, 200));
-  assert.equal(menu.hidden, true, "a row menu closes on a refresh: its ids are stale");
+  assert.equal(menu.hidden, false, "a row menu survives a refresh whose rows survived");
+  const goneIndex = tabs.findIndex((tab) => tab.id === 1);
+  const [gone] = tabs.splice(goneIndex, 1);
+  await chrome.tabs.onRemoved.fire(1, { windowId: 1, isWindowClosing: false });
+  await new Promise((resolve) => setTimeout(resolve, 200));
+  assert.equal(menu.hidden, true, "its tab closed: the menu goes, its ids are stale");
+  tabs.splice(goneIndex, 0, must(gone));
+  await chrome.tabs.onCreated.fire(gone);
+  await new Promise((resolve) => setTimeout(resolve, 200));
 
   byId("quick-actions-btn").click();
   await tick();

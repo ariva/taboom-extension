@@ -13,9 +13,10 @@ ctxMenu.hidden = true;
 ctxMenu.setAttribute("popover", "manual");
 document.body.append(ctxMenu);
 
-// set by showCtxMenu: a menu whose items depend on nothing the host re-renders (a toolbar
-// menu) stays open across the host's renders; a list-bound menu (row ids) must not
-let survivesRender = false;
+// set by showCtxMenu: whether the menu may stay open across a host render — a toolbar menu
+// always (() => true), a list-bound menu while every row it names is still there; a menu
+// shown without it closes on the first render (its ids may be stale)
+let staysWhile: (() => boolean) | null = null;
 
 export function hideCtxMenu(): void {
   ctxMenu.hidden = true;
@@ -26,9 +27,9 @@ export function hideCtxMenu(): void {
   }
 }
 
-// the host re-rendered what the menu may refer to: close it, unless it was shown as surviving
+// the host re-rendered what the menu may refer to: close it, unless its staysWhile still holds
 export function hideCtxMenuForRender(): void {
-  if (!survivesRender) {
+  if (!staysWhile?.()) {
     hideCtxMenu();
   }
 }
@@ -45,7 +46,7 @@ export function ctxMenuContains(target: Node | null): boolean {
 // menu builders start from an empty menu, append their items, then showCtxMenu()
 export function clearCtxMenu(): void {
   ctxMenu.textContent = "";
-  survivesRender = false;
+  staysWhile = null;
 }
 
 export function ctxAppend(...nodes: (Node | string)[]): void {
@@ -143,13 +144,13 @@ export function ctxDivider(): HTMLDivElement {
 
 // `at`: the pointer event, or a plain {clientX, clientY} for a menu anchored to a button.
 // `closeLabel`: a text button ("Close") instead of the corner X — for menus that behave
-// like a small panel rather than a right-click menu. `survivesRender`: see hideCtxMenuForRender
+// like a small panel rather than a right-click menu. `staysWhile`: see hideCtxMenuForRender
 export function showCtxMenu(
   at: Pick<MouseEvent, "clientX" | "clientY">,
   closeLabel?: string,
-  options: { survivesRender?: boolean } = {},
+  options: { staysWhile?: () => boolean } = {},
 ): void {
-  survivesRender = options.survivesRender ?? false;
+  staysWhile = options.staysWhile ?? null;
   // every menu build ends here — stamp the close control in the top-right corner
   const close = document.createElement("button");
   close.type = "button";

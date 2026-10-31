@@ -90,9 +90,9 @@ function renderNowImpl(): void {
 }
 
 function renderList(): void {
-  // any re-render (selection change, tab/window events, background refresh)
-  // invalidates the open context menu's ids — close it rather than act stale
-  // (the ☰ quick-actions menu names no row and stays: showCtxMenu's survivesRender)
+  // a re-render (selection change, tab/window events, background refresh) may invalidate the
+  // open context menu's ids: it closes unless its staysWhile holds — a list menu while every
+  // row it names is still there, the ☰ quick-actions menu always (it names no row)
   hideCtxMenuForRender();
   // active search: chips count found items (what clicking each filter would show)
   const counted = state.query ? searchCandidates(state.allTabs, state) : state.allTabs;
