@@ -118,7 +118,10 @@ async function jumpWithin(hist: TabHistory, cursor: number): Promise<TabHistory 
   if (cursor < 0 || cursor >= hist.stack.length) {
     return null;
   }
-  const tabId = hist.stack[cursor]!; // cursor is bounds-checked just above
+  const tabId = hist.stack[cursor];
+  if (tabId === undefined) {
+    return null; // bounds-checked above; the type cannot say so
+  }
   const tab = await chrome.tabs.get(tabId).catch(() => undefined);
   if (!tab) {
     // tab already gone (e.g. closed while worker slept) — drop it, stay put

@@ -81,6 +81,7 @@ export interface MessageResponses {
   "move-parked-tabs": MessageAck;
 }
 
-// resolves with the handler's answer, a MessageError when it threw, or
-// undefined when no listener answered; rejects while the worker is unreachable
+// resolves with the handler's answer, a MessageError when it threw, or undefined when no
+// listener answered; never rejects — an unreachable worker or an invalidated extension context
+// answers { error } too (lib/messaging.ts), so fire-and-forget calls leak nothing
 export const { send } = createMessenger<Message, MessageResponses>();

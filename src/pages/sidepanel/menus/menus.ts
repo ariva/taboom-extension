@@ -195,8 +195,6 @@ const WINDOW_TAB_ORDERS: [UiPrefs["groupByWindowTabsOrder"], string][] = [
 // human labels for WINDOW_DOT_COLORS, same order
 const WINDOW_DOT_COLOR_NAMES = ["Red", "Teal", "Yellow", "Green", "Purple", "Pink", "Gray", "Gold"];
 
-// E: tab-group menu — identity actions on top, Chrome-strip controls, then
-// the usual bulk actions over the group's visible tabs
 // Alive view row for a mark with no open tab: nothing to activate or move, so the
 // menu is the mark itself — open the page, pause / resume, stop keeping it
 export function openMarkMenu(event: MouseEvent, mark: KeepAliveTab): void {
@@ -242,7 +240,7 @@ export function openTabGroupMenu(
   ctxAppend(color.btn, color.submenu);
   for (const [colorName, hex] of Object.entries(TAB_GROUP_COLORS)) {
     // colorName[0]!: color names are non-empty; `as`: TAB_GROUP_COLORS is keyed by Chrome's color names
-    const item = ctxItem(colorName[0]!.toUpperCase() + colorName.slice(1), () =>
+    const item = ctxItem(colorName.charAt(0).toUpperCase() + colorName.slice(1), () =>
       updateTabGroup(groupId, { color: colorName as TabGroup["color"] }),
     );
     const dot = document.createElement("span");

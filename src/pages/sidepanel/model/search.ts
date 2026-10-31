@@ -51,10 +51,9 @@ const isWordChar = (ch: string): boolean => /[a-z0-9]/.test(ch);
 export function fuzzyScore(haystack: string, token: string): number {
   const at = haystack.indexOf(token);
   if (at !== -1) {
-    // haystack[...]!: in range — at > 0 / end < haystack.length on the branches that index
-    const wordStart = at === 0 || !isWordChar(haystack[at - 1]!);
+    const wordStart = at === 0 || !isWordChar(haystack.charAt(at - 1));
     const end = at + token.length;
-    const wordEnd = end === haystack.length || !isWordChar(haystack[end]!);
+    const wordEnd = end === haystack.length || !isWordChar(haystack.charAt(end));
     return 10 * token.length + (wordStart ? 15 : 0) + (wordStart && wordEnd ? 15 : 0) + (at === 0 ? 5 : 0);
   }
   let score = 0;
@@ -66,8 +65,7 @@ export function fuzzyScore(haystack: string, token: string): number {
     }
     if (found === prev + 1) {
       score += 8; // contiguous run
-    } else if (found === 0 || !isWordChar(haystack[found - 1]!)) {
-      // found > 0 → in range
+    } else if (found === 0 || !isWordChar(haystack.charAt(found - 1))) {
       score += 6; // fresh word start
     } else {
       score += 1; // scattered mid-word hit
@@ -112,9 +110,13 @@ export function highlightRanges(text: string, tokens: string[], fuzzy = false): 
     return [];
   }
   ranges.sort((a, b) => a[0] - b[0]);
-  const merged = [ranges[0]!]; // non-empty, checked above
-  for (const [start, end] of ranges.slice(1)) {
-    const tail = merged[merged.length - 1]!; // merged starts with one element and only grows
+  const [first, ...rest] = ranges;
+  if (!first) {
+    return [];
+  }
+  const merged = [first];
+  for (const [start, end] of rest) {
+    const tail = merged.at(-1) ?? first; // merged starts with one element and only grows
     if (start <= tail[1]) {
       tail[1] = Math.max(tail[1], end);
     } else {

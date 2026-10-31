@@ -126,7 +126,7 @@ sortDirBtn.addEventListener("click", () => {
     state.sortDir = canonicalDir(state.sort);
   } else {
     const states = meta?.states ?? ["asc", "desc"];
-    state.sortDir = states[(states.indexOf(state.sortDir) + 1) % states.length]!; // modulo length: always in range
+    state.sortDir = states[(states.indexOf(state.sortDir) + 1) % states.length] ?? "asc"; // modulo length: always in range
   }
   resetScrollPositions(); // new order = saved positions meaningless; start at top
   persistUiPrefs();

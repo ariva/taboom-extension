@@ -322,7 +322,10 @@ export function collapseAdjacent({ stack, cursor }: TabHistory): TabHistory {
       }
       continue;
     }
-    next.push(stack[index]!); // index < stack.length, never undefined
+    const id = stack[index];
+    if (id !== undefined) {
+      next.push(id);
+    }
   }
   return { stack: next, cursor: nextCursor };
 }
@@ -333,8 +336,8 @@ export function dedupeHistory({ stack, cursor }: TabHistory): TabHistory {
   const seen = new Set<number>();
   const kept: number[] = [];
   for (let index = stack.length - 1; index >= 0; index--) {
-    const id = stack[index]!; // 0 <= index < stack.length, never undefined
-    if (!seen.has(id)) {
+    const id = stack[index];
+    if (id !== undefined && !seen.has(id)) {
       seen.add(id);
       kept.unshift(id);
     }

@@ -76,8 +76,11 @@ async function refreshWindowProfiles(): Promise<void> {
   const profiles = { ...windowProfiles };
   for (const [windowId, fingerprint] of candidates) {
     // merge, don't replace — panelOpen (and future per-window flags) survive
-    // map[windowId]!: every candidate window got an id in the loop above
-    const stored = profiles[map[windowId]!];
+    const logicalId = map[windowId];
+    if (logicalId === undefined) {
+      continue; // every candidate window got an id in assignLogicalIds; the type cannot say so
+    }
+    const stored = profiles[logicalId];
     // …except on a profile this session already wrote (updatedAt at or after the session
     // start) that lands on a window the map did not know: that window was closed and
     // reopened (Ctrl+Shift+T), and the close left panelOpen behind — no worker alive to see
@@ -89,7 +92,7 @@ async function refreshWindowProfiles(): Promise<void> {
       windowSessionMap[windowId] === undefined &&
       (stored.updatedAt ?? 0) >= identitySessionStart;
     const kept = reopened ? { ...stored, panelOpen: undefined } : stored; // undefined drops the key on write
-    profiles[map[windowId]!] = { ...kept, ...fingerprint, chromeWindowId: windowId };
+    profiles[logicalId] = { ...kept, ...fingerprint, chromeWindowId: windowId };
   }
   const next = expireProfiles(profiles, now, PROFILE_TTL_MS);
   // every wake runs this pass (alarms, messages, panel ports): with the same windows and tabs as

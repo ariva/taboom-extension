@@ -263,11 +263,6 @@ function renderList(): void {
   refillTagAssignPickerIfOpen();
 }
 
-// Feed the real row height back into the content-visibility placeholder
-// (--row-h). Offscreen rows use the placeholder for layout, so any gap between
-// it and the true height (fonts per OS, fontSize/density settings) makes a
-// restored scrollTop land rows off the saved position. Runs BEFORE the
-// pendingScroll restore so the restore maps through corrected heights.
 // the ask dialog sits right under the header (banners and the fuzzy label change its height)
 let lastHeaderHeight = -1; // -1: the first measurement always writes (a 0 px header in tests included)
 function syncHeaderHeight(): void {
@@ -279,6 +274,11 @@ function syncHeaderHeight(): void {
   }
 }
 
+// Feed the real row height back into the content-visibility placeholder
+// (--row-h). Offscreen rows use the placeholder for layout, so any gap between
+// it and the true height (fonts per OS, fontSize/density settings) makes a
+// restored scrollTop land rows off the saved position. Runs BEFORE the
+// pendingScroll restore so the restore maps through corrected heights.
 let lastRowHeight = 0;
 function syncRowHeight(): void {
   const row = listEl.querySelector<HTMLElement>(".row");

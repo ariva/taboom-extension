@@ -22,8 +22,8 @@ export function commitTabGroupTitle(groupId: number, title: string): Promise<unk
   return chrome.tabGroups.update(groupId, { title }).catch(() => {});
 }
 
-// tab-group rename: the label lives on a C header (.group-label) or a B
-// sub-header (.tg-title), whichever is on screen
+// tab-group rename: the label lives on a group header (.group-label, Group by tab group) or on a
+// tab-group run's sub-header inside a window (.tg-title), whichever is on screen
 export function startRenameTabGroup(groupId: number): void {
   const label = listEl.querySelector(
     `.group-header[data-tab-group-id="${groupId}"] .group-label, .tabgroup-header[data-tab-group-id="${groupId}"] .tg-title`,

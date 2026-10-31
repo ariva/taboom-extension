@@ -65,8 +65,11 @@ export function initKeyboardNav(): void {
         return;
       }
       activate(cursorTab);
-      // activated tab jumps to the top of the list — put the cursor back on it
-      state.cursor = 0;
+      // the recent sort moves the activated tab to the top: the cursor follows; every other sort
+      // keeps the row where it is, and so does the cursor
+      if (state.sort === "recent") {
+        state.cursor = 0;
+      }
     }
   });
 }

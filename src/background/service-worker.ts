@@ -27,6 +27,9 @@ import { refreshOnTabChange, scheduleProfileRefresh, trackPanelPort } from "./wi
 
 // ---------- lifecycle ----------
 
+// same-event listeners run in registration order: the history reset queues on the history chain
+// before init's prune step does (both write the same key)
+chrome.runtime.onStartup.addListener(resetHistoryOnStartup);
 chrome.runtime.onInstalled.addListener(init);
 chrome.runtime.onStartup.addListener(init);
 
@@ -63,7 +66,6 @@ chrome.tabs.onActivated.addListener(async ({ tabId }) => {
 
 // ---------- tab history (back/forward across tabs) ----------
 
-chrome.runtime.onStartup.addListener(resetHistoryOnStartup); // before init's prune: both run on the history chain
 chrome.tabs.onActivated.addListener(({ tabId }) => recordActivation(tabId));
 chrome.windows.onFocusChanged.addListener(recordWindowFocus);
 chrome.tabs.onRemoved.addListener(dropClosedTabs);

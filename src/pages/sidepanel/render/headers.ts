@@ -13,7 +13,7 @@ type Tab = chrome.tabs.Tab;
 // opens the window menu for a header's ⋯ button
 export type WindowMenuOpener = (event: MouseEvent, windowId: number) => void;
 
-// B: contiguous runs of one tab group inside a window's rows get a sub-header
+// contiguous runs of one tab group inside a window's rows get a sub-header
 // (rail color, title, count, collapse) — the list mirrors Chrome's strip
 export function renderMembersWithTabGroupRuns(
   frag: DocumentFragment,

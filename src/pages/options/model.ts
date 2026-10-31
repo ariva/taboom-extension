@@ -89,7 +89,6 @@ export function releaseNotes(markdown: string, version: string): ReleaseSection 
     return null;
   }
   const match = sections.find((s) => s.startsWith(`v${version} `) || s.startsWith(`v${version}\n`));
-  // sections[0]!: non-empty, checked above; title!: split() always yields at least one element
-  const [title, ...body] = (match ?? sections[0]!).split("\n");
-  return { title: title!.trim(), body: body.join("\n").trim() };
+  const [title = "", ...body] = (match ?? sections[0] ?? "").split("\n");
+  return { title: title.trim(), body: body.join("\n").trim() };
 }
