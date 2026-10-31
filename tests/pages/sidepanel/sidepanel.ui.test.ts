@@ -3832,3 +3832,93 @@ test("UI - Sidepanel - PARKED_WINDOWS: a theme-only ui write does not re-apply a
   await settle();
   assert.equal(byId<HTMLSelectElement>("scope").value, "all-windows");
 });
+
+// keyboard gaps: Esc inside the ask dialog must not also clear the search; Enter on a parked row
+// opens its menu like a click; the quick launch's Tags view counts live tabs in the Parked scope
+test("UI - Sidepanel - PARKED_WINDOWS: Esc in the dialog keeps the search, Enter opens a parked row's menu, Tags view stays live", {
+  skip: !PARKED_ON || TEST_FEATURES.SIDEBAR_KEYBOARD_NAVIGATION?.enabled !== true || !TAGS_ON,
+}, async () => {
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 200));
+  const liveUrl = tabs.find((tab) => tab.id === 2)?.url ?? "";
+  await chrome.storage.local.set({
+    parkedWindows: [
+      { id: "p-keys", parkedAt: Date.now(), tabs: [{ url: "https://k.example.com/", title: "Parked K" }], groups: [] },
+    ],
+    parkedTrash: [],
+    tags: [{ id: "t-live", name: "LiveTag", color: "blue" }],
+    tagPages: [{ url: liveUrl, tagIds: ["t-live"] }],
+  });
+  await chrome.storage.onChanged.fire({ parkedWindows: {}, tags: {}, tagPages: {} }, "local");
+  await settle();
+
+  // 1. Esc with the restore dialog open
+  const search = byId<HTMLInputElement>("search");
+  search.value = "foo";
+  search.dispatchEvent(new window.Event("input", { bubbles: true }));
+  await tick();
+  byId<HTMLButtonElement>("win-list-btn").click();
+  await tick();
+  const pop = byId("windows-pop");
+  must(qa(pop, ".win-row.parked")[0]).click();
+  await tick();
+  await tick();
+  const ask = byId<HTMLDialogElement>("ask-dialog");
+  assert.equal(ask.open, true, "restore asks first");
+  ask.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+  await tick();
+  assert.equal(search.value, "foo", "Esc belongs to the dialog: the search stays");
+  q(ask, ".ask-cancel").click();
+  await tick();
+  search.value = "";
+  search.dispatchEvent(new window.Event("input", { bubbles: true }));
+  await tick();
+
+  // 2. Enter on a parked row opens the parked menu
+  const scope = byId<HTMLSelectElement>("scope");
+  scope.value = "parked-windows";
+  scope.dispatchEvent(new window.Event("change", { bubbles: true }));
+  await settle();
+  const key = (name: string) =>
+    document.dispatchEvent(new window.KeyboardEvent("keydown", { key: name, bubbles: true, cancelable: true }));
+  key("ArrowDown");
+  key("Enter");
+  await tick();
+  const ctx = byId("ctx-menu");
+  assert.equal(ctx.hidden, false, "Enter on a parked row opens its menu");
+  assert.equal(q(ctx, ".ctx-title").textContent, "Parked K");
+  q(ctx, ".ctx-close").click();
+
+  // 3. Tags view counts the live tab while the list shows parked windows
+  byId<HTMLButtonElement>("win-list-btn").click();
+  await tick();
+  must(qa(pop, ".win-view").find((el) => el.textContent.startsWith("Tags"))).click();
+  await tick();
+  const tagRow = must(qa(pop, ".win-row").find((el) => q(el, ".win-title").textContent === "LiveTag"));
+  assert.match(q(tagRow, ".win-stats").textContent, /^1 tab/, "the live tab is counted in the Parked scope");
+  document.body.click();
+
+  scope.value = "all-windows";
+  scope.dispatchEvent(new window.Event("change", { bubbles: true }));
+  await chrome.storage.local.set({ parkedWindows: [], parkedTrash: [], tags: [], tagPages: [] });
+  await chrome.storage.onChanged.fire({ parkedWindows: {}, tags: {}, tagPages: {} }, "local");
+  await settle();
+});
+
+// `/` focuses the search from anywhere — except from a text field, where it is a character
+test("UI - Sidepanel - TAGS: a slash typed in the picker's new-tag field is not stolen by the search shortcut", {
+  skip: !TAGS_ON,
+}, async () => {
+  const menu = byId("ctx-menu");
+  q(document, '.row[data-tab-id="1"]').dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+  must(qa(menu, ".ctx-item").find((el) => /^Tag URL/.test(el.textContent ?? ""))).click();
+  await tick();
+  const pick = byId("tag-assign-pop");
+  const name = q<HTMLInputElement>(pick, ".tag-new-name");
+  name.focus();
+  const slash = new window.KeyboardEvent("keydown", { key: "/", bubbles: true, cancelable: true });
+  name.dispatchEvent(slash);
+  assert.equal(slash.defaultPrevented, false, "the character is typed");
+  assert.equal(document.activeElement, name, "focus stays in the field");
+  q(pick, ".tag-pick-cancel").click();
+  await tick();
+});

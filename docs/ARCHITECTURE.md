@@ -75,7 +75,7 @@ Dependency direction: `foundation` ← `model` ← `ops` ← `menus` ← `window
 Two things worth knowing before changing this folder:
 
 - **`foundation/scheduler.ts` inverts the render dependency.** Features call `render()` / `refresh()` through it and never import `render/render.ts` — that is what keeps the import graph acyclic. `main.ts` registers the real implementations first thing.
-- **Listener order is behaviour.** Capture-phase Esc runs before the list's keydown; the context-menu hide runs before the popover click-away; blur handlers go dropdown → context menu → popovers. The order is fixed in exactly two places: the bare `src/lib/ui` imports at the top of `main.ts`, and the `init*()` call sequence below them.
+- **Listener order is behaviour.** Capture-phase Esc runs before the list's keydown (and stops there while the ask dialog or a tag picker is open: those own the Esc, the search must not clear underneath); the context-menu hide runs before the popover click-away; blur handlers go dropdown → context menu → popovers. The order is fixed in exactly two places: the bare `src/lib/ui` imports at the top of `main.ts`, and the `init*()` call sequence below them.
 
 `src/background/`, `src/pages/options/` and `src/app/` stay flat on purpose: each file there is already one feature, and a folder per file would add depth without adding structure.
 

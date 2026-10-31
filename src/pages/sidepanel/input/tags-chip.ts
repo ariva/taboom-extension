@@ -13,7 +13,7 @@ const pop = getElementById("tags-pop");
 // focus left for the page or another window: close like the context menu does
 window.addEventListener("blur", () => pop.hidePopover?.());
 
-function pickerOpen(): boolean {
+export function isTagsPickerOpen(): boolean {
   try {
     return pop.matches(":popover-open");
   } catch {
@@ -76,7 +76,7 @@ function fillPicker(): void {
 
 // renders happen on every tab / storage event — keep an open picker current
 export function refillTagsPickerIfOpen(): void {
-  if (pickerOpen()) {
+  if (isTagsPickerOpen()) {
     fillPicker();
   }
 }
@@ -90,7 +90,7 @@ export function initTagsChip(): void {
   // and the click that follows must not reopen it — a second click toggles, like Esc
   let closedByThisPress = false;
   filterBar.addEventListener("pointerdown", (event) => {
-    closedByThisPress = pickerOpen() && closest(event.target, 'button[data-filter="tags"]') !== null;
+    closedByThisPress = isTagsPickerOpen() && closest(event.target, 'button[data-filter="tags"]') !== null;
   });
   // after the filter-bar handler (same element, registration order): the filter is set, the list rendered
   filterBar.addEventListener("click", (event) => {
@@ -102,7 +102,7 @@ export function initTagsChip(): void {
       return;
     }
     fillPicker();
-    if (!pickerOpen()) {
+    if (!isTagsPickerOpen()) {
       pop.showPopover?.(); // a second click while open would throw (the light dismiss already closed it)
     }
     // under the chip, left-aligned with it — pulled left when it would run past the panel's edge

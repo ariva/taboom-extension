@@ -4,14 +4,21 @@ import { isAskDialogOpen } from "../../../lib/ui/ask-dialog.ts";
 import { hideCtxMenu, isCtxMenuOpen } from "../../../lib/ui/context-menu.ts";
 import { winPop } from "../foundation/elements.ts";
 import { winPopOpen } from "../windows-popover/popover.ts";
+import { isTagAssignPickerOpen } from "./tag-assign-picker.ts";
+import { isTagsPickerOpen } from "./tags-chip.ts";
 
 export function initGlobalKeys(): void {
   // capture phase: an Esc that closes the menu must not also clear the search
   document.addEventListener(
     "keydown",
     (event) => {
-      if (isAskDialogOpen()) {
-        return; // Esc belongs to the modal dialog — the popover behind it stays
+      if (isAskDialogOpen() || isTagsPickerOpen() || isTagAssignPickerOpen()) {
+        // Esc belongs to the overlay (the dialog's native cancel, a picker's light dismiss) — the
+        // popover behind it stays, and the search underneath must not clear too
+        if (event.key === "Escape") {
+          event.stopPropagation();
+        }
+        return;
       }
       if (event.key === "Escape" && isCtxMenuOpen()) {
         hideCtxMenu();

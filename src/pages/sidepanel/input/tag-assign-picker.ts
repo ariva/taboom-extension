@@ -38,7 +38,7 @@ let openedAt: Pick<MouseEvent, "clientX" | "clientY"> | null = null; // where th
 // outside) leaves it null — the one case that asks about unsaved ticks
 let closingBy: "apply" | "cancel" | "escape" | "blur" | null = null;
 
-function pickerOpen(): boolean {
+export function isTagAssignPickerOpen(): boolean {
   try {
     return pop.matches(":popover-open");
   } catch {
@@ -49,7 +49,7 @@ function pickerOpen(): boolean {
 // focus left for the page or another window: close like the context menu does (the light
 // dismiss only sees pointer events inside this document)
 window.addEventListener("blur", () => {
-  if (pickerOpen()) {
+  if (isTagAssignPickerOpen()) {
     closingBy = "blur";
     pop.hidePopover?.();
   }
@@ -58,7 +58,7 @@ window.addEventListener("blur", () => {
 document.addEventListener(
   "keydown",
   (event) => {
-    if (event.key === "Escape" && pickerOpen()) {
+    if (event.key === "Escape" && isTagAssignPickerOpen()) {
       closingBy = "escape";
     }
   },
@@ -161,7 +161,7 @@ function reopenStaged(ids: number[], changes: [string, boolean][]): void {
     staged.set(tagId, on);
   }
   fill(ids);
-  if (!pickerOpen()) {
+  if (!isTagAssignPickerOpen()) {
     pop.showPopover?.();
   }
 }
@@ -414,7 +414,7 @@ export function openTagAssignPicker(
   staged.clear(); // every open starts from the stored state
   closingBy = null;
   fill(ids);
-  if (!pickerOpen()) {
+  if (!isTagAssignPickerOpen()) {
     pop.showPopover?.();
   }
   // measured after the show: a hidden popover has no size
@@ -424,7 +424,7 @@ export function openTagAssignPicker(
 
 // renders happen on every tab / storage event — keep an open picker current (its rows may be gone)
 export function refillTagAssignPickerIfOpen(): void {
-  if (pickerIds !== null && pickerOpen()) {
+  if (pickerIds !== null && isTagAssignPickerOpen()) {
     const live = new Set(actionableTabs().map((tab) => tab.id));
     const ids = pickerIds.filter((id) => live.has(id));
     if (ids.length === 0) {

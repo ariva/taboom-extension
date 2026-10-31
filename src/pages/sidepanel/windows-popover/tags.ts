@@ -2,7 +2,7 @@
 // windows carry it) — click filters the list to that tag, ⋯ / right-click opens the tag menu,
 // whose Rename edits the row in place.
 import { editTag } from "../../../app/storage.ts";
-import { tagColorHex, tagNameError } from "../../../app/tags.ts";
+import { tagColorHex, tagNameError, tagsForUrl } from "../../../app/tags.ts";
 import type { Tag } from "../../../app/types.ts";
 import { inlineEdit } from "../../../lib/ui/inline-edit.ts";
 import { toast } from "../../../lib/ui/toast.ts";
@@ -18,8 +18,11 @@ function countOf(count: number, noun: string): string {
 
 export function fillTagRows(tags: Tag[], tabs: PanelTab[], onMenu: (event: MouseEvent, tagId: string) => void): void {
   for (const tag of tags) {
-    // live tabs only: the derived map covers the list's tabs, parked rows included in that scope
-    const tagged = tabs.filter((tab) => state.derived.get(tab.id)?.tags.some((known) => known.id === tag.id));
+    // live tabs: the derived map covers the shown list, which is the parked snapshot in that scope —
+    // a live id missing there is derived here
+    const tagsOf = (tab: PanelTab) =>
+      state.derived.get(tab.id)?.tags ?? tagsForUrl(state.tagPages, state.tags, tab.url);
+    const tagged = tabs.filter((tab) => tagsOf(tab).some((known) => known.id === tag.id));
     const windows = new Set(tagged.map((tab) => tab.windowId)).size;
     const row = document.createElement("button");
     row.type = "button";

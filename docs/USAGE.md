@@ -58,7 +58,7 @@ Panel position (left or right) is a global Chrome setting: `chrome://settings/ap
 - **Quick actions (☰)** — top-right menu (opening it closes any other popup: quick launch, history list, a dropdown): **Open Settings**, **Snooze inactive tabs now** (snoozes every tab the automatic-snooze rules allow, ignoring the inactivity threshold; the toast says how many), **Cleanup Duplicates (N)**, which runs *There can be only one* over every duplicated page at once (N = tabs it would close; greyed out when nothing is duplicated; confirmed first), and **Undo last remove in Parked windows**.
 - **Select all** — checkbox left of the scope selector selects/unselects every tab currently shown (i.e. matching the active search and filter). Search first, select all, then bulk-act.
 
-Keyboard: `/` focus search · `↑`/`↓` move selection · `Enter` activate · `Esc` clear search.
+Keyboard: `/` focus search (a character inside a text field) · `↑`/`↓` move selection · `Enter` activate (on a parked row: its menu) · `Esc` clear search (inside a dialog or picker it only closes that).
 
 ### Duplicates
 
