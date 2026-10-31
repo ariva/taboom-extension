@@ -15,6 +15,7 @@ import {
 } from "../../app/keep-alive.ts";
 import {
   clearKeepAlive,
+  editKeepAlive,
   loadState,
   localStore,
   pauseKeepAlive,
@@ -67,7 +68,7 @@ export async function renderKeepAlive(state: AppState): Promise<void> {
     rows.append(empty);
   }
   keepAlive.forEach((entry, index) => {
-    rows.append(keepAliveRow(keepAlive, entry, index + 1));
+    rows.append(keepAliveRow(entry, index + 1));
   });
   tickCountdowns();
 }
@@ -87,14 +88,12 @@ function renderRestore(trash: KeepAliveRemoval[]): void {
   }
 }
 
-// every row edit goes through one writer: skip the write when nothing changed
-async function save(next: KeepAliveTab[] | undefined): Promise<void> {
-  if (!next) {
-    return;
+// every row edit goes through the stored-list writer: nothing written when the edit changed nothing
+async function save(edit: (list: KeepAliveTab[]) => KeepAliveTab[] | undefined): Promise<void> {
+  if (await editKeepAlive(edit)) {
+    flashSaved();
+    render();
   }
-  await localStore.set({ keepAlive: next });
-  flashSaved();
-  render();
 }
 
 function cell(...children: (Node | string)[]): HTMLTableCellElement {
@@ -121,11 +120,7 @@ function pageCell(entry: KeepAliveTab): HTMLTableCellElement {
       initial: entry.url,
       placeholder: "https://app.example.com/board",
       commit: async (value) => {
-        // applied to the stored list, not the rendered one: a mark added meanwhile must survive
-        const { keepAlive = [] } = await localStore.get("keepAlive");
-        const next = setKeepAliveUrl(keepAlive, entry.url, keepAliveUrlFromInput(value));
-        if (next) {
-          await localStore.set({ keepAlive: next });
+        if (await editKeepAlive((list) => setKeepAliveUrl(list, entry.url, keepAliveUrlFromInput(value)))) {
           flashSaved();
         }
       },
@@ -135,7 +130,7 @@ function pageCell(entry: KeepAliveTab): HTMLTableCellElement {
   return page;
 }
 
-function keepAliveRow(list: KeepAliveTab[], entry: KeepAliveTab, number: number): HTMLTableRowElement {
+function keepAliveRow(entry: KeepAliveTab, number: number): HTMLTableRowElement {
   const running = document.createElement("input");
   running.type = "checkbox";
   running.checked = !entry.paused;
@@ -152,7 +147,7 @@ function keepAliveRow(list: KeepAliveTab[], entry: KeepAliveTab, number: number)
   select.value = String(entry.minutes);
   select.addEventListener("change", () => {
     const minutes = Number(select.value);
-    save(setKeepAliveMinutes(list, entry.url, minutes, nextReloadAt(minutes, Date.now())));
+    save((list) => setKeepAliveMinutes(list, entry.url, minutes, nextReloadAt(minutes, Date.now())));
   });
 
   // which open tabs the reload hits: one (pinned first, else the first found) or all
@@ -167,7 +162,7 @@ function keepAliveRow(list: KeepAliveTab[], entry: KeepAliveTab, number: number)
   tabsSelect.title =
     "One tab: the pinned one, else the first found across windows. All tabs: every open tab on this page";
   tabsSelect.addEventListener("change", () => {
-    save(setKeepAliveReloadAll(list, entry.url, tabsSelect.value === "all"));
+    save((list) => setKeepAliveReloadAll(list, entry.url, tabsSelect.value === "all"));
   });
 
   const countdown = document.createElement("span");
@@ -215,9 +210,11 @@ async function addTypedMark(): Promise<void> {
   if (url === "") {
     return;
   }
-  const [{ settings }, { keepAlive = [] }] = await Promise.all([loadState(), localStore.get("keepAlive")]);
+  const { settings } = await loadState();
   const minutes = settings.keepAliveMinutes;
-  await save(markKeepAlive(keepAlive, [{ url, title: hostnameOf(url) }], minutes, nextReloadAt(minutes, Date.now())));
+  await save((list) =>
+    markKeepAlive(list, [{ url, title: hostnameOf(url) }], minutes, nextReloadAt(minutes, Date.now())),
+  );
   input.value = "";
 }
 

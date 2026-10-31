@@ -121,6 +121,19 @@ export function removeKeepAlive(urls: (string | undefined)[]): Promise<boolean> 
   return writeRemoval((keepAlive) => unmarkKeepAlive(keepAlive, urls));
 }
 
+// Settings → Keep Tabs Alive: the row edits (interval, tabs, address) and Add — applied to the
+// stored list, so a sweep re-arm or a mark made elsewhere between the render and the edit survives.
+// False when the edit changed nothing.
+export async function editKeepAlive(edit: (list: KeepAliveTab[]) => KeepAliveTab[] | undefined): Promise<boolean> {
+  const { keepAlive = [] } = await localStore.get("keepAlive");
+  const next = edit(keepAlive);
+  if (!next) {
+    return false;
+  }
+  await localStore.set({ keepAlive: next });
+  return true;
+}
+
 // Options "Clear all". False when the list was already empty.
 export function clearKeepAlive(): Promise<boolean> {
   return writeRemoval((keepAlive) => (keepAlive.length === 0 ? undefined : []));
@@ -340,6 +353,17 @@ export function toggleTagOnPages(urls: string[], tagId: string, on: boolean): Pr
 // Settings → Tagged pages: a page's whole tag set (empty keeps the rule without tags; Remove drops it)
 export function setPageTagIds(url: string, tagIds: string[]): Promise<boolean> {
   return editPages((pages) => setPageTags(pages, url, tagIds));
+}
+
+// Settings → Tagged pages: one tag on or off the page's STORED set (the chip ✕, the picker tick) —
+// a tag added from the panel between the render and the click survives; an emptied entry stays
+// (togglePageTags drops it, which is the menus' rule, not this card's)
+export function setPageTag(url: string, tagId: string, on: boolean): Promise<boolean> {
+  return editPages((pages) => {
+    const current = pages.find((page) => page.url === url)?.tagIds ?? [];
+    const next = on ? (current.includes(tagId) ? current : [...current, tagId]) : current.filter((id) => id !== tagId);
+    return setPageTags(pages, url, next);
+  });
 }
 
 // Settings → Tagged pages: the address edit, one write (tags and switch travel with the entry)

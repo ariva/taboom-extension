@@ -841,11 +841,13 @@ test("UI - Options - Keep-alive table: per-row pause, interval, countdown and re
     qa<HTMLOptionElement>(tabsOf(rows[0]!), "option").map((option) => option.textContent),
     ["One tab", "All tabs"],
   );
+  stored.keepAlive[1]!.nextReload = 777; // the sweep re-armed the other mark meanwhile (no re-render yet)
   tabsOf(rows[0]!).value = "all";
   tabsOf(rows[0]!).dispatchEvent(new window.Event("change", { bubbles: true }));
   await tick();
   await tick();
   assert.equal(stored.keepAlive[0]?.reloadAll, true, "All tabs written on the mark");
+  assert.equal(stored.keepAlive[1]?.nextReload, 777, "the edit lands on the stored list: the re-arm survives");
   const mailTabs = tabsOf(qa(byId("keep-alive-rows"), "tr")[1]!);
   mailTabs.value = "one";
   mailTabs.dispatchEvent(new window.Event("change", { bubbles: true }));
@@ -1369,9 +1371,12 @@ test("UI - Options - TAGS card: tag table (add, rename, recolor, remove), tagged
     ticks().map((box) => `${box.closest("label")?.querySelector(".tag-name")?.textContent}:${box.checked}`),
     ["Job:true", "bills:false"],
   );
+  stored.tagPages[0]!.tagIds.push("t-else"); // tagged from the panel meanwhile (no re-render yet)
   must(ticks()[1]).click();
   await settle();
-  assert.deepEqual(stored.tagPages[0]?.tagIds, [work.id, bills.id]);
+  assert.deepEqual(stored.tagPages[0]?.tagIds, [work.id, "t-else", bills.id], "the tick edits the stored set");
+  stored.tagPages[0]!.tagIds.splice(1, 1); // drop the stand-in again
+  await rerender();
   assert.deepEqual(
     ticks().map((box) => box.checked),
     [true, true],
@@ -1397,9 +1402,11 @@ test("UI - Options - TAGS card: tag table (add, rename, recolor, remove), tagged
   await rerender();
   // ✕ on a chip takes that tag off; the last one gone keeps the rule (address, switch) with no chip —
   // Remove is the button that drops a rule
+  stored.tagPages[0]!.tagIds.push("t-else"); // tagged from the panel meanwhile (no re-render yet)
   q(must(chips()[0]), ".tag-chip-remove").click();
   await settle();
-  assert.deepEqual(stored.tagPages[0]?.tagIds, [bills.id]);
+  assert.deepEqual(stored.tagPages[0]?.tagIds, [bills.id, "t-else"], "✕ takes one tag off the stored set");
+  stored.tagPages[0]!.tagIds.splice(1, 1);
   await rerender();
   q(must(chips()[0]), ".tag-chip-remove").click();
   await settle();

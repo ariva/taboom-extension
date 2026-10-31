@@ -16,6 +16,7 @@ import {
   reorderTags,
   restoreTags,
   saveState,
+  setPageTag,
   setPageTagIds,
 } from "../../app/storage.ts";
 import {
@@ -348,13 +349,7 @@ function pageChip(tag: Tag, page: TagPage): HTMLSpanElement {
   remove.textContent = "✕";
   remove.title = remove.ariaLabel = `Remove "${tag.name}" from this page`;
   remove.addEventListener("click", async () => {
-    if (
-      (await confirmedUntick(page.url, tag)) &&
-      (await setPageTagIds(
-        page.url,
-        page.tagIds.filter((id) => id !== tag.id),
-      ))
-    ) {
+    if ((await confirmedUntick(page.url, tag)) && (await setPageTag(page.url, tag.id, false))) {
       flashSaved();
       render();
     }
@@ -440,8 +435,7 @@ function fillPagePicker(tags: Tag[], pages: TagPage[]): void {
         box.checked = true; // declined: the tick stays
         return;
       }
-      const next = box.checked ? [...current, tag.id] : current.filter((id) => id !== tag.id);
-      if (await setPageTagIds(url, next)) {
+      if (await setPageTag(url, tag.id, box.checked)) {
         flashSaved();
         render(); // renderTags refills the open picker
       }
