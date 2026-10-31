@@ -57,6 +57,9 @@ export async function renderKeepAlive(state: AppState): Promise<void> {
   const { keepAlive = [], keepAliveTrash = [] } = await localStore.get(["keepAlive", "keepAliveTrash"]);
   renderRestore(keepAliveTrash);
   const rows = getElementById("keep-alive-rows");
+  if (rows.querySelector(".rename-input")) {
+    return; // an address edit in progress: the table catches up when it ends (the editor drops its class on blur, its finish renders)
+  }
   rows.textContent = "";
   if (keepAlive.length === 0) {
     const cell = document.createElement("td");

@@ -76,6 +76,7 @@ export function inlineEdit(label: Element, { initial, placeholder, commit, finis
       return; // the host re-rendered under the edit: not a commit, and no finish — it is rendered already
     }
     swallowNextClick = pressInFlight; // blurred by a press: that click is spent on ending the edit
+    input.classList.remove("rename-input"); // the edit is over: a host that leaves an open editor alone may rebuild on finish
     if (!cancelled) {
       await commit(input.value);
     }

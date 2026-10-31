@@ -284,7 +284,7 @@ test("UI - Options - A focused number field keeps its typed value across an exte
   await tick();
   assert.equal(minutes.value, "12", "a focused field keeps what was typed");
   minutes.dispatchEvent(new window.Event("blur"));
-  await chrome.storage.onChanged.fire({ keepAlive: {} }, "local");
+  await chrome.storage.onChanged.fire({ settings: {} }, "local"); // a settings write re-renders the form (a keepAlive write no longer does)
   await tick();
   await tick();
   assert.equal(minutes.value, String(stored.settings.inactivityMinutes), "blurred without a change: back to the store");
@@ -396,7 +396,7 @@ test("UI - Options - Delete restore data: disabled while both undo stacks are em
   stored.keepAliveTrash = [];
   stored.protectionTrash = [];
   stored.parkedTrash = [];
-  await chrome.storage.onChanged.fire({ protectionRules: {} }, "local");
+  await chrome.storage.onChanged.fire({ parkedTrash: {} }, "local");
   await tick();
   await tick();
   assert.equal(button.disabled, true, "nothing to forget: disabled");
@@ -405,7 +405,7 @@ test("UI - Options - Delete restore data: disabled while both undo stacks are em
   stored.parkedTrash = [
     { at: 1, items: [{ id: "p1", parkedAt: 1, tabs: [{ url: "https://p.example.com/", title: "P" }], groups: [] }] },
   ];
-  await chrome.storage.onChanged.fire({ protectionRules: {} }, "local");
+  await chrome.storage.onChanged.fire({ parkedTrash: {} }, "local");
   await tick();
   await tick();
   assert.equal(button.disabled, false, "removed parked data counts as restore data");
@@ -427,7 +427,7 @@ test("UI - Options - Delete restore data: disabled while both undo stacks are em
   stored.keepAliveTrash = [
     { at: 1, items: [{ url: "https://x.example.com/", title: "X", minutes: 5, nextReload: 1 }] },
   ];
-  await chrome.storage.onChanged.fire({ protectionRules: {} }, "local");
+  await chrome.storage.onChanged.fire({ protectionTrash: {}, keepAliveTrash: {} }, "local"); // the keys that changed
   await tick();
   await tick();
   assert.equal(button.disabled, false, "something to forget: enabled");
@@ -1723,4 +1723,73 @@ test("UI - Options - TAGS: click Color / Tag / Pages headers to sort the table (
   assert.equal(pageHeader("stored").dataset.dir, "asc");
   stored.tags = [];
   stored.tagPages = [];
+});
+
+// the page re-rendered every card on any of ten keys: a keep-alive re-arm (every 30 s while a
+// mark is due) queried every tab for the Tags card and ended an address edit in progress
+test("UI - Options - A keepAlive write re-renders only its card and keeps an open address editor", async () => {
+  const { applyExperimental, featureEnabled } = await import("../../../src/app/core.ts");
+  if (!featureEnabled(applyExperimental(RAW_FEATURES, stored.ui?.showExperimental ?? false), "KEEP_ALIVE")) {
+    return;
+  }
+  stored.keepAlive = [
+    { url: "https://edit.example.com/", title: "Edit", minutes: 25, nextReload: 123 },
+    { url: "https://other.example.com/", title: "Other", minutes: 5, nextReload: 1 },
+  ];
+  await chrome.storage.onChanged.fire({ keepAlive: {} }, "local");
+  await tick();
+  await tick();
+  const realQuery = chrome.tabs.query;
+  let queries = 0;
+  chrome.tabs.query = async (info: chrome.tabs.QueryInfo = {}) => {
+    queries++;
+    return realQuery(info);
+  };
+  try {
+    const row = () => qa(byId("keep-alive-rows"), "tr")[0]!;
+    qa(row(), "td")[2]!.click(); // the Page cell opens the address editor
+    const editor = q<HTMLInputElement>(row(), "input.rename-input");
+    editor.value = "https://edit.example.com/half-typ";
+    // the sweep re-armed the other mark
+    stored.keepAlive[1]!.nextReload = 999;
+    await chrome.storage.onChanged.fire({ keepAlive: {} }, "local");
+    await tick();
+    await tick();
+    assert.equal(queries, 0, "the Tags card's tab query is not run for a keep-alive write");
+    assert.equal(q<HTMLInputElement>(row(), "input.rename-input"), editor, "the editor is still there");
+    assert.equal(editor.value, "https://edit.example.com/half-typ", "with its text");
+    editor.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    await tick();
+    await tick();
+    assert.equal(row().querySelector("input.rename-input"), null, "Escape ends it and the table catches up");
+  } finally {
+    chrome.tabs.query = realQuery;
+  }
+  stored.keepAlive = [];
+  await chrome.storage.onChanged.fire({ keepAlive: {} }, "local");
+  await tick();
+  await tick();
+});
+
+test("UI - Options - A ui write that moves only the panel's view renders nothing here", async () => {
+  const realQuery = chrome.tabs.query;
+  let queries = 0;
+  chrome.tabs.query = async (info: chrome.tabs.QueryInfo = {}) => {
+    queries++;
+    return realQuery(info);
+  };
+  const rulesBefore = byId("rules").firstElementChild;
+  try {
+    const before = { ...(stored.ui ?? {}), scope: "all-windows" };
+    await chrome.storage.onChanged.fire(
+      { ui: { oldValue: before, newValue: { ...before, scope: "current-window" } } },
+      "local",
+    );
+    await tick();
+    await tick();
+    assert.equal(queries, 0, "a scope click in the panel is not Settings' business");
+    assert.equal(byId("rules").firstElementChild, rulesBefore, "no card re-rendered");
+  } finally {
+    chrome.tabs.query = realQuery;
+  }
 });

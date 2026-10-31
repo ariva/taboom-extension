@@ -32,7 +32,7 @@ import {
   tagPageError,
   usesDarkText,
 } from "../../app/tags.ts";
-import { matchesTagPage, tagPagePatternFromInput, tagPagePatternHint } from "../../app/tag-patterns.ts";
+import { matchesTagPageKey, pageKeyOf, tagPagePatternFromInput, tagPagePatternHint } from "../../app/tag-patterns.ts";
 import type {
   AppState,
   Removal,
@@ -147,6 +147,9 @@ function dragGrip(): HTMLSpanElement {
 
 function renderTagRows(tags: Tag[], pages: TagPage[]): void {
   const rows = getElementById("tag-rows");
+  if (rows.querySelector(".rename-input")) {
+    return; // a rename in progress: the table catches up when it ends (the editor drops its class on blur, its finish renders)
+  }
   rows.textContent = "";
   if (tags.length === 0) {
     rows.append(emptyRow("No tags yet.", 7));
@@ -469,8 +472,7 @@ async function openPagePicker(anchor: HTMLElement, url: string): Promise<void> {
 
 // the Tabs column: how many open tabs the entry covers — the number tells whether a domain or
 // pattern is the one meant; the tooltip names them
-function openTabsCell(page: TagPage, openTabs: chrome.tabs.Tab[]): HTMLTableCellElement {
-  const covered = openTabs.filter((tab) => matchesTagPage(page.url, tab.url));
+function openTabsCell(covered: chrome.tabs.Tab[]): HTMLTableCellElement {
   const count = document.createElement("span");
   count.className = "tag-page-tabs";
   count.textContent = String(covered.length);
@@ -484,6 +486,9 @@ function openTabsCell(page: TagPage, openTabs: chrome.tabs.Tab[]): HTMLTableCell
 
 function renderPageRows(tags: Tag[], pages: TagPage[], openTabs: chrome.tabs.Tab[]): void {
   const rows = getElementById("tag-page-rows");
+  if (rows.querySelector(".rename-input")) {
+    return; // an address edit in progress: the table catches up when it ends (the editor drops its class on blur, its finish renders)
+  }
   rows.textContent = "";
   if (pages.length === 0) {
     rows.append(emptyRow("No tagged page rules yet.", 6));
@@ -491,9 +496,12 @@ function renderPageRows(tags: Tag[], pages: TagPage[], openTabs: chrome.tabs.Tab
   renderSortHeaders("tag-page-table", tagPageSort);
   // the # column keeps the stored position, like the tag table
   const stored = new Map(pages.map((page, index) => [page.url, index]));
-  const tabCounts = new Map(
-    pages.map((page) => [page.url, openTabs.filter((tab) => matchesTagPage(page.url, tab.url)).length]),
+  // each open tab's key once, each page's covered tabs once (the count sorts, the cell lists them)
+  const keyed = openTabs.map((tab) => [tab, pageKeyOf(tab.url)] as const);
+  const coveredBy = new Map(
+    pages.map((page) => [page.url, keyed.filter(([, key]) => matchesTagPageKey(page.url, key)).map(([tab]) => tab)]),
   );
+  const tabCounts = new Map([...coveredBy].map(([url, covered]) => [url, covered.length]));
   for (const page of sortedTagPages(pages, tabCounts, tagPageSort, tags)) {
     const index = stored.get(page.url) ?? 0;
     const url = document.createElement("span");
@@ -552,7 +560,14 @@ function renderPageRows(tags: Tag[], pages: TagPage[], openTabs: chrome.tabs.Tab
     if (page.disabled) {
       row.classList.add("off");
     }
-    row.append(cell(String(index + 1)), cell(enabled), pageCell, chips, openTabsCell(page, openTabs), cell(remove));
+    row.append(
+      cell(String(index + 1)),
+      cell(enabled),
+      pageCell,
+      chips,
+      openTabsCell(coveredBy.get(page.url) ?? []),
+      cell(remove),
+    );
     rows.append(row);
   }
 }
