@@ -12,12 +12,11 @@ import {
 import { duplicatesActive, type PanelTab, state } from "../foundation/state.ts";
 import { closeTabs } from "./actions.ts";
 import { windowLabel } from "./window-ops.ts";
+import { pluralize } from "../../../app/plural.ts";
 
 export type DupSet = DuplicateSet<PanelTab>;
 
 export const keeperContext = () => ({ currentWindowId: state.currentWindowId, keepAlive: state.keepAlive });
-
-const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ? "" : "s"}`;
 
 export async function cleanupDuplicates(sets: DupSet[], mode: CleanupMode): Promise<void> {
   const ids = sets.flatMap((set) => duplicatesToClose(set, mode, keeperContext()).map((tab) => tab.id));
@@ -25,7 +24,7 @@ export async function cleanupDuplicates(sets: DupSet[], mode: CleanupMode): Prom
     return;
   }
   const message = [
-    `Close ${plural(ids.length, "duplicate tab")}?`,
+    `Close ${pluralize(ids.length, "duplicate tab")}?`,
     ...closingWindows(state.liveTabs, ids).map(
       (windowId) => `${windowLabel(windowId)} will close — every tab in it is a duplicate.`,
     ),

@@ -2,6 +2,7 @@
 // numbered, each with its pause checkbox, own interval, a live countdown to the
 // next reload and Remove — an Add row for a page that is not open, Remove all and Restore last removal. The enable checkbox and default interval are
 // settings — settings-form.ts persists them; this module only shows / hides.
+import { renderRestoreButton } from "./restore-button.ts";
 import { applyExperimental, featureEnabled, hostnameOf } from "../../app/core.ts";
 import {
   formatCountdown,
@@ -28,6 +29,7 @@ import { getElementById } from "../../lib/dom.ts";
 import { onBusyClick } from "../../lib/ui/busy-button.ts";
 import { inlineEdit } from "../../lib/ui/inline-edit.ts";
 import { flashSaved, getFeatures, render } from "./page-state.ts";
+import { pluralize } from "../../app/plural.ts";
 
 function option(value: number): HTMLOptionElement {
   const element = document.createElement("option"); // not `new Option()`: happy-dom lacks the constructor
@@ -78,17 +80,13 @@ export async function renderKeepAlive(state: AppState): Promise<void> {
 
 // "Restore last removal (N marks)" — only while an action exists; hovering lists what
 // comes back, capped so a Remove all of hundreds does not become a screen-high tooltip
-const TOOLTIP_URLS = 10;
 function renderRestore(trash: KeepAliveRemoval[]): void {
-  const button = getElementById<HTMLButtonElement>("restore-keep-alive");
   const newest = popRemoval(trash)?.newest;
-  button.hidden = !newest;
-  if (newest) {
-    const count = newest.items.length;
-    button.textContent = `Restore last removal (${count} mark${count === 1 ? "" : "s"})`;
-    const urls = newest.items.slice(0, TOOLTIP_URLS).map((entry) => entry.url);
-    button.title = ["Restore:", ...urls, ...(count > TOOLTIP_URLS ? ["…"] : [])].join("\n");
-  }
+  renderRestoreButton(
+    getElementById<HTMLButtonElement>("restore-keep-alive"),
+    newest ? pluralize(newest.items.length, "mark") : null,
+    newest?.items.map((entry) => entry.url) ?? [],
+  );
 }
 
 // every row edit goes through the stored-list writer: nothing written when the edit changed nothing

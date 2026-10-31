@@ -134,6 +134,11 @@ export async function editKeepAlive(edit: (list: KeepAliveTab[]) => KeepAliveTab
   return true;
 }
 
+// Settings → Delete restore data: every undo stack at once (parked windows / groups / tabs included)
+export function clearRemovalTrash(): Promise<void> {
+  return localStore.set({ keepAliveTrash: [], protectionTrash: [], parkedTrash: [], tagTrash: [] });
+}
+
 // Options "Clear all". False when the list was already empty.
 export function clearKeepAlive(): Promise<boolean> {
   return writeRemoval((keepAlive) => (keepAlive.length === 0 ? undefined : []));

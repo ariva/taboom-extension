@@ -2194,19 +2194,23 @@ test("UI - Sidepanel - DUPLICATES: quick launch lists pages open twice, ticks dr
   await tick();
   must(qa(pop, ".win-view").find((el) => el.textContent.startsWith("Dupes"))).click();
   await tick();
+  // the cleanup asks through the in-panel dialog (like Park / Restore), then closes exactly the extras
   const asked: string[] = [];
-  const realConfirm = globalThis.confirm;
-  globalThis.confirm = (message?: string) => {
-    asked.push(message ?? "");
-    return true;
+  const ask = byId<HTMLDialogElement>("ask-dialog");
+  const acceptAsk = async () => {
+    await tick();
+    await tick();
+    assert.equal(ask.open, true, "the dialog asks");
+    asked.push(q(ask, ".ask-message").textContent);
+    q(ask, ".ask-ok").click();
+    await tick();
+    await tick();
   };
   calls.length = 0;
   must(
     qa<HTMLButtonElement>(pop, ".dup-action").find((el) => el.textContent.startsWith("There can be only one")),
   ).click();
-  await tick();
-  await tick();
-  globalThis.confirm = realConfirm;
+  await acceptAsk();
   assert.equal(asked.length, 1);
   assert.match(asked[0]!, /^Close 4 duplicate tabs\?\n/);
   assert.match(asked[0]!, /Ctrl\+Shift\+T/);
@@ -2225,14 +2229,8 @@ test("UI - Sidepanel - DUPLICATES: quick launch lists pages open twice, ticks dr
   assert.equal(quick.disabled, false);
   asked.length = 0;
   calls.length = 0;
-  globalThis.confirm = (message?: string) => {
-    asked.push(message ?? "");
-    return true;
-  };
   quick.click();
-  await tick();
-  await tick();
-  globalThis.confirm = realConfirm;
+  await acceptAsk();
   assert.match(asked[0] ?? "", /^Close 4 duplicate tabs\?/);
   assert.ok(calls.includes("tabs.remove 10,11,13,15"), `quick action closes the same extras: ${calls.join(" | ")}`);
 
@@ -3462,8 +3460,6 @@ test("UI - Sidepanel - Bulk close with a stale id closes the live tabs and repor
     }
     return removed.length; // the stub's own signature (calls.push): nothing reads the result
   };
-  const confirmBefore = window.confirm;
-  window.confirm = () => true;
   try {
     q(document, '#filters button[data-filter="all"]').click();
     await tick();
@@ -3479,11 +3475,16 @@ test("UI - Sidepanel - Bulk close with a stale id closes the live tabs and repor
     byId("bulk-close").click();
     await tick();
     await tick();
+    const ask = byId<HTMLDialogElement>("ask-dialog");
+    assert.equal(ask.open, true, "a multi-close asks through the in-panel dialog");
+    assert.equal(q(ask, ".ask-message").textContent, "Close 3 tabs?");
+    q(ask, ".ask-ok").click();
+    await tick();
+    await tick();
     assert.deepEqual(removed.sort(), [1, 3], "every live tab closed, the stale id did not stop the batch");
     assert.match(byId("toast").textContent, /already closed/);
   } finally {
     chrome.tabs.remove = original;
-    window.confirm = confirmBefore;
     tabs.splice(0, tabs.length, ...fixture);
   }
 });

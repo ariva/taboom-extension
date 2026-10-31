@@ -1,6 +1,8 @@
 // Tags card: the tag table (color select, click-to-edit name, pages count, Remove), an Add
 // row (name + color), the tagged-pages table (click-to-edit address or pattern, one toggle
 // chip per tag, Remove), an Add row (address / pattern + tag), Remove all and Restore last removal.
+import { saveUiPatch } from "./ui-prefs.ts";
+import { renderRestoreButton } from "./restore-button.ts";
 import { applyExperimental, featureEnabled } from "../../app/core.ts";
 import { popRemoval } from "../../app/removal-trash.ts";
 import {
@@ -8,25 +10,24 @@ import {
   clearTags,
   editTag,
   editTagPage,
-  loadState,
   localStore,
   removeTagPagesToTrash,
   removeTagsToTrash,
   renameStoredTagPage,
   reorderTags,
   restoreTags,
-  saveState,
   setPageTag,
   setPageTagIds,
 } from "../../app/storage.ts";
 import {
+  TAG_COLORS,
+  losingTabLines,
   nextTagSort,
   orderedTags,
   pageCountByTag,
   sortedTagPages,
   sortedTags,
   tabsLosingTag,
-  TAG_COLORS,
   tagColorHex,
   tagNameError,
   tagPageError,
@@ -49,6 +50,7 @@ import { closest, getElementById } from "../../lib/dom.ts";
 import { onBusyClick } from "../../lib/ui/busy-button.ts";
 import { inlineEdit } from "../../lib/ui/inline-edit.ts";
 import { flashSaved, getFeatures, render } from "./page-state.ts";
+import { pluralize } from "../../app/plural.ts";
 
 // header sort of the tag table (ui.tagSort, saved on every click); the stored order (drag) stays.
 // Mirrored here from the last render, with the picker-order prefs the page's own pickers read
@@ -322,13 +324,10 @@ async function confirmedUntick(url: string, tag: Tag): Promise<boolean> {
   if (losing.length < 2) {
     return true;
   }
-  const names = losing.slice(0, 5).map((tab) => `• ${tab.title || tab.url}`);
-  const more = losing.length > 5 ? [`• … and ${losing.length - 5} more`] : [];
   return confirm(
     [
       `Taking "${tag.name}" off ${url} removes it from ${losing.length} open tabs:`,
-      ...names,
-      ...more,
+      ...losingTabLines(losing),
       "Continue?",
     ].join("\n"),
   );
@@ -576,20 +575,18 @@ function renderPageRows(tags: Tag[], pages: TagPage[], openTabs: chrome.tabs.Tab
 function renderRestore(trash: Removal<TagRemoval>[]): void {
   const button = getElementById<HTMLButtonElement>("restore-tags");
   const newest = popRemoval(trash)?.newest;
-  button.hidden = !newest;
   if (!newest) {
+    renderRestoreButton(button, null, []);
     return;
   }
   const tagCount = newest.items.reduce((sum, removal) => sum + removal.tags.length, 0);
   const pageCount = newest.items.reduce((sum, removal) => sum + removal.pages.length, 0);
-  const what =
-    tagCount > 0 ? `${tagCount} tag${tagCount === 1 ? "" : "s"}` : `${pageCount} rule${pageCount === 1 ? "" : "s"}`;
-  button.textContent = `Restore last removal (${what})`;
+  const what = tagCount > 0 ? pluralize(tagCount, "tag") : pluralize(pageCount, "rule");
   const names = newest.items.flatMap((removal) => [
     ...removal.tags.map((tag) => tag.name),
     ...removal.pages.map((page) => page.url),
   ]);
-  button.title = ["Restore:", ...names.slice(0, 10), ...(names.length > 10 ? ["…"] : [])].join("\n");
+  renderRestoreButton(button, what, names);
 }
 
 async function addTypedTag(): Promise<void> {
@@ -649,10 +646,7 @@ export function initTags(): void {
     }
     // "stored" = the # header: back to the stored order; the markup carries the three column keys
     const next = header.dataset.sort === "stored" ? null : nextTagSort(tagSort, header.dataset.sort as TagSortKey);
-    const { ui } = await loadState();
-    const { tagSort: _previous, ...rest } = ui;
-    await saveState({ ui: next ? { ...rest, tagSort: next } : rest }); // saved at once; absent = stored order
-    flashSaved();
+    await saveUiPatch({ tagSort: next ?? undefined }); // saved at once; absent = stored order
     render(); // the storage listener re-renders too; this one is for the page that wrote
   });
   getElementById("tag-page-table").addEventListener("click", async (event) => {
@@ -662,10 +656,7 @@ export function initTags(): void {
     }
     const next =
       header.dataset.sort === "stored" ? null : nextTagSort(tagPageSort, header.dataset.sort as TagPageSortKey);
-    const { ui } = await loadState();
-    const { tagPageSort: _previous, ...rest } = ui;
-    await saveState({ ui: next ? { ...rest, tagPageSort: next } : rest });
-    flashSaved();
+    await saveUiPatch({ tagPageSort: next ?? undefined });
     render();
   });
   // light dismiss closed the picker: forget its page so a re-render does not refill a closed box

@@ -20,7 +20,6 @@ import { scopeSelect, winListBtn, winPop } from "../foundation/elements.ts";
 import { appendWindowIdentityItems, openMarkMenu, openRowMenu, openTabGroupMenu } from "../menus/menus.ts";
 import { openParkedWindowMenu } from "../menus/parked-menus.ts";
 import { openTagMenu } from "../menus/tag-menu.ts";
-import { windowMaps } from "../model/index.ts";
 import { refresh } from "../foundation/scheduler.ts";
 import {
   duplicatesActive,
@@ -43,6 +42,7 @@ import { fillPinRows } from "./pins.ts";
 import { fillParkedRows, parkedRowsNewestFirst, startRenameParkedInList } from "./parked.ts";
 import { fillTagRows, startRenameTagInList } from "./tags.ts";
 import { orderedTags } from "../../../app/tags.ts";
+import { pluralize } from "../../../app/plural.ts";
 
 type WinPopView = "windows" | "groups" | "pins" | "alive" | "duplicates" | "tags";
 let winPopView: WinPopView = "windows"; // reset on ▦ open
@@ -126,7 +126,7 @@ export function initWindowsPopover(): void {
 // group…"), the rest with a member. Empty = nothing to launch (the ▦ button is disabled then).
 function quickLaunchViews() {
   // live sets: in the Parked windows scope state.allTabs holds snapshots, the quick launch stays live
-  const maps = windowMaps(state.liveTabs, state.currentWindowId, state.liveWindowMeta);
+  const maps = state.liveWindowMaps; // computed once per refresh
   const groupList = tabGroupsActive() ? [...state.liveTabGroups.values()] : [];
   const pinnedTabs = state.liveTabs.filter((tab) => tab.pinned);
   const aliveMarks = keepAliveActive() ? state.keepAlive : [];
@@ -272,7 +272,7 @@ function fillWindowsPopover(): void {
     }
     const stats = document.createElement("span");
     stats.className = "win-stats muted";
-    stats.textContent = `${tabs.length} tab${tabs.length === 1 ? "" : "s"} · ${awake} awake · ${snoozed} snoozed`;
+    stats.textContent = `${pluralize(tabs.length, "tab")} · ${awake} awake · ${snoozed} snoozed`;
     row.append(dot, name, ...(pin ? [pin] : []), stats);
     // native title, not #hover-tip: the popover lives in the top layer and
     // draws over any fixed-position tip; the browser tooltip renders above it
@@ -281,7 +281,7 @@ function fillWindowsPopover(): void {
     const activeTab = tabs.find((tab) => tab.active);
     row.title = [
       name.textContent,
-      `${tabs.length} tab${tabs.length === 1 ? "" : "s"} · ${awake} awake · ${snoozed} snoozed`,
+      `${pluralize(tabs.length, "tab")} · ${awake} awake · ${snoozed} snoozed`,
       `${pinned} pinned · ${audible} audible`,
       activeTab ? `Active tab: ${activeTab.title || activeTab.url}` : null,
     ]
@@ -289,7 +289,7 @@ function fillWindowsPopover(): void {
       .join("\n");
     row.addEventListener("click", () => {
       winPop.hidePopover?.();
-      chrome.windows.update(windowId, { focused: true }).catch(() => {});
+      focusWindow(windowId);
     });
     // ⋯ beside the row (a button can't nest one) — same window menu as right-click
     const menuBtn = document.createElement("button");

@@ -119,9 +119,13 @@ export function applyTheme(theme: string | undefined) {
 // Single merge point for ui writes: re-reads right before writing so a
 // concurrent writer (the side panel persisting filter/scope/sort) is far less
 // likely to be clobbered by a whole-object overwrite from a stale read.
-async function saveUiPatch(patch: Partial<UiPrefs>) {
+// the single merge point for ui writes from this page; a key set to undefined leaves the stored object
+export async function saveUiPatch(patch: Partial<UiPrefs>): Promise<void> {
   const state = await loadState();
-  await saveState({ ui: { ...state.ui, ...patch } });
+  const merged = Object.fromEntries(
+    Object.entries({ ...state.ui, ...patch }).filter(([, value]) => value !== undefined),
+  );
+  await saveState({ ui: merged as unknown as UiPrefs }); // `as`: Object.fromEntries widens the keys; every required one came from the stored ui
   flashSaved();
 }
 

@@ -1,5 +1,6 @@
 // Protected-sites card: the rule chips with their remove buttons, the Add row,
 // Remove all and Restore last removal (every removal is undoable, newest first).
+import { renderRestoreButton } from "./restore-button.ts";
 import { makeRule } from "../../app/core.ts";
 import { setRulePattern } from "../../app/protection-rules.ts";
 import { popRemoval } from "../../app/removal-trash.ts";
@@ -10,8 +11,7 @@ import { onBusyClick } from "../../lib/ui/busy-button.ts";
 import { inlineEdit } from "../../lib/ui/inline-edit.ts";
 import { hasRule } from "./model.ts";
 import { flashSaved, render } from "./page-state.ts";
-
-const TOOLTIP_PATTERNS = 10;
+import { pluralize } from "../../app/plural.ts";
 
 export async function renderRules(state: AppState): Promise<void> {
   const list = getElementById("rules");
@@ -79,15 +79,12 @@ function ruleChip(rule: ProtectionRule): HTMLLIElement {
 // "Restore last removal (N sites)" — only while an action exists; hovering lists what
 // comes back, capped so a Remove all of hundreds does not become a screen-high tooltip
 function renderRestore(trash: Removal<ProtectionRule>[]): void {
-  const button = getElementById<HTMLButtonElement>("restore-protected");
   const newest = popRemoval(trash)?.newest;
-  button.hidden = !newest;
-  if (newest) {
-    const count = newest.items.length;
-    button.textContent = `Restore last removal (${count} site${count === 1 ? "" : "s"})`;
-    const patterns = newest.items.slice(0, TOOLTIP_PATTERNS).map((rule) => rule.pattern);
-    button.title = ["Restore:", ...patterns, ...(count > TOOLTIP_PATTERNS ? ["…"] : [])].join("\n");
-  }
+  renderRestoreButton(
+    getElementById<HTMLButtonElement>("restore-protected"),
+    newest ? pluralize(newest.items.length, "site") : null,
+    newest?.items.map((rule) => rule.pattern) ?? [],
+  );
 }
 
 async function addRule(): Promise<void> {

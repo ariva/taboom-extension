@@ -4,7 +4,7 @@ import { send } from "../../../app/messages.ts";
 import { inlineEdit } from "../../../lib/ui/inline-edit.ts";
 import { toastFailure } from "../../../lib/ui/toast.ts";
 import { listEl } from "../foundation/elements.ts";
-import { windowGroupName, windowMaps } from "../model/index.ts";
+import { windowGroupName } from "../model/index.ts";
 import type { WindowMaps } from "../model/index.ts";
 import { refresh } from "../foundation/scheduler.ts";
 import { pinActive, state } from "../foundation/state.ts";
@@ -15,7 +15,7 @@ import { reportAnswer } from "./answer.ts";
 export function windowLabel(windowId: number): string {
   // live sets on purpose: in the Parked windows scope allTabs holds snapshots, and this label
   // names live windows (quick launch rows, park prompt, move targets)
-  const maps = windowMaps(state.liveTabs, state.currentWindowId, state.liveWindowMeta);
+  const maps = state.liveWindowMaps; // computed once per refresh
   return windowGroupName(windowId, {
     currentWindowId: state.currentWindowId,
     indexes: maps.indexes,

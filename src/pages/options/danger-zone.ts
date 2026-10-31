@@ -2,7 +2,7 @@
 // forgetting the undo history (no confirm).
 // (Clear protected sites / keep-alive marks live in their own cards, with Restore.)
 import { DEFAULTS } from "../../app/core.ts";
-import { localStore, saveState } from "../../app/storage.ts";
+import { clearRemovalTrash, localStore, saveState } from "../../app/storage.ts";
 import { getElementById } from "../../lib/dom.ts";
 import { flashSaved, render } from "./page-state.ts";
 import { applyTheme } from "./ui-prefs.ts";
@@ -22,8 +22,7 @@ export async function renderDangerZone(): Promise<void> {
 export function initDangerZone(): void {
   // no confirm: the data is only undo history, and the button is dead while there is none
   getElementById("delete-restore-data").addEventListener("click", async () => {
-    // every undo stack at once — removed parked windows / groups / tabs included
-    await localStore.set({ keepAliveTrash: [], protectionTrash: [], parkedTrash: [], tagTrash: [] });
+    await clearRemovalTrash();
     flashSaved();
     render(); // only trash keys changed — the storage listener does not re-render for those
   });

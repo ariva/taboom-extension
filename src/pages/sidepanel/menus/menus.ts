@@ -1,5 +1,6 @@
 // Context menus of the tab list: row menu, tab-group menu, window header menu, and the
 // item builders they share with the windows popover's menus.
+import { pluralize } from "../../../app/plural.ts";
 import { keepAliveEntry } from "../../../app/keep-alive.ts";
 import { parkedGroupRef, parkedNewestFirst, parkedRef, parkedWindowLabel } from "../../../app/parked.ts";
 import { pauseKeepAlive, removeKeepAlive } from "../../../app/storage.ts";
@@ -27,7 +28,7 @@ import {
   unprotectTabs,
   wake,
 } from "../ops/actions.ts";
-import { TAB_GROUP_COLORS, WINDOW_DOT_COLORS, windowGroupName, windowMaps } from "../model/index.ts";
+import { TAB_GROUP_COLORS, WINDOW_DOT_COLORS, windowGroupName } from "../model/index.ts";
 import { refresh, render } from "../foundation/scheduler.ts";
 import {
   actionableTabs,
@@ -37,6 +38,7 @@ import {
   parkedScope,
   pinActive,
   state,
+  tabById,
   tabGroupsActive,
   tagsActive,
 } from "../foundation/state.ts";
@@ -65,7 +67,7 @@ type TabGroup = chrome.tabGroups.TabGroup;
 // bare labels (the clicked tab is unambiguous there)
 export function appendCtxActions(ids: number[], alwaysCount = false): void {
   // filter(Boolean) drops the misses — TS cannot see that through the Boolean constructor
-  const targets = ids.map((id) => actionableTabs().find((tab) => tab.id === id)).filter(Boolean) as PanelTab[];
+  const targets = ids.map((id) => tabById(id)).filter(Boolean) as PanelTab[];
   const actions: [label: string, run: () => void][] = [
     ["Snooze", () => snooze(ids)],
     ["Wake", () => wake(ids)],
@@ -77,7 +79,7 @@ export function appendCtxActions(ids: number[], alwaysCount = false): void {
     ...(targets.some((tab) => tab.pinned) ? [["Unpin", () => pinTabs(ids, false)] satisfies [string, () => void]] : []),
     ["Close", () => closeTabs(ids)],
   ];
-  const suffix = ` ${ids.length} tab${ids.length === 1 ? "" : "s"}`;
+  const suffix = ` ${pluralize(ids.length, "tab")}`;
   for (const [label, run] of actions) {
     ctxAppend(ctxItem(ids.length > 1 || alwaysCount ? label + suffix : label, run));
   }
@@ -100,10 +102,10 @@ export function openRowMenu(event: MouseEvent, tabId: number): void {
   const ids = actionIds(tabId);
   // live sets: in the Parked windows scope the list shows snapshots, but this menu serves the quick
   // launch's live rows there too, and its Move-to targets are live windows either way
-  const sourceWindows = new Set(ids.map((id) => state.liveTabs.find((tab) => tab.id === id)?.windowId));
-  const maps = windowMaps(state.liveTabs, state.currentWindowId, state.liveWindowMeta);
+  const sourceWindows = new Set(ids.map((id) => tabById(id)?.windowId));
+  const maps = state.liveWindowMaps; // computed once per refresh
   clearCtxMenu();
-  const clicked = state.liveTabs.find((tab) => tab.id === tabId);
+  const clicked = tabById(tabId);
   ctxAppend(ctxTitle(ids.length > 1 ? `${ids.length} tabs selected` : clicked?.title || "Tab"), ctxDivider());
   ctxAppend(ctxItem(ids.length > 1 ? `Copy ${ids.length} URLs` : "Copy URL", () => copyUrls(ids)));
   appendCtxActions(ids);
@@ -174,7 +176,7 @@ export function openRowMenu(event: MouseEvent, tabId: number): void {
         moveTabsToGroup(ids, null, title.trim());
       }),
     );
-    const grouped = ids.filter((id) => (state.liveTabs.find((tab) => tab.id === id)?.groupId ?? -1) !== -1);
+    const grouped = ids.filter((id) => (tabById(id)?.groupId ?? -1) !== -1);
     if (grouped.length > 0) {
       ctxAppend(ctxItem("Remove from group", () => ungroupTabs(grouped)));
     }
@@ -256,7 +258,7 @@ export function openTabGroupMenu(
     ctxItem(group.collapsed ? "Expand in tab strip" : "Collapse in tab strip", () =>
       updateTabGroup(groupId, { collapsed: !group.collapsed }),
     ),
-    ctxItem(`Ungroup ${ids.length} tab${ids.length === 1 ? "" : "s"}`, () => ungroupTabs(ids)),
+    ctxItem(`Ungroup ${pluralize(ids.length, "tab")}`, () => ungroupTabs(ids)),
   );
   if (ids.length > 0) {
     ctxAppend(ctxDivider());

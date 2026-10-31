@@ -26,6 +26,7 @@ import { state } from "../foundation/state.ts";
 import { closeTabs } from "./actions.ts";
 import { reportAnswer } from "./answer.ts";
 import { windowLabel } from "./window-ops.ts";
+import { pluralize } from "../../../app/plural.ts";
 
 // the parked window a synthetic window id (or any of its row ids) stands for
 export function parkedOf(syntheticId: number): ParkedWindow | undefined {
@@ -47,7 +48,7 @@ export async function parkWindowPrompt(windowId: number): Promise<void> {
     const ok = await askDialog({
       message:
         `Park ${windowLabel(windowId)}?\n` +
-        `Its ${count} tab${count === 1 ? "" : "s"} close and wait under Parked windows (the scope selector) until you restore them.`,
+        `Its ${pluralize(count, "tab")} close and wait under Parked windows (the scope selector) until you restore them.`,
       okLabel: "Park",
       checkbox: {
         label: "Don't ask again",
@@ -85,8 +86,7 @@ export async function restoreParkedPrompt(syntheticWindowId: number): Promise<bo
   }
   const count = parked.tabs.length;
   const ok = await askDialog({
-    message:
-      `Restore ${parkedWindowLabel(parked)}?\n` + `Its ${count} tab${count === 1 ? "" : "s"} open in a new window.`,
+    message: `Restore ${parkedWindowLabel(parked)}?\n` + `Its ${pluralize(count, "tab")} open in a new window.`,
     okLabel: "Restore",
   });
   if (!ok) {
@@ -111,7 +111,7 @@ export async function moveTabsToParked(tabIds: number[], parked: ParkedWindow): 
   const message =
     tabs.length > 1 || closing.length > 0
       ? [
-          `Move ${tabs.length} tab${tabs.length === 1 ? "" : "s"} to ${parkedWindowLabel(parked)}?`,
+          `Move ${pluralize(tabs.length, "tab")} to ${parkedWindowLabel(parked)}?`,
           ...closing.map((windowId) => `${windowLabel(windowId)} will close — every tab in it moves.`),
         ].join("\n")
       : undefined;

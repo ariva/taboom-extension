@@ -15,6 +15,7 @@ import { state } from "../foundation/state.ts";
 import { activate } from "../ops/actions.ts";
 import { cleanupDuplicates as cleanup, type DupSet, keeperContext as context } from "../ops/duplicate-ops.ts";
 import { windowLabel } from "../ops/window-ops.ts";
+import { pluralize } from "../../../app/plural.ts";
 
 // keys the user unticked; the popover shell clears it on every open
 const unticked = new Set<string>();
@@ -22,8 +23,6 @@ const unticked = new Set<string>();
 export function resetDuplicateSelection(): void {
   unticked.clear();
 }
-
-const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ? "" : "s"}`;
 
 function openDuplicateMenu(event: MouseEvent, set: DupSet): void {
   clearCtxMenu();
@@ -137,7 +136,7 @@ export function fillDuplicateRows(sets: DupSet[], refill: () => void): void {
     name.textContent = set.title;
     const stats = document.createElement("span");
     stats.className = "win-stats muted";
-    stats.textContent = `${plural(set.tabs.length, "tab")} · ${plural(set.windowIds.length, "window")}`;
+    stats.textContent = `${pluralize(set.tabs.length, "tab")} · ${pluralize(set.windowIds.length, "window")}`;
     row.append(name, stats);
     row.title = [set.url || set.title, ...windowBreakdown(set), "Click to go to the copy that stays"].join("\n");
     row.addEventListener("click", () => goToKeeper(set));

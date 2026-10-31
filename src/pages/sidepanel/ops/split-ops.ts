@@ -3,7 +3,8 @@
 import { adjacentMove, isSplit, type SplitTab, splitPlan } from "../../../app/split.ts";
 import { toast } from "../../../lib/ui/toast.ts";
 import { refresh } from "../foundation/scheduler.ts";
-import { type PanelTab, state } from "../foundation/state.ts";
+import { state, tabById } from "../foundation/state.ts";
+import type { PanelTab } from "../foundation/state.ts";
 
 interface SplitApi {
   createSplit?: (tabIds: [number, number]) => Promise<number>;
@@ -33,8 +34,8 @@ export function asSplitTab(tab: PanelTab): SplitTab {
 // the anchor (clicked tab) stays put; the partner is brought beside it, matched to its pin
 // state and group, then the two are split. Chrome's own refusals surface as a toast.
 export async function splitTabs(anchorId: number, partnerId: number): Promise<void> {
-  const anchor = state.liveTabs.find((tab) => tab.id === anchorId); // split view pairs live tabs
-  const partner = state.liveTabs.find((tab) => tab.id === partnerId);
+  const anchor = tabById(anchorId); // split view pairs live tabs
+  const partner = tabById(partnerId);
   if (!anchor || !partner) {
     return;
   }
@@ -75,7 +76,7 @@ export async function splitTabs(anchorId: number, partnerId: number): Promise<vo
 }
 
 export async function unsplitTab(tabId: number): Promise<void> {
-  const tab = state.liveTabs.find((candidate) => candidate.id === tabId);
+  const tab = tabById(tabId);
   if (!tab || !isSplit(tab) || tab.splitViewId === undefined) {
     return;
   }

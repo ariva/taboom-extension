@@ -1,6 +1,8 @@
 // Tab actions: activate, snooze, wake, close, pin, protect / unprotect. Each one consumes
 // the tabs it acted on from the selection and refreshes the panel. copyUrls is the
 // exception: it touches no tab, so the selection stays.
+import { pluralize } from "../../../app/plural.ts";
+import { askDialog } from "../../../lib/ui/ask-dialog.ts";
 import { isUnloaded } from "../../../app/core.ts";
 import { send } from "../../../app/messages.ts";
 import { parkedRef } from "../../../app/parked.ts";
@@ -8,7 +10,7 @@ import { pauseKeepAlive } from "../../../app/storage.ts";
 import { toast, toastFailure } from "../../../lib/ui/toast.ts";
 import { refresh } from "../foundation/scheduler.ts";
 import { reportAnswer } from "./answer.ts";
-import { actionableTabs, state } from "../foundation/state.ts";
+import { actionableTabs, state, tabById } from "../foundation/state.ts";
 import type { PanelTab } from "../foundation/state.ts";
 import { hostsOf, urlsOf } from "../model/tab-hosts.ts";
 
@@ -60,7 +62,7 @@ export async function snooze(tabIds: number[]): Promise<void> {
 // non-discarded tabs are skipped so a mixed selection never force-reloads live pages
 export async function wake(tabIds: number[]): Promise<void> {
   const snoozed = tabIds.filter((tabId) => {
-    const tab = actionableTabs().find((candidate) => candidate.id === tabId);
+    const tab = tabById(tabId);
     return tab !== undefined && isUnloaded(tab);
   });
   await Promise.all(snoozed.map((tabId) => chrome.tabs.reload(tabId).catch(() => {})));
@@ -81,9 +83,9 @@ export async function closeTabs(
   confirmMessage?: string,
   beforeClose?: () => Promise<unknown>,
 ): Promise<void> {
-  // Native confirm for multi-close; upgrade to undo snackbar if it annoys
-  const message = confirmMessage ?? (tabIds.length > 1 ? `Close ${tabIds.length} tabs?` : null);
-  if (message !== null && !confirm(message)) {
+  // the in-panel dialog, like Park / Restore / New group (an undo snackbar would be the next step)
+  const message = confirmMessage ?? (tabIds.length > 1 ? `Close ${pluralize(tabIds.length, "tab")}?` : null);
+  if (message !== null && !(await askDialog({ message, okLabel: "Close" }))) {
     return;
   }
   await beforeClose?.();
@@ -144,7 +146,7 @@ export async function keepAlivePause(tabIds: number[], paused: boolean): Promise
 // Must run synchronously from the click: clipboard writes in an extension page ride
 // on the user activation, no clipboardWrite permission needed.
 export async function copyUrls(tabIds: number[]): Promise<void> {
-  const urls = tabIds.map((tabId) => actionableTabs().find((tab) => tab.id === tabId)?.url).filter(Boolean);
+  const urls = tabIds.map((tabId) => tabById(tabId)?.url).filter(Boolean);
   try {
     await navigator.clipboard.writeText(urls.join("\n"));
     toast(urls.length === 1 ? "URL copied" : `${urls.length} URLs copied`);

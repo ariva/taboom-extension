@@ -1014,12 +1014,18 @@ test("Model - selectVisible window sort ranks the windows once, not per comparis
   const plain = view(many, { sort: "recent" }); // a one-number comparator: the yardstick
   selectVisible(many, v);
   selectVisible(many, plain); // warm both
-  const startedPlain = performance.now();
-  selectVisible(many, plain);
-  const plainMs = performance.now() - startedPlain;
-  const started = performance.now();
+  const best = (run: () => void): number => {
+    let min = Number.POSITIVE_INFINITY;
+    for (let i = 0; i < 3; i++) {
+      const started = performance.now();
+      run();
+      min = Math.min(min, performance.now() - started);
+    }
+    return min;
+  };
+  const plainMs = best(() => selectVisible(many, plain));
+  const elapsed = best(() => selectVisible(many, v));
   const sorted = selectVisible(many, v);
-  const elapsed = performance.now() - started;
   assert.equal(sorted.length, 1000);
   assert.equal(sorted[0]?.windowId, 1, "the current window first");
   // after the current window: ABC by display name, numeric-aware — "Window 1" (chrome id 40), "Window 2" (39), …

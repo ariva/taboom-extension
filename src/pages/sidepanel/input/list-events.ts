@@ -6,7 +6,7 @@ import { activate, closeTabs, snooze } from "../ops/actions.ts";
 import { listEl } from "../foundation/elements.ts";
 import { hideHoverTip } from "../render/hover-tip.ts";
 import { render } from "../foundation/scheduler.ts";
-import { state } from "../foundation/state.ts";
+import { state, tabById } from "../foundation/state.ts";
 
 // One delegated click listener instead of ~6 listeners per row — with big
 // lists that's thousands of listener allocations saved on every render.
@@ -41,7 +41,7 @@ export function initListEvents(): void {
         closeTabs([tabId]);
         return;
     }
-    const tab = state.allTabs.find((t) => t.id === tabId);
+    const tab = tabById(tabId);
     if (tab && parkedRef(tabId)) {
       openParkedTabMenu(event, tabId); // a parked row: move / open / remove instead of activate
     } else if (tab) {

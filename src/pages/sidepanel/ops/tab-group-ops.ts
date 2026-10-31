@@ -4,7 +4,7 @@ import { inlineEdit } from "../../../lib/ui/inline-edit.ts";
 import { toast } from "../../../lib/ui/toast.ts";
 import { listEl } from "../foundation/elements.ts";
 import { refresh } from "../foundation/scheduler.ts";
-import { state } from "../foundation/state.ts";
+import { state, tabById } from "../foundation/state.ts";
 import { persistUiPrefs } from "../input/toolbar-events.ts";
 
 // what chrome.tabs.group/ungroup are typed to take
@@ -52,7 +52,7 @@ export async function moveTabsToGroup(tabIds: number[], groupId: number | null, 
     if (groupId != null) {
       // Chrome refuses to group across windows — move foreign tabs over first
       const group = state.liveTabGroups.get(groupId); // live ids: the group targets are Chrome groups
-      const foreign = tabIds.filter((id) => state.liveTabs.find((tab) => tab.id === id)?.windowId !== group?.windowId);
+      const foreign = tabIds.filter((id) => tabById(id)?.windowId !== group?.windowId);
       if (group && foreign.length > 0) {
         await chrome.tabs.move(foreign, { windowId: group.windowId, index: -1 });
       }

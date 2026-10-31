@@ -8,6 +8,7 @@ import { winPop } from "../foundation/elements.ts";
 import { refresh } from "../foundation/scheduler.ts";
 import { state } from "../foundation/state.ts";
 import { parkedOf, restoreParkedPrompt } from "../ops/parked-ops.ts";
+import { pluralize } from "../../../app/plural.ts";
 
 // parked windows, newest first, as the synthetic ids their menu / rename works on
 export function parkedRowsNewestFirst(): number[] {
@@ -42,8 +43,8 @@ export function fillParkedRows(onMenu: (event: MouseEvent, windowId: number) => 
     const stats = document.createElement("span");
     stats.className = "win-stats muted";
     stats.textContent = [
-      `${tabs} tab${tabs === 1 ? "" : "s"}`,
-      ...(groups > 0 ? [`${groups} group${groups === 1 ? "" : "s"}`] : []),
+      `${pluralize(tabs, "tab")}`,
+      ...(groups > 0 ? [`${pluralize(groups, "group")}`] : []),
       `parked ${new Date(parked.parkedAt).toLocaleString()}`,
     ].join(" · ");
     row.append(dot, name, stats);

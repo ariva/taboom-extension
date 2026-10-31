@@ -7,7 +7,7 @@ import type { DropSpec } from "./dnd-model.ts";
 import { clearDropTarget, markDropTarget } from "./drop-target.ts";
 import { listEl } from "../foundation/elements.ts";
 import { refresh } from "../foundation/scheduler.ts";
-import { effectiveSort, reorderActive, state, tabGroupsActive } from "../foundation/state.ts";
+import { effectiveSort, reorderActive, tabById, tabGroupsActive } from "../foundation/state.ts";
 import { moveTabsToGroup, ungroupTabs } from "../ops/tab-group-ops.ts";
 import type { TabIdList } from "../ops/tab-group-ops.ts";
 import { moveTabsToWindow } from "../ops/window-ops.ts";
@@ -18,9 +18,9 @@ let draggedTabId: number | null = null; // dataTransfer is unreadable during dra
 
 // reads what dropSpecFor decides on: the dragged tab, what is under the pointer, the flags
 function dropSpec(target: EventTarget | null): DropSpec | null {
-  const source = state.allTabs.find((tab) => tab.id === draggedTabId);
+  const source = draggedTabId === null ? undefined : tabById(draggedTabId);
   const row = closest(target, ".row");
-  const targetTab = row ? state.allTabs.find((tab) => tab.id === Number(row.dataset.tabId)) : null;
+  const targetTab = row ? tabById(Number(row.dataset.tabId)) : null;
   const tgHeader = closest(target, "[data-tab-group-id]");
   const header = closest(target, ".group-header");
   return dropSpecFor(

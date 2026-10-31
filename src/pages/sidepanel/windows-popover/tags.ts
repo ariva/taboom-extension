@@ -11,10 +11,7 @@ import { refresh } from "../foundation/scheduler.ts";
 import { state } from "../foundation/state.ts";
 import type { PanelTab } from "../foundation/state.ts";
 import { filterByTag } from "../ops/tag-ops.ts";
-
-function countOf(count: number, noun: string): string {
-  return `${count} ${noun}${count === 1 ? "" : "s"}`;
-}
+import { pluralize } from "../../../app/plural.ts";
 
 export function fillTagRows(tags: Tag[], tabs: PanelTab[], onMenu: (event: MouseEvent, tagId: string) => void): void {
   for (const tag of tags) {
@@ -37,7 +34,7 @@ export function fillTagRows(tags: Tag[], tabs: PanelTab[], onMenu: (event: Mouse
     const stats = document.createElement("span");
     stats.className = "win-stats muted";
     stats.textContent =
-      tagged.length === 0 ? "no open tab" : `${countOf(tagged.length, "tab")} · ${countOf(windows, "window")}`;
+      tagged.length === 0 ? "no open tab" : `${pluralize(tagged.length, "tab")} · ${pluralize(windows, "window")}`;
     row.append(dot, name, stats);
     row.title = [tag.name, stats.textContent, ...tagged.map((tab) => tab.title || tab.url)].join("\n");
     row.addEventListener("click", () => {

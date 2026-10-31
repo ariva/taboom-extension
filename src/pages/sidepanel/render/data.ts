@@ -8,7 +8,7 @@ import { enabledTags } from "../../../app/tags.ts";
 import { getElementById, mustQuery } from "../../../lib/dom.ts";
 import { capabilities } from "../../../lib/platform/capabilities.ts";
 import { filterBar, scopeSelect, sortSelect } from "../foundation/elements.ts";
-import { deriveTabs } from "../model/index.ts";
+import { deriveTabs, windowMaps } from "../model/index.ts";
 import { render } from "../foundation/scheduler.ts";
 import {
   effectiveSort,
@@ -112,6 +112,7 @@ export async function refresh(animate = false, preloaded: AppState | null = null
   state.liveTabs = state.allTabs;
   state.liveTabGroups = state.tabGroups;
   state.liveWindowMeta = state.windowMeta;
+  state.liveWindowMaps = windowMaps(state.liveTabs, state.currentWindowId, state.liveWindowMeta);
   // Parked windows scope: the list shows the snapshots as rows (negative ids, one synthetic
   // window per parked window) — search, filters, sorts and headers work unchanged on them
   // static markup: the scope <select> has the parked-windows option
@@ -134,6 +135,7 @@ export async function refresh(animate = false, preloaded: AppState | null = null
   if (state.filter === "tags" && !tagsActive()) {
     state.filter = "all";
   }
+  state.tabsById = new Map([...state.liveTabs, ...state.allTabs].map((tab) => [tab.id, tab]));
   // tabs closed outside the panel (or id-swapped by discard) leave stale ids
   // in the selection — prune so counts and select-all stay truthful
   const shownIds = new Set(state.allTabs.map((tab) => tab.id));

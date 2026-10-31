@@ -15,6 +15,7 @@ import { state } from "../foundation/state.ts";
 import { commitTabGroupTitle, moveTabsToGroup } from "../ops/tab-group-ops.ts";
 import { persistUiPrefs } from "../input/toolbar-events.ts";
 import { windowLabel } from "../ops/window-ops.ts";
+import { pluralize } from "../../../app/plural.ts";
 
 type TabGroup = chrome.tabGroups.TabGroup;
 
@@ -57,11 +58,11 @@ export function fillGroupRows(groupList: TabGroup[]): void {
     const awake = tabs.length - snoozed; // filter-chip terminology, like the Windows view
     const stats = document.createElement("span");
     stats.className = "win-stats muted";
-    stats.textContent = `${tabs.length} tab${tabs.length === 1 ? "" : "s"} · ${awake} awake · ${snoozed} snoozed`;
+    stats.textContent = `${pluralize(tabs.length, "tab")} · ${awake} awake · ${snoozed} snoozed`;
     row.append(square, name, stats);
     row.title = [
       `Group "${group.title || "(unnamed group)"}"`,
-      `${tabs.length} tab${tabs.length === 1 ? "" : "s"} · ${awake} awake · ${snoozed} snoozed`,
+      `${pluralize(tabs.length, "tab")} · ${awake} awake · ${snoozed} snoozed`,
       `In ${windowLabel(group.windowId)}`,
     ].join("\n");
     row.addEventListener("click", () => {

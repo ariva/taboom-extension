@@ -6,14 +6,15 @@
 import { addTag, toggleTagOnPages } from "../../../app/storage.ts";
 import { matchesTagPage } from "../../../app/tag-patterns.ts";
 import {
+  TAG_NAME_MAX,
   hasTagEverywhere,
   inheritedTagIds,
+  losingTabLines,
   orderedTags,
-  TAG_NAME_MAX,
   tabsLosingTag,
-  type TagOrigin,
   tagColorHex,
   tagNameError,
+  type TagOrigin,
 } from "../../../app/tags.ts";
 import { askDialog } from "../../../lib/ui/ask-dialog.ts";
 import { refresh } from "../foundation/scheduler.ts";
@@ -127,11 +128,7 @@ function removalWarning(ids: number[], changes: [string, boolean][]): string | n
     }
     const name = state.tags.find((tag) => tag.id === tagId)?.name ?? "";
     const where = pickerScope === "site" ? ` on ${urls.join(", ")}` : "";
-    lines.push(`Unticking "${name}"${where} takes it off ${losing.length} open tabs:`);
-    lines.push(...losing.slice(0, 5).map((tab) => `• ${tab.title || tab.url}`));
-    if (losing.length > 5) {
-      lines.push(`• … and ${losing.length - 5} more`);
-    }
+    lines.push(`Unticking "${name}"${where} takes it off ${losing.length} open tabs:`, ...losingTabLines(losing));
   }
   return lines.length === 0 ? null : lines.join("\n");
 }

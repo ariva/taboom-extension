@@ -13,7 +13,7 @@ import type {
   UiPrefs,
 } from "../../../app/types.ts";
 import { capabilities } from "../../../lib/platform/capabilities.ts";
-import type { DerivedTabs, SortDir, WindowMetaMap } from "../model/index.ts";
+import type { DerivedTabs, SortDir, WindowMaps, WindowMetaMap } from "../model/index.ts";
 
 // every tab the panel holds comes from chrome.tabs.query/create — those always
 // carry an id (only foreign-session tabs lack one), so ids flow into chrome.*
@@ -70,6 +70,8 @@ export interface PanelState {
   tagPages: TagPage[];
   tagFilter: Set<string>;
   pendingUiWrites: Set<string>; // JSON of each ui object this panel wrote and has not seen echoed yet
+  tabsById: Map<number, PanelTab>; // shown ∪ live tabs by id, rebuilt per refresh (ids never collide: parked rows are negative)
+  liveWindowMaps: WindowMaps; // windowMaps over the live set, computed once per refresh (labels, menus, quick launch)
 }
 
 // the single mutable state of the panel — handlers write here, render reads
@@ -123,6 +125,8 @@ export const state: PanelState = {
   tagPages: [], // storage.local.tagPages
   tagFilter: new Set(), // session only: the ticked tags of the Tags chip (empty = any tagged tab)
   pendingUiWrites: new Set(),
+  tabsById: new Map(),
+  liveWindowMaps: { indexes: new Map(), dotColors: new Map(), names: new Map() },
 };
 
 // TAB_GROUPS flag + API present (permission granted, Chrome supports it)
@@ -181,6 +185,11 @@ export function parkedScope(): boolean {
 // Id spaces never collide — parked rows are negative, live ids positive
 export function actionableTabs(): PanelTab[] {
   return parkedScope() ? [...state.allTabs, ...state.liveTabs] : state.allTabs;
+}
+
+// the one id → tab lookup (a shown row or a live tab), no scan per call
+export function tabById(tabId: number): PanelTab | undefined {
+  return state.tabsById.get(tabId);
 }
 
 // sorts that only exist while their feature flag is on (option hidden + a

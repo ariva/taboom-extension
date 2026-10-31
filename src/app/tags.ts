@@ -504,3 +504,10 @@ export function orderedTags(
           : null;
   return sortedTags(enabledTags(tags), pageCountByTag(pages), sort);
 }
+
+// the tabs a wide untick reaches, as prompt lines: five named, the rest counted (Settings and the
+// panel picker ask the same way)
+export function losingTabLines(losing: { title?: string; url?: string }[]): string[] {
+  const names = losing.slice(0, 5).map((tab) => `• ${tab.title || tab.url}`);
+  return losing.length > 5 ? [...names, `• … and ${losing.length - 5} more`] : names;
+}

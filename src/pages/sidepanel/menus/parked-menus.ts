@@ -12,8 +12,8 @@ import {
   showCtxMenu,
 } from "../../../lib/ui/context-menu.ts";
 import type { ParkedTarget } from "../../../app/messages.ts";
-import { state, tabGroupsActive, tagsActive } from "../foundation/state.ts";
-import { TAB_GROUP_COLORS, windowGroupName, windowMaps } from "../model/index.ts";
+import { state, tabById, tabGroupsActive, tagsActive } from "../foundation/state.ts";
+import { TAB_GROUP_COLORS, windowGroupName } from "../model/index.ts";
 import { actionIds, copyUrls } from "../ops/actions.ts";
 import {
   forgetParked,
@@ -28,6 +28,7 @@ import {
 } from "../ops/parked-ops.ts";
 import { orderedWindowIds } from "../ops/window-ops.ts";
 import { appendTagItems } from "./tag-menu.ts";
+import { pluralize } from "../../../app/plural.ts";
 
 // the quick launch opens the same menu from its parked rows: rename edits the row there,
 // not a list header, and "Show in Parked windows" jumps to the scope
@@ -59,7 +60,7 @@ export function openParkedWindowMenu(event: MouseEvent, windowId: number, host?:
 
 // live windows as move targets — the list itself shows parked rows, so the live sets are read
 function appendWindowTargets(submenu: HTMLElement, pick: (target: ParkedTarget) => void): void {
-  const maps = windowMaps(state.liveTabs, state.currentWindowId, state.liveWindowMeta);
+  const maps = state.liveWindowMaps; // computed once per refresh
   for (const liveWindowId of orderedWindowIds(maps)) {
     const name = windowGroupName(liveWindowId, {
       currentWindowId: state.currentWindowId,
@@ -78,7 +79,7 @@ export function openParkedGroupMenu(event: MouseEvent, groupId: number): void {
   if (!found || ids.length === 0) {
     return;
   }
-  const noun = `group (${ids.length} tab${ids.length === 1 ? "" : "s"})`;
+  const noun = `group (${pluralize(ids.length, "tab")})`;
   clearCtxMenu();
   ctxAppend(ctxTitle(found.parked.groups[found.index]?.title || "(unnamed group)"), ctxDivider());
   ctxAppend(
@@ -98,7 +99,7 @@ export function openParkedGroupMenu(event: MouseEvent, groupId: number): void {
 
 export function openParkedTabMenu(event: MouseEvent, tabId: number): void {
   const ids = actionIds(tabId).filter((id) => parkedRef(id) !== undefined);
-  const clicked = state.allTabs.find((tab) => tab.id === tabId);
+  const clicked = tabById(tabId);
   if (ids.length === 0 || !clicked) {
     return;
   }
