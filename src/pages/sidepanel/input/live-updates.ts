@@ -17,6 +17,7 @@ for (const event of [
   chrome.tabs.onCreated,
   chrome.tabs.onActivated,
   chrome.tabs.onRemoved,
+  chrome.tabs.onReplaced, // a discard may swap a tab's id (prerender, back/forward cache)
   chrome.tabs.onMoved,
   chrome.tabs.onAttached,
   chrome.tabs.onDetached,
@@ -39,7 +40,10 @@ chrome.tabs.onUpdated.addListener((_tabId, changeInfo) => {
 
 // our own perf flush + history bookkeeping write storage constantly — don't
 // let those echo back into renders (history buttons have their own listener)
-chrome.storage.onChanged.addListener((changes) => {
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== "local") {
+    return; // storage.session (wake times, the identity map) is worker bookkeeping
+  }
   const ignored = [
     "perfMetrics",
     "perfSnapshots",

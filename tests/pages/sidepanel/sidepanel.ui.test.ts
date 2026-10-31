@@ -464,12 +464,12 @@ test("UI - Sidepanel - Own ui-prefs storage echo is ignored; foreign ui change r
   // deliver the storage echo of exactly what the click persisted
   const lastSet = calls.filter((c) => c.startsWith("storage.set")).at(-1);
   const { ui }: Pick<LocalStorageSchema, "ui"> = JSON.parse(must(lastSet).slice("storage.set ".length));
-  await chrome.storage.onChanged.fire({ ui: { newValue: ui } });
+  await chrome.storage.onChanged.fire({ ui: { newValue: ui } }, "local");
   await new Promise((resolve) => setTimeout(resolve, 200)); // past the 150ms debounce
   assert.equal(document.querySelector(".row"), firstRow, "own echo: no second render");
 
   // a change written elsewhere (e.g. options page) must still re-render
-  await chrome.storage.onChanged.fire({ ui: { newValue: { ...ui, density: "comfortable" } } });
+  await chrome.storage.onChanged.fire({ ui: { newValue: { ...ui, density: "comfortable" } } }, "local");
   await new Promise((resolve) => setTimeout(resolve, 200));
   assert.notEqual(document.querySelector(".row"), firstRow, "foreign ui change re-renders");
 
@@ -3725,4 +3725,63 @@ test("UI - Sidepanel - WINDOW_NAMES: a profile rename elsewhere refreshes the he
   await chrome.storage.session.set({ windowSessionMap: {} });
   await chrome.tabs.onActivated.fire({});
   await settle();
+});
+
+// review round 2 nits: a drag whose row was re-rendered away must still end; a replaced tab id
+// (Chrome swaps ids on some discards) refreshes the list; session-area writes do not
+test("UI - Sidepanel - A drag ended on a detached row still resets; tabs.onReplaced refreshes; session writes do not", async () => {
+  const rowOf = (id: number) => q(document, `.row[data-tab-id="${id}"]`);
+  rowOf(1).dispatchEvent(new window.Event("dragstart", { bubbles: true }));
+  const dragged = rowOf(1);
+  dragged.remove(); // a render replaced the list under the drag
+  dragged.dispatchEvent(new window.Event("dragend", { bubbles: true })); // fires on the detached source
+  await tick();
+  calls.length = 0;
+  rowOf(3).dispatchEvent(new window.Event("dragover", { bubbles: true, cancelable: true }));
+  assert.ok(!rowOf(3).classList.contains("drop-target"), "no drag in flight: nothing to drop");
+  await chrome.tabs.onActivated.fire({});
+  await new Promise((resolve) => setTimeout(resolve, 200)); // the list back in shape
+
+  const before = document.querySelector(".row");
+  await chrome.tabs.onReplaced.fire(99, 1);
+  await new Promise((resolve) => setTimeout(resolve, 200));
+  assert.notEqual(document.querySelector(".row"), before, "onReplaced re-renders");
+
+  const settled = document.querySelector(".row");
+  await chrome.storage.onChanged.fire({ wakeTimes: { newValue: { 1: Date.now() } } }, "session");
+  await new Promise((resolve) => setTimeout(resolve, 200));
+  assert.equal(document.querySelector(".row"), settled, "a storage.session write does not render");
+});
+
+// two refreshes in flight (an explicit one racing the debounced one): the older result must not
+// land over the newer one
+test("UI - Sidepanel - An older refresh resolving last does not overwrite the newer state", async () => {
+  const realQuery = chrome.tabs.query;
+  let holdFirst: () => void = () => {};
+  let queries = 0;
+  chrome.tabs.query = async (info: chrome.tabs.QueryInfo = {}) => {
+    queries++;
+    if (queries === 1) {
+      await new Promise<void>((resolve) => {
+        holdFirst = resolve;
+      });
+      return [tabs[0]] as chrome.tabs.Tab[]; // the stale world: one tab
+    }
+    return realQuery(info);
+  };
+  try {
+    await chrome.tabs.onActivated.fire({}); // refresh 1 starts (debounced) and blocks on the query
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    await chrome.tabs.onCreated.fire({}); // refresh 2 starts, resolves at once with every tab
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    const fresh = qa(document, ".row").length;
+    assert.ok(fresh > 1, "the newer refresh rendered the full list");
+    holdFirst();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    assert.equal(qa(document, ".row").length, fresh, "the stale result was dropped");
+  } finally {
+    chrome.tabs.query = realQuery;
+  }
+  await chrome.tabs.onActivated.fire({});
+  await new Promise((resolve) => setTimeout(resolve, 200));
 });

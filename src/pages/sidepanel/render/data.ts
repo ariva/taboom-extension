@@ -27,7 +27,11 @@ type TabGroup = chrome.tabGroups.TabGroup;
 // animate only for user-initiated refreshes; background event echoes
 // (tab/storage/focus changes — incl. renders triggered in OTHER open panels)
 // re-render without a view transition
+// two refreshes in flight (an explicit one racing the debounced one): only the newest may land
+let generation = 0;
+
 export async function refresh(animate = false, preloaded: AppState | null = null): Promise<void> {
+  const mine = ++generation;
   const [
     persisted,
     tabs,
@@ -43,6 +47,9 @@ export async function refresh(animate = false, preloaded: AppState | null = null
     sessionStore.get("windowSessionMap"),
     capabilities.tabGroups ? chrome.tabGroups.query({}).catch(() => []) : [],
   ]);
+  if (mine !== generation) {
+    return; // a newer refresh started meanwhile: its answer is the one to show
+  }
   state.tabGroups = new Map(groups.map((group): [number, TabGroup] => [group.id, group]));
   // parked rows have positional ids: a parked list edited elsewhere (another panel, Settings'
   // Restore) moves them under the ticks — the selection goes, as live ids go with their tabs

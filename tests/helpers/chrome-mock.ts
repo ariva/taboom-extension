@@ -279,7 +279,10 @@ export function makeChrome<
     },
     commands: { onCommand: makeEvent<typeof chrome.commands.onCommand>() },
     contextMenus: {
-      removeAll: async () => calls.push("contextMenus.removeAll"),
+      removeAll: (done?: () => void) => {
+        calls.push("contextMenus.removeAll");
+        done?.();
+      },
       create: (props: chrome.contextMenus.CreateProperties) => calls.push(`contextMenus.create ${props.id}`),
       update: (id: string | number, props: Omit<chrome.contextMenus.CreateProperties, "id">, done?: () => void) => {
         calls.push(`contextMenus.update ${id} ${JSON.stringify(props)}`);

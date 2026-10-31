@@ -45,6 +45,16 @@ export function initTabDnd(): void {
       return;
     }
     draggedTabId = Number(row.dataset.tabId);
+    // dragend fires on the source row; a render mid-drag detaches it, so a listener on the list
+    // would miss it and the drag state would outlive the drag — listen on the row itself
+    row.addEventListener(
+      "dragend",
+      () => {
+        draggedTabId = null;
+        clearDropTarget();
+      },
+      { once: true },
+    );
     event.dataTransfer?.setData("text/plain", String(draggedTabId));
     if (event.dataTransfer) {
       event.dataTransfer.effectAllowed = "move";
@@ -101,11 +111,6 @@ export function initTabDnd(): void {
         )
         .then(() => refresh(true));
     }
-    draggedTabId = null;
-    clearDropTarget();
-  });
-
-  listEl.addEventListener("dragend", () => {
     draggedTabId = null;
     clearDropTarget();
   });

@@ -25,7 +25,8 @@ export function registerTagMenuBuilder(builder: () => Promise<void>): void {
 
 export function createContextMenus(): Promise<unknown> {
   return enqueueMenuOp(async () => {
-    await chrome.contextMenus.removeAll();
+    // callback form: the Promise form of removeAll arrived in Chrome 123, the manifest minimum is 121
+    await new Promise<void>((resolve) => chrome.contextMenus.removeAll(resolve));
     chrome.contextMenus.create({ id: "root", title: `${DEV_PREFIX}${getAppName()}`, contexts: ["page"] });
     for (const item of MENU_ITEMS) {
       chrome.contextMenus.create({ ...item, parentId: "root", contexts: ["page"] });
