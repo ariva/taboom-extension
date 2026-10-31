@@ -3,7 +3,7 @@
 import { applyExperimental, featureEnabled, resolveColorScheme, resolveNavMode } from "../../../app/core.ts";
 import { loadState, localStore, sessionStore } from "../../../app/storage.ts";
 import type { AppState } from "../../../app/types.ts";
-import { parkedPanelTabs } from "../../../app/parked.ts";
+import { parkedLayoutKey, parkedPanelTabs } from "../../../app/parked.ts";
 import { getElementById, mustQuery } from "../../../lib/dom.ts";
 import { capabilities } from "../../../lib/platform/capabilities.ts";
 import { filterBar, scopeSelect, sortSelect } from "../foundation/elements.ts";
@@ -43,6 +43,11 @@ export async function refresh(animate = false, preloaded: AppState | null = null
     capabilities.tabGroups ? chrome.tabGroups.query({}).catch(() => []) : [],
   ]);
   state.tabGroups = new Map(groups.map((group): [number, TabGroup] => [group.id, group]));
+  // parked rows have positional ids: a parked list edited elsewhere (another panel, Settings'
+  // Restore) moves them under the ticks — the selection goes, as live ids go with their tabs
+  if (parkedScope() && parkedLayoutKey(state.parked) !== parkedLayoutKey(parkedWindows)) {
+    state.selected.clear();
+  }
   state.parked = parkedWindows;
   state.parkedTrashCount = parkedTrash.length;
   state.tags = tags;

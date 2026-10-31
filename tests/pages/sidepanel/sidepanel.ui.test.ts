@@ -3405,3 +3405,47 @@ test("UI - Sidepanel - A rejecting worker: bulk snooze reports and finishes ever
     chrome.runtime.sendMessage = original;
   }
 });
+
+// Parked rows carry positional ids: after the parked list changes outside this panel (another
+// panel, Settings → Restore last removal), a ticked id names a different tab — the selection
+// must go, as it does for live tabs closed outside the panel
+test("UI - Sidepanel - PARKED_WINDOWS: a parked selection is cleared when the parked list changed elsewhere", {
+  skip: !PARKED_ON,
+}, async () => {
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 200));
+  const tabsOf = (titles: string[]) => titles.map((title) => ({ url: `https://${title}.example.com/`, title }));
+  await chrome.storage.local.set({
+    parkedWindows: [{ id: "p-sel", parkedAt: Date.now(), tabs: tabsOf(["one", "two", "three", "four"]), groups: [] }],
+    parkedTrash: [],
+  });
+  await chrome.storage.onChanged.fire({ parkedWindows: {} }, "local");
+  await settle();
+  const scope = byId<HTMLSelectElement>("scope");
+  scope.value = "parked-windows";
+  scope.dispatchEvent(new window.Event("change", { bubbles: true }));
+  await settle();
+  const rowOf = (title: string) =>
+    must(qa(document, ".row.parked").find((row) => q(row, ".title").textContent === title));
+  q(rowOf("three"), 'input[type="checkbox"]').click();
+  await tick();
+  assert.match(byId("bulk-count").textContent, /1 selected/);
+
+  // tab "one" removed elsewhere: the id ticked above now sits on "four"
+  await chrome.storage.local.set({
+    parkedWindows: [{ id: "p-sel", parkedAt: Date.now(), tabs: tabsOf(["two", "three", "four"]), groups: [] }],
+  });
+  await chrome.storage.onChanged.fire({ parkedWindows: {} }, "local");
+  await settle();
+  assert.match(byId("bulk-count").textContent, /0 selected/, "nothing selected after an outside edit");
+  assert.ok(
+    qa<HTMLInputElement>(document, '.row.parked input[type="checkbox"]').every((box) => !box.checked),
+    "no row ticked",
+  );
+
+  scope.value = "all-windows";
+  scope.dispatchEvent(new window.Event("change", { bubbles: true }));
+  await settle();
+  await chrome.storage.local.set({ parkedWindows: [], parkedTrash: [] });
+  await chrome.storage.onChanged.fire({ parkedWindows: {} }, "local");
+  await settle();
+});

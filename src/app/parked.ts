@@ -269,6 +269,12 @@ function parkedGroupId(windowIndex: number, groupIndex: number): number {
   return -(2 + windowIndex * BASE + groupIndex);
 }
 
+// the layout those ids depend on: which windows, which tabs in which order. Two lists with the
+// same key give every tab the same synthetic id; a different key means ticks may point elsewhere
+export function parkedLayoutKey(list: ParkedWindow[]): string {
+  return list.map((parked) => `${parked.id}:${parked.tabs.map((tab) => tab.url).join(" ")}`).join("\n");
+}
+
 // which parked window / tab a synthetic row id stands for; undefined for a live id
 export function parkedRef(tabId: number): { window: number; tab: number } | undefined {
   if (tabId >= 0) {

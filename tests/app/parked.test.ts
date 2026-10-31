@@ -3,6 +3,7 @@ import { test } from "vitest";
 import {
   addParkedTabs,
   parkedGroupRef,
+  parkedLayoutKey,
   parkedNewestFirst,
   parkedPanelTabs,
   parkedRef,
@@ -243,4 +244,25 @@ test("Parked - newest first: indexes into the list by parkedAt, descending", () 
   const newest = { ...other, id: "p3", parkedAt: NOW + 5 };
   assert.deepEqual(parkedNewestFirst([older, parked, newest]), [2, 1, 0]);
   assert.deepEqual(parkedNewestFirst([]), []);
+});
+
+test("Parked - layout key: same windows, tabs and order give one key; a removed or reordered tab changes it, a rename does not", () => {
+  const a: ParkedWindow[] = [
+    {
+      id: "p1",
+      parkedAt: 1,
+      tabs: [
+        { url: "https://a.test/", title: "A" },
+        { url: "https://b.test/", title: "B" },
+      ],
+      groups: [],
+    },
+  ];
+  const renamed: ParkedWindow[] = [{ ...a[0]!, name: "Work" }];
+  const dropped: ParkedWindow[] = [{ ...a[0]!, tabs: [a[0]!.tabs[1]!] }];
+  const swapped: ParkedWindow[] = [{ ...a[0]!, tabs: [a[0]!.tabs[1]!, a[0]!.tabs[0]!] }];
+  assert.equal(parkedLayoutKey(a), parkedLayoutKey(renamed));
+  assert.notEqual(parkedLayoutKey(a), parkedLayoutKey(dropped));
+  assert.notEqual(parkedLayoutKey(a), parkedLayoutKey(swapped));
+  assert.notEqual(parkedLayoutKey(a), parkedLayoutKey([]));
 });
