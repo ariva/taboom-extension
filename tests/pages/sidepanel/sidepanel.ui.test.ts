@@ -3785,3 +3785,50 @@ test("UI - Sidepanel - An older refresh resolving last does not overwrite the ne
   await chrome.tabs.onActivated.fire({});
   await new Promise((resolve) => setTimeout(resolve, 200));
 });
+
+// the live filter may differ from the stored one on purpose (the Parked scope shows All for a
+// stored awake / snoozed): a ui write that changes something else (theme) must not re-apply the
+// stored trio over it — only a trio that changed in storage is adopted
+test("UI - Sidepanel - PARKED_WINDOWS: a theme-only ui write does not re-apply a stored filter the scope overrides", {
+  skip: !PARKED_ON,
+}, async () => {
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 200));
+  const pressed = () => q(document, '#filters button[aria-pressed="true"]').dataset.filter;
+  await chrome.storage.local.set({
+    parkedWindows: [
+      { id: "p-theme", parkedAt: Date.now(), tabs: [{ url: "https://t.example.com/", title: "T" }], groups: [] },
+    ],
+    parkedTrash: [],
+  });
+  const { ui: before } = await chrome.storage.local.get("ui");
+  const parkedSnoozed = {
+    ...before,
+    defaultFilter: "snoozed",
+    scope: "parked-windows",
+    sort: "recent",
+    panelView: "shared",
+  };
+  await chrome.storage.local.set({ ui: parkedSnoozed });
+  await chrome.storage.onChanged.fire(
+    { ui: { oldValue: before, newValue: parkedSnoozed }, parkedWindows: {} },
+    "local",
+  );
+  await settle();
+  assert.equal(byId<HTMLSelectElement>("scope").value, "parked-windows");
+  assert.equal(pressed(), "all", "the Parked scope shows All for a stored snoozed filter");
+
+  const list = byId("tab-list");
+  list.scrollTop = 500; // somewhere down the list
+  const themed = { ...parkedSnoozed, theme: "light" };
+  await chrome.storage.local.set({ ui: themed });
+  await chrome.storage.onChanged.fire({ ui: { oldValue: parkedSnoozed, newValue: themed } }, "local");
+  await settle();
+  assert.equal(pressed(), "all");
+  assert.equal(list.scrollTop, 500, "nothing in the trio changed in storage: no adoption, no scroll reset");
+
+  const restore = { ...before, panelView: "shared" };
+  await chrome.storage.local.set({ ui: restore, parkedWindows: [], parkedTrash: [] });
+  await chrome.storage.onChanged.fire({ ui: { oldValue: themed, newValue: restore }, parkedWindows: {} }, "local");
+  await settle();
+  assert.equal(byId<HTMLSelectElement>("scope").value, "all-windows");
+});

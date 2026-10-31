@@ -77,7 +77,23 @@ chrome.storage.onChanged.addListener((changes, area) => {
   }
   if (changes.ui?.newValue) {
     // StorageChange values are `unknown`; "ui" is only ever written whole, as UiPrefs
-    adoptStoredView(changes.ui.newValue as Partial<UiPrefs>); // a foreign write: shared view follows it (a cleared store has no new value)
+    const stored = changes.ui.newValue as Partial<UiPrefs>;
+    const before = changes.ui.oldValue as Partial<UiPrefs> | undefined;
+    // only a filter / scope / sort that changed IN STORAGE is adopted: the live trio may differ from
+    // the stored one on purpose (the Parked scope shows All for a stored snoozed, a flag off, a
+    // search that auto-selected All), and a theme write must not re-apply the stored one over it
+    const { defaultFilter, scope, sort, ...rest } = stored;
+    const view: Partial<UiPrefs> = rest;
+    if (before?.defaultFilter !== defaultFilter) {
+      view.defaultFilter = defaultFilter;
+    }
+    if (before?.scope !== scope) {
+      view.scope = scope;
+    }
+    if (before?.sort !== sort) {
+      view.sort = sort;
+    }
+    adoptStoredView(view); // a foreign write: the shared view follows it (a cleared store has no new value)
   }
   scheduleRefresh();
 });
