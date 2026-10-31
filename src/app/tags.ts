@@ -360,12 +360,25 @@ export function restoreTagRemoval(
   }
   const live = new Set(nextTags.map((tag) => tag.id));
   let nextPages = pages;
-  for (const page of popped.newest.items.flatMap((removal) => removal.pages)) {
-    const current = nextPages.find((candidate) => candidate.url === page.url)?.tagIds ?? [];
-    const merged = [...current, ...page.tagIds.filter((id) => live.has(id) && !current.includes(id))];
-    nextPages = setPageTags(nextPages, page.url, merged) ?? nextPages;
-    if (page.disabled) {
-      nextPages = setPageEnabled(nextPages, page.url, false) ?? nextPages; // a whole entry comes back as it left
+  for (const removal of popped.newest.items) {
+    // a page removal (no tags in the action) brings the whole entry back as it left — tagless or
+    // switched off included; a tag removal only re-attaches ids, so an entry it emptied stays
+    // gone when its tag did not return (setPageTags refuses an absent entry with no tags)
+    const wholeEntries = removal.tags.length === 0;
+    for (const page of removal.pages) {
+      const existing = nextPages.find((candidate) => candidate.url === page.url);
+      const current = existing?.tagIds ?? [];
+      const merged = [...current, ...page.tagIds.filter((id) => live.has(id) && !current.includes(id))];
+      if (!existing) {
+        if (merged.length > 0 || wholeEntries) {
+          nextPages = [...nextPages, { ...page, tagIds: merged }];
+        }
+        continue;
+      }
+      nextPages = setPageTags(nextPages, page.url, merged) ?? nextPages;
+      if (page.disabled) {
+        nextPages = setPageEnabled(nextPages, page.url, false) ?? nextPages;
+      }
     }
   }
   return { tags: nextTags, tagPages: nextPages, tagTrash: popped.rest };

@@ -229,6 +229,32 @@ test("Tags - restoreTagRemoval merges tags and page ids back, skips a name taken
   assert.equal(restoreTagRemoval(TAGS, PAGES, []), undefined);
 });
 
+// a page entry comes back as it left: tagless (its last chip unticked — allowed) or switched
+// off; before, the restore routed through setPageTags, which refuses an absent entry with no tags
+test("Tags - restoreTagRemoval brings back a tagless and a disabled page entry as they left", () => {
+  const pages = [
+    { url: "https://a.test/x", tagIds: [] },
+    { url: "b.test", tagIds: ["t1"], disabled: true },
+    { url: "https://c.test/", tagIds: ["t2"] },
+  ];
+  const gone = removeTagPages(pages, ["https://a.test/x", "b.test"]);
+  assert.ok(gone);
+  const trash = recordRemoval([], [gone.removed], 1);
+  const back = restoreTagRemoval(TAGS, gone.pages, trash);
+  assert.deepEqual(back?.tagPages, [
+    { url: "https://c.test/", tagIds: ["t2"] },
+    { url: "https://a.test/x", tagIds: [] },
+    { url: "b.test", tagIds: ["t1"], disabled: true },
+  ]);
+  // a disabled entry whose tag died meanwhile still returns, tagless and still off
+  const dead = restoreTagRemoval(
+    TAGS.filter((tag) => tag.id !== "t1"),
+    gone.pages,
+    trash,
+  );
+  assert.deepEqual(dead?.tagPages.at(-1), { url: "b.test", tagIds: [], disabled: true });
+});
+
 test("Tags - pageCountByTag counts the pages carrying each tag", () => {
   assert.deepEqual(
     [...pageCountByTag(PAGES)],
