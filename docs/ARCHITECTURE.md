@@ -92,6 +92,7 @@ Two things worth knowing before changing this folder:
 | `platform/capabilities.ts`, `platform/favicon.ts`, `platform/panel.ts` | The one browser-specific seam: feature detection, `_favicon/` URLs, side-panel open / toolbar behaviour. Chromium implementation only; app code asks for a capability, never for a browser name. |
 | `ui/ask-dialog.ts` | confirm / prompt on the native `<dialog>`, optional swatches and a `validate` hook (a message keeps it open) |
 | `ui/inline-edit.ts` | label → input editing, including "the press that ends an edit only ends the edit"; a host re-rendered mid-edit drops the edit (Chrome fires blur on the removed input — that blur never commits) |
+| `ui/typing.ts` | `isBeingTyped(field)`: `input` fired, `change` / blur not yet — a form re-rendered on storage events skips such a field instead of overwriting the keystrokes |
 | `ui/context-menu.ts` | popover menu with hover-intent submenus |
 | `ui/dropdown.ts` | custom select that positions inside a side panel |
 | `ui/toast.ts` | transient message |

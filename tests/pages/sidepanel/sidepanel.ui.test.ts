@@ -3449,3 +3449,47 @@ test("UI - Sidepanel - PARKED_WINDOWS: a parked selection is cleared when the pa
   await chrome.storage.onChanged.fire({ parkedWindows: {} }, "local");
   await settle();
 });
+
+// a ticked tag removed (or disabled) in Settings must leave the filter: kept, it matched nothing
+// while the chip read "Tags" as if nothing were ticked
+test("UI - Sidepanel - TAGS: a ticked tag removed elsewhere leaves the Tags filter", { skip: !TAGS_ON }, async () => {
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 200));
+  const urlOf = (id: number) => tabs.find((tab) => tab.id === id)?.url ?? "";
+  await chrome.storage.local.set({
+    tags: [
+      { id: "t-stale", name: "Stale", color: "blue" },
+      { id: "t-keep", name: "Keep", color: "red" },
+    ],
+    tagPages: [
+      { url: urlOf(2), tagIds: ["t-stale"] },
+      { url: urlOf(3), tagIds: ["t-keep"] },
+    ],
+  });
+  await chrome.storage.onChanged.fire({ tags: {}, tagPages: {} }, "local");
+  await settle();
+  const chip = q(document, '#filters button[data-filter="tags"]');
+  const pop = byId("tags-pop");
+  chip.click();
+  await tick();
+  must(qa(pop, ".tag-pick").find((el) => q(el, ".tag-name").textContent === "Stale"))
+    .querySelector("input")
+    ?.click();
+  await tick();
+  assert.equal(q(chip, ".chip-label").textContent, "Stale");
+  const shown = () => qa(document, ".row").map((el) => el.dataset.tabId);
+  assert.deepEqual(shown(), ["2"]);
+
+  await chrome.storage.local.set({
+    tags: [{ id: "t-keep", name: "Keep", color: "red" }],
+    tagPages: [{ url: urlOf(3), tagIds: ["t-keep"] }],
+  });
+  await chrome.storage.onChanged.fire({ tags: {}, tagPages: {} }, "local");
+  await settle();
+  assert.equal(q(chip, ".chip-label").textContent, "Tags", "no tick left");
+  assert.deepEqual(shown(), ["3"], "no tick = every tagged tab, not an empty list");
+
+  q(document, '#filters button[data-filter="all"]').click();
+  await chrome.storage.local.set({ tags: [], tagPages: [] });
+  await chrome.storage.onChanged.fire({ tags: {}, tagPages: {} }, "local");
+  await settle();
+});

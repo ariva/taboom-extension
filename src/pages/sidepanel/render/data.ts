@@ -4,6 +4,7 @@ import { applyExperimental, featureEnabled, resolveColorScheme, resolveNavMode }
 import { loadState, localStore, sessionStore } from "../../../app/storage.ts";
 import type { AppState } from "../../../app/types.ts";
 import { parkedLayoutKey, parkedPanelTabs } from "../../../app/parked.ts";
+import { enabledTags } from "../../../app/tags.ts";
 import { getElementById, mustQuery } from "../../../lib/dom.ts";
 import { capabilities } from "../../../lib/platform/capabilities.ts";
 import { filterBar, scopeSelect, sortSelect } from "../foundation/elements.ts";
@@ -51,6 +52,14 @@ export async function refresh(animate = false, preloaded: AppState | null = null
   state.parked = parkedWindows;
   state.parkedTrashCount = parkedTrash.length;
   state.tags = tags;
+  // a ticked tag removed or disabled in Settings leaves the filter: kept, it would match nothing
+  // while the chip (which names enabled tags only) read "Tags"
+  const enabledIds = new Set(enabledTags(tags).map((tag) => tag.id));
+  for (const tagId of [...state.tagFilter]) {
+    if (!enabledIds.has(tagId)) {
+      state.tagFilter.delete(tagId);
+    }
+  }
   state.tagPages = tagPages;
   state.rules = persisted.protectionRules;
   state.keepAlive = keepAlive;

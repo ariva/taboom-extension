@@ -5,6 +5,7 @@ import { saveState } from "../../app/storage.ts";
 import type { AppState, Settings } from "../../app/types.ts";
 import { getElementById } from "../../lib/dom.ts";
 import { toast } from "../../lib/ui/toast.ts";
+import { isBeingTyped } from "../../lib/ui/typing.ts";
 import { clampedNumber } from "./model.ts";
 import { flashSaved } from "./page-state.ts";
 
@@ -23,6 +24,11 @@ const SETTING_IDS: (keyof Settings)[] = [
 export function renderSettings(state: AppState): void {
   for (const id of SETTING_IDS) {
     const input = getElementById(id);
+    // the page re-renders on every storage write (a keep-alive reload tick, a panel pref click):
+    // a field being typed in keeps its text; once it commits or blurs it follows the store again
+    if (isBeingTyped(input)) {
+      continue;
+    }
     if (input.type === "checkbox") {
       input.checked = Boolean(state.settings[id]);
     } else {

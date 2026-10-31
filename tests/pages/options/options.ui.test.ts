@@ -272,6 +272,33 @@ test("UI - Options - External rule change re-renders the protection list", async
   assert.match(q(document, "#rules li").textContent, /elsewhere\.example\.com/);
 });
 
+// the page re-renders on every storage write (keep-alive reload bookkeeping, a panel pref click):
+// a field being typed in must keep its text — only a blurred field follows the store
+test("UI - Options - A focused number field keeps its typed value across an external re-render", async () => {
+  const minutes = byId<HTMLInputElement>("inactivityMinutes");
+  minutes.focus();
+  minutes.value = "12";
+  minutes.dispatchEvent(new window.Event("input", { bubbles: true }));
+  await chrome.storage.onChanged.fire({ keepAlive: {} }, "local");
+  await tick();
+  await tick();
+  assert.equal(minutes.value, "12", "a focused field keeps what was typed");
+  minutes.dispatchEvent(new window.Event("blur"));
+  await chrome.storage.onChanged.fire({ keepAlive: {} }, "local");
+  await tick();
+  await tick();
+  assert.equal(minutes.value, String(stored.settings.inactivityMinutes), "blurred without a change: back to the store");
+  const zoom = byId<HTMLInputElement>("fontSize-custom");
+  zoom.focus();
+  zoom.value = "1.3";
+  zoom.dispatchEvent(new window.Event("input", { bubbles: true }));
+  await chrome.storage.onChanged.fire({ ui: {} }, "local");
+  await tick();
+  await tick();
+  assert.equal(zoom.value, "1.3", "the custom zoom field too");
+  zoom.dispatchEvent(new window.Event("blur"));
+});
+
 test("UI - Options - History-nav dropdown persists the mode", async () => {
   const { resolveNavMode, applyExperimental } = await import("../../../src/app/core.ts");
   const select = byId<HTMLSelectElement>("historyNav");

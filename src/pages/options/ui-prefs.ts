@@ -4,6 +4,7 @@ import { applyExperimental, featureEnabled, resolveColorScheme, resolveNavMode }
 import { loadState, saveState } from "../../app/storage.ts";
 import type { AppState, FeatureName, UiPrefs } from "../../app/types.ts";
 import { getElementById, mustQuery } from "../../lib/dom.ts";
+import { isBeingTyped } from "../../lib/ui/typing.ts";
 import { clampFontSize, FONT_SIZE_STEPS, stepFontSize } from "./model.ts";
 import { flashSaved, getFeatures } from "./page-state.ts";
 
@@ -62,7 +63,10 @@ function renderZoom(fontSize: number) {
   const custom = !FONT_SIZE_STEPS.includes(fontSize);
   getElementById("fontSize").value = custom ? "custom" : String(fontSize);
   getElementById("fontSize-custom-box").hidden = !custom;
-  getElementById("fontSize-custom").value = String(fontSize);
+  const customInput = getElementById("fontSize-custom");
+  if (!isBeingTyped(customInput)) {
+    customInput.value = String(fontSize); // mid-typing the text stays (see renderSettings)
+  }
   getElementById("fontSize-dec").disabled = stepFontSize(fontSize, -1) === fontSize;
   getElementById("fontSize-inc").disabled = stepFontSize(fontSize, 1) === fontSize;
   // CSS zoom, not a root font-size: this page sizes things in px, and zoom scales
