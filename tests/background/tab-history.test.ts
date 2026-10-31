@@ -119,3 +119,23 @@ test("Tab history - Manual switches after the jumps are all recorded", skip, asy
   await userFocusesWindow(1);
   assert.deepEqual(await history(), { stack: [2, 3, 4, 5, 3], cursor: 4 }, "no activation swallowed");
 });
+
+// only a vanished tab leaves the trail; a window that refuses focus (minimized, another
+// desktop) must not cost the tab its place
+test("Tab history - A window refusing focus on a jump keeps the tab in the trail", skip, async () => {
+  const before = await history();
+  const realUpdate = chrome.windows.update;
+  chrome.windows.update = async (id: number) => {
+    calls.push(`windows.update ${id}`);
+    throw new Error(`Cannot focus window ${id}`);
+  };
+  try {
+    await chrome.commands.onCommand.fire(before.cursor > 0 ? "history-back" : "history-forward");
+    await tick();
+  } finally {
+    chrome.windows.update = realUpdate;
+  }
+  const after = await history();
+  assert.deepEqual(after.stack, before.stack, "the trail is untouched");
+  assert.notEqual(after.cursor, before.cursor, "the cursor moved to the tab that did activate");
+});

@@ -10,3 +10,9 @@ export function toast(message: string): void {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => (el.hidden = true), 5000);
 }
+
+// "Could not <what>: <reason>" for a rejected chrome.* call or an error answer — the one
+// wording every failed action reports with
+export function toastFailure(what: string, error: unknown): void {
+  toast(`Could not ${what}: ${error instanceof Error ? error.message : String(error)}`);
+}

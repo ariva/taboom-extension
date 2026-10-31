@@ -32,7 +32,8 @@ import {
   tagsActive,
 } from "../foundation/state.ts";
 import { parkWindowPrompt } from "../ops/parked-ops.ts";
-import { orderedWindowIds, windowLabel } from "../ops/window-ops.ts";
+import { focusWindow, orderedWindowIds, windowLabel } from "../ops/window-ops.ts";
+import { reportAnswer } from "../ops/answer.ts";
 import { fillGroupRows, registerPopoverRefill, startRenameTabGroupInList } from "./groups.ts";
 import { duplicateSets } from "../../../app/duplicates.ts";
 import { keepAliveEntry } from "../../../app/keep-alive.ts";
@@ -356,7 +357,7 @@ function startRenameWindowInList(windowId: number): void {
   inlineEdit(title, {
     initial: state.liveWindowMeta.get(windowId)?.name ?? "",
     placeholder: "Window name",
-    commit: (name) => send({ type: "window-rename", windowId, name }),
+    commit: async (name) => reportAnswer(await send({ type: "window-rename", windowId, name }), "rename the window"),
     finish: () => {
       fillWindowsPopover(); // fresh name in place, popover stays open
       refresh(false);
@@ -370,7 +371,7 @@ function openWindowListMenu(event: MouseEvent, windowId: number): void {
   clearCtxMenu();
   ctxAppend(ctxTitle(windowLabel(windowId)), ctxDivider());
   if (windowId !== state.currentWindowId) {
-    ctxAppend(ctxItem("Focus window", () => chrome.windows.update(windowId, { focused: true })));
+    ctxAppend(ctxItem("Focus window", () => focusWindow(windowId)));
   }
   appendWindowIdentityItems(windowId, startRenameWindowInList);
   if (parkedActive()) {

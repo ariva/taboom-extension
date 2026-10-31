@@ -24,6 +24,7 @@ import { listEl } from "../foundation/elements.ts";
 import { refresh } from "../foundation/scheduler.ts";
 import { state } from "../foundation/state.ts";
 import { closeTabs } from "./actions.ts";
+import { reportAnswer } from "./answer.ts";
 import { windowLabel } from "./window-ops.ts";
 
 // the parked window a synthetic window id (or any of its row ids) stands for
@@ -61,7 +62,7 @@ export async function parkWindowPrompt(windowId: number): Promise<void> {
       return;
     }
   }
-  await send({ type: "park-window", windowId });
+  reportAnswer(await send({ type: "park-window", windowId }), "park the window");
   refresh(true);
 }
 
@@ -71,7 +72,7 @@ export async function restoreParked(syntheticWindowId: number, intoCurrentWindow
     return;
   }
   const into = intoCurrentWindow && state.currentWindowId != null ? { intoWindowId: state.currentWindowId } : {};
-  await send({ type: "restore-parked", id: parked.id, ...into });
+  reportAnswer(await send({ type: "restore-parked", id: parked.id, ...into }), "restore the window");
   refresh(true);
 }
 
@@ -139,7 +140,7 @@ export async function moveParkedTabs(
   asGroup = false,
 ): Promise<void> {
   for (const [id, indexes] of byParkedWindow(tabIds)) {
-    await send({ type: "move-parked-tabs", id, indexes, target, keep, asGroup });
+    reportAnswer(await send({ type: "move-parked-tabs", id, indexes, target, keep, asGroup }), "move the parked tabs");
   }
   for (const tabId of tabIds) {
     state.selected.delete(tabId);

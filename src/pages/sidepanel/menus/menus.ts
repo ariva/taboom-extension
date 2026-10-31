@@ -46,6 +46,7 @@ import { openParkedGroupMenu, openParkedTabMenu, openParkedWindowMenu } from "./
 import { appendTagItems } from "./tag-menu.ts";
 import { appendSplitItems } from "./split-menu.ts";
 import {
+  focusWindow,
   moveTabsToWindow,
   orderedWindowIds,
   setWindowColor,
@@ -305,7 +306,7 @@ export function openWindowHeaderMenu(event: MouseEvent, windowId: number): void 
   if (namesActive()) {
     // "Focus window" — bring that window to front (pointless on the current one)
     if (windowId !== state.currentWindowId) {
-      ctxAppend(ctxItem("Focus window", () => chrome.windows.update(windowId, { focused: true })));
+      ctxAppend(ctxItem("Focus window", () => focusWindow(windowId)));
     }
     // "Rename window…" + "Window color ▸" (palette swatches + Auto)
     appendWindowIdentityItems(windowId);

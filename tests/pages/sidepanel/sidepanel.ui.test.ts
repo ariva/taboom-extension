@@ -3401,8 +3401,80 @@ test("UI - Sidepanel - A rejecting worker: bulk snooze reports and finishes ever
     byId("hist-back").click();
     byId("hist-forward").click();
     await tick(); // an unhandled rejection here fails the run
+
+    // an op that awaits the worker's answer says so when the answer is an error
+    byId("toast").textContent = "";
+    q(document, '.row[data-tab-id="1"]').dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+    must(qa(byId("ctx-menu"), ".ctx-item").find((el) => /^Protect domain/.test(el.textContent ?? ""))).click();
+    await tick();
+    await tick();
+    assert.match(byId("toast").textContent, /Could not protect.*Receiving end does not exist/);
   } finally {
     chrome.runtime.sendMessage = original;
+  }
+});
+
+// a row whose window vanished between the render and the click: no unhandled rejection, a
+// message, and a refresh so the stale row goes
+test("UI - Sidepanel - Activating a tab whose window is gone reports instead of rejecting", async () => {
+  const original = chrome.windows.update;
+  chrome.windows.update = async (id: number) => {
+    calls.push(`windows.update ${id}`);
+    throw new Error(`No window with id: ${id}.`);
+  };
+  try {
+    byId("toast").textContent = "";
+    calls.length = 0;
+    q(document, '.row[data-tab-id="2"] .title').click();
+    await tick();
+    await tick();
+    assert.match(byId("toast").textContent, /Could not switch to the tab: No window with id/);
+    await tick(); // an unhandled rejection here fails the run
+  } finally {
+    chrome.windows.update = original;
+  }
+});
+
+// one id closed meanwhile must not stop the batch: every live tab closes, the stale ones are named
+test("UI - Sidepanel - Bulk close with a stale id closes the live tabs and reports the rest", async () => {
+  const original = chrome.tabs.remove;
+  const fixture = [...tabs];
+  const removed: number[] = [];
+  // Chrome-faithful: the list is removed in order and the call rejects at the first unknown id
+  chrome.tabs.remove = async (ids: number | number[]) => {
+    for (const id of Array.isArray(ids) ? ids : [ids]) {
+      const index = tabs.findIndex((tab) => tab.id === id);
+      if (index === -1) {
+        throw new Error(`No tab with id: ${id}.`);
+      }
+      tabs.splice(index, 1);
+      removed.push(id);
+    }
+    return removed.length; // the stub's own signature (calls.push): nothing reads the result
+  };
+  const confirmBefore = window.confirm;
+  window.confirm = () => true;
+  try {
+    q(document, '#filters button[data-filter="all"]').click();
+    await tick();
+    for (const id of [1, 2, 3]) {
+      q<HTMLInputElement>(document, `.row[data-tab-id="${id}"] input[type="checkbox"]`).click();
+    }
+    await tick();
+    tabs.splice(
+      tabs.findIndex((tab) => tab.id === 2),
+      1,
+    ); // closed elsewhere inside the debounce
+    byId("toast").textContent = "";
+    byId("bulk-close").click();
+    await tick();
+    await tick();
+    assert.deepEqual(removed.sort(), [1, 3], "every live tab closed, the stale id did not stop the batch");
+    assert.match(byId("toast").textContent, /already closed/);
+  } finally {
+    chrome.tabs.remove = original;
+    window.confirm = confirmBefore;
+    tabs.splice(0, tabs.length, ...fixture);
   }
 });
 

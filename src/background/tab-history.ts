@@ -109,17 +109,17 @@ async function jumpWithin(hist: TabHistory, cursor: number): Promise<TabHistory 
     return null;
   }
   const tabId = hist.stack[cursor]!; // cursor is bounds-checked just above
-  try {
-    const tab = await chrome.tabs.get(tabId);
-    // tab first, window second: the focus change then finds the target already active,
-    // so recordWindowFocus records it (a no-op) and not the window's previous tab
-    await chrome.tabs.update(tabId, { active: true });
-    await chrome.windows.update(tab.windowId, { focused: true });
-    return { ...hist, cursor };
-  } catch {
+  const tab = await chrome.tabs.get(tabId).catch(() => undefined);
+  if (!tab) {
     // tab already gone (e.g. closed while worker slept) — drop it, stay put
     return removeFromHistory(hist, tabId);
   }
+  // tab first, window second: the focus change then finds the target already active,
+  // so recordWindowFocus records it (a no-op) and not the window's previous tab.
+  // Only a vanished tab leaves the trail: a window refusing focus keeps the tab its place
+  await chrome.tabs.update(tabId, { active: true }).catch(() => {});
+  await chrome.windows.update(tab.windowId, { focused: true }).catch(() => {});
+  return { ...hist, cursor };
 }
 
 // Jumps start one at a time. Chrome echoes a jump as tabs.onActivated / windows.onFocusChanged

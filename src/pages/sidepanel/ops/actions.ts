@@ -5,8 +5,9 @@ import { isUnloaded } from "../../../app/core.ts";
 import { send } from "../../../app/messages.ts";
 import { parkedRef } from "../../../app/parked.ts";
 import { pauseKeepAlive } from "../../../app/storage.ts";
-import { toast } from "../../../lib/ui/toast.ts";
+import { toast, toastFailure } from "../../../lib/ui/toast.ts";
 import { refresh } from "../foundation/scheduler.ts";
+import { reportAnswer } from "./answer.ts";
 import { state } from "../foundation/state.ts";
 import type { PanelTab } from "../foundation/state.ts";
 import { hostsOf, urlsOf } from "../model/tab-hosts.ts";
@@ -22,9 +23,15 @@ export async function activate(tab: PanelTab): Promise<void> {
   if (parkedRef(tab.id)) {
     return; // a parked snapshot has no window to focus (row click / Enter: the menu is the way in)
   }
-  await chrome.windows.update(tab.windowId, { focused: true });
-  await chrome.tabs.update(tab.id, { active: true });
-  state.followCurrent = true;
+  try {
+    await chrome.windows.update(tab.windowId, { focused: true });
+    await chrome.tabs.update(tab.id, { active: true });
+    state.followCurrent = true;
+  } catch (error) {
+    // the tab or its window went between the render and the click: say so, drop the stale row
+    toastFailure("switch to the tab", error);
+    refresh(false);
+  }
 }
 
 // an action consumes only the tabs it acted on — the rest of the selection
@@ -84,8 +91,14 @@ export async function closeTabs(
   await beforeClose?.();
   try {
     await chrome.tabs.remove(tabIds);
-  } catch (error) {
-    console.debug("close failed", error);
+  } catch {
+    // the list stopped at a tab that is already gone: close what is still open, say so
+    const live = new Set((await chrome.tabs.query({})).map((tab) => tab.id));
+    const open = tabIds.filter((tabId) => live.has(tabId));
+    if (open.length > 0) {
+      await chrome.tabs.remove(open).catch(() => {});
+    }
+    toast("Could not close every tab: some were already closed");
   }
   unselect(tabIds);
   refresh(true);
@@ -99,28 +112,28 @@ export async function pinTabs(tabIds: number[], pinned: boolean): Promise<void> 
 }
 
 export async function protectTabs(tabIds: number[]): Promise<void> {
-  await send({ type: "protect-hosts", hosts: hostsOf(state.allTabs, tabIds) });
+  reportAnswer(await send({ type: "protect-hosts", hosts: hostsOf(state.allTabs, tabIds) }), "protect the site");
   unselect(tabIds);
   refresh(true);
 }
 
 // exact addresses, so two tabs on one host can differ; the host stays snoozable
 export async function protectUrls(tabIds: number[]): Promise<void> {
-  await send({ type: "protect-urls", urls: urlsOf(state.allTabs, tabIds) });
+  reportAnswer(await send({ type: "protect-urls", urls: urlsOf(state.allTabs, tabIds) }), "protect the page");
   unselect(tabIds);
   refresh(true);
 }
 
 // by url: removes the host rule covering the page and its exact url rule alike
 export async function unprotectTabs(tabIds: number[]): Promise<void> {
-  await send({ type: "unprotect-urls", urls: urlsOf(state.allTabs, tabIds) });
+  reportAnswer(await send({ type: "unprotect-urls", urls: urlsOf(state.allTabs, tabIds) }), "unprotect");
   unselect(tabIds);
   refresh(true);
 }
 
 // keep-it-alive marks follow the page (by url), so the selection stays — nothing was consumed
 export async function keepAlive(tabIds: number[], kept: boolean): Promise<void> {
-  await send({ type: "keep-alive-set", tabIds, kept });
+  reportAnswer(await send({ type: "keep-alive-set", tabIds, kept }), kept ? "keep the page alive" : "unmark the page");
   refresh(true);
 }
 
