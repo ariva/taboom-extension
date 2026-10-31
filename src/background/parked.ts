@@ -3,7 +3,7 @@
 // groups and the active tab; move = open picked parked tabs somewhere live.
 import type { MessageError, ParkedTarget } from "../app/messages.ts";
 import { restorePlan, snapshotWindow } from "../app/parked.ts";
-import { addParkedWindow, dropParkedTabs, localStore } from "../app/storage.ts";
+import { addParkedWindow, dropParkedTabsByUrl, localStore } from "../app/storage.ts";
 import { capabilities } from "../lib/platform/capabilities.ts";
 import { patchWindowProfiles, windowProfileOf } from "./window-profiles.ts";
 
@@ -109,9 +109,10 @@ export async function restoreParked(id: string, intoWindowId?: number): Promise<
   }
   const plan = restorePlan(parked);
   const { windowId, ids } = await openTabs(plan.urls, plan.pinned, intoWindowId);
-  const opened = ids.flatMap((tabId, index) => (tabId === undefined ? [] : [index]));
+  // consumed by address, not position: the snapshot may have been edited while the tabs opened
+  const opened = ids.flatMap((tabId, index) => (tabId === undefined ? [] : [plan.urls[index] ?? ""]));
   if (opened.length > 0) {
-    await dropParkedTabs(id, opened);
+    await dropParkedTabsByUrl(id, opened);
   }
   if (windowId === undefined) {
     return { error: "none of its addresses could be opened" };
@@ -185,9 +186,9 @@ export async function moveParkedTabs(
   }
   // only what opened leaves the snapshot (restore does the same): a target window closed
   // after the menu was built, or an address Chrome refused, keeps its tab parked
-  const opened = indexes.filter((_, position) => ids[position] !== undefined);
+  const opened = picked.flatMap((tab, position) => (ids[position] === undefined ? [] : [tab.url]));
   if (!keep && opened.length > 0) {
-    await dropParkedTabs(id, opened);
+    await dropParkedTabsByUrl(id, opened);
   }
   return opened.length === 0 ? { error: "none of the addresses could be opened" } : undefined;
 }

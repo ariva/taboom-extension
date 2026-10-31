@@ -9,9 +9,10 @@ import {
 } from "./keep-alive.ts";
 import {
   addParkedTabs,
-  removedParkedSlice,
   removeParkedTabs,
+  removeParkedTabsByUrl,
   removeParkedWindow,
+  removedParkedSlice,
   renameParkedGroup,
   renameParkedWindow,
   restoreParkedRemoval,
@@ -253,8 +254,8 @@ export function appendParkedTabs(id: string, tabs: ParkedTab[]): Promise<boolean
 }
 
 // tabs moved into a live window (or forgotten one by one) leave the snapshot — not a removal, no trash
-export function dropParkedTabs(id: string, indexes: number[]): Promise<boolean> {
-  return editParked((list) => removeParkedTabs(list, id, indexes));
+export function dropParkedTabsByUrl(id: string, urls: string[]): Promise<boolean> {
+  return editParked((list) => removeParkedTabsByUrl(list, id, urls));
 }
 
 // Remove parked tab / group: the removed slice lands in the trash as its own entry, so Restore

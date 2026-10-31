@@ -46,7 +46,7 @@ test("Core - Storage - Parked windows: add, rename, drop tabs, take, forget to t
   Object.assign(globalThis, { chrome: makeChrome({ stored, calls }) });
   const {
     addParkedWindow,
-    dropParkedTabs,
+    dropParkedTabsByUrl,
     forgetParkedWindow,
     renameParked,
     renameParkedGroupTitle,
@@ -99,13 +99,13 @@ test("Core - Storage - Parked windows: add, rename, drop tabs, take, forget to t
     ["A", "B"],
     "…and back in its window",
   );
-  assert.equal(await dropParkedTabs("p1", [1]), true);
+  assert.equal(await dropParkedTabsByUrl("p1", ["https://b.example.com/"]), true);
   assert.deepEqual(
     stored.parkedWindows?.[0]?.tabs.map((tab) => tab.title),
     ["A"],
   );
-  assert.equal(await dropParkedTabs("p1", [7]), false);
-  assert.equal(await dropParkedTabs("p2", [0]), true, "last tab out = window out");
+  assert.equal(await dropParkedTabsByUrl("p1", ["https://zz.example.com/"]), false);
+  assert.equal(await dropParkedTabsByUrl("p2", ["https://c.example.com/"]), true, "last tab out = window out");
   assert.deepEqual(
     stored.parkedWindows?.map((parked) => parked.id),
     ["p1"],

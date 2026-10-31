@@ -4002,3 +4002,13 @@ test("UI - Sidepanel - Two own ui writes before their echoes: neither echo is ad
   q(document, '#filters button[data-filter="all"]').click();
   await tick();
 });
+
+// the current window is the last focused NORMAL (or popup) window: a focused undocked DevTools
+// window must not become the panel's "current window" (an empty Current window scope)
+test("UI - Sidepanel - The current window is asked for among normal and popup windows only", async () => {
+  calls.length = 0;
+  await chrome.tabs.onActivated.fire({});
+  await new Promise((resolve) => setTimeout(resolve, 200));
+  const asked = calls.find((c) => c.startsWith("windows.getLastFocused")) ?? "";
+  assert.match(asked, /"windowTypes":\["normal","popup"\]/);
+});

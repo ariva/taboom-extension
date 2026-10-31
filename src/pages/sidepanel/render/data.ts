@@ -42,7 +42,7 @@ export async function refresh(animate = false, preloaded: AppState | null = null
   ] = await Promise.all([
     preloaded ?? loadState(), // startup passes its already-read state — no second read
     chrome.tabs.query({}),
-    chrome.windows.getLastFocused(),
+    chrome.windows.getLastFocused({ windowTypes: ["normal", "popup"] }), // not a focused DevTools / app window: the list never shows those
     localStore.get(["windowProfiles", "keepAlive", "parkedWindows", "parkedTrash", "tags", "tagPages"]),
     sessionStore.get("windowSessionMap"),
     capabilities.tabGroups ? chrome.tabGroups.query({}).catch(() => []) : [],

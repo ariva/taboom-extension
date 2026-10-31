@@ -218,7 +218,10 @@ export function makeChrome<
     },
     windows: {
       WINDOW_ID_NONE: -1,
-      getLastFocused: async () => ({ id: 1 }),
+      getLastFocused: async (info?: chrome.windows.QueryOptions) => {
+        calls.push(`windows.getLastFocused ${JSON.stringify(info ?? {})}`);
+        return { id: 1 };
+      },
       getCurrent: async () => ({ id: 1 }),
       getAll: async () =>
         [...new Set(tabs.map((t) => t.windowId))].map((id) => ({

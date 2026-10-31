@@ -54,7 +54,21 @@ export function onKeepAliveAlarm(alarm: chrome.alarms.Alarm): void {
   }
 }
 
-export async function keepAlivePass(): Promise<void> {
+// Every read-modify-write of the mark list in the worker runs on this chain: a sweep alarm due
+// at browser start and the startup stagger otherwise both read the same list and the loser's
+// write re-times pages the winner just reloaded
+let keepAliveChain: Promise<unknown> = Promise.resolve();
+function queuedKeepAlive<T>(work: () => Promise<T>): Promise<T> {
+  const next = keepAliveChain.then(work, work);
+  keepAliveChain = next.catch(() => {});
+  return next;
+}
+
+export function keepAlivePass(): Promise<void> {
+  return queuedKeepAlive(keepAlivePassNow);
+}
+
+async function keepAlivePassNow(): Promise<void> {
   const list = await activeKeepAliveList();
   if (list.length === 0) {
     return;
@@ -96,12 +110,14 @@ export async function keepAlivePass(): Promise<void> {
 
 // runtime.onStartup: the marks that came due while Chrome was closed reload one every 30–60 s
 // from now, not all in the first sweep; the rest keep their time
-export async function staggerOverdueKeepAlive(): Promise<void> {
-  const { keepAlive = [] } = await localStore.get("keepAlive");
-  const next = staggerKeepAlive(keepAlive, Date.now());
-  if (next) {
-    await localStore.set({ keepAlive: next });
-  }
+export function staggerOverdueKeepAlive(): Promise<void> {
+  return queuedKeepAlive(async () => {
+    const { keepAlive = [] } = await localStore.get("keepAlive");
+    const next = staggerKeepAlive(keepAlive, Date.now());
+    if (next) {
+      await localStore.set({ keepAlive: next });
+    }
+  });
 }
 
 async function markTabs(tabs: chrome.tabs.Tab[]): Promise<boolean> {
@@ -164,7 +180,11 @@ export async function syncKeepAliveMenuOnNavigation(
 }
 
 // the main checkbox went on: every mark starts over from now
-export async function restartKeepAlive(): Promise<void> {
+export function restartKeepAlive(): Promise<void> {
+  return queuedKeepAlive(restartKeepAliveNow);
+}
+
+async function restartKeepAliveNow(): Promise<void> {
   const { keepAlive = [] } = await localStore.get("keepAlive");
   if (keepAlive.length > 0) {
     await localStore.set({ keepAlive: rearmAllKeepAlive(keepAlive, Date.now()) });

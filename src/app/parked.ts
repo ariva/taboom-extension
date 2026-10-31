@@ -128,6 +128,31 @@ export function removeParkedTabs(list: ParkedWindow[], id: string, indexes: numb
   });
 }
 
+// Restore / move consumed their tabs by position — and a snapshot edited elsewhere during the
+// seconds a big restore takes (a parked tab removed from another panel) shifts positions: a tab
+// that never opened was dropped, an opened one stayed. The opened ADDRESSES leave instead, one
+// occurrence per address, whatever happened to the list meanwhile.
+export function removeParkedTabsByUrl(list: ParkedWindow[], id: string, urls: string[]): ParkedWindow[] | undefined {
+  const pending = new Map<string, number>();
+  for (const url of urls) {
+    pending.set(url, (pending.get(url) ?? 0) + 1);
+  }
+  return patchParked(list, id, (parked) => {
+    const tabs = parked.tabs.filter((tab) => {
+      const left = pending.get(tab.url) ?? 0;
+      if (left === 0) {
+        return true;
+      }
+      pending.set(tab.url, left - 1);
+      return false;
+    });
+    if (tabs.length === parked.tabs.length) {
+      return undefined;
+    }
+    return tabs.length === 0 ? null : { ...parked, tabs };
+  });
+}
+
 // The removed tabs as a parked window of their own (same id / name / time, only the groups
 // they are in) — what the trash keeps, so Undo remove can put them back
 export function removedParkedSlice(parked: ParkedWindow, indexes: number[]): ParkedWindow | undefined {

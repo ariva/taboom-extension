@@ -4,6 +4,7 @@ import {
   addParkedTabs,
   parkedGroupRef,
   parkedLayoutKey,
+  removeParkedTabsByUrl,
   parkedNewestFirst,
   parkedPanelTabs,
   parkedRef,
@@ -265,4 +266,35 @@ test("Parked - layout key: same windows, tabs and order give one key; a removed 
   assert.notEqual(parkedLayoutKey(a), parkedLayoutKey(dropped));
   assert.notEqual(parkedLayoutKey(a), parkedLayoutKey(swapped));
   assert.notEqual(parkedLayoutKey(a), parkedLayoutKey([]));
+});
+
+test("Parked - remove by url: one occurrence per address leaves, whatever the positions are now", () => {
+  const list: ParkedWindow[] = [
+    {
+      id: "p1",
+      parkedAt: 1,
+      tabs: [
+        { url: "https://a.test/", title: "a" },
+        { url: "https://b.test/", title: "b" },
+        { url: "https://b.test/", title: "b again" },
+        { url: "https://c.test/", title: "c" },
+      ],
+      groups: [],
+    },
+  ];
+  assert.deepEqual(
+    removeParkedTabsByUrl(list, "p1", ["https://b.test/", "https://c.test/"])?.[0]?.tabs.map((tab) => tab.title),
+    ["a", "b again"],
+    "one of the two b entries and c left",
+  );
+  assert.equal(removeParkedTabsByUrl(list, "p1", ["https://zz.test/"]), undefined, "nothing matched: no write");
+  assert.deepEqual(
+    removeParkedTabsByUrl(
+      list,
+      "p1",
+      list[0]!.tabs.map((tab) => tab.url),
+    ),
+    [],
+    "every tab opened: the entry goes",
+  );
 });

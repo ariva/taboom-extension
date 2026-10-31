@@ -400,3 +400,47 @@ test("Service Worker - Parked: restore and move answer an error when nothing cou
   });
   assert.ok(nothingPicked && "error" in nothingPicked, "no such tab in the snapshot");
 });
+
+// reproduced in real Chrome (tests/e2e/round3-races.spec.ts): a parked tab removed from another
+// surface while a restore opens its tabs shifted the positions the drop used — the refused address
+// was dropped and an opened one stayed. The opened addresses leave now, wherever they sit
+test("Service Worker - Parked: a snapshot edited during the restore still leaves exactly the refused address parked", async () => {
+  stored.parkedWindows = [
+    {
+      id: "p-shift",
+      parkedAt: NOW,
+      tabs: [
+        { url: "https://s0.example.com/", title: "s0" },
+        { url: "https://s1.example.com/", title: "s1" },
+        { url: "file:///refused.html", title: "refused" },
+        { url: "https://s3.example.com/", title: "s3" },
+      ],
+      groups: [],
+    },
+  ];
+  const realCreate = chrome.tabs.create;
+  let firstOpen = true;
+  chrome.tabs.create = async (opts: chrome.tabs.CreateProperties = {}) => {
+    if (firstOpen) {
+      firstOpen = false; // another surface removes s0 while the first tab is opening
+      stored.parkedWindows = stored.parkedWindows?.map((parked) =>
+        parked.id === "p-shift" ? { ...parked, tabs: parked.tabs.slice(1) } : parked,
+      );
+    }
+    if (String(opts.url).startsWith("file:")) {
+      throw new Error("Cannot open file URLs without permission");
+    }
+    return realCreate(opts);
+  };
+  try {
+    await send({ type: "restore-parked", id: "p-shift", intoWindowId: 1 });
+  } finally {
+    chrome.tabs.create = realCreate;
+  }
+  await tick();
+  assert.deepEqual(
+    stored.parkedWindows?.[0]?.tabs.map((tab) => tab.title),
+    ["refused"],
+    "s1 and s3 opened and left; the refused address stays whatever position it sits at now",
+  );
+});
