@@ -76,13 +76,23 @@ export function resetHistoryOnStartup(): Promise<void> {
 // tabs.onRemoved
 export function dropClosedTabs(tabId: number): Promise<void> {
   // NOT gated on the nav-stack flag: a stack recorded while the feature was on
-  // must not keep dead tab ids after it's toggled off. Sweeps ALL closed ids.
+  // must not keep dead tab ids after it's toggled off. Sweeps ALL closed ids —
+  // through one tabs.get per distinct stack id (the stack is capped), not a
+  // query over every open tab: closing a window of N tabs runs this N times
   return withHistory(async (hist) => {
     if (hist.stack.length === 0) {
       return null; // default installs: no write
     }
-    const open = new Set((await chrome.tabs.query({})).map((tab) => tab.id));
-    open.delete(tabId); // this close may still be listed by the query
+    const others = [...new Set(hist.stack)].filter((id) => id !== tabId);
+    const alive = await Promise.all(
+      others.map((id) =>
+        chrome.tabs.get(id).then(
+          () => id,
+          () => undefined,
+        ),
+      ),
+    );
+    const open = new Set(alive.filter((id): id is number => id !== undefined));
     const next = filterHistory(hist, (id) => open.has(id));
     return next.stack.length === hist.stack.length ? null : next;
   });

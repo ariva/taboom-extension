@@ -1,12 +1,12 @@
 // TAGS in the page context menu: a "Tag page ▸" submenu with one checkbox per tag
 // (existing tags only — tags are made in the side panel or Settings). The items follow
 // the tag list; the checks follow the active tab's page.
-import { applyExperimental, featureEnabled } from "../app/core.ts";
-import { loadState, localStore, toggleTagOnPages } from "../app/storage.ts";
+import { featureEnabled } from "../app/core.ts";
+import { localStore, toggleTagOnPages } from "../app/storage.ts";
 import { orderedTags, tagPageKey, tagsForUrl } from "../app/tags.ts";
 import type { Tag } from "../app/types.ts";
 import { enqueueMenuOp, registerTagMenuBuilder, removeMenu } from "./context-menus.ts";
-import { getFeatures } from "./nav-mode.ts";
+import { effectiveFeatures } from "./nav-mode.ts";
 
 export const TAG_MENU_ID = "tag-page";
 const TAG_ITEM_PREFIX = "tag-";
@@ -17,18 +17,14 @@ export function tagIdOfMenuItem(menuItemId: string | number): string | undefined
     : undefined;
 }
 
-async function tagsActive(): Promise<boolean> {
-  const [{ ui }, features] = await Promise.all([loadState(), getFeatures()]);
-  return featureEnabled(applyExperimental(features, ui.showExperimental ?? false), "TAGS");
-}
-
-// the tags the menu lists: none while the flag is off
+// the tags the menu lists: none while the flag is off — one state read, not two
 async function activeTags(): Promise<Tag[]> {
-  if (!(await tagsActive())) {
+  const { state, features } = await effectiveFeatures();
+  if (!featureEnabled(features, "TAGS")) {
     return [];
   }
-  const [{ ui }, { tags = [], tagPages = [] }] = await Promise.all([loadState(), localStore.get(["tags", "tagPages"])]);
-  return orderedTags(tags, tagPages, ui); // the Settings picker order, switched-off tags left out
+  const { tags = [], tagPages = [] } = await localStore.get(["tags", "tagPages"]);
+  return orderedTags(tags, tagPages, state.ui); // the Settings picker order, switched-off tags left out
 }
 
 // inside a menu pass (createContextMenus / rebuildTagMenu): the parent exists only with a tag to pick

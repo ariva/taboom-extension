@@ -1351,3 +1351,67 @@ test("Service Worker - Tab history: a browser start clears the trail; an extensi
   ({ tabHistory } = await chrome.storage.local.get("tabHistory"));
   assert.deepEqual(tabHistory, { stack: [1, 2], cursor: 1 }, "reload: only the closed id goes");
 });
+
+// ---------- per-event work (review round 3) ----------
+
+test("Service Worker - Window identity: a pass that changes nothing writes nothing", async () => {
+  await chrome.windows.onCreated.fire({ id: 1 });
+  await new Promise((resolve) => setTimeout(resolve, 600)); // one pass lands whatever the state before
+  calls.length = 0;
+  await chrome.windows.onCreated.fire({ id: 1 });
+  await new Promise((resolve) => setTimeout(resolve, 600));
+  assert.ok(
+    !calls.some((c) => c.startsWith("storage.set") && c.includes("windowProfiles")),
+    "same windows, same tabs: the profiles are not rewritten for a timestamp",
+  );
+  assert.ok(!calls.some((c) => c.startsWith("storage.session.set")), "nor the session map");
+});
+
+test("Service Worker - A ui write that changes only the theme rebuilds no menu", async () => {
+  calls.length = 0;
+  await chrome.storage.onChanged.fire(
+    {
+      ui: {
+        oldValue: { theme: "dark", historyNav: "traditional" },
+        newValue: { theme: "light", historyNav: "traditional" },
+      },
+    },
+    "local",
+  );
+  await tick();
+  await tick();
+  assert.ok(!calls.some((c) => c.startsWith("contextMenus.")), `no menu work: ${calls.join(" | ")}`);
+});
+
+test("Service Worker - Closing a tab prunes it from the history without querying every tab", async () => {
+  await chrome.storage.local.set({ tabHistory: { stack: [1, 2], cursor: 1 } });
+  const realQuery = chrome.tabs.query;
+  let queries = 0;
+  chrome.tabs.query = async (info: chrome.tabs.QueryInfo = {}) => {
+    queries++;
+    return realQuery(info);
+  };
+  try {
+    await chrome.tabs.onRemoved.fire(2, { windowId: 1, isWindowClosing: false });
+    await tick();
+  } finally {
+    chrome.tabs.query = realQuery;
+  }
+  const { tabHistory } = await chrome.storage.local.get("tabHistory");
+  assert.deepEqual(tabHistory, { stack: [1], cursor: 0 });
+  assert.equal(queries, 0, "the one removed id is enough");
+});
+
+test("Service Worker - A navigation whose discard flag is already right writes nothing to the tab", async () => {
+  calls.length = 0;
+  await chrome.tabs.onUpdated.fire(
+    1,
+    { url: "https://plain.example.com/next" },
+    { id: 1, windowId: 1, active: false, autoDiscardable: true, url: "https://plain.example.com/next" },
+  );
+  await tick();
+  assert.ok(
+    !calls.some((c) => c.startsWith("tabs.update 1") && c.includes("autoDiscardable")),
+    "unprotected page already discardable: no update",
+  );
+});

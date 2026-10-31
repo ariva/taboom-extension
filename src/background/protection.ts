@@ -53,11 +53,14 @@ export async function unprotectUrls(urls: string[]): Promise<void> {
 }
 
 // Keep the protect menu item's title matching the active tab's protection state.
-export async function syncProtectMenu(tab: chrome.tabs.Tab | null | undefined): Promise<void> {
+export async function syncProtectMenu(
+  tab: chrome.tabs.Tab | null | undefined,
+  rules?: ProtectionRule[], // a caller that already read them passes them along
+): Promise<void> {
   if (!tab || !isSupportedUrl(tab.url)) {
     return;
   }
-  const { protectionRules } = await loadState();
+  const protectionRules = rules ?? (await loadState()).protectionRules;
   const title = isProtected(tab.url, protectionRules) ? "Remove site protection" : "Protect site";
   await enqueueMenuOp(
     () =>
@@ -80,14 +83,16 @@ export async function reprotectOnNavigation(
   if (!changeInfo.url || !isSupportedUrl(changeInfo.url)) {
     return;
   }
-  if (tab?.active) {
-    await syncProtectMenu(tab);
-  }
   const { protectionRules } = await loadState();
+  if (tab?.active) {
+    await syncProtectMenu(tab, protectionRules);
+  }
+  const wanted = !isProtected(changeInfo.url, protectionRules);
+  if (tab?.autoDiscardable === wanted) {
+    return; // SPA route changes fire this constantly: nothing to write
+  }
   try {
-    await chrome.tabs.update(tabId, {
-      autoDiscardable: !isProtected(changeInfo.url, protectionRules),
-    });
+    await chrome.tabs.update(tabId, { autoDiscardable: wanted });
   } catch (error) {
     console.debug("autoDiscardable update failed", tabId, error);
   }

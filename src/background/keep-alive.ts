@@ -1,7 +1,7 @@
 // Keep-it-alive: the 30 s sweep alarm that reloads marked pages when their
 // jittered time comes, the mark/unmark entry points (menu, panel message) and
 // the checkbox menu item's state.
-import { applyExperimental, DEFAULTS, featureEnabled } from "../app/core.ts";
+import { DEFAULTS, featureEnabled } from "../app/core.ts";
 import {
   dueKeepAlive,
   isKeptAlive,
@@ -16,7 +16,7 @@ import {
 import { loadState, localStore, removeKeepAlive } from "../app/storage.ts";
 import type { KeepAliveTab, Settings } from "../app/types.ts";
 import { enqueueMenuOp } from "./context-menus.ts";
-import { getFeatures } from "./nav-mode.ts";
+import { effectiveFeatures } from "./nav-mode.ts";
 
 const ALARM_NAME = "keep-alive";
 export const KEEP_ALIVE_MENU_ID = "keep-alive-tab";
@@ -26,10 +26,8 @@ const SWEEP_MINUTES = 0.5;
 
 // flag (experimental opt-in applied) + the user's checkbox
 export async function keepAliveActive(): Promise<boolean> {
-  const [{ settings, ui }, features] = await Promise.all([loadState(), getFeatures()]);
-  return (
-    featureEnabled(applyExperimental(features, ui.showExperimental ?? false), "KEEP_ALIVE") && settings.keepAliveEnabled
-  );
+  const { state, features } = await effectiveFeatures();
+  return featureEnabled(features, "KEEP_ALIVE") && state.settings.keepAliveEnabled;
 }
 
 // the marks the sweep and the snooze pass honour: none while the feature is off

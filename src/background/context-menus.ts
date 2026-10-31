@@ -1,9 +1,9 @@
 // The page context menu: static items, the "Navigation stack" submenu, and the
 // one queue every menu mutation runs through.
-import { applyExperimental, featureEnabled, isKeptAlive, resolveNavMode } from "../app/core.ts";
+import { featureEnabled, isKeptAlive, resolveNavMode } from "../app/core.ts";
 import { DEV_PREFIX, getAppName } from "../app/env.ts";
-import { loadState, localStore } from "../app/storage.ts";
-import { getFeatures } from "./nav-mode.ts";
+import { localStore } from "../app/storage.ts";
+import { effectiveFeatures } from "./nav-mode.ts";
 import { loadHistory } from "./tab-history.ts";
 
 // per-tab items only appear on pages we can snooze/protect; global items show everywhere
@@ -44,11 +44,8 @@ export function createContextMenus(): Promise<unknown> {
 // enabled in settings; checked state seeded from the active tab — background/keep-alive.ts
 // keeps it in sync afterwards (this module sits below it in the import graph)
 async function createKeepAliveItem(): Promise<void> {
-  const [{ settings, ui }, features] = await Promise.all([loadState(), getFeatures()]);
-  if (
-    !featureEnabled(applyExperimental(features, ui.showExperimental ?? false), "KEEP_ALIVE") ||
-    !settings.keepAliveEnabled
-  ) {
+  const { state, features } = await effectiveFeatures();
+  if (!featureEnabled(features, "KEEP_ALIVE") || !state.settings.keepAliveEnabled) {
     return;
   }
   const [{ keepAlive = [] }, [active]] = await Promise.all([
@@ -103,11 +100,10 @@ export function rebuildHistoryMenu(): Promise<unknown> {
 }
 
 async function rebuildHistoryMenuNow(): Promise<void> {
-  const [{ ui }, rawFeatures] = await Promise.all([loadState(), getFeatures()]);
-  const features = applyExperimental(rawFeatures, ui.showExperimental ?? false);
+  const { state, features } = await effectiveFeatures();
   await removeMenu("history");
   await removeMenu("sep-2");
-  if (resolveNavMode(features, ui) === "off") {
+  if (resolveNavMode(features, state.ui) === "off") {
     return;
   }
   const { stack, cursor } = await loadHistory(); // only read when the menu will exist
@@ -119,8 +115,11 @@ async function rebuildHistoryMenuNow(): Promise<void> {
     contexts: ["page"],
     enabled: stack.length > 0,
   });
-  const byId = new Map((await chrome.tabs.query({})).map((tab) => [tab.id, tab]));
   const from = stack.length - 1;
+  const shown = stack.slice(Math.max(0, from - MENU_HISTORY_MAX + 1)); // the ≤15 ids the menu names
+  // one tabs.get per shown id, not a query over every tab: this rebuild follows every tab switch
+  const titled = await Promise.all(shown.map((id) => chrome.tabs.get(id).catch(() => undefined)));
+  const byId = new Map(titled.flatMap((tab) => (tab ? [[tab.id, tab] as const] : [])));
   for (let index = from; index > from - MENU_HISTORY_MAX && index >= 0; index--) {
     const tab = byId.get(stack[index]);
     const title = tab?.title || tab?.url || "(closed tab)";

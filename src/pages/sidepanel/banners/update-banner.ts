@@ -32,5 +32,10 @@ export function initUpdateBanner(): void {
   });
 
   syncUpdateBanner();
-  chrome.storage.onChanged.addListener(syncUpdateBanner);
+  // storage events arrive for every key in every area (history per tab switch, session bookkeeping)
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === "local" && ("updateAvailable" in changes || "dismissedUpdate" in changes || "ui" in changes)) {
+      syncUpdateBanner();
+    }
+  });
 }

@@ -1,7 +1,14 @@
 // Window identity (logical ids stable across restarts), the per-window profile
 // patches (name / color / pin / panelOpen), and panel-open tracking + restore.
 import { localStore, sessionStore } from "../app/storage.ts";
-import { assignLogicalIds, buildFingerprint, expireProfiles, windowsToRestore } from "../app/window-identity.ts";
+import {
+  assignLogicalIds,
+  buildFingerprint,
+  expireProfiles,
+  profilesUnchanged,
+  sameSessionMap,
+  windowsToRestore,
+} from "../app/window-identity.ts";
 import type { WindowFingerprint, WindowProfile } from "../app/types.ts";
 
 // ---------- window identity (logical ids stable across restarts) ----------
@@ -13,6 +20,7 @@ import type { WindowFingerprint, WindowProfile } from "../app/types.ts";
 
 const PROFILE_DEBOUNCE_MS = 400;
 const PROFILE_TTL_MS = 14 * 24 * 3_600_000;
+const PROFILE_STAMP_MS = 10 * 60_000; // a live window's profile is restamped at most this often when nothing else moved
 let profileTimer: ReturnType<typeof setTimeout> | null = null;
 
 // Every read-modify-write of windowProfiles runs on this one chain — a refresh
@@ -56,10 +64,9 @@ async function refreshWindowProfiles(): Promise<void> {
     buildFingerprint(windowTabs, boundsOf.get(windowId) ?? null, now),
   ]);
 
-  const { windowSessionMap = {}, identitySessionStart = now } = await sessionStore.get([
-    "windowSessionMap",
-    "identitySessionStart",
-  ]);
+  const session = await sessionStore.get(["windowSessionMap", "identitySessionStart"]);
+  const firstPass = session.identitySessionStart === undefined; // this session's first pass always writes
+  const { windowSessionMap = {}, identitySessionStart = now } = session;
   const { windowProfiles = {} } = await localStore.get("windowProfiles");
   const map = assignLogicalIds(windowSessionMap, windowProfiles, candidates, () => `w-${crypto.randomUUID()}`);
 
@@ -84,8 +91,18 @@ async function refreshWindowProfiles(): Promise<void> {
     const kept = reopened ? { ...stored, panelOpen: undefined } : stored; // undefined drops the key on write
     profiles[map[windowId]!] = { ...kept, ...fingerprint, chromeWindowId: windowId };
   }
+  const next = expireProfiles(profiles, now, PROFILE_TTL_MS);
+  // every wake runs this pass (alarms, messages, panel ports): with the same windows and tabs as
+  // last time, the only difference is the timestamp — not worth two storage writes per wake
+  if (
+    !firstPass &&
+    sameSessionMap(windowSessionMap, map) &&
+    profilesUnchanged(windowProfiles, next, now, PROFILE_STAMP_MS)
+  ) {
+    return;
+  }
   await sessionStore.set({ windowSessionMap: map, identitySessionStart });
-  await localStore.set({ windowProfiles: expireProfiles(profiles, now, PROFILE_TTL_MS) });
+  await localStore.set({ windowProfiles: next });
 }
 
 // ---------- panel-open tracking + restore ----------

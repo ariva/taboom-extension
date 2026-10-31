@@ -201,3 +201,35 @@ export function identityChanged(before: WindowProfiles | undefined, after: Windo
   const ids = new Set([...Object.keys(before ?? {}), ...Object.keys(after ?? {})]);
   return [...ids].some((id) => shown(before?.[id]) !== shown(after?.[id]));
 }
+
+// the session map as the pass computed it vs the stored one: same windows under the same ids?
+export function sameSessionMap(before: WindowSessionMap, after: WindowSessionMap): boolean {
+  const ids = Object.keys(after);
+  return ids.length === Object.keys(before).length && ids.every((id) => before[Number(id)] === after[Number(id)]);
+}
+
+// a profile pass restamps every live window's profile with `updatedAt: now` — when nothing else
+// moved there is nothing worth a write. The stamp still lands every `stampMs`, so the TTL sweep
+// keeps seeing a live window as live; profiles of closed windows keep their old stamp and compare equal
+export function profilesUnchanged(
+  before: WindowProfiles,
+  after: WindowProfiles,
+  now: number,
+  stampMs: number,
+): boolean {
+  const ids = Object.keys(after);
+  if (ids.length !== Object.keys(before).length) {
+    return false;
+  }
+  return ids.every((id) => {
+    const stored = before[id];
+    const fresh = after[id];
+    if (!stored || !fresh) {
+      return false;
+    }
+    const { updatedAt: was, ...storedRest } = stored;
+    const { updatedAt: stamp, ...freshRest } = fresh;
+    const restamped = stamp !== was;
+    return JSON.stringify(storedRest) === JSON.stringify(freshRest) && (!restamped || now - (was ?? 0) < stampMs);
+  });
+}

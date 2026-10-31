@@ -3922,3 +3922,20 @@ test("UI - Sidepanel - TAGS: a slash typed in the picker's new-tag field is not 
   q(pick, ".tag-pick-cancel").click();
   await tick();
 });
+
+// the update banner re-read storage on every storage event in every area; only its own keys matter
+test("UI - Sidepanel - The update banner does not re-read storage for an unrelated session write", async () => {
+  const realGet = chrome.storage.local.get;
+  let reads = 0;
+  chrome.storage.local.get = ((...args: Parameters<typeof realGet>) => {
+    reads++;
+    return realGet(...args);
+  }) as typeof realGet;
+  try {
+    await chrome.storage.onChanged.fire({ wakeTimes: { newValue: { 1: Date.now() } } }, "session");
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    assert.equal(reads, 0, "nothing in the panel reads storage for a session bookkeeping write");
+  } finally {
+    chrome.storage.local.get = realGet;
+  }
+});

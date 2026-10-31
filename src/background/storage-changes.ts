@@ -2,7 +2,7 @@
 // the pages re-apply the alarm, protection flags, nav mode and menus.
 import { dedupeHistory } from "../app/core.ts";
 import { DEFAULTS } from "../app/core.ts";
-import type { ProtectionRule, Settings } from "../app/types.ts";
+import type { ProtectionRule, Settings, UiPrefs } from "../app/types.ts";
 import { createContextMenus, rebuildHistoryMenu } from "./context-menus.ts";
 import { ensureKeepAliveAlarm, keepAliveSettingChanged, restartKeepAlive, syncKeepAliveMenu } from "./keep-alive.ts";
 import { invalidateNavMode, navMode } from "./nav-mode.ts";
@@ -56,11 +56,18 @@ export async function onStorageChanged(
     const [active] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
     await syncProtectMenu(active);
   }
-  if (changes.tabHistory || changes.ui) {
+  // `ui` is written by every panel chip click: rebuild a menu only when a key it reads moved (a change
+  // record without both values — first write, a cleared store — counts as moved)
+  const uiMoved = (...keys: (keyof UiPrefs)[]): boolean => {
+    const before = changes.ui?.oldValue as Partial<UiPrefs> | undefined;
+    const after = changes.ui?.newValue as Partial<UiPrefs> | undefined;
+    return changes.ui !== undefined && (!before || !after || keys.some((key) => before[key] !== after[key]));
+  };
+  if (changes.tabHistory || uiMoved("historyNav", "showExperimental")) {
     await rebuildHistoryMenu();
   }
-  if (changes.tags || changes.ui) {
-    await rebuildTagMenu(); // the list changed, or the experimental opt-in flipped the flag
+  if (changes.tags || uiMoved("showExperimental", "tagPickOrder", "tagSort")) {
+    await rebuildTagMenu(); // the list changed, or the experimental opt-in / picker order moved
   } else if (changes.tagPages) {
     const [active] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
     await syncTagMenu(active);
