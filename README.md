@@ -10,7 +10,12 @@ Taboom - Tabs Manager frees memory by snoozing (discarding) tabs you haven't use
   <img src="docs/assets/demo/taboom-demo.gif" alt="Taboom in 30 seconds: tags, the side panel, search, windows" width="480">
 </p>
 
-* The [full feature demo](docs/assets/demo/taboom-demo.mp4) (MP4, ~4-5 minutes) walks through every feature with the matching Settings section beside the panel.
+<p align="center">
+  <a href="https://youtu.be/HDdjwM7mcYY"><img src="docs/assets/demo/youtube-cover.png" alt="Watch the full Taboom demo on YouTube" width="480"></a>
+</p>
+
+* **[Watch the full demo on YouTube](https://youtu.be/HDdjwM7mcYY)** (5 minutes, with chapters) — every feature with the matching Settings section beside the panel.
+* The same film as a file: [taboom-demo.mp4](docs/assets/demo/taboom-demo.mp4) in this repository.
 
 ## Buy me Pizza/Coffee/Tea
 * Like what I do? Taboom is free and stays free. If it saved you time or memory, you can support the next release: **[Buy me a coffee ☕](https://buymeacoffee.com/ariva)** — or scan the code.
