@@ -7,7 +7,7 @@ import { editTag, removeTagsToTrash } from "../../../app/storage.ts";
 import { TAG_COLORS, type TagOrigin, tagOriginSets, tagPageKey } from "../../../app/tags.ts";
 import { refresh, render } from "../foundation/scheduler.ts";
 import { actionableTabs, state } from "../foundation/state.ts";
-import { persistUiPrefs } from "../input/toolbar-events.ts";
+import { persistUiPrefs, publishSharedTagFilter } from "../input/toolbar-events.ts";
 
 export const TAG_SWATCHES = Object.entries(TAG_COLORS) as [name: string, hex: string][];
 
@@ -50,6 +50,7 @@ export function filterByTag(tagId: string): void {
   state.filter = "tags";
   state.tagFilter = new Set([tagId]);
   persistUiPrefs();
+  publishSharedTagFilter();
   render(false);
 }
 

@@ -3,7 +3,7 @@
 // memory and the ui-prefs persistence those handlers share.
 import { featureEnabled } from "../../../app/core.ts";
 import type { UiPrefs } from "../../../app/types.ts";
-import { saveState } from "../../../app/storage.ts";
+import { saveState, sessionStore } from "../../../app/storage.ts";
 import { closest, getElementById } from "../../../lib/dom.ts";
 import { closeTabs, protectTabs, snooze, wake } from "../ops/actions.ts";
 import { restoreLastForgotten } from "../ops/parked-ops.ts";
@@ -59,6 +59,76 @@ export function setQuery(value: string): void {
   state.cursor = value ? 0 : -1;
   state.pendingScroll = value ? 0 : (scrollByFilter.get(state.filter) ?? 0);
   render(false);
+  publishSharedSearch(value);
+}
+
+// Shared search: the search text is part of the shared view (ui.panelView; an independent panel
+// shares nothing). What this panel types goes to storage.session.sharedSearch once the keystrokes
+// settle, and every other open panel takes it as if typed there. lastSharedSearch is the text the
+// store holds as far as this panel knows: its own write echoing back and a foreign text already
+// adopted both match it, so neither is written or rendered again.
+const SHARE_SEARCH_DEBOUNCE_MS = 100;
+let lastSharedSearch: string | undefined;
+let shareSearchTimer: ReturnType<typeof setTimeout> | undefined;
+
+function viewShared(): boolean {
+  return (state.ui.panelView ?? "shared") === "shared";
+}
+
+function publishSharedSearch(value: string): void {
+  clearTimeout(shareSearchTimer);
+  if (!viewShared() || value === lastSharedSearch) {
+    return;
+  }
+  shareSearchTimer = setTimeout(() => {
+    lastSharedSearch = value;
+    sessionStore.set({ sharedSearch: value });
+  }, SHARE_SEARCH_DEBOUNCE_MS);
+}
+
+// The Tags chip's ticks are a filter, so the shared view carries them too (storage.session.sharedTagFilter,
+// written on every tick / reset / quick-launch pick, no debounce — clicks, not keystrokes). Same echo
+// guard as the search: the JSON the store holds as far as this panel knows.
+let lastSharedTagFilter: string | undefined;
+
+export function publishSharedTagFilter(): void {
+  const ids = [...state.tagFilter];
+  const json = JSON.stringify(ids);
+  if (!viewShared() || json === lastSharedTagFilter) {
+    return;
+  }
+  lastSharedTagFilter = json;
+  sessionStore.set({ sharedTagFilter: ids });
+}
+
+// a storage.session.sharedTagFilter write (another panel ticked, or the set found at boot); the
+// render refills an open picker
+export function adoptSharedTagFilter(ids: string[] | undefined): void {
+  const next = ids ?? [];
+  if (!viewShared()) {
+    return;
+  }
+  lastSharedTagFilter = JSON.stringify(next);
+  if (next.length === state.tagFilter.size && next.every((id) => state.tagFilter.has(id))) {
+    return; // the own write echoing back, or nothing new
+  }
+  state.tagFilter = new Set(next);
+  render(false);
+}
+
+// a storage.session.sharedSearch write (another panel typed, or the text found at boot)
+export function adoptSharedSearch(text: string | undefined): void {
+  const value = text ?? "";
+  if (!viewShared()) {
+    return;
+  }
+  clearTimeout(shareSearchTimer); // keystrokes still waiting here are older than the text that just landed
+  lastSharedSearch = value;
+  if (value === state.query) {
+    return; // the own write echoing back, or nothing new
+  }
+  searchInput.value = value;
+  setQuery(value);
 }
 
 searchInput.addEventListener("input", () => {

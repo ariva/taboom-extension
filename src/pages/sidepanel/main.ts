@@ -8,7 +8,7 @@ import { attachDropdown } from "../../lib/ui/dropdown.ts";
 import "../../lib/ui/context-menu.ts";
 import "../../lib/ui/ask-dialog.ts";
 import "../../lib/ui/inline-edit.ts";
-import { loadFeatures, loadState } from "../../app/storage.ts";
+import { loadFeatures, loadState, sessionStore } from "../../app/storage.ts";
 import type { Features } from "../../app/types.ts";
 import { DEV_PREFIX, getAppName, getReleaseVersion, markDevPage } from "../../app/env.ts";
 import { scopeSelect, sortSelect } from "./foundation/elements.ts";
@@ -23,7 +23,7 @@ import { refresh, registerPanel, render } from "./foundation/scheduler.ts";
 import { refresh as refreshImpl } from "./render/data.ts";
 import { render as renderImpl } from "./render/render.ts";
 import { initListEvents } from "./input/list-events.ts";
-import { initBulkButtons } from "./input/toolbar-events.ts";
+import { adoptSharedSearch, adoptSharedTagFilter, initBulkButtons } from "./input/toolbar-events.ts";
 import { initKeyboardNav } from "./input/keyboard-nav.ts";
 import { initQuickActions } from "./input/quick-actions.ts";
 import { initTagsChip } from "./input/tags-chip.ts";
@@ -100,6 +100,14 @@ initialStatePromise.then((persisted) => {
   scopeSelect.value = state.scope;
   sortSelect.value = state.sort;
   refresh(false, persisted); // search input focuses itself via the autofocus attribute
+  if ((persisted.ui.panelView ?? "shared") === "shared") {
+    // the shared view's search and ticked tags another panel set in this browser session: this
+    // panel opens with them
+    sessionStore.get(["sharedSearch", "sharedTagFilter"]).then(({ sharedSearch, sharedTagFilter }) => {
+      adoptSharedTagFilter(sharedTagFilter);
+      adoptSharedSearch(sharedSearch);
+    });
+  }
 });
 
 initUpdateBanner();

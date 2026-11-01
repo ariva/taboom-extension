@@ -664,16 +664,19 @@ test("UI - Options - Hidden-matches dropdown visible only with SEARCH_AUTO_SELEC
   );
 });
 
-test("UI - Options - Panel view dropdown: shared by default, persists ui.panelView", async () => {
-  const select = byId<HTMLSelectElement>("panelView");
-  assert.equal(select.value, stored.ui?.panelView ?? "shared", "shared across panels by default");
-  select.value = "independent";
-  select.dispatchEvent(new window.Event("change", { bubbles: true }));
+test("UI - Options - Panel view toggle: on (shared) by default, off stores ui.panelView independent", async () => {
+  const toggle = byId<HTMLInputElement>("panelView");
+  assert.equal(toggle.type, "checkbox", "a toggle, not a dropdown");
+  // a boolean, not the node: an assertion message that inspects a happy-dom element never finishes
+  assert.ok(!document.getElementById("searchShared"), "the search text follows the toggle: no option of its own");
+  assert.equal(toggle.checked, (stored.ui?.panelView ?? "shared") === "shared", "shared across panels by default");
+  toggle.checked = false;
+  toggle.dispatchEvent(new window.Event("change", { bubbles: true }));
   await tick();
   await tick();
   assert.equal(stored.ui.panelView, "independent");
-  select.value = "shared";
-  select.dispatchEvent(new window.Event("change", { bubbles: true }));
+  toggle.checked = true;
+  toggle.dispatchEvent(new window.Event("change", { bubbles: true }));
   await tick();
   await tick();
   assert.equal(stored.ui.panelView, "shared");

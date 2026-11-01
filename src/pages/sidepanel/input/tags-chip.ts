@@ -7,6 +7,7 @@ import { filterBar } from "../foundation/elements.ts";
 import { countsByFilter, searchCandidates } from "../model/index.ts";
 import { render } from "../foundation/scheduler.ts";
 import { state } from "../foundation/state.ts";
+import { publishSharedTagFilter } from "./toolbar-events.ts";
 
 const pop = getElementById("tags-pop");
 
@@ -45,6 +46,7 @@ function fillPicker(): void {
       } else {
         state.tagFilter.delete(tag.id);
       }
+      publishSharedTagFilter();
       render(false);
       fillPicker(); // the counts and the Clear link follow
     });
@@ -67,6 +69,7 @@ function fillPicker(): void {
     clear.textContent = "Reset selection";
     clear.addEventListener("click", () => {
       state.tagFilter.clear();
+      publishSharedTagFilter();
       render(false);
       fillPicker();
     });

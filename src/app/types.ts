@@ -191,6 +191,10 @@ export interface SessionStorageSchema {
   // when this browser session's worker first built the window map — a profile written after
   // it belongs to a window of this session (see refreshWindowProfiles)
   identitySessionStart: number;
+  // the search text of the shared view (ui.panelView): a session thing, not a preference — a new
+  // panel in the same browser session opens with it, a browser start begins clean
+  sharedSearch: string;
+  sharedTagFilter: string[]; // the Tags chip's ticked tag ids of the shared view, the same way
 }
 
 // ---------- feature flags (features.json at extension root) ----------

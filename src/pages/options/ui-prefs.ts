@@ -15,7 +15,7 @@ export function renderUiPrefs(state: AppState): void {
   getElementById("sortDirMode").value = state.ui.sortDirMode ?? "default";
   getElementById("groupByWindowTabsOrder").value = state.ui.groupByWindowTabsOrder ?? "same-as-window";
   getElementById("searchEmptyFilter").value = state.ui.searchEmptyFilter ?? "keep";
-  getElementById("panelView").value = state.ui.panelView ?? "shared";
+  getElementById("panelView").checked = (state.ui.panelView ?? "shared") === "shared"; // the toggle stands for the stored mode
   getElementById("tagPickOrder").value = state.ui.tagPickOrder ?? "stored";
   getElementById("theme").value = state.ui.theme ?? "auto";
   getElementById("showExperimental").checked = state.ui.showExperimental ?? false;
@@ -135,7 +135,7 @@ type UiValue = string | number | boolean;
 interface UiField {
   id: keyof UiPrefs;
   prop: "value" | "checked";
-  parse?: (value: string) => UiValue;
+  parse?: (value: UiValue) => UiValue; // the raw field value → the stored one (a number, a mode name)
   apply?: (value: UiValue, input: HTMLInputElement) => void;
 }
 const UI_FIELDS: UiField[] = [
@@ -143,7 +143,11 @@ const UI_FIELDS: UiField[] = [
   { id: "sortDirMode", prop: "value" },
   { id: "groupByWindowTabsOrder", prop: "value" },
   { id: "searchEmptyFilter", prop: "value" },
-  { id: "panelView", prop: "value" },
+  {
+    id: "panelView",
+    prop: "checked",
+    parse: (on) => (on ? "shared" : "independent"), // a toggle in Settings, a mode name in storage
+  },
   { id: "tagPickOrder", prop: "value" },
   { id: "theme", prop: "value", apply: (v) => applyTheme(String(v)) },
   { id: "historyNav", prop: "value" },
@@ -160,7 +164,7 @@ export function initUiPrefs(): void {
     getElementById(id).addEventListener("change", async () => {
       const input = getElementById(id);
       const raw = input[prop];
-      const value = parse && typeof raw === "string" ? parse(raw) : raw;
+      const value = parse ? parse(raw) : raw;
       apply?.(value, input);
       await saveUiPatch({ [id]: value });
     });

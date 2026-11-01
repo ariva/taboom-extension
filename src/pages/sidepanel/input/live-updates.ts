@@ -4,7 +4,7 @@ import { refresh } from "../foundation/scheduler.ts";
 import type { UiPrefs, WindowProfiles } from "../../../app/types.ts";
 import { identityChanged } from "../../../app/window-identity.ts";
 import { state } from "../foundation/state.ts";
-import { adoptStoredView } from "./toolbar-events.ts";
+import { adoptSharedSearch, adoptSharedTagFilter, adoptStoredView } from "./toolbar-events.ts";
 
 // Tab/storage events → debounced refresh. Querying Chrome fresh each time
 // avoids incremental-cache sync bugs; cheap for a few hundred tabs.
@@ -42,8 +42,19 @@ chrome.tabs.onUpdated.addListener((_tabId, changeInfo) => {
 // our own perf flush + history bookkeeping write storage constantly — don't
 // let those echo back into renders (history buttons have their own listener)
 chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === "session") {
+    if (changes.sharedSearch) {
+      // StorageChange values are `unknown`; the key is only ever written as a string
+      adoptSharedSearch(changes.sharedSearch.newValue as string | undefined);
+    }
+    if (changes.sharedTagFilter) {
+      // likewise: only ever written as a string[]
+      adoptSharedTagFilter(changes.sharedTagFilter.newValue as string[] | undefined);
+    }
+    return; // the rest of storage.session (wake times, the identity map) is worker bookkeeping
+  }
   if (area !== "local") {
-    return; // storage.session (wake times, the identity map) is worker bookkeeping
+    return;
   }
   const ignored = [
     "perfMetrics",
