@@ -33,6 +33,15 @@ Tags chip opens a picker to show only tabs carrying one of the ticked tags.
   <img src="assets/features/filters-tags-picker.png" alt="Filters - Tags picker" width="360">
 </p>
 
+Two or more open side panels share one view: a filter, scope, sort or tag tick in one, and the
+search text typed there, reach every other panel at once (Esc anywhere clears the search
+everywhere). Switch it off in Settings → Customizations and each panel keeps its own.
+
+<p>
+  <img src="assets/features/shared-view-search.png" alt="Shared view - the search typed in another panel" width="360">
+  <img src="assets/features/settings-shared-view.png" alt="Settings - Share filter, scope, sort and search across side panels" width="460">
+</p>
+
 → [Usage: Side panel](USAGE.md#side-panel-main-ui) · [Usage: Tags](USAGE.md#tags)
 
 ## Tags

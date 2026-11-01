@@ -8,6 +8,11 @@ import { GIF_MAX_SECONDS, orderedForRelease, SCENES } from "../../demo/scenes/in
 
 const version = (JSON.parse(readFileSync("package.json", "utf8")) as { version: string }).version;
 
+// features the demo browser cannot run: Playwright's bundled Chromium (153) has no split view
+// (Chrome 155+), so a scene would film nothing — exempt until that Chromium catches up, then
+// the entry goes and the registry asks for the scene again
+const NOT_FILMABLE_YET = [/\bsplit view\b/i];
+
 // the top entry of CHANGES.md: its version and the bullets under "### New Features"
 function currentNewFeatures(): { entryVersion: string | null; bullets: string[] } {
   // entries start with "## v<version>"; sections inside with "### "
@@ -74,6 +79,7 @@ test("Demo - Registry - every New Features bullet of the current CHANGES.md entr
   // A feature shipped behind "Show experimental features" is not filmed: the bullet says so
   const uncovered = bullets
     .filter((bullet) => !/\bexperimental\b/i.test(bullet))
+    .filter((bullet) => !NOT_FILMABLE_YET.some((pattern) => pattern.test(bullet)))
     .filter((bullet) => !SCENES.some((scene) => scene.covers?.test(bullet)));
   assert.deepEqual(uncovered, [], `New Features of v${version} without a demo scene:\n- ${uncovered.join("\n- ")}`);
   for (const scene of SCENES.filter((scene) => scene.newIn === version)) {

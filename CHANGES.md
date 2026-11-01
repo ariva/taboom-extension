@@ -1,5 +1,60 @@
 # CHANGES
 
+## v1.0.8 — 2026-11-01
+
+### Summary
+Shared view across side panels, split view on current Chrome, a faster panel and worker, and a long round of side panel fixes
+
+### New Features
+- Split view support on latest Chrome browsers (b0c1bae)
+- Shared or independent search / filter / scope / sort across side panels (83d388c) (8a0c8cf)
+
+### Fixes
+- A parked restore dropping the wrong tab when the snapshot was edited meanwhile, keep-alive writers on one chain, the current window among normal windows only (9bf37d7)
+- Settings feedback and accessibility, panel empty-list messages, a badge flash for a refused keyboard snooze (661d372)
+- A refresh in flight reverting the panel's own ui write, and a second own write's echo read as foreign (60773df)
+- Park, restore and move parked answering ok when nothing happened (bcfbdfb)
+- Esc in a dialog or picker clearing the search, a slash stolen from text fields, the Tags view blind in the Parked scope, Enter dead on a parked row (23914ad)
+- Settings tag chips and keep-alive edits overwriting a list changed meanwhile (1f50a68)
+- A tagless or switched-off tagged-page rule lost on Restore last removal (e2f5aa0)
+- A theme or zoom write from Settings re-applying the stored filter over a scope that overrides it (b35a9ad)
+- Drag state outliving a re-rendered drag, an older refresh landing last, onReplaced and session writes in the panel, removeAll below Chrome 123 (fd94a56)
+- A second side panel not showing a window rename, color or pin made elsewhere (6801430)
+- A list context menu closing on every render, title ticks included (c00da07)
+- A double-click on Settings' Restore last removal popping two removals (09dcb2e)
+- Quick-launch Pins and Groups menus acting on the parked snapshot while the list shows parked windows (351c1c1)
+- Failed panel actions reporting nothing, a bulk close stopping at a closed tab, and a history jump dropping a tab over a focus failure (a50f607)
+- Settings fields losing typed text on an external re-render, and a removed tag lingering in the panel's Tags filter (f8ab41f)
+- A parked selection pointing at other tabs after the parked list changed elsewhere (36d71a9)
+- Moving parked tabs dropping them from the snapshot when nothing opened (6660483)
+- The worker's settings reaction throwing on Delete all and leaving the keep-alive sweep alarm armed (aa0cf94)
+- A re-render mid-edit saving a half-typed inline value, and two Settings edits overwriting a list changed meanwhile (1541e8c)
+- Tag globs with many stars freezing the panel, Settings and the worker (5b9ffc1)
+- Clear the stale panelOpen flag when a window closed and reopened in this session reclaims its profile, so the restore banner does not offer it (c5aeaa0)
+- Fire-and-forget messages leaking unhandled rejections when the worker is gone or the extension context is invalidated (ea9dffd)
+- A stray New Tab left after snoozing a window's only tab fails (bc70b20)
+- Reconnect the side panel port at once after a worker idle-kill (d77f2b5)
+- Feature flags stuck disabled when the first features.json read fails during an extension update (043cf03)
+- Window name/color edits silently dropped after clearing storage.local while the session map still holds the logical id (6775656)
+- The keep-alive reload burst after wake or restart by re-timing every overdue mark in list (d744109)
+- Clear tab history on browser startup since Chrome reuses tab ids across sessions (548f8e3)
+- Restore losing a parked window when an address or the target window fails: open tabs first, then prune the snapshot per opened tab (d76f0c7)
+- Window names lost on session restore - more predictable window name preservation (7e23e68)
+- Settings re-renders only the card whose key changed and leaves an open editor alone (fec91dc)
+
+### Performance
+- Panel per-render cost: window sort ranked once, tag matching parsed once per tab, one message per bulk snooze (898c8f0)
+- Worker wakes and per-event work (1892e70)
+
+### Other
+- Performance tier - nine measurements at 2000 tabs against the built extension, a history line per run, a compare command (9298d50)
+- Comments and docs that no longer matched the code, an explicit startup order, no non-null assertions left (e952709)
+- Panel and Settings reuse: one pluralizer, one id lookup, cached window maps, one Restore button, one ui patch writer; closeTabs asks through the in-panel dialog (8dd5c49)
+- Renumber the ticket references in docs and test comments (106b998)
+- Isolate each init step in the worker's lifecycle pass so one rejecting step is logged and the rest still run (0badb40)
+- Route every protection-rule write through queued storage writers (7992faa)
+- Rework tag page rules (e2a8d51)
+
 ## v1.0.7 — 2026-10-25
 
 ### Summary
@@ -259,15 +314,15 @@ Tab groups support, quick jump views and restore banner fixes
 ## v0.2.8 — 2026-08-18
 
 ### Fixes
-- Reset scroll pos on dropdown change (58bbff3)
+- Reset scroll pos on dropdown change (3d9f0a7)
 - Keep pre-search scroll positions intact (1c2c3bc)
 - Scroll position leaking across filters (f786541)
 - Protect and unprotect used the same missleading shield icon. It should have unique icons. (da82622)
 - Refresh options page on rules change (96a149a)
 
 ### Performance
-- Options page re-rendering (d65d782)
-- Service worker - tabHistory improvements. (55e99b0)
+- Options page re-rendering (5058ed2)
+- Service worker - tabHistory improvements. (1535851)
 - Misc render trims (9a17833)
 - Faster panel open. Promote SIDEBAR_KEYBOARD_NAVIGATION to stable. (e58b9f8)
 - Double render after filter/scope/sort clicks (4ab9702)

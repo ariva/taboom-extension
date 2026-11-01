@@ -72,7 +72,7 @@ Tests that do not depend on flags (tooling, release packaging, changelog format)
 | `tests/helpers/` | `chrome-mock.ts` — the typed `chrome.*` stub (capturing events, flat call log), browser-safe, shared by the ui and browser tiers; `ui.ts` — happy-dom harness: `loadPage("src/pages/…/index.html")` (repo-root-relative), binds the mock to the current flag scenario |
 | `tests/fixtures/` | `release-snapshot.json` |
 | `tests/perf/` | The performance tier (`just test-perf`, see below): `run.ts` / `scenarios.ts` / `probes.ts` / `world.ts` are a tool, not tests; `stats.ts` is pure and `stats.test.ts` runs in `just check` |
-| `tests/demo/` | `registry.test.ts` — the demo recorder's scene registry: unique ids, every `### New Features` bullet of the current `CHANGES.md` entry has a scene that covers it (a bullet saying "experimental" is exempt — experimental features are not filmed), the GIF clips fit the 30 s budget, every scene's Settings anchor is an id of the options page |
+| `tests/demo/` | `registry.test.ts` — the demo recorder's scene registry: unique ids, every `### New Features` bullet of the current `CHANGES.md` entry has a scene that covers it (exempt: a bullet saying "experimental" — experimental features are not filmed — and a feature the bundled Chromium cannot run yet, listed in `NOT_FILMABLE_YET` with the reason), the GIF clips fit the 30 s budget, every scene's Settings anchor is an id of the options page |
 
 Which tests run per flag scenario and which run once is decided in `vitest.config.ts` (`FLAG_DEPENDENT` / `FLAG_INDEPENDENT`): `lib/`, `tooling/`, `structure/`, `demo/` and the pure page units run once; `app/`, `background/` and the rest of `pages/` run three times.
 
