@@ -22,5 +22,5 @@
   "KEEP_ALIVE": { "enabled": true, "experimental": false },
   "DUPLICATES": { "enabled": true, "experimental": false },
   "PARKED_WINDOWS": { "enabled": true, "experimental": false },
-  "SPLIT_VIEW": { "enabled": false, "experimental": true }
+  "SPLIT_VIEW": { "enabled": true, "experimental": false }
 }
