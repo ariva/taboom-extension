@@ -53,7 +53,7 @@ test-e2e:
 
 # Performance tier (docs/TESTING.md "Performance tier"): the production build in headless Chromium
 # with a synthetic world, nine measurements, medians of `repeat` runs → .private/perf/data/<version>-<stamp>-<label>.json
-# and .private/perf/HISTORY.md rebuilt from every run. Not a gate; run before a release, compare on the same machine.
+# and .private/perf/HISTORY.md + COMPARISONS.md rebuilt from every run. Not a gate; run before a release, compare on the same machine.
 test-perf tabs="2000" repeat="15":
     npx vite build --logLevel warn
     node tests/perf/run.ts --tabs {{ tabs }} --repeat {{ repeat }} --label full

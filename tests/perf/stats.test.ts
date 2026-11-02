@@ -11,6 +11,7 @@ import {
   median,
   overallDeltaPct,
   percentile,
+  releaseComparisons,
   summarize,
 } from "./stats.ts";
 import type { PerfRun } from "./stats.ts";
@@ -122,4 +123,31 @@ test("Perf stats - the overall judgement is the median delta in words: within 5 
     formatCompare(run({ boot: 100 }), run({ boot: 80 }), compareRuns(run({ boot: 100 }), run({ boot: 80 }))),
     /overall: 20% faster/,
   );
+});
+
+test("Perf stats - release comparisons pair the latest run of each version with the version before, newest first", () => {
+  const old = run({ boot: 100, search: 40 }, { version: "1.0.7", commit: "aaa1111", date: "2026-10-29T10:00:00.000Z" });
+  const early = run({ boot: 90, search: 40 }, { commit: "bbb2222", date: "2026-10-29T11:00:00.000Z" });
+  const quick = run({ boot: 30, search: 10 }, { commit: "ccc3333", date: "2026-10-29T12:00:00.000Z", tabs: 500 });
+  const latest = run({ boot: 50, search: 40 }, { commit: "ddd4444", date: "2026-10-29T13:00:00.000Z" });
+  const next = run(
+    { boot: 55, search: 45 },
+    { version: "1.0.9", commit: "eee5555", date: "2026-10-29T14:00:00.000Z", tabs: 1000 },
+  );
+  const text = releaseComparisons([early, next, old, latest, quick]);
+  const headings = text.split("\n").filter((line) => line.startsWith("## "));
+  assert.deepEqual(
+    headings,
+    ["## 1.0.8 → 1.0.9", "## 1.0.7 → 1.0.8"],
+    "newest version first, the oldest has no predecessor",
+  );
+  assert.match(text, /1\.0\.7 aaa1111 .* → 1\.0\.8 ddd4444 /, "the latest 2000-tab run of 1.0.8, not the first one");
+  assert.match(text, /\| boot \| 100 \| 50 \| -50% \|/);
+  assert.match(
+    text,
+    /## 1\.0\.8 → 1\.0\.9\n\nno 1\.0\.8 run with 1000 tabs to compare against/,
+    "pairs only with the same tab count",
+  );
+  assert.doesNotMatch(text, /ccc3333/, "the 500-tab 1.0.8 run does not stand in for the full one");
+  assert.equal(releaseComparisons([old]), "", "one version: nothing to compare");
 });

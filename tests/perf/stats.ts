@@ -166,3 +166,24 @@ export function historyTable(runs: PerfRun[], order: string[]): string {
   });
   return [historyHeader(order), ...lines].join("\n");
 }
+
+// COMPARISONS.md: one section per version — its latest run against the latest run of the version
+// before it with the same tab count (a quick 500-tab run is not judged against a full one), newest
+// version first. Rebuilt from every stored run, like HISTORY.md, so it never goes stale by hand.
+export function releaseComparisons(runs: PerfRun[]): string {
+  const byDate = [...runs].sort((a, b) => a.date.localeCompare(b.date));
+  const versions = [...new Set(byDate.map((run) => run.version))].sort(compareVersions);
+  const latestOf = (version: string, tabs?: number) =>
+    byDate.findLast((run) => run.version === version && (tabs === undefined || run.tabs === tabs));
+  const sections = versions.slice(1).map((version, index) => {
+    const previousVersion = versions[index] ?? "";
+    const newer = latestOf(version);
+    const older = newer ? latestOf(previousVersion, newer.tabs) : undefined;
+    const body =
+      newer && older
+        ? formatCompare(older, newer, compareRuns(older, newer))
+        : `no ${previousVersion} run with ${newer?.tabs} tabs to compare against`;
+    return `## ${previousVersion} → ${version}\n\n${body}`;
+  });
+  return sections.reverse().join("\n\n");
+}
