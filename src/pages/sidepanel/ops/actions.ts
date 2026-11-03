@@ -12,6 +12,7 @@ import { refresh } from "../foundation/scheduler.ts";
 import { reportAnswer } from "./answer.ts";
 import { actionableTabs, state, tabById } from "../foundation/state.ts";
 import type { PanelTab } from "../foundation/state.ts";
+import { askFocus } from "./focus-ask.ts";
 import { hostsOf, urlsOf } from "../model/tab-hosts.ts";
 
 // dragging (or right-clicking) a selected row acts on the whole selection
@@ -29,6 +30,7 @@ export async function activate(tab: PanelTab): Promise<void> {
     await chrome.windows.update(tab.windowId, { focused: true });
     await chrome.tabs.update(tab.id, { active: true });
     state.followCurrent = true;
+    askFocus(tab.windowId);
   } catch (error) {
     // the tab or its window went between the render and the click: say so, drop the stale row
     toastFailure("switch to the tab", error);

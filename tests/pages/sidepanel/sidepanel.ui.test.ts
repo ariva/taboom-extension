@@ -84,6 +84,14 @@ function must<T>(found: T | null | undefined): T {
   return found;
 }
 
+// a cross-window row click leaves the asked window current until Chrome reports a real focus
+// change — one after the settle window (model/focus-intent.ts): put the fixture's window 1 back
+async function focusBackToWindowOne(): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, 1100));
+  await chrome.windows.onFocusChanged.fire(1);
+  await new Promise((resolve) => setTimeout(resolve, 200));
+}
+
 // own-property stand-ins for two prototype methods (happy-dom has no popover engine), deleted after use
 type Shadowable = Omit<HTMLElement, "matches" | "hidePopover"> & {
   matches?: (selectors: string) => boolean;
@@ -310,6 +318,78 @@ test("UI - Sidepanel - Bulk bar appears on selection; Wake reloads only discarde
   assert.ok(calls.includes("sendMessage tabs-woken"), "wake reported so the SW restarts its clock");
 });
 
+test("UI - Sidepanel - A press inside the panel corrects a stale current window until Chrome reports a focus change", async () => {
+  const originalGetLastFocused = chrome.windows.getLastFocused;
+  const currentRowId = () => must(qa(document, ".row").find((r) => r.classList.contains("current"))).dataset.tabId;
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 200)); // 150ms refresh debounce
+  try {
+    let asks = 0;
+    chrome.windows.getLastFocused = async () => {
+      asks++;
+      return { id: 2 };
+    };
+    await chrome.windows.onFocusChanged.fire(2);
+    await settle();
+    assert.equal(currentRowId(), "3", "Chrome's record: window 2 (tab 3 is its active tab)");
+    // a press in this panel proves its own window (1) holds the focus, whatever Chrome's record says
+    // (after a Linux workspace switch Chrome keeps naming the window focused before)
+    document.body.dispatchEvent(new window.Event("pointerdown", { bubbles: true }));
+    await settle();
+    assert.equal(currentRowId(), "1", "the panel's own window is current");
+    // another press changes nothing (no refresh churn), Chrome still disagrees
+    asks = 0;
+    document.body.dispatchEvent(new window.Event("pointerdown", { bubbles: true }));
+    await settle();
+    assert.equal(asks, 0, "no refresh for a press that proves nothing new");
+    // a focus change inside the settle window is the window manager's dance: the hint stays
+    await chrome.windows.onFocusChanged.fire(2);
+    await settle();
+    assert.equal(currentRowId(), "1", "still the panel's own window");
+    // one after it is the user moving focus for real: Chrome's record is trusted again
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    await chrome.windows.onFocusChanged.fire(2);
+    await settle();
+    assert.equal(currentRowId(), "3");
+  } finally {
+    chrome.windows.getLastFocused = originalGetLastFocused;
+    await chrome.windows.onFocusChanged.fire(1);
+    await settle();
+  }
+});
+
+test("UI - Sidepanel - Activating a row on another window shows that window as current whatever Chrome's focus record says, and tells the other panels", async () => {
+  const currentRowId = () => qa(document, ".row").find((r) => r.classList.contains("current"))?.dataset.tabId;
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 200)); // 150ms refresh debounce
+  const originalGetLastFocused = chrome.windows.getLastFocused;
+  try {
+    calls.length = 0;
+    must(qa(document, ".row").find((r) => r.dataset.tabId === "3")).click(); // tab 3 lives in window 2
+    await tick();
+    assert.ok(
+      calls.some((c) => c.startsWith("storage.session.set") && c.includes('"focusHint":{"windowId":2')),
+      "the ask is shared with the other panels",
+    );
+    // Chrome's record lands on a third window (the one last used on that workspace): the panel
+    // keeps the window it asked for — its header is Current, its active tab the current row
+    chrome.windows.getLastFocused = async () => ({ id: 9 });
+    await chrome.windows.onFocusChanged.fire(9);
+    await settle();
+    assert.equal(currentRowId(), "3", "the asked window is current");
+    // the user moves focus for real, after the settle window: Chrome's record rules again
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    await chrome.windows.onFocusChanged.fire(9);
+    await settle();
+    assert.equal(currentRowId(), undefined, "window 9 has no tabs here: no current row");
+    // another panel's ask arrives through storage.session: adopted here
+    await chrome.storage.onChanged.fire({ focusHint: { newValue: { windowId: 2, at: Date.now() } } }, "session");
+    await settle();
+    assert.equal(currentRowId(), "3", "the other panel's asked window is current here too");
+  } finally {
+    chrome.windows.getLastFocused = originalGetLastFocused;
+    await focusBackToWindowOne();
+  }
+});
+
 test("UI - Sidepanel - Activating a row scrolls the current tab into view after re-render", async () => {
   const scrolled: string[] = [];
   window.HTMLElement.prototype.scrollIntoView = function (this: HTMLElement) {
@@ -336,6 +416,7 @@ test("UI - Sidepanel - Activating a row scrolls the current tab into view after 
   await new Promise((resolve) => setTimeout(resolve, 200));
   assert.equal(listEl.scrollTop, 500, "no follow without user activation");
   assert.equal(scrolled.length, 0);
+  await focusBackToWindowOne();
 });
 
 test("UI - Sidepanel - Active tab switched outside the panel (keyboard history) reveals the new current row", async () => {
@@ -1290,6 +1371,7 @@ test("UI - Sidepanel - Same-as-window mode: in-window drag reorder; cross-window
 
 test("UI - Sidepanel - WINDOW_NAMES: named headers, custom dots, overview list, inline rename", {
   skip: !(TEST_FEATURES.WINDOW_NAMES?.enabled === true), // "WINDOW_NAMES disabled in features.json"
+  timeout: 15_000, // two focus-settle waits (focusBackToWindowOne) on top of a long test
 }, async () => {
   // third window named "Alpha" — proves the overview sorts others by name
   tabs.push({
@@ -1418,6 +1500,9 @@ test("UI - Sidepanel - WINDOW_NAMES: named headers, custom dots, overview list, 
   await tick();
   assert.ok(calls.includes("sendMessage window-rename"), "rename sent to the service worker");
 
+  // the Alpha row click above asked Chrome to focus window 3, which the panel shows as current
+  // until a real focus change: window 1 back before the window labels are read
+  await focusBackToWindowOne();
   // "Move tab to" targets follow the windows-list order: ABC by display name…
   const moveTargets = () => {
     q(document, '.row[data-tab-id="1"]').dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
@@ -1698,6 +1783,7 @@ test("UI - Sidepanel - WINDOW_NAMES: named headers, custom dots, overview list, 
     calls.some((c) => c.startsWith("tabs.update 3") && c.includes('"active":true')),
     "…and activates the tab",
   );
+  await focusBackToWindowOne(); // the pin click asked for window 2: window 1 current again before the order is read
 
   // sidebar list follows: pin window 3 too → its group lifts above window 2
   windowProfiles["w-t3"] = { ...windowProfiles["w-t3"], pinnedWindow: true };

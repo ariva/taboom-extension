@@ -2,6 +2,7 @@
 // from it alone that many features read.
 import { featureEnabled } from "../../../app/core.ts";
 import type {
+  FocusHint,
   FeatureName,
   Features,
   KeepAliveTab,
@@ -51,6 +52,8 @@ export interface PanelState {
   selected: Set<number>;
   cursor: number;
   currentWindowId: number | null; // null until the first refresh() resolves
+  panelWindowId: number | null; // the window this panel lives in (chrome.windows.getCurrent), read on the first refresh()
+  focusHint: FocusHint | null; // shown as current instead of Chrome's focus record while it lives (model/focus-intent.ts)
   activeTabId: number | null; // active tab of the current window as of the last refresh()
   followCurrent: boolean;
   revealCurrent: boolean; // after the next render: the current row at the top of the list (reveal.ts "start")
@@ -105,6 +108,10 @@ export const state: PanelState = {
   selected: new Set(),
   cursor: -1,
   currentWindowId: null, // until the first refresh() resolves
+  panelWindowId: null,
+  // the window this or another panel asked Chrome to focus, or proved focused by a press in it
+  // (ops/focus-ask.ts, input/live-updates.ts): Chrome's record lags on Linux workspace switches
+  focusHint: null,
   activeTabId: null,
   // a row activated from the list: on the next event-driven re-render the minimal scroll
   // keeps it on screen (recent sort moves it to the top) without the list jumping under the click

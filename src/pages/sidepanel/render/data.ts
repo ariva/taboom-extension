@@ -36,6 +36,7 @@ export async function refresh(animate = false, preloaded: AppState | null = null
     persisted,
     tabs,
     win,
+    panelWindowId,
     { windowProfiles = {}, keepAlive = [], parkedWindows = [], parkedTrash = [], tags = [], tagPages = [] },
     { windowSessionMap = {} },
     groups,
@@ -43,6 +44,7 @@ export async function refresh(animate = false, preloaded: AppState | null = null
     preloaded ?? loadState(), // startup passes its already-read state — no second read
     chrome.tabs.query({}),
     chrome.windows.getLastFocused({ windowTypes: ["normal", "popup"] }), // not a focused DevTools / app window: the list never shows those
+    state.panelWindowId ?? chrome.windows.getCurrent().then((own) => own.id ?? null), // read once: a panel never changes window
     localStore.get(["windowProfiles", "keepAlive", "parkedWindows", "parkedTrash", "tags", "tagPages"]),
     sessionStore.get("windowSessionMap"),
     capabilities.tabGroups ? chrome.tabGroups.query({}).catch(() => []) : [],
@@ -81,12 +83,18 @@ export async function refresh(animate = false, preloaded: AppState | null = null
   document.documentElement.style.colorScheme = resolveColorScheme(state.ui.theme);
   // (a focus move to another window changes the active tab below: that reveal covers the
   // window grouping's reorder, the new current window's group jumping to the top)
-  state.currentWindowId = win.id!; // live windows always have an id (only sessions-API windows lack one)
+  state.panelWindowId = panelWindowId;
+  // a window this or another panel asked for (or proved focused by a press) outranks Chrome's
+  // focus record while the hint lives — see model/focus-intent.ts
+  if (state.focusHint && win.id === state.focusHint.windowId) {
+    state.focusHint = null; // Chrome's record caught up: nothing to outrank
+  }
+  state.currentWindowId = state.focusHint?.windowId ?? win.id!; // live windows always have an id (only sessions-API windows lack one)
   // active tab switched from outside the panel (worker's history command,
   // Ctrl+Tab): the row re-renders as current but may sit off-screen. The first
   // refresh counts too: the panel opens at the top, the active tab may be far down
   const previousActive = state.activeTabId;
-  state.activeTabId = tabs.find((tab) => tab.active && tab.windowId === win.id)?.id ?? null;
+  state.activeTabId = tabs.find((tab) => tab.active && tab.windowId === state.currentWindowId)?.id ?? null;
   if (state.activeTabId !== previousActive) {
     state.revealCurrent = true;
   }

@@ -10,6 +10,7 @@ import { refresh } from "../foundation/scheduler.ts";
 import { pinActive, state } from "../foundation/state.ts";
 import { orderWindowIds } from "../model/window-order.ts";
 import { reportAnswer } from "./answer.ts";
+import { askFocus } from "./focus-ask.ts";
 
 // display name of a window (custom name or "Window #N") for menu headers
 export function windowLabel(windowId: number): string {
@@ -61,6 +62,7 @@ export async function moveTabsToWindow(tabIds: number[], windowId: number | null
 export async function focusWindow(windowId: number): Promise<void> {
   try {
     await chrome.windows.update(windowId, { focused: true });
+    askFocus(windowId);
   } catch (error) {
     toastFailure("focus the window", error);
     refresh(false);

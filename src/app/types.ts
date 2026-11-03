@@ -195,6 +195,14 @@ export interface SessionStorageSchema {
   // panel in the same browser session opens with it, a browser start begins clean
   sharedSearch: string;
   sharedTagFilter: string[]; // the Tags chip's ticked tag ids of the shared view, the same way
+  // the window a panel last asked Chrome to focus (or proved focused by a press in it): every
+  // panel shows it as current while Chrome's own focus record may lag (see model/focus-intent.ts)
+  focusHint: FocusHint;
+}
+
+export interface FocusHint {
+  windowId: number;
+  at: number; // Date.now() of the ask
 }
 
 // ---------- feature flags (features.json at extension root) ----------

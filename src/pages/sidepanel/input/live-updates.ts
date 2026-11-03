@@ -1,9 +1,11 @@
 // Live updates: chrome.tabs / tabGroups / windows / storage events → one debounced refresh.
 import { capabilities } from "../../../lib/platform/capabilities.ts";
 import { refresh } from "../foundation/scheduler.ts";
-import type { UiPrefs, WindowProfiles } from "../../../app/types.ts";
+import type { FocusHint, UiPrefs, WindowProfiles } from "../../../app/types.ts";
 import { identityChanged } from "../../../app/window-identity.ts";
 import { state } from "../foundation/state.ts";
+import { hintSurvives } from "../model/focus-intent.ts";
+import { askFocus } from "../ops/focus-ask.ts";
 import { adoptSharedSearch, adoptSharedTagFilter, adoptStoredView } from "./toolbar-events.ts";
 
 // Tab/storage events → debounced refresh. Querying Chrome fresh each time
@@ -30,6 +32,29 @@ for (const event of [
   event.addListener(scheduleRefresh);
 }
 
+// A press or key inside this panel proves its window is the focused one, whatever Chrome's
+// record says (a Linux workspace switch leaves it naming the window focused before, with no
+// windows.onFocusChanged until a real click elsewhere and back). Corrected at once — a row
+// click right after reads the right origin — and told to the other panels.
+for (const type of ["pointerdown", "keydown"]) {
+  document.addEventListener(
+    type,
+    () => {
+      if (state.panelWindowId != null && state.currentWindowId !== state.panelWindowId) {
+        askFocus(state.panelWindowId);
+        scheduleRefresh();
+      }
+    },
+    true,
+  );
+}
+// a focus change after the settle window is the user moving focus for real: the record rules again
+chrome.windows.onFocusChanged.addListener((windowId) => {
+  if (state.focusHint && !hintSurvives(state.focusHint, windowId, Date.now())) {
+    state.focusHint = null;
+  }
+});
+
 // onUpdated fires for every tab's loading progress — with hundreds of tabs that's
 // a constant stream; only changes the list actually shows should trigger a render
 const RENDERED_TAB_PROPS = ["title", "url", "favIconUrl", "discarded", "audible", "pinned", "groupId"];
@@ -50,6 +75,15 @@ chrome.storage.onChanged.addListener((changes, area) => {
     if (changes.sharedTagFilter) {
       // likewise: only ever written as a string[]
       adoptSharedTagFilter(changes.sharedTagFilter.newValue as string[] | undefined);
+    }
+    if (changes.focusHint?.newValue) {
+      // another panel asked Chrome for a window (or proved its own focused): show it as current
+      // here too. Only ever written as a FocusHint; this panel's own write echoes back unchanged
+      const hint = changes.focusHint.newValue as FocusHint;
+      if (hint.windowId !== state.focusHint?.windowId || hint.at !== state.focusHint.at) {
+        state.focusHint = hint;
+        scheduleRefresh();
+      }
     }
     return; // the rest of storage.session (wake times, the identity map) is worker bookkeeping
   }
