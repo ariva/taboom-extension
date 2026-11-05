@@ -74,7 +74,10 @@ export function setQuery(value: string): void {
 // written back. ownWrites are this panel's writes whose storage echo has not arrived yet: an echo
 // lands after the next keystrokes (always; late by several writes when seven panels are busy
 // rendering), and taken for foreign text it would reset the box to the older text (T-0149).
-const SHARE_SEARCH_DEBOUNCE_MS = 100;
+// longer than a typing gap (120–250 ms): the other panels follow when the typist pauses, not per
+// keystroke — every open panel renders the adopted text on the one main thread the extension's
+// pages share, 190 ms each for 1100 rows (measured 2026-11-05, 7 panels)
+const SHARE_SEARCH_DEBOUNCE_MS = 300;
 let lastSharedSearch: string | undefined;
 let ownWrites: string[] = [];
 let shareSearchTimer: ReturnType<typeof setTimeout> | undefined;

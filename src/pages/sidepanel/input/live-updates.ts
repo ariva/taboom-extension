@@ -1,6 +1,6 @@
 // Live updates: chrome.tabs / tabGroups / windows / storage events → one debounced refresh.
 import { capabilities } from "../../../lib/platform/capabilities.ts";
-import { refresh } from "../foundation/scheduler.ts";
+import { refresh, render } from "../foundation/scheduler.ts";
 import type { FocusHint, UiPrefs, WindowProfiles } from "../../../app/types.ts";
 import { identityChanged } from "../../../app/window-identity.ts";
 import { state } from "../foundation/state.ts";
@@ -10,10 +10,28 @@ import { adoptSharedSearch, adoptSharedTagFilter, adoptStoredView } from "./tool
 
 // Tab/storage events → debounced refresh. Querying Chrome fresh each time
 // avoids incremental-cache sync bugs; cheap for a few hundred tabs.
+// The wait also lets the panel that caused the event (a click in another panel on the same
+// main thread) paint first; a render asked for while a refresh is pending folds into the refresh
 let refreshTimer: ReturnType<typeof setTimeout> | undefined;
+let refreshDue = false;
 function scheduleRefresh(): void {
+  refreshDue = true;
+  armTimer();
+}
+function scheduleRender(): void {
+  armTimer();
+}
+function armTimer(): void {
   clearTimeout(refreshTimer);
-  refreshTimer = setTimeout(refresh, 150);
+  refreshTimer = setTimeout(() => {
+    const full = refreshDue;
+    refreshDue = false;
+    if (full) {
+      refresh();
+    } else {
+      render(false);
+    }
+  }, 150);
 }
 
 for (const event of [
@@ -144,6 +162,29 @@ chrome.storage.onChanged.addListener((changes, area) => {
       view.sort = sort;
     }
     adoptStoredView(view); // a foreign write: the shared view follows it (a cleared store has no new value)
+    // a click in another panel moves the view only: no tab changed, so the adopted view renders
+    // without re-querying them, and the independent view (nothing adopted) does nothing at all —
+    // every open panel shares one main thread, and a refresh per panel per click added up (T-0150).
+    // The scope is not view-only: the Parked scope swaps the data set in refresh()
+    if (relevant.length === 1 && before && movedOnly(before, stored, VIEW_ONLY_KEYS)) {
+      if ((state.ui.panelView ?? "shared") === "shared") {
+        scheduleRender();
+      }
+      return;
+    }
   }
   scheduleRefresh();
 });
+
+const VIEW_ONLY_KEYS = new Set<keyof UiPrefs>(["defaultFilter", "sort", "sortDirections"]);
+
+// true when every key whose value differs between the two is in `keys` (objects by content)
+function movedOnly(before: Partial<UiPrefs>, after: Partial<UiPrefs>, keys: Set<keyof UiPrefs>): boolean {
+  const all = new Set([...Object.keys(before), ...Object.keys(after)] as (keyof UiPrefs)[]);
+  for (const key of all) {
+    if (!keys.has(key) && JSON.stringify(before[key]) !== JSON.stringify(after[key])) {
+      return false;
+    }
+  }
+  return true;
+}

@@ -3786,6 +3786,94 @@ test("UI - Sidepanel - Shared view follows a foreign filter / scope / sort chang
   assert.equal(scope.value, "all-windows");
 });
 
+// T-0150: every open panel shares one main thread, so what the OTHER panels do on a click matters.
+// A click's ui write moves the view only (filter / sort / direction): the shared view renders the
+// adopted view without re-querying the tabs; the independent view, which adopted nothing, does nothing
+test("UI - Sidepanel - A foreign view-only ui write renders without a refresh; the independent view does nothing", async () => {
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 250));
+  const refreshes = () => calls.filter((call) => call.startsWith("windows.getLastFocused")).length;
+  const pressed = () => q(document, '#filters button[aria-pressed="true"]').dataset.filter;
+  const sentinel = () => {
+    q(document, "#tab-list").firstElementChild?.setAttribute("data-sentinel", "1");
+    return () => document.querySelector("#tab-list [data-sentinel]") !== null; // still the old DOM?
+  };
+  const { ui: base } = await chrome.storage.local.get("ui");
+  const clicked = {
+    ...base,
+    defaultFilter: "snoozed",
+    sortDirections: { ...(base.sortDirections ?? {}), recent: "desc" },
+  };
+  await chrome.storage.local.set({ ui: clicked });
+  calls.length = 0;
+  const untouched = sentinel();
+  await chrome.storage.onChanged.fire({ ui: { oldValue: base, newValue: clicked } }, "local");
+  await settle();
+  assert.equal(pressed(), "snoozed", "shared: the filter followed");
+  assert.equal(untouched(), false, "shared: the list was rendered");
+  assert.equal(refreshes(), 0, "shared: no tabs re-query for a view-only write");
+
+  const themed = { ...clicked, theme: clicked.theme === "light" ? "dark" : "light" }; // earlier tests may have left either
+  await chrome.storage.local.set({ ui: themed });
+  calls.length = 0;
+  await chrome.storage.onChanged.fire({ ui: { oldValue: clicked, newValue: themed } }, "local");
+  await settle();
+  assert.equal(refreshes(), 1, "a write that moves more than the view still refreshes");
+
+  const independent = { ...themed, panelView: "independent" };
+  await chrome.storage.local.set({ ui: independent });
+  await chrome.storage.onChanged.fire({ ui: { oldValue: themed, newValue: independent } }, "local");
+  await settle();
+  const foreign = { ...independent, defaultFilter: "awake" };
+  await chrome.storage.local.set({ ui: foreign });
+  calls.length = 0;
+  const stillThere = sentinel();
+  await chrome.storage.onChanged.fire({ ui: { oldValue: independent, newValue: foreign } }, "local");
+  await settle();
+  assert.equal(pressed(), "snoozed", "independent: the filter stays");
+  assert.equal(stillThere(), true, "independent: not even a render");
+  assert.equal(refreshes(), 0, "independent: no refresh");
+
+  const restore = { ...base, panelView: "shared" };
+  await chrome.storage.local.set({ ui: restore });
+  await chrome.storage.onChanged.fire({ ui: { oldValue: foreign, newValue: restore } }, "local");
+  await settle();
+  assert.equal(pressed(), base.defaultFilter);
+});
+
+// T-0150: a hidden panel (its window minimized or on another workspace) does no DOM work: every
+// change meanwhile becomes one refresh, at once when the panel is shown
+test("UI - Sidepanel - A hidden panel coalesces changes into one refresh when it is shown", async () => {
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 400)); // past the visible debounce (150 ms)
+  const refreshes = () => calls.filter((call) => call.startsWith("windows.getLastFocused")).length;
+  const search = byId<HTMLInputElement>("search");
+  q(document, '#filters button[data-filter="all"]').click(); // Inbox is awake: the All filter shows it
+  await settle();
+  Object.defineProperty(document, "hidden", { value: true, configurable: true });
+  calls.length = 0;
+  q(document, "#tab-list").firstElementChild?.setAttribute("data-sentinel", "1");
+  await chrome.tabs.onCreated.fire({ id: 77, windowId: 1, url: "https://new.com/", title: "New" });
+  await chrome.storage.onChanged.fire({ sharedSearch: { newValue: "inbox" } }, "session"); // adopted text renders at once when visible
+  await settle();
+  assert.equal(search.value, "inbox", "state still follows while hidden");
+  assert.ok(document.querySelector("#tab-list [data-sentinel]"), "hidden: no render");
+  assert.equal(refreshes(), 0, "hidden: no refresh");
+
+  Reflect.deleteProperty(document, "hidden"); // back to happy-dom's own getter: visible
+  document.dispatchEvent(new window.Event("visibilitychange"));
+  await tick();
+  await tick();
+  assert.equal(refreshes(), 1, "shown: one refresh at once");
+  assert.equal(document.querySelector("#tab-list [data-sentinel]"), null, "shown: rendered");
+  assert.deepEqual(
+    Array.from(document.querySelectorAll(".row .title")).map((el) => el.textContent),
+    ["Inbox"],
+    "the search adopted while hidden is applied",
+  );
+  search.value = ""; // back to the full list for the tests after this one
+  search.dispatchEvent(new window.Event("input", { bubbles: true }));
+  await settle();
+});
+
 // window names / colors / pins written elsewhere (another panel's rename, the worker's restart
 // recovery) must reach this panel; the fingerprint rewrite on every tab event must not re-render it
 test("UI - Sidepanel - WINDOW_NAMES: a profile rename elsewhere refreshes the headers; a fingerprint-only rewrite does not render", {

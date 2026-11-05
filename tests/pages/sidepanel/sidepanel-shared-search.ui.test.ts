@@ -62,7 +62,7 @@ const type = (text: string) => {
   search().value = text;
   search().dispatchEvent(new window.Event("input", { bubbles: true }));
 };
-const settle = () => new Promise((resolve) => setTimeout(resolve, 150)); // past the publish debounce
+const settle = () => new Promise((resolve) => setTimeout(resolve, 350)); // past the publish debounce (300 ms)
 const refreshed = () => new Promise((resolve) => setTimeout(resolve, 200)); // past the refresh debounce
 
 test("UI - Sidepanel Shared search - a new panel opens with the text another panel typed", () => {
