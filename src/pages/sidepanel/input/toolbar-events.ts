@@ -39,6 +39,10 @@ export function setQuery(value: string): void {
   if (!value) {
     searchScrollByFilter.clear(); // search over — in-results positions are stale
     state.searchCollapsedGroups.clear();
+    if (state.filterBeforeSearch !== null) {
+      state.filter = state.filterBeforeSearch; // the search is over: the filter it replaced is back
+      state.filterBeforeSearch = null;
+    }
   }
   state.query = value;
   // search narrowed the current filter to nothing while matches exist elsewhere:
@@ -53,6 +57,7 @@ export function setQuery(value: string): void {
     const found = countsByFilter(searchCandidates(state.allTabs, state), state.derived);
     // an unknown stored filter reads undefined here — never === 0, so nothing switches
     if (found[state.filter as FilterName] === 0 && found.all > 0) {
+      state.filterBeforeSearch ??= state.filter; // the first switch of this search remembers the user's filter
       state.filter = "all";
     }
   }
@@ -154,6 +159,7 @@ filterBar.addEventListener("click", (event) => {
   const scrollMap = state.query ? searchScrollByFilter : scrollByFilter;
   scrollMap.set(state.filter, listEl.scrollTop);
   state.filter = button.dataset.filter!; // the button matched [data-filter]
+  state.filterBeforeSearch = null; // the user's choice, search or not
   state.pendingScroll = scrollMap.get(state.filter) ?? 0;
   state.revealCurrent = true; // the current row at the top, when this view holds it
   persistUiPrefs();
@@ -224,6 +230,7 @@ export function adoptStoredView(ui: Partial<UiPrefs>): void {
   let changed = false;
   if (ui.defaultFilter !== undefined && ui.defaultFilter !== state.filter) {
     state.filter = ui.defaultFilter;
+    state.filterBeforeSearch = null; // a click in another panel: the user's choice here too
     changed = true;
   }
   if (ui.scope !== undefined && ui.scope !== state.scope) {

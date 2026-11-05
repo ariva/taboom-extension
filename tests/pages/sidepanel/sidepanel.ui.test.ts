@@ -267,8 +267,24 @@ test("UI - Sidepanel - Hidden-matches behavior: keep filter by default, switch t
     "true",
     "All filter auto-selected",
   );
+  // T-0151: the search ends → the filter the search replaced is back, in every panel alike,
+  // and storage never saw the auto-selected All
   document.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  assert.equal(
+    q(document, '#filters button[data-filter="snoozed"]').getAttribute("aria-pressed"),
+    "true",
+    "clearing the search restores the filter it replaced",
+  );
+  assert.equal((await chrome.storage.local.get("ui")).ui.defaultFilter, ui.defaultFilter, "not persisted");
+  // a filter clicked during the search is the user's choice: the clear keeps it
+  type("inbox");
   q(document, '#filters button[data-filter="all"]').click();
+  document.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  assert.equal(
+    q(document, '#filters button[data-filter="all"]').getAttribute("aria-pressed"),
+    "true",
+    "a clicked filter stays after the clear",
+  );
 
   await chrome.storage.local.set({ ui: { ...ui, searchEmptyFilter: "keep" } });
   await chrome.storage.onChanged.fire({ ui: { newValue: {} } }, "local");

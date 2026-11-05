@@ -48,6 +48,7 @@ export function rowTagOrigins(tabIds: number[]): Map<string, Set<TagOrigin>> {
 // quick launch row click: the list shows that tag alone (the chip's tick set becomes this tag)
 export function filterByTag(tagId: string): void {
   state.filter = "tags";
+  state.filterBeforeSearch = null; // the user's choice
   state.tagFilter = new Set([tagId]);
   persistUiPrefs();
   publishSharedTagFilter();

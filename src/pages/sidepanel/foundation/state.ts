@@ -55,6 +55,7 @@ export interface PanelState {
   panelWindowId: number | null; // the window this panel lives in (chrome.windows.getCurrent), read on the first refresh()
   focusHint: FocusHint | null; // shown as current instead of Chrome's focus record while it lives (model/focus-intent.ts)
   activeTabId: number | null; // active tab of the current window as of the last refresh()
+  filterBeforeSearch: string | null; // the filter a search replaced by All (toolbar-events setQuery); null = the user's own choice is showing
   followCurrent: boolean;
   revealCurrent: boolean; // after the next render: the current row at the top of the list (reveal.ts "start")
   pendingScroll: number | null;
@@ -115,6 +116,10 @@ export const state: PanelState = {
   activeTabId: null,
   // a row activated from the list: on the next event-driven re-render the minimal scroll
   // keeps it on screen (recent sort moves it to the top) without the list jumping under the click
+  // Settings "Switch to the All filter": the search shows All, the end of the search brings this
+  // back — the user never chose All, storage never saw it, and every panel of a shared view
+  // ends the search on the same filter (T-0151)
+  filterBeforeSearch: null,
   followCurrent: false,
   // the active tab changed outside the panel (keyboard history command, Ctrl+Tab), the panel
   // opened, or the view changed (filter / scope / sort): the current row — with its Split or
