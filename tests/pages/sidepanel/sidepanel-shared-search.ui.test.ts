@@ -83,6 +83,39 @@ test("UI - Sidepanel Shared search - typing publishes the text once the keystrok
   assert.deepEqual(rows(), ["Gamma"]);
 });
 
+// T-0149: the echo of an earlier keystroke's write must not undo what was typed since
+test("UI - Sidepanel Shared search - the echo of an earlier write leaves the newer keystrokes alone", async () => {
+  calls.length = 0;
+  type("b");
+  await settle(); // "b" written
+  type("be"); // typed before the echo of "b" lands
+  await chrome.storage.onChanged.fire({ sharedSearch: { newValue: "b" } }, "session");
+  assert.equal(search().value, "be", "the own echo does not reset the box");
+  await settle();
+  assert.deepEqual(published(), [
+    'storage.session.set {"sharedSearch":"b"}',
+    'storage.session.set {"sharedSearch":"be"}',
+  ]);
+  await chrome.storage.onChanged.fire({ sharedSearch: { newValue: "be" } }, "session");
+  assert.equal(search().value, "be");
+});
+
+test("UI - Sidepanel Shared search - two own writes echoing late, in order, are both recognised", async () => {
+  calls.length = 0;
+  type("g");
+  await settle();
+  type("ga");
+  await settle(); // both written, neither echoed yet (a busy browser delivers echoes late)
+  type("gam"); // waiting for its own write
+  await chrome.storage.onChanged.fire({ sharedSearch: { newValue: "g" } }, "session");
+  await chrome.storage.onChanged.fire({ sharedSearch: { newValue: "ga" } }, "session");
+  assert.equal(search().value, "gam", "late echoes of own writes are not foreign text");
+  await settle();
+  assert.deepEqual(published().at(-1), 'storage.session.set {"sharedSearch":"gam"}');
+  await chrome.storage.onChanged.fire({ sharedSearch: { newValue: "gam" } }, "session");
+  assert.deepEqual(rows(), ["Gamma"]);
+});
+
 test("UI - Sidepanel Shared search - another panel's text fills the box and filters the list, and is not written back", async () => {
   calls.length = 0;
   await chrome.storage.onChanged.fire({ sharedSearch: { newValue: "alpha" } }, "session");

@@ -65,10 +65,13 @@ export function setQuery(value: string): void {
 // Shared search: the search text is part of the shared view (ui.panelView; an independent panel
 // shares nothing). What this panel types goes to storage.session.sharedSearch once the keystrokes
 // settle, and every other open panel takes it as if typed there. lastSharedSearch is the text the
-// store holds as far as this panel knows: its own write echoing back and a foreign text already
-// adopted both match it, so neither is written or rendered again.
+// store holds as far as this panel knows: a foreign text already adopted matches it, so it is not
+// written back. ownWrites are this panel's writes whose storage echo has not arrived yet: an echo
+// lands after the next keystrokes (always; late by several writes when seven panels are busy
+// rendering), and taken for foreign text it would reset the box to the older text (T-0149).
 const SHARE_SEARCH_DEBOUNCE_MS = 100;
 let lastSharedSearch: string | undefined;
+let ownWrites: string[] = [];
 let shareSearchTimer: ReturnType<typeof setTimeout> | undefined;
 
 function viewShared(): boolean {
@@ -82,6 +85,7 @@ function publishSharedSearch(value: string): void {
   }
   shareSearchTimer = setTimeout(() => {
     lastSharedSearch = value;
+    ownWrites.push(value);
     sessionStore.set({ sharedSearch: value });
   }, SHARE_SEARCH_DEBOUNCE_MS);
 }
@@ -121,6 +125,11 @@ export function adoptSharedSearch(text: string | undefined): void {
   const value = text ?? "";
   if (!viewShared()) {
     return;
+  }
+  const own = ownWrites.indexOf(value);
+  if (own !== -1) {
+    ownWrites = ownWrites.slice(own + 1); // echoes come in write order: everything before it has echoed too
+    return; // this panel's own write: the box already moved on, keystrokes waiting keep their timer
   }
   clearTimeout(shareSearchTimer); // keystrokes still waiting here are older than the text that just landed
   lastSharedSearch = value;
