@@ -1,5 +1,21 @@
 # CHANGES
 
+## v1.0.9 — 2026-11-08
+
+### Summary
+Shared view fixes, a faster click with many side panels
+
+### Fixes
+- The end of a search brings back the filter it replaced (cb82711)
+- Shared search losing typed characters when a panel's own late storage echo reset the search box (3fcbd88)
+- The panel marking the wrong window current after a workspace switch (752b8ba)
+
+### Performance
+- Other side panels render less on a click — view-only writes skip the refresh, hidden panels wait, search publishes after 300 ms (c781c5f)
+
+### Other
+- Add auto-generated perf comparison based on release versions (1860c45)
+
 ## v1.0.8 — 2026-11-01
 
 ### Summary
