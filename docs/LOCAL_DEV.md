@@ -33,7 +33,9 @@ One-off production build without the watcher: `npx vite build` → `dist/chrome`
 
 ### Firefox (temporary add-on)
 
-Firefox has no persistent "load unpacked". Build the Firefox flavour (`just dev target=firefox` while developing → `dist/dev-firefox`; `TARGET=firefox npx vite build` → `dist/firefox`), then `about:debugging` → **This Firefox** → **Load Temporary Add-on** → pick the `manifest.json` in that folder. The add-on is gone after a Firefox restart — load it again, or use `just firefox-run`, which starts a throwaway profile with the add-on and reloads it on every rebuild. The panel is in the sidebar: the toolbar button toggles it.
+**Restart the watcher after a change to `vite.config.ts`, `src/manifest.ts` or anything under `tooling/`** — `vite build --watch` never re-reads its config, so a running `just dev` keeps building with the old one: after the `__CHROME__` / `__FIREFOX__` constants arrived, a watcher started before them left the identifiers unreplaced and the worker died at start with `ReferenceError: __FIREFOX__ is not defined` (toolbar button dead, nothing after it registered). Ctrl+C, run `just dev` / `just dev-firefox` again, press **Reload** on the extension.
+
+Firefox has no persistent "load unpacked". Build the Firefox flavour (`just dev target=firefox` while developing → `dist/dev-firefox`; `TARGET=firefox npx vite build` → `dist/firefox`), then `about:debugging` → **This Firefox** → **Load Temporary Add-on** → pick the `manifest.json` in that folder. The add-on is gone after a Firefox restart — load it again, or use `just firefox-run`, which starts a throwaway profile with the add-on and reloads it on every rebuild. The panel is in the sidebar: the toolbar button toggles it. What else differs between the two browsers for a developer: [CROSS_BROWSER.md](CROSS_BROWSER.md).
 
 ## Verify it works
 

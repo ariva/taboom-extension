@@ -1,6 +1,6 @@
 # Building Taboom
 
-How the source becomes a loadable extension, which command does what, and what the optional minified build buys you. Setup (Node 24, `npm install`, `just`) is in [LOCAL_DEV.md](LOCAL_DEV.md); how the build is wired is in [ARCHITECTURE.md](ARCHITECTURE.md#build-dev-loop-release); the test tiers are in [TESTING.md](TESTING.md).
+How the source becomes a loadable extension, which command does what, and what the optional minified build buys you. Setup (Node 24, `npm install`, `just`) is in [LOCAL_DEV.md](LOCAL_DEV.md); how the build is wired is in [ARCHITECTURE.md](ARCHITECTURE.md#build-dev-loop-release); the test tiers are in [TESTING.md](TESTING.md); the Chrome / Firefox differences behind the two targets are in [CROSS_BROWSER.md](CROSS_BROWSER.md).
 
 Every command goes through [`just`](https://github.com/casey/just) — run `just --list` to see them all.
 

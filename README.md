@@ -97,6 +97,7 @@ More in [Features](docs/FEATURES.md) — the demo retakes every screenshot on ea
 - [Building](docs/BUILD.md) — every build command, what a build produces, the dev loop, the release checks, the optional minified build (with measurements).
 - [Architecture](docs/ARCHITECTURE.md) — how the code is layered: service worker, side panel, options, the generic library, build and release.
 - [Testing](docs/TESTING.md) — the four test tiers (unit, ui, real-browser, e2e), running them, layout and conventions.
+- [Chrome and Firefox](docs/CROSS_BROWSER.md) — what differs between the two browsers for an extension developer, and how this one source builds for both.
 
 ## Licence
 
