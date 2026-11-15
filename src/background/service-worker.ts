@@ -24,6 +24,7 @@ import {
 } from "./tab-history.ts";
 import { syncTagMenu, syncTagMenuOnNavigation } from "./tags.ts";
 import { refreshOnTabChange, scheduleProfileRefresh, trackPanelPort } from "./window-profiles.ts";
+import { toggleSidebarOnActionClick } from "../lib/platform/panel.ts";
 
 // ---------- lifecycle ----------
 
@@ -69,7 +70,7 @@ chrome.tabs.onActivated.addListener(async ({ tabId }) => {
 chrome.tabs.onActivated.addListener(({ tabId }) => recordActivation(tabId));
 chrome.windows.onFocusChanged.addListener(recordWindowFocus);
 chrome.tabs.onRemoved.addListener(dropClosedTabs);
-chrome.tabs.onReplaced.addListener(replaceTabId);
+chrome.tabs.onReplaced?.addListener(replaceTabId); // Firefox has no onReplaced: a discard keeps the id there
 
 chrome.tabs.onUpdated.addListener(reprotectOnNavigation);
 chrome.tabs.onUpdated.addListener(syncKeepAliveMenuOnNavigation);
@@ -79,6 +80,7 @@ chrome.tabs.onUpdated.addListener(syncTagMenuOnNavigation);
 
 chrome.commands.onCommand.addListener(runCommand);
 chrome.contextMenus.onClicked.addListener(runMenuClick);
+toggleSidebarOnActionClick(); // Firefox: the toolbar button toggles the sidebar (Chrome: setPanelBehavior in init)
 
 // ---------- window identity ----------
 

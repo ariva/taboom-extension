@@ -3,7 +3,7 @@
 import { send } from "../../../app/messages.ts";
 import { localStore } from "../../../app/storage.ts";
 import type { TabHistory, UiPrefs } from "../../../app/types.ts";
-import { getElementById } from "../../../lib/dom.ts";
+import { getElementById, setSvgMarkup } from "../../../lib/dom.ts";
 import { winPop } from "../foundation/elements.ts";
 import { windowMaps } from "../model/index.ts";
 import { faviconImg } from "../render/row.ts";
@@ -86,8 +86,9 @@ async function fillHistoryPopover(): Promise<void> {
 
     const icon = document.createElement("span");
     icon.className = "favicon";
-    if (tab?.url) {
-      icon.append(faviconImg(tab.url));
+    const img = tab?.url ? faviconImg(tab.url) : undefined;
+    if (img) {
+      icon.append(img);
     }
 
     const title = document.createElement("span");
@@ -118,7 +119,7 @@ async function fillHistoryPopover(): Promise<void> {
     removeBtn.type = "button";
     removeBtn.className = "icon-btn hist-x";
     removeBtn.title = removeBtn.ariaLabel = "Remove from history";
-    removeBtn.innerHTML = ICONS.close;
+    setSvgMarkup(removeBtn, ICONS.close);
     removeBtn.addEventListener("click", () => {
       send({ type: "history-remove", index });
     });

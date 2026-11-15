@@ -60,7 +60,7 @@ export interface RowViewModel {
   classes: string[];
   viewTransitionName: string;
   checked: boolean;
-  favicon: { pageUrl: string } | { letter: string }; // no _favicon/ for unsupported URLs — host initial instead
+  favicon: { pageUrl: string } | { letter: string }; // no cached favicon for unsupported URLs — host initial instead
   title: string;
   titleRanges: HighlightRange[];
   host: string;
@@ -233,6 +233,11 @@ export function emptyMessage(query: string, filter: string, parked = false, tags
 }
 
 // everything renderRow needs to build the DOM, as plain data
+// the favicon placeholder: the host's first letter, a bullet for a host-less tab
+export function hostInitial(host: string): string {
+  return (host[0] ?? "•").toUpperCase();
+}
+
 export function rowViewModel(
   tab: Tab,
   {
@@ -301,7 +306,7 @@ export function rowViewModel(
     ].filter((name): name is string => Boolean(name)),
     viewTransitionName: `tab-${tab.id}`,
     checked: selected.has(tab.id),
-    favicon: tab.url && isSupportedUrl(tab.url) ? { pageUrl: tab.url } : { letter: (d.host[0] ?? "•").toUpperCase() },
+    favicon: tab.url && isSupportedUrl(tab.url) ? { pageUrl: tab.url } : { letter: hostInitial(d.host) },
     title,
     titleRanges,
     host,

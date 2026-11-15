@@ -1,6 +1,6 @@
 // The nine measurements, each returning its samples. Order matters: it is the HISTORY.md column order.
 import type { PerfWorld } from "./world.ts";
-import { installFrameRecorder, scrollGesture, startFrames, stopFrames, timed } from "./probes.ts";
+import { installFrameRecorder, startFrames, stopFrames, timed } from "./probes.ts";
 import { percentile, summarize, type Summary } from "./stats.ts";
 
 export interface Scenario {
@@ -87,7 +87,6 @@ export const SCENARIOS: Scenario[] = [
     name: "scroll",
     what: "frame interval (p95) over five synthesized wheel gestures down the list",
     run: async (world, repeat) => {
-      const cdp = await world.browser.context.newCDPSession(world.panel);
       await installFrameRecorder(world.panel);
       const p95s: number[] = [];
       for (let i = 0; i < repeat; i++) {
@@ -96,12 +95,11 @@ export const SCENARIOS: Scenario[] = [
         });
         await startFrames(world.panel);
         for (let gesture = 0; gesture < 5; gesture++) {
-          await scrollGesture(cdp, world.panel, 2500);
+          await world.browser.scrollGesture(world.panel, 2500);
         }
         const { frames } = await stopFrames(world.panel);
         p95s.push(percentile(frames, 0.95));
       }
-      await cdp.detach();
       return summarize(p95s, "ms/frame p95");
     },
   },

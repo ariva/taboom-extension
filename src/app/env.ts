@@ -1,6 +1,8 @@
-// Store installs get `update_url` injected into the manifest; an unpacked
-// (local dev) copy never has it. Lets both run side by side distinguishably.
-export const IS_DEV = !chrome.runtime.getManifest().update_url;
+// The dev marker comes from the BUILD: `just dev` (Vite mode development → dist/dev-chrome, dist/dev-firefox) is the
+// dev copy, every other build is the shipped one. Not from the manifest's update_url — the
+// Chrome store injects it, Firefox's AMO never does, so that test would mark every Firefox
+// install as DEV (T-0152). Lets the dev copy and the store copy run side by side distinguishably.
+export const IS_DEV = import.meta.env.MODE === "development";
 
 export const DEV_PREFIX = IS_DEV ? "DEV · " : "";
 

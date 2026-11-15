@@ -3,7 +3,7 @@
 // (row-height feedback, fold-all button, bulk bar).
 import { splitPairEdges } from "../../../app/split.ts";
 import { enabledTags, splitTagQuery, tagColorHex } from "../../../app/tags.ts";
-import { FOLD_ICONS } from "../../../lib/dom.ts";
+import { FOLD_ICONS, setSvgMarkup } from "../../../lib/dom.ts";
 import { hideCtxMenuForRender } from "../../../lib/ui/context-menu.ts";
 import {
   bulkBar,
@@ -311,7 +311,7 @@ function renderCollapseAllButton(groups: PanelRun[], anythingToFold: boolean): v
   }
   collapseAllBtn.disabled = groups.length === 0;
   const allCollapsed = groups.length > 0 && groups.every(([windowId]) => activeCollapsedSet().has(windowId));
-  collapseAllBtn.innerHTML = allCollapsed ? FOLD_ICONS.unfold : FOLD_ICONS.fold;
+  setSvgMarkup(collapseAllBtn, allCollapsed ? FOLD_ICONS.unfold : FOLD_ICONS.fold);
   collapseAllBtn.title = collapseAllBtn.ariaLabel = allCollapsed ? "Click to Expand" : "Click to Collapse";
   collapseAllBtn.dataset.groups = JSON.stringify(groups.map(([windowId]) => windowId));
 }

@@ -1,6 +1,7 @@
 // Group headers of the list: the header of any grouping, and the nested tab-group
 // sub-headers inside a window's rows.
 import { featureEnabled } from "../../../app/core.ts";
+import { setSvgMarkup } from "../../../lib/dom.ts";
 import { tabGroupColor } from "../model/index.ts";
 import type { RowViewModel } from "../model/index.ts";
 import { renderRow } from "./row.ts";
@@ -72,7 +73,7 @@ export function renderSplitSubheader(tabs: PanelTab[], nested: boolean): HTMLEle
   icon.setAttribute("stroke", "currentColor");
   icon.setAttribute("stroke-width", "2");
   icon.setAttribute("stroke-linejoin", "round");
-  icon.innerHTML = SPLIT_ICON; // constant markup from this file, never user data
+  setSvgMarkup(icon, SPLIT_ICON); // constant markup from this file, never user data
   const title = document.createElement("span");
   title.className = "tg-title";
   title.textContent = "Split";

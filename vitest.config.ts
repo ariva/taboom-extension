@@ -5,7 +5,9 @@
 //   enabled      — flags exactly as shipped in features.json
 //   experimental — experimental flags treated as enabled (ui.showExperimental injected)
 //   disabled     — every flag disabled, proving disabled-state behaviour
-// tests/helpers read TEST_EXPERIMENTAL / TEST_ALL_DISABLED. Flag-independent tests
+//   firefox      — flags as shipped against the Firefox-shaped chrome mock (no sidePanel,
+//                  tabs.onReplaced, split view or favicon store; a sidebarAction) — T-0152
+// tests/helpers read TEST_EXPERIMENTAL / TEST_ALL_DISABLED / TEST_BROWSER. Flag-independent tests
 // (lib, tooling, structure guards, pure page units) run once, in `unit`.
 // Layout mirrors src/: tests/app, lib, background, pages/*, tooling; tests/structure holds
 // the repo-wide guards; tests/browser and tests/e2e have their own configs.
@@ -29,7 +31,14 @@ const FLAG_INDEPENDENT = [
 // everything else under these folders runs once per flag scenario
 const FLAG_DEPENDENT = ["tests/app/**/*.test.*", "tests/background/**/*.test.*", "tests/pages/**/*.test.*"];
 
-const flagProject = (name: string, env: Record<string, string>) => ({
+// the build-time browser constants (src/lib/platform/build-target.d.ts): tests run the source, where
+// both branches stay and the chrome mock decides — like a build that may run anywhere; the firefox
+// project is the Firefox build, so the Chrome branches are off there too
+const BOTH = { __CHROME__: "true", __FIREFOX__: "true" };
+const FIREFOX_BUILD = { __CHROME__: "false", __FIREFOX__: "true" };
+
+const flagProject = (name: string, env: Record<string, string>, define = BOTH) => ({
+  define,
   test: {
     name,
     environment: "node" as const, // UI tests bring their own happy-dom Window (tests/helpers)
@@ -42,10 +51,11 @@ const flagProject = (name: string, env: Record<string, string>) => ({
 export default defineConfig({
   test: {
     projects: [
-      { test: { name: "unit", environment: "node", include: FLAG_INDEPENDENT } },
+      { define: BOTH, test: { name: "unit", environment: "node", include: FLAG_INDEPENDENT } },
       flagProject("enabled", {}),
       flagProject("experimental", { TEST_EXPERIMENTAL: "1" }),
       flagProject("disabled", { TEST_ALL_DISABLED: "1" }),
+      flagProject("firefox", { TEST_BROWSER: "firefox" }, FIREFOX_BUILD),
     ],
   },
 });

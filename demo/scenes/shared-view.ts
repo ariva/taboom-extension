@@ -19,19 +19,13 @@ export const sharedView: Scene = {
     await stage.still("settings-shared-view", "settings");
 
     const url = stage.panel.url();
-    const context = stage.panel.context();
-    // not the filmed panel itself: it has this very url
-    const isOther = (page: typeof stage.panel) => page !== stage.panel && page.url() === url;
-    const shown = context.waitForEvent("page", { predicate: isOther, timeout: 15_000 });
-    const own = await stage.worker.evaluate(async (url) => {
-      const created = await chrome.windows.create({ url, focused: false, type: "popup", width: 600, height: 820 });
-      return { windowId: created?.id ?? -1, tabId: created?.tabs?.[0]?.id ?? -1 };
-    }, url);
+    // a second panel page in a popup window of its own, like the aside pages
+    const second = await stage.browser.openAside(url, { width: 600, height: 820 });
+    const own = { windowId: second.windowId, tabId: second.tabId };
     await stage.panel.addStyleTag({
       content: `#tab-list .row[data-tab-id="${own.tabId}"], #tab-list .group-header:has(+ .row[data-tab-id="${own.tabId}"]), #windows-pop .win-row[data-window-id="${own.windowId}"], #windows-pop .win-row[data-window-id="${own.windowId}"] + .win-menu-btn { display: none !important; }`,
     });
-    const other = context.pages().find(isOther) ?? (await shown);
-    await other.setViewportSize({ width: 600, height: 820 });
+    const other = second.page;
     // the off-screen panel is driven by dispatched events, the way the UI tests drive it: a locator
     // click waits for visibility, which a page in an unfocused popup window may never report
     await other.locator("#tab-list .row").first().waitFor({ state: "attached", timeout: 30_000 });

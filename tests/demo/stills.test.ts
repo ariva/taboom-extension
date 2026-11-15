@@ -48,7 +48,7 @@ const isReadme = (name: string) => name.startsWith("readme-");
 test("Demo - Stills - docs/FEATURES.md shows every feature still and nothing else", () => {
   const names = [...stillsBySource().values()].flat().filter((name) => !isReadme(name));
   const page = readFileSync("docs/FEATURES.md", "utf8");
-  const shown = [...page.matchAll(/assets\/features\/([a-z0-9-]+)\.png/g)].map((match) => match[1] ?? "");
+  const shown = [...page.matchAll(/assets\/features\/chrome\/([a-z0-9-]+)\.png/g)].map((match) => match[1] ?? "");
   assert.deepEqual(
     names.filter((name) => !shown.includes(name)),
     [],
@@ -65,17 +65,17 @@ test("Demo - Stills - README shows every readme-* still and nothing else", () =>
   const names = [...stillsBySource().values()].flat().filter(isReadme);
   assert.ok(names.length > 0, "no readme-* stills: the README screenshots come from the readme scene");
   const page = readFileSync("README.md", "utf8");
-  const notScreenshots = ["bmc_qr", "demo/youtube-cover"]; // the Buy Me a Coffee QR code and the YouTube cover: not pictures of the UI
+  const notScreenshots = ["bmc_qr", "demo/chrome/youtube-cover"]; // the Buy Me a Coffee QR code and the YouTube cover: not pictures of the UI
   const images = [...page.matchAll(/docs\/assets\/([a-z0-9_/-]+)\.png/g)]
     .map((match) => match[1] ?? "")
     .filter((image) => !notScreenshots.includes(image));
   assert.deepEqual(
-    images.filter((image) => !names.includes(image.replace(/^features\//, ""))),
+    images.filter((image) => !names.includes(image.replace(/^features\/chrome\//, ""))),
     [],
     "README screenshots no scene records",
   );
   assert.deepEqual(
-    names.filter((name) => !images.includes(`features/${name}`)),
+    names.filter((name) => !images.includes(`features/chrome/${name}`)),
     [],
     "readme-* stills the README does not show",
   );

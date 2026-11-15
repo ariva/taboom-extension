@@ -9,14 +9,26 @@ export interface Summary {
   samples: number[];
 }
 
+export type PerfBrowser = "chrome" | "firefox";
+
 export interface PerfRun {
   version: string;
   commit: string;
   date: string; // ISO
   tabs: number;
   repeat: number;
+  browser?: PerfBrowser; // absent in runs before T-0152: Chromium
   machine: { platform: string; cpus: number; node: string };
   scenarios: Record<string, Summary>;
+}
+
+export function browserOf(run: PerfRun): PerfBrowser {
+  return run.browser ?? "chrome";
+}
+
+// two runs are comparable when they measured the same tab count in the same browser
+function sameWorld(a: PerfRun, b: PerfRun): boolean {
+  return a.tabs === b.tabs && browserOf(a) === browserOf(b);
 }
 
 export function percentile(samples: number[], fraction: number): number {
@@ -71,8 +83,14 @@ export function localStamp(iso: string): string {
 }
 
 export function formatCompare(older: PerfRun, newer: PerfRun, rows: CompareRow[]): string {
-  const head = `${older.version} ${older.commit} (${older.tabs} tabs, ${localStamp(older.date)}) → ${newer.version} ${newer.commit} (${newer.tabs} tabs, ${localStamp(newer.date)})`;
-  const warn = older.tabs !== newer.tabs ? "\nWARNING: different tab counts — the deltas are not comparable\n" : "\n";
+  const where = (run: PerfRun) => `${run.tabs} tabs, ${browserOf(run)}, ${localStamp(run.date)}`;
+  const head = `${older.version} ${older.commit} (${where(older)}) → ${newer.version} ${newer.commit} (${where(newer)})`;
+  const warn =
+    older.tabs !== newer.tabs
+      ? "\nWARNING: different tab counts — the deltas are not comparable\n"
+      : browserOf(older) !== browserOf(newer)
+        ? "\nWARNING: different browsers — the deltas are not comparable\n"
+        : "\n";
   const cell = (value: number | null) => (value === null ? "—" : String(value));
   const delta = (row: CompareRow) =>
     row.deltaPct === null
@@ -110,7 +128,7 @@ export function judgement(deltaPct: number | null, thresholdPct = 25): string {
 // or more, the ones beyond the SLOWER margin marked; "≈ same" when none did
 export function historyVerdict(previous: PerfRun | undefined, run: PerfRun, thresholdPct = 25): string {
   if (!previous) {
-    return "— (first run at this tab count)";
+    return `— (first run at this tab count${browserOf(run) === "chrome" ? "" : ` in ${browserOf(run)}`})`;
   }
   const moved = compareRuns(previous, run, thresholdPct)
     .filter((row) => row.deltaPct !== null && Math.abs(row.deltaPct) >= 10)
@@ -128,13 +146,13 @@ export function historyLine(run: PerfRun, order: string[], previous?: PerfRun): 
     return summary ? String(summary.median) : "—";
   });
   const overall = previous ? judgement(overallDeltaPct(compareRuns(previous, run))) : "—";
-  return `| ${localStamp(run.date)} | ${run.version} | ${run.commit} | ${run.tabs} | ${run.repeat} | ${cells.join(" | ")} | ${overall} | ${historyVerdict(previous, run)} |`;
+  return `| ${localStamp(run.date)} | ${run.version} | ${run.commit} | ${browserOf(run)} | ${run.tabs} | ${run.repeat} | ${cells.join(" | ")} | ${overall} | ${historyVerdict(previous, run)} |`;
 }
 
 export function historyHeader(order: string[]): string {
   return [
-    `| date | version | commit | tabs | reps | ${order.join(" | ")} | overall | vs previous (same tabs) |`,
-    `|---|---|---|---|---|${order.map(() => "---").join("|")}|---|---|`,
+    `| date | version | commit | browser | tabs | reps | ${order.join(" | ")} | overall | vs previous (same tabs, same browser) |`,
+    `|---|---|---|---|---|---|${order.map(() => "---").join("|")}|---|---|`,
   ].join("\n");
 }
 
@@ -153,28 +171,44 @@ function compareVersions(a: string, b: string): number {
 
 // the whole HISTORY.md from every stored run: rebuilt on each run, so a header change or a late
 // run of an older release lands in the right place — sorted by version, then date, so the verdict
-// of each line is against the latest run BEFORE it in that order with the same tab count (an old
-// release measured today is still judged against the release before it, not against HEAD)
+// of each line is against the latest run BEFORE it in that order with the same tab count and
+// browser (an old release measured today is still judged against the release before it, not
+// against HEAD; a Firefox run is never judged against a Chromium one)
 export function historyTable(runs: PerfRun[], order: string[]): string {
   const sorted = [...runs].sort((a, b) => compareVersions(a.version, b.version) || a.date.localeCompare(b.date));
   const lines = sorted.map((run, index) => {
     const previous = sorted
       .slice(0, index)
       .reverse()
-      .find((candidate) => candidate.tabs === run.tabs);
+      .find((candidate) => sameWorld(candidate, run));
     return historyLine(run, order, previous);
   });
   return [historyHeader(order), ...lines].join("\n");
 }
 
-// COMPARISONS.md: one section per version — its latest run against the latest run of the version
-// before it with the same tab count (a quick 500-tab run is not judged against a full one), newest
-// version first. Rebuilt from every stored run, like HISTORY.md, so it never goes stale by hand.
+// COMPARISONS.md: one section per version and browser — its latest run against the latest run of
+// the version before it with the same tab count (a quick 500-tab run is not judged against a full
+// one), newest version first; the Firefox sections (marked) after the Chromium ones. Rebuilt from
+// every stored run, like HISTORY.md, so it never goes stale by hand.
 export function releaseComparisons(runs: PerfRun[]): string {
+  const browsers: PerfBrowser[] = ["chrome", "firefox"];
+  return browsers
+    .map((browser) =>
+      browserComparisons(
+        runs.filter((run) => browserOf(run) === browser),
+        browser,
+      ),
+    )
+    .filter((text) => text !== "")
+    .join("\n\n");
+}
+
+function browserComparisons(runs: PerfRun[], browser: PerfBrowser): string {
   const byDate = [...runs].sort((a, b) => a.date.localeCompare(b.date));
   const versions = [...new Set(byDate.map((run) => run.version))].sort(compareVersions);
   const latestOf = (version: string, tabs?: number) =>
     byDate.findLast((run) => run.version === version && (tabs === undefined || run.tabs === tabs));
+  const mark = browser === "chrome" ? "" : ` (${browser})`;
   const sections = versions.slice(1).map((version, index) => {
     const previousVersion = versions[index] ?? "";
     const newer = latestOf(version);
@@ -182,8 +216,8 @@ export function releaseComparisons(runs: PerfRun[]): string {
     const body =
       newer && older
         ? formatCompare(older, newer, compareRuns(older, newer))
-        : `no ${previousVersion} run with ${newer?.tabs} tabs to compare against`;
-    return `## ${previousVersion} → ${version}\n\n${body}`;
+        : `no ${previousVersion} run with ${newer?.tabs} tabs${mark} to compare against`;
+    return `## ${previousVersion} → ${version}${mark}\n\n${body}`;
   });
   return sections.reverse().join("\n\n");
 }

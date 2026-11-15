@@ -20,3 +20,20 @@ test("a search hit in a title is an inline bold mark without the browser's yello
   expect(title.getBoundingClientRect().height).toBeLessThan(30); // one line
   await userEvent.keyboard("{Escape}");
 });
+
+// T-0152 D5: the box's own ✕ (Firefox draws none on type=search) shows with text only, in both engines
+test("the search box's ✕ appears with text, clears it on click and hides again", async () => {
+  const clear = document.getElementById("search-clear") as HTMLElement;
+  const search = document.getElementById("search") as HTMLInputElement;
+  expect(getComputedStyle(clear).display).toBe("none");
+  await userEvent.click(search);
+  await userEvent.keyboard("pull");
+  await settle();
+  expect(getComputedStyle(clear).display).not.toBe("none"); // absolutely positioned: the engine reports flex
+  await userEvent.click(clear);
+  await settle();
+  expect(search.value).toBe("");
+  expect(document.activeElement).toBe(search);
+  expect(getComputedStyle(clear).display).toBe("none");
+  expect(document.querySelectorAll(".row").length).toBe(3);
+});

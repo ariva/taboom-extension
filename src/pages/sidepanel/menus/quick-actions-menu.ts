@@ -2,6 +2,7 @@
 // ("There can be only one" over every duplicated page). Items carry an icon — the shared
 // ctx menu is text-only elsewhere, so the svg is prepended here.
 import { duplicatesToClose } from "../../../app/duplicates.ts";
+import { setSvgMarkup } from "../../../lib/dom.ts";
 import { snoozeInactiveNow } from "../../../app/snooze-now.ts";
 import { clearCtxMenu, ctxAppend, ctxDivider, ctxItem, ctxTitle, showCtxMenu } from "../../../lib/ui/context-menu.ts";
 import { toast } from "../../../lib/ui/toast.ts";
@@ -31,7 +32,7 @@ function iconItem(icon: string, label: string, run: () => void): HTMLButtonEleme
   svg.setAttribute("stroke-width", "2");
   svg.setAttribute("stroke-linecap", "round");
   svg.setAttribute("stroke-linejoin", "round");
-  svg.innerHTML = icon; // constant markup from this file, never user data
+  setSvgMarkup(svg, icon); // constant markup from this file, never user data
   item.prepend(svg);
   return item;
 }

@@ -1,15 +1,17 @@
 // Records the pages worth watching — the panel, the story pane and the Settings page — with
-// the DevTools screencast, one JPEG per changed frame, into dist/demo/<version>/scenes/<id>/
+// the DevTools screencast, one JPEG per changed frame, into dist/demo/<version>-chrome/scenes/<id>/
 // <stream>/. Not Playwright's recordVideo: that records every page of the context, and the
 // world has 500 of them. A frame goes to the stream its url maps to (record.ts); a page with
 // no stream is attached but never written. The timeline per stream is written as an ffmpeg
-// concat list (durations between frames), which encode.sh turns into video.
+// concat list (durations between frames), which encode.sh turns into video. Chromium only —
+// Firefox has no screencast and polls screenshots instead (demo/firefox/recorder.ts).
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { BrowserContext, CDPSession, Page } from "@playwright/test";
+import type { DemoPage, FrameRecorder, Stream } from "./page-api.ts";
+import type { PlaywrightPage } from "./playwright-page.ts";
 
-export const STREAMS = ["panel", "story", "settings"] as const;
-export type Stream = (typeof STREAMS)[number];
+export const STREAMS: Stream[] = ["panel", "story", "settings"];
 
 interface Frame {
   at: number; // ms since the scene started
@@ -23,7 +25,7 @@ interface SceneTake {
   frames: Map<Stream, Frame[]>;
 }
 
-export class Recorder {
+export class Recorder implements FrameRecorder {
   private readonly sessions = new Map<Page, CDPSession>();
   private take: SceneTake | null = null;
   private panel: Page | null = null;
@@ -50,8 +52,8 @@ export class Recorder {
 
   // the panel is one page; every other page is attached as it appears (a woken tab is a new
   // target, so is a Settings page reopened by a scene — they map to a stream only if their url does)
-  async start(panel: Page, log: (line: string) => void = () => {}): Promise<void> {
-    this.panel = panel;
+  async start(panel: DemoPage, log: (line: string) => void = () => {}): Promise<void> {
+    this.panel = (panel as PlaywrightPage).inner; // `as`: the Chromium browser hands out PlaywrightPages only
     for (const page of this.context.pages()) {
       await this.attach(page);
     }

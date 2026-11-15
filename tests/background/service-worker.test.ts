@@ -6,7 +6,7 @@ import type { Message, MessageError, MessageResponses } from "../../src/app/mess
 import type { KeepAliveTab, LocalStorageSchema, ProtectionRule, Removal, Settings } from "../../src/app/types.ts";
 import { buildFingerprint } from "../../src/app/window-identity.ts";
 import type { ChromeMockOptions } from "../helpers/chrome-mock.ts";
-import { makeChrome, tick, TEST_EXPERIMENTAL, TEST_FEATURES } from "../helpers/ui.ts";
+import { FIREFOX, makeChrome, tick, TEST_EXPERIMENTAL, TEST_FEATURES } from "../helpers/ui.ts";
 
 // flag-dependent tests skip when the EFFECTIVE flags (experimental resolved
 // under TEST_EXPERIMENTAL=1) disable their feature
@@ -129,7 +129,10 @@ test("Service Worker - Concurrent onInstalled + onStartup coalesce into one init
   assert.equal(calls.filter((c) => c.startsWith("alarms.create")).length, 1, "alarm ensured once");
 });
 
-test("Service Worker - Init finishes the remaining steps when one rejects (old Chrome without setPanelBehavior)", async () => {
+// Firefox has no sidePanel to break: the Chrome-only step is the subject here
+test("Service Worker - Init finishes the remaining steps when one rejects (old Chrome without setPanelBehavior)", {
+  skip: FIREFOX,
+}, async () => {
   const setPanelBehavior = chrome.sidePanel.setPanelBehavior;
   chrome.sidePanel.setPanelBehavior = async () => {
     throw new Error("setPanelBehavior is not a function");
@@ -367,7 +370,8 @@ test("Service Worker - Show-manager menu click opens the side panel", async () =
   calls.length = 0;
   await chrome.contextMenus.onClicked.fire({ menuItemId: "show-manager" }, { id: 1, windowId: 1 });
   await tick();
-  assert.ok(calls.some((c) => c.startsWith("sidePanel.open")));
+  // Chrome's side panel for the window; Firefox's sidebar in the active window
+  assert.ok(calls.some((c) => c.startsWith(FIREFOX ? "sidebarAction.open" : "sidePanel.open")));
 });
 
 test("Service Worker - Protect menu title follows active tab's protection state", async () => {
@@ -592,7 +596,10 @@ test("Service Worker - Switching to compact dedupes the stack; compact re-pick m
 
 // Discarding (snooze) swaps a tab's id via onReplaced with NO onRemoved — the
 // trail must follow the new id or the entry reads "(closed tab)" while open.
-test("Service Worker - Tab id replacement (snooze/prerender) is followed in the history stack", async () => {
+// Firefox never replaces a tab id (no tabs.onReplaced): nothing to follow there
+test("Service Worker - Tab id replacement (snooze/prerender) is followed in the history stack", {
+  skip: FIREFOX,
+}, async () => {
   await chrome.storage.local.set({ tabHistory: { stack: [3, 2, 1], cursor: 2 } });
   await chrome.tabs.onReplaced.fire(2222, 2);
   await tick();

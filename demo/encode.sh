@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Turns the takes under dist/demo/<version>/scenes/ into the deliverables, with ffmpeg only
+# Turns the takes under dist/demo/<version>-chrome/scenes/ into the deliverables, with ffmpeg only
 # (no browser): taboom-<version>.mp4 — the panel beside the story pane and the Settings page,
 # every scene in registry order — the same film as taboom-<version>-1080p.mp4 (1920×1080, for
 # YouTube) and taboom-<version>.gif — the panel alone, the GIF clips of the scenes that have
@@ -10,20 +10,21 @@ set -euo pipefail
 STILLS_ONLY=""
 if [[ "${1:-}" == "--stills" ]]; then STILLS_ONLY=1; shift; fi
 VERSION="${1:-$(node -p "require('./package.json').version")}"
-DIR="${DEMO_DIR:-dist/demo/$VERSION}"   # DEMO_DIR: another take folder (record.ts --out)
+DIR="${DEMO_DIR:-dist/demo/$VERSION-chrome}"   # DEMO_DIR: another take folder (record.ts --out, the Firefox take)
 MANIFEST="$DIR/scenes.json"
 
 # the copies the docs link to: one name per kind, no version, overwritten by every encode of
 # the real take folder (a DEMO_DIR scratch take never lands in the docs unless DEMO_PUBLISH says so)
 PUBLISH="${DEMO_PUBLISH:-}"
-if [[ -z "$PUBLISH" && -z "${DEMO_DIR:-}" ]]; then PUBLISH="docs/assets/demo"; fi
+if [[ -z "$PUBLISH" && -z "${DEMO_DIR:-}" ]]; then PUBLISH="docs/assets/demo/chrome"; fi
 
-# the feature stills (stage.still in the scenes) next to the demo, for FEATURES.md and the README
+# the feature stills (stage.still in the scenes) for FEATURES.md and the README — from the Chrome
+# take only, into docs/assets/features/chrome/: the docs embed one set of stills, and a Firefox take
+# publishes its films into its own folder (DEMO_PUBLISH=docs/assets/demo/firefox)
 publish_stills() {
-  [[ -n "$PUBLISH" ]] || return 0
+  [[ "$PUBLISH" == "docs/assets/demo/chrome" ]] || return 0
   if compgen -G "$DIR/features/*.png" > /dev/null; then
-    local features
-    features="$(dirname "$PUBLISH")/features"
+    local features="docs/assets/features/chrome"
     mkdir -p "$features"
     cp "$DIR"/features/*.png "$features/"
     echo "copied $(ls "$DIR"/features/*.png | wc -l) stills to $features/"

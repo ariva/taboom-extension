@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { test as base, chromium, type BrowserContext, type Worker } from "@playwright/test";
 
-const EXTENSION_DIR = resolve(import.meta.dirname, "../../dist/prod");
+const EXTENSION_DIR = resolve(import.meta.dirname, "../../dist/chrome");
 
 interface ExtensionFixtures {
   context: BrowserContext;

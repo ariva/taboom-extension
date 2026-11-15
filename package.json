@@ -16,7 +16,8 @@
     "happy-dom": "^20.11.2",
     "typescript": "^7.0.2",
     "vite": "^8.3.0",
-    "vitest": "^5.0.1"
+    "vitest": "^5.0.1",
+    "web-ext": "^10.8.0"
   },
   "license": "SEE LICENCE IN LICENCE",
   "author": "Arunas Ivanauskas <arunas.work.hg@gmail.com>"

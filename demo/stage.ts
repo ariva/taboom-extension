@@ -5,27 +5,28 @@
 // Beside the panel: the story pane (every caption also lands there, with the ones before it)
 // and the Settings page, scrolled to the section a scene is about.
 import { join } from "node:path";
-import type { Locator, Page, Worker } from "@playwright/test";
 import { CAPTION_BAND, PANEL_VIEWPORT, type World } from "./browser.ts";
+import type { DemoBrowser, DemoLocator, DemoPage, Evaluator } from "./page-api.ts";
 
 export interface Stage {
-  panel: Page;
-  worker: Worker;
+  panel: DemoPage;
+  worker: Evaluator;
+  browser: DemoBrowser; // the pages it opens (a scene that needs a second panel finds it here)
   world: World;
   aside: Aside; // the story pane and the Settings page beside the panel
   caption: (text: string, holdMs?: number) => Promise<void>;
   pause: (ms: number) => Promise<void>;
-  hover: (target: Locator) => Promise<void>;
-  click: (target: Locator, options?: { button?: "left" | "right" }) => Promise<void>;
+  hover: (target: DemoLocator) => Promise<void>;
+  click: (target: DemoLocator, options?: { button?: "left" | "right" }) => Promise<void>;
   type: (text: string) => Promise<void>;
   press: (key: string) => Promise<void>;
   select: (selector: string, value: string) => Promise<void>; // with a drawn dropdown: headless shows no native one
   settingsSelect: (selector: string, value: string) => Promise<void>; // the same on the Settings pane (no cursor there)
   settings: (selector: string) => Promise<void>; // scroll the Settings pane to the card holding this #id and flash it
   scrollList: (dy: number) => Promise<void>;
-  row: (title: string) => Locator; // a list row by (part of) its title
-  awakeRow: (title: string) => Locator; // the same, not snoozed (a snoozed row has no snooze button)
-  menuItem: (text: string) => Locator; // an item of the open context menu by its text
+  row: (title: string) => DemoLocator; // a list row by (part of) its title
+  awakeRow: (title: string) => DemoLocator; // the same, not snoozed (a snoozed row has no snooze button)
+  menuItem: (text: string) => DemoLocator; // an item of the open context menu by its text
   check: (ok: boolean, what: string) => void; // a scene's own assertion: logged, never fatal
   // a feature still for the docs: <stillsDir>/<name>.png of the panel (or the Settings pane;
   // with a height, the page from its top that tall), overlay hidden for the shot — names are
@@ -147,7 +148,7 @@ function installInPage({ own, band }: { own: Hidden; band: number }): void {
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
-export async function installOverlay(panel: Page, own: Hidden): Promise<void> {
+export async function installOverlay(panel: DemoPage, own: Hidden): Promise<void> {
   await panel.evaluate(installInPage, { own, band: CAPTION_BAND });
 }
 
@@ -231,8 +232,8 @@ function drawnDropdown(args: DropdownArgs): { x: number; y: number } | null {
 }
 
 export interface Aside {
-  story: Page;
-  settings: Page;
+  story: DemoPage;
+  settings: DemoPage;
 }
 
 export function storyScene(aside: Aside, title: string): Promise<void> {
@@ -240,8 +241,8 @@ export function storyScene(aside: Aside, title: string): Promise<void> {
 }
 
 export function makeStage(
-  panel: Page,
-  worker: Worker,
+  panel: DemoPage,
+  browser: DemoBrowser,
   world: World,
   aside: Aside,
   log: (line: string) => void,
@@ -249,7 +250,7 @@ export function makeStage(
 ): Stage {
   const warnings: string[] = [];
   const stills: string[] = [];
-  const moveTo = async (target: Locator) => {
+  const moveTo = async (target: DemoLocator) => {
     // centered, not merely in view: a context menu opens at the click and must have room below
     await target.evaluate((element) => element.scrollIntoView({ block: "center", inline: "nearest" })).catch(() => {});
     await sleep(120);
@@ -269,7 +270,7 @@ export function makeStage(
   };
   const pressRing = () => panel.evaluate(() => (window as DemoWindow).__demo?.press());
   // open the drawn list, mark the current value, then the chosen one, close, change for real
-  const pickFromDropdown = async (page: Page, selector: string, value: string, withCursor: boolean) => {
+  const pickFromDropdown = async (page: DemoPage, selector: string, value: string, withCursor: boolean) => {
     const open: DropdownArgs = { selector, value, step: "open" };
     await page.evaluate(drawnDropdown, open);
     await sleep(800);
@@ -282,12 +283,13 @@ export function makeStage(
     await sleep(800);
     const close: DropdownArgs = { selector, value, step: "close" };
     await page.evaluate(drawnDropdown, close);
-    await page.selectOption(selector, value);
+    await page.locator(selector).selectOption(value);
     await sleep(1100);
   };
   return {
     panel,
-    worker,
+    worker: browser.worker,
+    browser,
     world,
     aside,
     caption: async (text, holdMs = 1200) => {

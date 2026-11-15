@@ -1,7 +1,7 @@
 // What the browser side measures: when the list has settled after an action, long tasks during it,
 // frame intervals during a synthesized scroll. Node's wall clock brackets every action, so a
 // measurement includes the panel's 150 ms debounce where the user would feel it too.
-import type { CDPSession, Page } from "@playwright/test";
+import type { DemoPage as Page } from "../../demo/page-api.ts";
 
 // arm BEFORE the action: resolves (ms, page clock) after the list's next DOM change plus two frames
 export function armListSettle(page: Page): Promise<number> {
@@ -69,19 +69,5 @@ export async function stopFrames(page: Page): Promise<{ frames: number[]; longTa
     const w = window as unknown as { __perfFrames: number[]; __perfRecording: boolean; __perfLong: number[] };
     w.__perfRecording = false;
     return { frames: w.__perfFrames.slice(1), longTasks: w.__perfLong.slice() };
-  });
-}
-
-// one wheel-like gesture down the list, through the DevTools protocol (trusted input)
-export async function scrollGesture(cdp: CDPSession, page: Page, distance: number): Promise<void> {
-  const box = await page.locator("#tab-list").boundingBox();
-  if (!box) {
-    throw new Error("no #tab-list to scroll");
-  }
-  await cdp.send("Input.synthesizeScrollGesture", {
-    x: box.x + box.width / 2,
-    y: box.y + box.height / 2,
-    yDistance: -distance,
-    speed: 2400,
   });
 }

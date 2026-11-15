@@ -26,7 +26,8 @@
       <button id="hist-forward" class="icon-btn" title="Click to go forward, right-click to see history" aria-label="Next tab" disabled><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m6 3 5 5-5 5"/></svg></button>
       <!-- caret-over-list: caret flips up while the popover is open (JS toggles .open) -->
       <button id="hist-list-btn" class="icon-btn" popovertarget="history-pop" title="Show Navigation History" aria-label="Show Navigation History" hidden><svg class="caret-closed" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m4.6 3.4 3.4 3 3.4-3"/><path d="M4 9.4h8M4 12.4h8"/></svg><svg class="caret-open" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m4.6 6.4 3.4-3 3.4 3"/><path d="M4 9.4h8M4 12.4h8"/></svg></button>
-      <input id="search" type="search" placeholder="Search tabs…  ( / )" autofocus />
+      <!-- the box carries its own clear ✕: Firefox draws none for type=search, Chrome's native one is hidden (T-0152) -->
+      <span class="search-box"><input id="search" type="search" placeholder="Search tabs…  ( / )" autofocus /><button id="search-clear" type="button" aria-label="Clear search" title="Clear search (Esc)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button></span>
       <label id="fuzzy-label" title="Fuzzy search — scattered letters match in order (no typo tolerance), best matches on top" hidden><input type="checkbox" id="fuzzy-toggle" />Fuzzy</label>
     </div>
     <div id="history-pop" popover></div>

@@ -61,11 +61,43 @@ test("Perf stats - the compare table and the history line read as Markdown", () 
   assert.match(table, /\| boot \| 100 \| 130 \| \+30% SLOWER \|/);
   assert.equal(
     historyHeader(["boot", "search"]),
-    "| date | version | commit | tabs | reps | boot | search | overall | vs previous (same tabs) |\n|---|---|---|---|---|---|---|---|---|",
+    "| date | version | commit | browser | tabs | reps | boot | search | overall | vs previous (same tabs, same browser) |\n|---|---|---|---|---|---|---|---|---|---|",
   );
   assert.equal(
     historyLine(older, ["boot", "search"]),
-    `| ${localStamp(older.date)} | 1.0.8 | abc1234 | 2000 | 5 | 100 | — | — | — (first run at this tab count) |`,
+    `| ${localStamp(older.date)} | 1.0.8 | abc1234 | chrome | 2000 | 5 | 100 | — | — | — (first run at this tab count) |`,
+  );
+});
+
+// T-0152: a Firefox run is a world of its own — never judged against a Chromium run of the same count
+test("Perf stats - a Firefox run is judged only against Firefox runs and compared in its own sections", () => {
+  const chrome = run({ boot: 100 }, { commit: "aaa1111", date: "2026-11-10T10:00:00.000Z" });
+  const firefox = run({ boot: 300 }, { commit: "bbb2222", date: "2026-11-10T11:00:00.000Z", browser: "firefox" });
+  const firefoxLater = run({ boot: 330 }, { commit: "ccc3333", date: "2026-11-10T12:00:00.000Z", browser: "firefox" });
+  const lines = historyTable([chrome, firefox, firefoxLater], ["boot"]).split("\n").slice(2);
+  assert.match(
+    lines[1] ?? "",
+    /bbb2222 \| firefox \| 2000 \| .* \| — \| — \(first run at this tab count in firefox\) \|$/,
+  );
+  assert.match(
+    lines[2] ?? "",
+    /ccc3333 \| firefox \| .* \| vs bbb2222: boot \+10% \|$/,
+    "judged against the Firefox run",
+  );
+  const table = formatCompare(chrome, firefox, compareRuns(chrome, firefox));
+  assert.match(table, /WARNING: different browsers/);
+  const next = run(
+    { boot: 320 },
+    { version: "1.0.9", commit: "ddd4444", date: "2026-11-10T13:00:00.000Z", browser: "firefox" },
+  );
+  const nextChrome = run({ boot: 90 }, { version: "1.0.9", commit: "eee5555", date: "2026-11-10T14:00:00.000Z" });
+  const headings = releaseComparisons([chrome, firefox, firefoxLater, next, nextChrome])
+    .split("\n")
+    .filter((line) => line.startsWith("## "));
+  assert.deepEqual(
+    headings,
+    ["## 1.0.8 → 1.0.9", "## 1.0.8 → 1.0.9 (firefox)"],
+    "Chromium sections first, Firefox marked",
   );
 });
 
@@ -91,23 +123,26 @@ test("Perf stats - the history table says better or worse against the latest ear
     { date: "2026-10-29T14:00:00.000Z", commit: "eee5555", version: "1.0.7" },
   );
   const lines = historyTable([third, first, other, late, second], ["boot", "search"]).split("\n").slice(2);
-  assert.match(lines.shift() ?? "", /1\.0\.7 \| eee5555 \| 2000 \| .* \| — \| — \(first run at this tab count\) \|$/);
+  assert.match(
+    lines.shift() ?? "",
+    /1\.0\.7 \| eee5555 \| chrome \| 2000 \| .* \| — \| — \(first run at this tab count\) \|$/,
+  );
   assert.match(
     lines[0] ?? "",
-    /aaa1111 \| 2000 \| .* \| vs eee5555: boot -50%, search -50% \|$/,
+    /aaa1111 \| chrome \| 2000 \| .* \| vs eee5555: boot -50%, search -50% \|$/,
     "the first 1.0.8 run is judged against the 1.0.7 one",
   );
   assert.match(
     lines[1] ?? "",
-    /bbb2222 \| 500 \| .* \| — \| — \(first run at this tab count\) \|$/,
+    /bbb2222 \| chrome \| 500 \| .* \| — \| — \(first run at this tab count\) \|$/,
     "another count: its own baselines",
   );
   assert.match(
     lines[2] ?? "",
-    /ccc3333 \| 2000 \| .* \| 16% slower \| vs aaa1111: boot \+30% SLOWER \|$/,
+    /ccc3333 \| chrome \| 2000 \| .* \| 16% slower \| vs aaa1111: boot \+30% SLOWER \|$/,
     "search +2% is not worth a word",
   );
-  assert.match(lines[3] ?? "", /ddd4444 \| 2000 \| .* \| ≈ same \| ≈ same as ccc3333 \|$/);
+  assert.match(lines[3] ?? "", /ddd4444 \| chrome \| 2000 \| .* \| ≈ same \| ≈ same as ccc3333 \|$/);
 });
 
 test("Perf stats - the overall judgement is the median delta in words: within 5 % is the same, beyond 25 % shouts", () => {

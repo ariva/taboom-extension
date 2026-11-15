@@ -11,13 +11,15 @@ import { test } from "vitest";
 import { fileURLToPath } from "node:url";
 
 const SNAPSHOT = new URL("../fixtures/release-snapshot.json", import.meta.url);
+const SNAPSHOT_FIREFOX = new URL("../fixtures/release-snapshot-firefox.json", import.meta.url);
 const PACK = fileURLToPath(new URL("../../scripts/pack.sh", import.meta.url));
 
-function packedRelease() {
+// target: the browser flavour pack.sh builds (dist/chrome, or dist/firefox with TARGET=firefox)
+function packedRelease(target: "chrome" | "firefox" = "chrome") {
   const dir = mkdtempSync(join(tmpdir(), "taboom-pack-"));
   try {
     const zip = join(dir, "release.zip");
-    execFileSync(PACK, [zip]);
+    execFileSync(PACK, [zip], { env: { ...process.env, TARGET: target } });
     const files = execFileSync("unzip", ["-Z1", zip], { encoding: "utf8" })
       .split("\n")
       .filter((name) => name && !name.endsWith("/")) // directory entries are noise
@@ -37,15 +39,53 @@ function packedRelease() {
   }
 }
 
-test("Release Package - Zip file list and manifest match the recorded snapshot", () => {
-  const actual = packedRelease();
+function matchesSnapshot(target: "chrome" | "firefox", snapshot: URL): ReturnType<typeof packedRelease> {
+  const actual = packedRelease(target);
   if (process.env.UPDATE_SNAPSHOT === "1") {
     // files + manifest only — `contents` is the whole bundle, used by the audit test, never stored
-    writeFileSync(SNAPSHOT, `${JSON.stringify({ files: actual.files, manifest: actual.manifest }, null, 2)}\n`);
+    writeFileSync(snapshot, `${JSON.stringify({ files: actual.files, manifest: actual.manifest }, null, 2)}\n`);
   }
-  const expected: { files: string[]; manifest: Record<string, unknown> } = JSON.parse(readFileSync(SNAPSHOT, "utf8"));
-  assert.deepEqual(actual.files, expected.files, "shipped file list changed");
-  assert.deepEqual(actual.manifest, expected.manifest, "shipped manifest changed");
+  const expected: { files: string[]; manifest: Record<string, unknown> } = JSON.parse(readFileSync(snapshot, "utf8"));
+  assert.deepEqual(actual.files, expected.files, `shipped file list changed (${target})`);
+  assert.deepEqual(actual.manifest, expected.manifest, `shipped manifest changed (${target})`);
+  return actual;
+}
+
+test("Release Package - Zip file list and manifest match the recorded snapshot", () => {
+  const { contents } = matchesSnapshot("chrome", SNAPSHOT);
+  // the Firefox branch of the platform seam folds away in the Chrome build (__FIREFOX__ false): the
+  // detection getter still names the API, the calls are gone
+  const panel = contents.get("chunks/panel.js") ?? "";
+  assert.ok(!/sidebar\.(open|toggle)\(/.test(panel), "no sidebarAction calls in the Chrome bundle");
+});
+
+// the Firefox zip: the same files, the Firefox manifest (event page, sidebar_action, gecko settings);
+// the Chrome branch of the platform seam folds away (__CHROME__ false)
+test("Release Package - The Firefox zip matches its recorded snapshot and ships the same files", () => {
+  const { contents } = matchesSnapshot("firefox", SNAPSHOT_FIREFOX);
+  const chrome: { files: string[] } = JSON.parse(readFileSync(SNAPSHOT, "utf8"));
+  const firefox: { files: string[] } = JSON.parse(readFileSync(SNAPSHOT_FIREFOX, "utf8"));
+  assert.deepEqual(firefox.files, chrome.files, "one file list, two manifests");
+  const panel = contents.get("chunks/panel.js") ?? "";
+  assert.ok(!/sidePanel\.(open|setPanelBehavior)\(/.test(panel), "no sidePanel calls in the Firefox bundle");
+});
+
+// AMO's validator on the Firefox build (the pack above left it in dist/firefox): no errors, no
+// warnings. Anything (an innerHTML with a variable, a manifest key Firefox for Android cannot take, a
+// Chrome-only API name) is a reviewer question to answer before upload, so it fails here first.
+test("Release Package - web-ext lint on the Firefox build: clean", () => {
+  const report = JSON.parse(
+    execFileSync(
+      "npx",
+      ["--no-install", "web-ext", "lint", "--source-dir", "dist/firefox", "--no-config-discovery", "--output", "json"],
+      { encoding: "utf8", maxBuffer: 16 * 1024 * 1024 },
+    ),
+  ) as { errors: { code: string }[]; warnings: { code: string; message: string; file?: string }[] };
+  assert.deepEqual(report.errors, []);
+  assert.deepEqual(
+    report.warnings.map((warning) => `${warning.code} ${warning.file ?? ""}: ${warning.message}`),
+    [],
+  );
 });
 
 test("Release Package - Ships no dev-only or tooling files", () => {
@@ -65,6 +105,8 @@ const FORBIDDEN_IN_RELEASE: [needle: string, meaning: string][] = [
   ["127.0.0.1", "code that talks to a local server (the dev-reload long-poll, or a hard-coded URL)"],
   ["ws://", "a WebSocket connection — the extension makes no network connections at all"],
   ["import.meta.hot", "Vite hot-module code — that only exists when a dev server is involved"],
+  // the dev marker is a build-time constant (src/app/env.ts): a production build folds it away
+  ["DEV · ", "the dev-build marker — IS_DEV must come from the build mode, not a runtime check"],
 ];
 
 // "sidepanel/index.js:120: const response = await fetch("http://localhost:5183/poll…"
@@ -87,14 +129,14 @@ test("Release Package - Production bundle carries no dev-loop or network code", 
     maps,
     [],
     `The release zip contains source maps: ${maps.join(", ")}.\n` +
-      "Source maps are for dist/dev only — check `build.sourcemap` in vite.config.ts (it must be off unless the mode is development).",
+      "Source maps are for the dev builds only — check `build.sourcemap` in vite.config.ts (it must be off unless the mode is development).",
   );
   for (const [needle, meaning] of FORBIDDEN_IN_RELEASE) {
     const found = occurrences(contents, needle);
     // assert.ok, not equal: the message is the whole point — no "1 !== 0" diff after it
     assert.ok(
       found.length === 0,
-      `The release zip (dist/prod) contains "${needle}" — ${meaning}.\n` +
+      `The release zip (dist/chrome) contains "${needle}" — ${meaning}.\n` +
         `Found in:\n${found.slice(0, 8).join("\n")}${found.length > 8 ? `\n  … and ${found.length - 8} more` : ""}\n` +
         "Why it matters: the store listing promises a fully local extension with zero network requests, and this test is what keeps that true.\n" +
         "How to fix: find where that code comes from in src/ (or which tooling/ plugin emitted it) and make sure it only runs or is emitted in development mode " +

@@ -2,7 +2,7 @@
 // two small DOM helpers rows share with other surfaces (marked text, favicon image).
 import { getElementById, mustQuery } from "../../../lib/dom.ts";
 import { faviconUrl } from "../../../lib/platform/favicon.ts";
-import { tabGroupColor } from "../model/index.ts";
+import { hostInitial, tabGroupColor } from "../model/index.ts";
 import type { HighlightRange, RowViewModel } from "../model/index.ts";
 import { perfMeasure, perfOn } from "../foundation/perf.ts";
 import { effectiveSort, state, tabGroupsActive } from "../foundation/state.ts";
@@ -108,10 +108,12 @@ function renderRowImpl(tab: Tab, vm: RowViewModel): HTMLElement {
       favicon.before(square); // the window dot was removed above
     }
   }
-  if ("pageUrl" in vm.favicon) {
-    favicon.append(faviconImg(vm.favicon.pageUrl));
+  const img = "pageUrl" in vm.favicon ? faviconImg(vm.favicon.pageUrl) : undefined;
+  if (img) {
+    favicon.append(img);
   } else {
-    favicon.textContent = vm.favicon.letter;
+    // no icon store in this browser: the same initial an unsupported URL gets
+    favicon.textContent = "letter" in vm.favicon ? vm.favicon.letter : hostInitial(vm.host);
   }
 
   setTextWithMarks(mustQuery(row, ".title"), vm.title, vm.titleRanges);
@@ -154,10 +156,14 @@ function renderRowImpl(tab: Tab, vm: RowViewModel): HTMLElement {
   return row;
 }
 
-// Chrome's local favicon cache — no network request to the site
-export function faviconImg(pageUrl: string): HTMLImageElement {
+// the browser's local favicon cache — no network request to the site; undefined without one
+export function faviconImg(pageUrl: string): HTMLImageElement | undefined {
+  const src = faviconUrl(pageUrl, 16);
+  if (src === undefined) {
+    return undefined;
+  }
   const img = document.createElement("img");
-  img.src = faviconUrl(pageUrl, 16);
+  img.src = src;
   img.loading = "lazy"; // don't fetch favicons for offscreen rows up front
   img.width = img.height = 16;
   img.addEventListener("error", () => img.remove());

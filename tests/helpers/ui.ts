@@ -23,6 +23,7 @@ const globals = globalThis as unknown as {
   matchMedia: Window["matchMedia"];
   Event: Window["Event"];
   KeyboardEvent: Window["KeyboardEvent"];
+  DOMParser: Window["DOMParser"];
   confirm: () => boolean;
   chrome: ChromeMock;
   fetch: (url: unknown) => Promise<{ json: () => Promise<Features> } | { text: () => Promise<string> }>;
@@ -42,6 +43,10 @@ const featuresJson = readFileSync(new URL("../../features.json", import.meta.url
 //     (the fetch stub serves the disabled set to the code under test).
 export const TEST_EXPERIMENTAL = process.env.TEST_EXPERIMENTAL === "1";
 export const TEST_ALL_DISABLED = process.env.TEST_ALL_DISABLED === "1";
+// 4. TEST_BROWSER=firefox — the mock takes Firefox's API shape (tests/helpers/chrome-mock.ts);
+//    a test of a Chrome-only API skips itself with { skip: FIREFOX }
+export const TEST_BROWSER: "chrome" | "firefox" = process.env.TEST_BROWSER === "firefox" ? "firefox" : "chrome";
+export const FIREFOX = TEST_BROWSER === "firefox";
 export const RAW_FEATURES: Features = (() => {
   const parsed: Features = JSON.parse(featuresJson);
   if (TEST_ALL_DISABLED) {
@@ -66,8 +71,12 @@ globals.fetch = async (url) => {
 };
 
 // the shared mock, bound to this run's flag scenario
-export function makeChrome(options: Omit<ChromeMockOptions, "experimental">): ChromeMock {
-  return makeChromeMock<LocalStorageSchema, SessionStorageSchema>({ ...options, experimental: TEST_EXPERIMENTAL });
+export function makeChrome(options: Omit<ChromeMockOptions, "experimental" | "browser">): ChromeMock {
+  return makeChromeMock<LocalStorageSchema, SessionStorageSchema>({
+    ...options,
+    experimental: TEST_EXPERIMENTAL,
+    browser: TEST_BROWSER,
+  });
 }
 
 // Loads <page>/index.html into a happy-dom window and exposes the globals
@@ -93,8 +102,11 @@ export function loadPage(htmlPath: string, chrome: ChromeMock): Window {
   globals.matchMedia = window.matchMedia.bind(window);
   globals.Event = window.Event; // page code dispatches synthetic events (custom dropdown)
   globals.KeyboardEvent = window.KeyboardEvent; // page code cancels a rename with a synthetic Esc
+  globals.DOMParser = window.DOMParser; // SVG icons go through the XML parser (lib/dom.ts setSvgMarkup)
   globals.confirm = () => true;
   globals.chrome = chrome;
+  // Firefox keeps its own APIs (sidebarAction) on `browser`; the mock serves as both
+  (globalThis as { browser?: ChromeMock }).browser = FIREFOX ? chrome : undefined;
   return window;
 }
 

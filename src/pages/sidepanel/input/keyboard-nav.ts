@@ -8,7 +8,7 @@ import { openParkedTabMenu } from "../menus/parked-menus.ts";
 import { listEl, searchInput } from "../foundation/elements.ts";
 import { isPopoverOpen } from "../history/history-nav.ts";
 import { state } from "../foundation/state.ts";
-import { setQuery } from "./toolbar-events.ts";
+import { clearSearch } from "./toolbar-events.ts";
 
 export function initKeyboardNav(): void {
   document.addEventListener("keydown", (event) => {
@@ -29,9 +29,7 @@ export function initKeyboardNav(): void {
       if (isPopoverOpen()) {
         return;
       }
-      searchInput.value = "";
-      setQuery("");
-      searchInput.focus();
+      clearSearch();
       return;
     }
     const keyboardNav = featureEnabled(state.features, "SIDEBAR_KEYBOARD_NAVIGATION");

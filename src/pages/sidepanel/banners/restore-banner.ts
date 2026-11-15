@@ -8,7 +8,7 @@ import { openPanel } from "../../../lib/platform/panel.ts";
 // The held port tells the service worker THIS window has a panel; the SW
 // persists that on the window's logical profile. On load we ask which OTHER
 // windows had a panel before the update/restart and offer to reopen them —
-// the banner click supplies the user gesture sidePanel.open() requires.
+// the banner click supplies the user gesture a panel open requires.
 
 async function trackPanelOpen(): Promise<number> {
   const win = await chrome.windows.getCurrent();
@@ -54,7 +54,7 @@ export function initRestoreBanner(): void {
       }
       return allOpened;
     };
-    // sidePanel.open() wants a user gesture; a fresh page has none, so "auto"
+    // opening a panel wants a user gesture; a fresh page has none, so "auto"
     // is best-effort — when Chrome refuses, fall through to the banner
     if (mode === "auto" && (await reopenAll())) {
       return;

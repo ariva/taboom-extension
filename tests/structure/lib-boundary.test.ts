@@ -44,6 +44,19 @@ test("Lib - Boundary - src/lib and tooling import nothing from app, pages or bac
   );
 });
 
+// Browser-specific names stay behind the platform seam and the manifest: app, pages and worker
+// code asks capabilities.ts, never a browser (T-0152)
+const BROWSER_NAMES = /\b(sidebarAction|sidebar_action|browser_specific_settings|moz-extension|sidePanel\.|_favicon)/;
+const SEAM = ["src/lib/platform/", "src/manifest.ts"];
+
+test("Lib - Boundary - Firefox- and Chrome-only names appear only under src/lib/platform and src/manifest.ts", () => {
+  const offenders = sourceFiles(join(ROOT, "src"))
+    .map((file) => relative(ROOT, file))
+    .filter((file) => !SEAM.some((allowed) => file.startsWith(allowed)))
+    .filter((file) => BROWSER_NAMES.test(readFileSync(join(ROOT, file), "utf8")));
+  assert.deepEqual(offenders, []);
+});
+
 test("Lib - Boundary - The guard catches static, type-only, side-effect and dynamic imports", () => {
   const file = join(ROOT, "src/lib/platform/x.ts");
   const source = [

@@ -1,9 +1,9 @@
 // `node tests/perf/compare.ts [older.json] [newer.json]` — default: the two newest runs in
-// .private/perf/ with the same tab count as the newest. Prints a Markdown table with deltas;
+// .private/perf/ with the same tab count and browser as the newest. Prints a Markdown table with deltas;
 // a median more than 25 % above the older run is marked SLOWER. Never a gate.
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { compareRuns, formatCompare, type PerfRun } from "./stats.ts";
+import { browserOf, compareRuns, formatCompare, type PerfRun } from "./stats.ts";
 
 const OUT_DIR = resolve(import.meta.dirname, "../../.private/perf/data");
 const read = (file: string): PerfRun => JSON.parse(readFileSync(file, "utf8")) as PerfRun;
@@ -25,7 +25,8 @@ if (olderArg && newerArg) {
     console.error("no runs in .private/perf/data — run `just test-perf` first");
     process.exit(1);
   }
-  const previous = runs.slice(1).find((run) => run.tabs === latest.tabs) ?? runs[1];
+  const previous =
+    runs.slice(1).find((run) => run.tabs === latest.tabs && browserOf(run) === browserOf(latest)) ?? runs[1];
   if (!previous) {
     console.error("only one run so far — nothing to compare against yet");
     process.exit(1);

@@ -40,7 +40,11 @@ export interface ChromeMockOptions {
   /** flat log of stubbed chrome calls, e.g. ["tabs.reload 3", "storage.set {...}"] */
   calls?: string[];
   experimental?: boolean;
+  /** the API shape: Firefox has no sidePanel, tabs.onReplaced, split view or favicon store, but a sidebarAction */
+  browser?: "chrome" | "firefox";
 }
+
+const PERMISSIONS = ["tabs", "tabGroups", "storage", "alarms", "contextMenus"];
 
 export type ChromeMock<
   Local extends object = Record<string, unknown>,
@@ -72,14 +76,15 @@ function list<T>(value: T | T[]): T[] {
 export function makeChrome<
   Local extends object = Record<string, unknown>,
   Session extends object = Record<string, unknown>,
->({ tabs = [], stored = {}, calls = [], groups = [], experimental = false }: ChromeMockOptions) {
+>({ tabs = [], stored = {}, calls = [], groups = [], experimental = false, browser = "chrome" }: ChromeMockOptions) {
   if (experimental) {
     const ui = stored.ui;
     stored.ui = { ...(typeof ui === "object" ? ui : {}), showExperimental: true };
   }
+  const firefox = browser === "firefox";
   let nextTabId = 1000;
   let nextWindowId = 900;
-  return {
+  const mock = {
     tabs: {
       query: async (opts: chrome.tabs.QueryInfo = {}) => {
         let result = tabs;
@@ -328,7 +333,7 @@ export function makeChrome<
       })(),
     },
     runtime: {
-      getURL: (path: string) => `chrome-extension://test${path}`,
+      getURL: (path: string) => `${firefox ? "moz-extension" : "chrome-extension"}://test${path}`,
       sendMessage: async (msg: { type: string }) => {
         calls.push(`sendMessage ${msg.type}`);
         return {};
@@ -343,8 +348,10 @@ export function makeChrome<
       },
       onConnect: makeEvent<typeof chrome.runtime.onConnect>(),
       openOptionsPage: () => calls.push("openOptionsPage"),
-      // update_url = store install; tests exercise the shipped (non-DEV) behaviour
-      getManifest: () => ({ version: "0.0.0-test", update_url: "https://clients2.google.com/service/update2/crx" }),
+      getManifest: () => ({
+        version: "0.0.0-test",
+        permissions: firefox ? PERMISSIONS : [...PERMISSIONS, "sidePanel", "favicon"],
+      }),
       onMessage: makeEvent<typeof chrome.runtime.onMessage>(),
       onInstalled: makeEvent<typeof chrome.runtime.onInstalled>(),
       onStartup: makeEvent<typeof chrome.runtime.onStartup>(),
@@ -357,11 +364,31 @@ export function makeChrome<
       getBadgeText: async () => "",
       setBadgeBackgroundColor: async () => {},
       setIcon: async () => {},
+      onClicked: makeEvent<typeof chrome.action.onClicked>(),
     },
     sidePanel: {
       open: async (opts?: chrome.sidePanel.OpenOptions) => calls.push(`sidePanel.open ${JSON.stringify(opts ?? {})}`),
       setPanelBehavior: async (opts: chrome.sidePanel.PanelBehavior) =>
         calls.push(`sidePanel.setPanelBehavior ${JSON.stringify(opts)}`),
     },
+    // Firefox's sidebar (on `browser` there; tests install the mock as both globals)
+    ...(firefox
+      ? {
+          sidebarAction: {
+            open: async () => void calls.push("sidebarAction.open"),
+            toggle: async () => void calls.push("sidebarAction.toggle"),
+          },
+        }
+      : {}),
   };
+  if (firefox) {
+    // the APIs Firefox lacks are ABSENT, not stubbed: the code must survive their absence.
+    // `as`: the mock's type keeps every key so Chrome-shaped tests stay typed; the deletion is runtime-only
+    const shape = mock as unknown as { tabs: Record<string, unknown>; sidePanel?: unknown };
+    delete shape.tabs.onReplaced;
+    delete shape.tabs.createSplit;
+    delete shape.tabs.unsplit;
+    delete shape.sidePanel;
+  }
+  return mock;
 }

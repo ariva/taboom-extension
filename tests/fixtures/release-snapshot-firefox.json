@@ -1,0 +1,109 @@
+{
+  "files": [
+    "CHANGES.md",
+    "assets/common.css",
+    "assets/moon.svg",
+    "assets/sidepanel.css",
+    "background/service-worker.js",
+    "chunks/env.js",
+    "chunks/panel.js",
+    "chunks/snooze-now.js",
+    "features.json",
+    "icons/icon128.png",
+    "icons/icon16.png",
+    "icons/icon32.png",
+    "icons/icon48.png",
+    "manifest.json",
+    "options/index.html",
+    "options/index.js",
+    "sidepanel/index.html",
+    "sidepanel/index.js"
+  ],
+  "manifest": {
+    "manifest_version": 3,
+    "name": "Taboom - Tabs Manager by ariva-tools",
+    "description": "Taboom - Privacy-first smart Tabs Manager to search, snooze, and protect Chrome tabs. Saves memory, runs fully locally.",
+    "action": {
+      "default_title": "Taboom - Smart Tabs Manager",
+      "default_icon": {
+        "16": "icons/icon16.png",
+        "32": "icons/icon32.png"
+      }
+    },
+    "icons": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    },
+    "options_ui": {
+      "page": "options/index.html",
+      "open_in_tab": true
+    },
+    "commands": {
+      "open-tab-manager": {
+        "suggested_key": {
+          "default": "Ctrl+Shift+Space",
+          "mac": "Command+Shift+Space"
+        },
+        "description": "Open Taboom side panel"
+      },
+      "snooze-current-tab": {
+        "description": "Snooze current tab"
+      },
+      "toggle-protection": {
+        "description": "Toggle site protection for current tab"
+      },
+      "history-back": {
+        "suggested_key": {
+          "default": "Ctrl+Shift+Comma",
+          "mac": "Command+Shift+Comma"
+        },
+        "description": "Tab history: back to the previous tab"
+      },
+      "history-forward": {
+        "suggested_key": {
+          "default": "Ctrl+Shift+Period",
+          "mac": "Command+Shift+Period"
+        },
+        "description": "Tab history: forward to the next tab"
+      }
+    },
+    "permissions": [
+      "tabs",
+      "tabGroups",
+      "storage",
+      "alarms",
+      "contextMenus"
+    ],
+    "background": {
+      "scripts": [
+        "background/service-worker.js"
+      ],
+      "type": "module"
+    },
+    "sidebar_action": {
+      "default_panel": "sidepanel/index.html",
+      "default_title": "Taboom - Tabs Manager",
+      "default_icon": {
+        "16": "icons/icon16.png",
+        "32": "icons/icon32.png"
+      },
+      "open_at_install": false
+    },
+    "browser_specific_settings": {
+      "gecko": {
+        "id": "taboom-tabs-manager@ariva-tools.com",
+        "strict_min_version": "140.0",
+        "data_collection_permissions": {
+          "required": [
+            "none"
+          ]
+        }
+      },
+      "gecko_android": {
+        "strict_min_version": "142.0"
+      }
+    }
+  }
+}

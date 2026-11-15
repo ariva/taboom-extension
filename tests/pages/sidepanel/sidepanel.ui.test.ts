@@ -3,14 +3,23 @@ import { test } from "vitest";
 import type { LocalStorageSchema } from "../../../src/app/types.ts";
 import type { ChromeMockOptions } from "../../helpers/chrome-mock.ts";
 import { byId, q, qa } from "../../helpers/dom.ts";
-import { loadPage, makeChrome, RAW_FEATURES, TEST_EXPERIMENTAL, TEST_FEATURES, tick } from "../../helpers/ui.ts";
+import {
+  loadPage,
+  makeChrome,
+  RAW_FEATURES,
+  TEST_EXPERIMENTAL,
+  TEST_FEATURES,
+  tick,
+  FIREFOX,
+} from "../../helpers/ui.ts";
 
 const AUTO_ALL_ON = TEST_FEATURES.SEARCH_AUTO_SELECT_ALL?.enabled === true;
 const KEEP_ALIVE_ON = TEST_FEATURES.KEEP_ALIVE?.enabled === true;
 const DUPLICATES_ON = TEST_FEATURES.DUPLICATES?.enabled === true;
 const PARKED_ON = TEST_FEATURES.PARKED_WINDOWS?.enabled === true;
 const TAGS_ON = TEST_FEATURES.TAGS?.enabled === true;
-const SPLIT_ON = TEST_FEATURES.SPLIT_VIEW?.enabled === true;
+// split view needs Chrome's API (tabs.createSplit): absent on Firefox, whatever the flag says
+const SPLIT_ON = TEST_FEATURES.SPLIT_VIEW?.enabled === true && !FIREFOX;
 
 const NOW = Date.now();
 const tabs: NonNullable<ChromeMockOptions["tabs"]> = [
@@ -216,6 +225,21 @@ test("UI - Sidepanel - Toolbar selects open the custom dropdown, not the native 
 test("UI - Sidepanel - UI prefs applied: dark theme + compact density", () => {
   assert.equal(document.documentElement.style.colorScheme, "dark");
   assert.ok(byId("tab-list").classList.contains("compact"));
+});
+
+// T-0152 D5: Firefox draws no clear button on type=search, so the box carries its own ✕ in
+// both browsers (Chrome's WebKit one is hidden by CSS) — same look everywhere, one path to clear
+test("UI - Sidepanel - The search box's own ✕ clears the search and gives the focus back to the box", () => {
+  const search = byId<HTMLInputElement>("search");
+  const clear = byId<HTMLButtonElement>("search-clear");
+  assert.equal(clear.getAttribute("aria-label"), "Clear search");
+  search.value = "xyz-nothing";
+  search.dispatchEvent(new window.Event("input"));
+  assert.ok(qa(document, ".row").length === 0, "the query is applied");
+  clear.click();
+  assert.equal(search.value, "", "the box is empty");
+  assert.ok(qa(document, ".row").length > 0, "the list is back");
+  assert.ok(document.activeElement === search, "typing can go on at once");
 });
 
 test("UI - Sidepanel - Search narrows list; no match shows empty state; Escape clears", () => {
@@ -3933,10 +3957,13 @@ test("UI - Sidepanel - A drag ended on a detached row still resets; tabs.onRepla
   await chrome.tabs.onActivated.fire({});
   await new Promise((resolve) => setTimeout(resolve, 200)); // the list back in shape
 
-  const before = document.querySelector(".row");
-  await chrome.tabs.onReplaced.fire(99, 1);
-  await new Promise((resolve) => setTimeout(resolve, 200));
-  assert.notEqual(document.querySelector(".row"), before, "onReplaced re-renders");
+  if (!FIREFOX) {
+    // Firefox has no tabs.onReplaced (a discard keeps the id): nothing to fire there
+    const before = document.querySelector(".row");
+    await chrome.tabs.onReplaced.fire(99, 1);
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    assert.notEqual(document.querySelector(".row"), before, "onReplaced re-renders");
+  }
 
   const settled = document.querySelector(".row");
   await chrome.storage.onChanged.fire({ wakeTimes: { newValue: { 1: Date.now() } } }, "session");

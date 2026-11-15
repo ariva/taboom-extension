@@ -152,6 +152,14 @@ searchInput.addEventListener("input", () => {
   setQuery(searchInput.value);
 });
 
+// the box's own ✕ and Esc: empty the box, drop the query, keep typing possible at once
+export function clearSearch(): void {
+  searchInput.value = "";
+  setQuery("");
+  searchInput.focus();
+}
+getElementById("search-clear").addEventListener("click", clearSearch);
+
 filterBar.addEventListener("click", (event) => {
   const button = closest(event.target, "button[data-filter]");
   if (!button) {

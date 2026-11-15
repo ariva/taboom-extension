@@ -6,7 +6,7 @@ import { join, resolve } from "node:path";
 import { type BrowserContext, chromium, expect, type Page, test as base, type Worker } from "@playwright/test";
 import { test } from "./fixtures.ts";
 
-const EXTENSION_DIR = resolve(import.meta.dirname, "../../dist/prod");
+const EXTENSION_DIR = resolve(import.meta.dirname, "../../dist/chrome");
 
 async function serveFakeSites(context: BrowserContext, hits?: Map<string, number>): Promise<void> {
   await context.route(/^https?:\/\/[a-z0-9-]+\.test\//, (route) => {

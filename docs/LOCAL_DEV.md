@@ -12,10 +12,10 @@ Taboom - Tabs Manager is written in TypeScript and built with [Vite](https://vit
 
 ```bash
 npm install
-just dev      # builds dist/dev and keeps rebuilding on every save (leave it running)
+just dev      # builds dist/dev-chrome and keeps rebuilding on every save (leave it running)
 ```
 
-One-off production build without the watcher: `npx vite build` → `dist/prod`. All build commands: [BUILD.md](BUILD.md).
+One-off production build without the watcher: `npx vite build` → `dist/chrome` (`TARGET=firefox npx vite build` → `dist/firefox`). All build commands: [BUILD.md](BUILD.md).
 
 ## Load unpacked (development install)
 
@@ -25,11 +25,15 @@ One-off production build without the watcher: `npx vite build` → `dist/prod`. 
 4. Select the built folder — the one containing `manifest.json`:
 
    ```text
-   dist/dev      (while developing, from `just dev`)
-   dist/prod     (production build)
+   dist/dev-chrome   (while developing, from `just dev`)
+   dist/chrome       (production build)
    ```
 
 5. The **Taboom - Tabs Manager** card appears. Pin the toolbar icon via the puzzle-piece menu if you want quick access.
+
+### Firefox (temporary add-on)
+
+Firefox has no persistent "load unpacked". Build the Firefox flavour (`just dev target=firefox` while developing → `dist/dev-firefox`; `TARGET=firefox npx vite build` → `dist/firefox`), then `about:debugging` → **This Firefox** → **Load Temporary Add-on** → pick the `manifest.json` in that folder. The add-on is gone after a Firefox restart — load it again, or use `just firefox-run`, which starts a throwaway profile with the add-on and reloads it on every rebuild. The panel is in the sidebar: the toolbar button toggles it.
 
 ## Verify it works
 
@@ -40,7 +44,7 @@ One-off production build without the watcher: `npx vite build` → `dist/prod`. 
 
 ## After changing code
 
-With `just dev` running and `dist/dev` loaded, nothing: every save rebuilds in well under a second and the loaded extension updates itself —
+With `just dev` running and `dist/dev-chrome` loaded, nothing: every save rebuilds in well under a second and the loaded extension updates itself —
 
 - a change to a page (side panel / options: TypeScript, HTML, CSS) reloads the open extension pages;
 - a change to the service worker, the manifest or shared code reloads the whole extension (the side panel comes back through the restore-panels setting).
@@ -68,7 +72,7 @@ Chrome may refuse the suggested key if another extension already claims it — a
 ## Packing a zip (optional)
 
 ```bash
-just build    # release checks + dist/taboom-tabs-manager-v<version>.zip (readable, unminified — the store upload)
+just build    # release checks + dist/taboom-tabs-manager-v<version>-chrome.zip and …-firefox.zip (readable, unminified — the store upload)
 ```
 
 Needs, on top of the requirements above: [`jq`](https://jqlang.github.io/jq/), `zip`, `unzip`, `git`, and Playwright's Chromium (`npx playwright install chromium`). What the release checks are, every other build command, and the optional minified build are described in [BUILD.md](BUILD.md).
@@ -77,7 +81,7 @@ The zip is only needed for distribution (e.g. Chrome Web Store upload). Local de
 
 ## Troubleshooting
 
-- **"Manifest file is missing or unreadable"** — you selected the repository root or a parent folder; select `dist/dev` (or `dist/prod`), and build first if it does not exist.
+- **"Manifest file is missing or unreadable"** — you selected the repository root or a parent folder; select `dist/dev-chrome` (or `dist/chrome`), and build first if it does not exist.
 - **Side panel button does nothing** — Chrome older than 121; check `chrome://version`.
 - **Snoozing the active tab switches to a neighbor tab first** (or opens a new tab if it's the only one in the window) — Chrome cannot discard the active tab, so focus must move before the discard.
 - **Errors after editing code** — check the red **Errors** button on the extension card, fix, reload.

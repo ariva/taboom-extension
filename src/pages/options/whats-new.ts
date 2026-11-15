@@ -1,7 +1,7 @@
 // "What's new": renders the bundled CHANGES.md as one entry per release — collapsible
 // behind a flag, with a fold-all toggle and a paginated Show-more.
 import { featureEnabled } from "../../app/core.ts";
-import { FOLD_ICONS, getElementById } from "../../lib/dom.ts";
+import { FOLD_ICONS, getElementById, setSvgMarkup } from "../../lib/dom.ts";
 import { releaseSections, SHOW_INITIAL_CHANGES, SHOW_MORE_PAGE } from "./model.ts";
 import { getFeatures } from "./page-state.ts";
 
@@ -54,7 +54,7 @@ export function initWhatsNew(): void {
         const allDetails = [...box.querySelectorAll("details")];
         const syncToggleAll = () => {
           const allCollapsed = allDetails.every((d) => !d.open);
-          toggleAll.innerHTML = allCollapsed ? FOLD_ICONS.unfold : FOLD_ICONS.fold;
+          setSvgMarkup(toggleAll, allCollapsed ? FOLD_ICONS.unfold : FOLD_ICONS.fold);
           toggleAll.title = toggleAll.ariaLabel = allCollapsed ? "Click to Expand" : "Click to Collapse";
         };
         toggleAll.addEventListener("click", () => {

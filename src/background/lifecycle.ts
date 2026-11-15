@@ -21,7 +21,7 @@ export function init(): Promise<void> {
   return initPromise;
 }
 
-// One step failing (a menu id already there, `sidePanel.setPanelBehavior` missing on an
+// One step failing (a menu id already there, the panel-behaviour setting missing on an
 // old Chrome, a dev icon absent) must not skip the rest: the update note would keep
 // showing the version now running, the sweep alarm would stay unarmed, the history
 // unpruned. Each step is isolated; the failure is logged, the pass goes on.
@@ -66,7 +66,7 @@ async function markDevBuild(): Promise<void> {
         128: "/icons/dev/icon128.png",
       },
     })
-    // dist/prod loaded unpacked (e2e, manual check) has no dev icons — keep the stock one
+    // a production build loaded unpacked (e2e, manual check) has no dev icons — keep the stock one
     .catch(() => {});
   await chrome.action.setBadgeText({ text: "dev" });
   await chrome.action.setBadgeBackgroundColor({ color: "#1a63d4" });

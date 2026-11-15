@@ -1,4 +1,4 @@
-// End-to-end smoke: the BUILT extension (dist/prod) loaded into real Chromium.
+// End-to-end smoke: the BUILT extension (dist/chrome) loaded into real Chromium.
 // Deliberately tiny — behaviour is covered by the Vitest tiers; this proves the package
 // boots: worker registers, pages load from chrome-extension://, nothing touches the network.
 import { defineConfig } from "@playwright/test";

@@ -1,6 +1,6 @@
 # Taboom - Tabs Manager — MV3 extension built with Vite (see vite.config.ts).
-# `just dev` builds dist/dev and keeps it fresh — load THAT folder unpacked in Chrome.
-# `just build` runs the release gate and packs dist/prod into a zip.
+# `just dev` builds dist/dev-chrome and keeps it fresh — load THAT folder unpacked in Chrome.
+# `just build` runs the release gate and packs dist/chrome (and dist/firefox) into zips.
 
 set shell := ["bash", "-uc"]
 
@@ -37,6 +37,10 @@ test-experimental:
 # every feature flag disabled
 test-disabled:
     npx vitest run --project disabled
+
+# flags as shipped against the Firefox-shaped chrome mock (no sidePanel / onReplaced / split view / favicon store)
+test-firefox:
+    npx vitest run --project firefox
 
 # rerun affected tests on save
 test-watch:
@@ -77,21 +81,66 @@ perf-refs base="" head="HEAD" tabs="2000" repeat="15":
     tests/perf/at-ref.sh {{ head }} {{ tabs }} {{ repeat }}
     node tests/perf/compare.ts
 
-# First time: chrome://extensions → Load unpacked → dist/dev. The loaded extension then
+# The same tier in Firefox (T-0152): the Firefox build (dist/firefox) in a real headless Firefox driven over
+# WebDriver BiDi, the same nine scenarios; runs are marked `firefox` and judged only against Firefox runs
+test-perf-firefox tabs="2000" repeat="15":
+    TARGET=firefox npx vite build --logLevel warn
+    node tests/perf/run.ts --tabs {{ tabs }} --repeat {{ repeat }} --label full --browser firefox
+
+perf-quick-firefox:
+    TARGET=firefox npx vite build --logLevel warn
+    node tests/perf/run.ts --tabs 500 --repeat 3 --label quick --browser firefox
+
+perf-at-firefox ref="HEAD" tabs="2000" repeat="15":
+    BROWSER=firefox tests/perf/at-ref.sh {{ ref }} {{ tabs }} {{ repeat }}
+
+perf-refs-firefox base="" head="HEAD" tabs="2000" repeat="15":
+    BROWSER=firefox tests/perf/at-ref.sh {{ if base == "" { "$(git describe --tags --abbrev=0)" } else { base } }} {{ tabs }} {{ repeat }}
+    BROWSER=firefox tests/perf/at-ref.sh {{ head }} {{ tabs }} {{ repeat }}
+    node tests/perf/compare.ts
+
+# First time: chrome://extensions → Load unpacked → dist/dev-chrome. The loaded extension then
 # reloads itself after each rebuild (tooling/dev-reload-plugin.ts); type errors stream alongside.
-# development loop: rebuild dist/dev on every save (source maps, dev icons) + tsc --watch
-dev:
+# development loop: rebuild dist/dev-chrome on every save (source maps, dev icons) + tsc --watch.
+# `just dev target=firefox` (or `just dev firefox`) builds dist/dev-firefox (the Firefox manifest)
+# on its own reload port, so both loops run side by side; Firefox loads it as a temporary add-on
+# (about:debugging) or through `just firefox-run` (docs/BUILD.md "The dev loop"). just hands
+# `target=firefox` to the recipe as a literal argument, hence the regex (as `build minify=true`)
+dev target="chrome":
     #!/usr/bin/env bash
     set -euo pipefail
     trap 'kill 0' EXIT
+    export TARGET={{ if target =~ '^(target=)?firefox$' { "firefox" } else { "chrome" } }}
     npx tsc -p tsconfig.json --watch --preserveWatchOutput &
     npx vite build --watch --mode development
+
+# alias: `just dev target=firefox`
+dev-firefox:
+    just dev target=firefox
+
+# the Firefox build (dist/firefox) zipped to dist/taboom-tabs-manager-v<version>-firefox.zip — no gate
+pack-firefox:
+    TARGET=firefox ./scripts/pack.sh
+
+# the source archive addons.mozilla.org asks for next to a bundled add-on: the committed tree at HEAD
+source-zip:
+    ./scripts/source-zip.sh
+
+# AMO's validator on the Firefox build (web-ext); `just build` runs it too
+firefox-lint:
+    TARGET=firefox npx vite build --logLevel warn
+    npx --no-install web-ext lint --source-dir dist/firefox --no-config-discovery
+
+# a throwaway Firefox profile with dist/dev-firefox as a temporary add-on, reloaded on every rebuild —
+# run `just dev-firefox` alongside (docs/BUILD.md "The dev loop"). FIREFOX_BIN picks another Firefox
+firefox-run:
+    npx --no-install web-ext run --source-dir dist/dev-firefox --no-config-discovery {{ if env("FIREFOX_BIN", "") != "" { "--firefox " + env("FIREFOX_BIN") } else { "" } }}
 
 # `just build minify=true` (or `just build true`) packs a minified copy instead (…-min.zip); the
 # store upload stays readable. just hands `minify=true` to the recipe as a literal argument, hence
 # the regex. Details and measurements: docs/BUILD.md
-# release gate (version, notes, hashes, check, browser tier) → pack dist/prod → e2e on the packed
-# build. No recording: docs/assets/demo/ and docs/assets/features/ stay as they are
+# release gate (version, notes, hashes, check, browser tier) → pack dist/chrome + dist/firefox → e2e on the packed
+# build. No recording: docs/assets/demo/chrome/ and docs/assets/features/chrome/ stay as they are
 build minify="false":
     MINIFY={{ if minify =~ '^(minify=)?true$' { "1" } else { "" } }} ./scripts/build.sh
 
@@ -105,7 +154,7 @@ clean:
     rm -rf dist
 
 # Feature demo recordings (demo/README.md): a synthetic 10-window / 500-tab world in headless
-# Chromium, scenes filmed per window, ffmpeg composes dist/demo/<version>/taboom-<version>.mp4
+# Chromium, scenes filmed per window, ffmpeg composes dist/demo/<version>-chrome/taboom-<version>.mp4
 # (panel + story pane + Settings, every scene), taboom-<version>-1080p.mp4 (the same at 1920×1080)
 # and .gif (panel only, the short clips).
 # record every scene and encode both files — `just demo scene=search` retakes one scene
@@ -118,8 +167,19 @@ demo scene="":
 demo-encode:
     ./demo/encode.sh
 
+# The demo in Firefox (T-0152): the Firefox build in a real headless Firefox (WebDriver BiDi), the same
+# scenes, filmed by screenshot polling into dist/demo/<version>-firefox/ and published to
+# docs/assets/demo/firefox/ (the Chrome films live in docs/assets/demo/chrome/, the stills in docs/assets/features/chrome/)
+demo-firefox scene="":
+    TARGET=firefox npx vite build --logLevel warn
+    node demo/record.ts --browser firefox {{ if scene != "" { "--scene " + scene } else { "" } }}
+    DEMO_DIR=dist/demo/$(node -p "require('./package.json').version")-firefox DEMO_PUBLISH=docs/assets/demo/firefox ./demo/encode.sh
+
+demo-encode-firefox:
+    DEMO_DIR=dist/demo/$(node -p "require('./package.json').version")-firefox DEMO_PUBLISH=docs/assets/demo/firefox ./demo/encode.sh
+
 # only the stills, no film, no ffmpeg: `all` (default) = the feature stills of every scene and
-# the README screenshots, `features` or `readme` = one of the two, published to docs/assets/features/
+# the README screenshots, `features` or `readme` = one of the two, published to docs/assets/features/chrome/
 demo-stills what="all":
     npx vite build --logLevel warn
     node demo/record.ts --stills {{ what }}

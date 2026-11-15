@@ -23,20 +23,6 @@
     "manifest_version": 3,
     "name": "Taboom - Tabs Manager by ariva-tools",
     "description": "Taboom - Privacy-first smart Tabs Manager to search, snooze, and protect Chrome tabs. Saves memory, runs fully locally.",
-    "minimum_chrome_version": "121",
-    "permissions": [
-      "tabs",
-      "tabGroups",
-      "storage",
-      "alarms",
-      "contextMenus",
-      "sidePanel",
-      "favicon"
-    ],
-    "background": {
-      "service_worker": "background/service-worker.js",
-      "type": "module"
-    },
     "action": {
       "default_title": "Taboom - Smart Tabs Manager",
       "default_icon": {
@@ -50,10 +36,10 @@
       "48": "icons/icon48.png",
       "128": "icons/icon128.png"
     },
-    "side_panel": {
-      "default_path": "sidepanel/index.html"
+    "options_ui": {
+      "page": "options/index.html",
+      "open_in_tab": true
     },
-    "options_page": "options/index.html",
     "commands": {
       "open-tab-manager": {
         "suggested_key": {
@@ -82,6 +68,23 @@
         },
         "description": "Tab history: forward to the next tab"
       }
+    },
+    "minimum_chrome_version": "121",
+    "permissions": [
+      "tabs",
+      "tabGroups",
+      "storage",
+      "alarms",
+      "contextMenus",
+      "sidePanel",
+      "favicon"
+    ],
+    "background": {
+      "service_worker": "background/service-worker.js",
+      "type": "module"
+    },
+    "side_panel": {
+      "default_path": "sidepanel/index.html"
     }
   }
 }

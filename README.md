@@ -1,21 +1,21 @@
-# Taboom - Tabs Manager - Chrome Extension
+# Taboom - Tabs Manager - Chrome & Firefox Extension
 
 [Install](#installation) · [Support](#buy-me-pizzacoffeetea) · [Features](#features) · [Privacy](#privacy-first) · [Permissions](#permissions) · [Screenshots](#screenshots) · [Docs](#documentation) · [Licence](#licence)
 
-Search, protect, and snooze inactive Chrome tabs.
+Search, protect, and snooze inactive tabs — in Chrome and in Firefox.
 
 Taboom - Tabs Manager frees memory by snoozing (discarding) tabs you haven't used in a while — they stay in the tab strip and reload when clicked, nothing is ever closed automatically. A side panel lists all your tabs with instant search, filters, and bulk actions; sites that lose state on reload can be protected from snoozing. TypeScript, no runtime dependencies, runs fully locally with no telemetry.
 
 <p align="center">
-  <img src="docs/assets/demo/taboom-demo.gif" alt="Taboom in 30 seconds: tags, the side panel, search, windows" width="480">
+  <img src="docs/assets/demo/chrome/taboom-demo.gif" alt="Taboom in 30 seconds: tags, the side panel, search, windows" width="480">
 </p>
 
 <p align="center">
-  <a href="https://youtu.be/HDdjwM7mcYY"><img src="docs/assets/demo/youtube-cover.png" alt="Watch the full Taboom demo on YouTube" width="480"></a>
+  <a href="https://youtu.be/HDdjwM7mcYY"><img src="docs/assets/demo/chrome/youtube-cover.png" alt="Watch the full Taboom demo on YouTube" width="480"></a>
 </p>
 
 * **[Watch the full demo on YouTube](https://youtu.be/HDdjwM7mcYY)** (5 minutes, with chapters) — every feature with the matching Settings section beside the panel.
-* The same film as a file: [taboom-demo.mp4](docs/assets/demo/taboom-demo.mp4) in this repository.
+* The same film as a file: [taboom-demo.mp4](docs/assets/demo/chrome/taboom-demo.mp4) in this repository.
 
 ## Buy me Pizza/Coffee/Tea
 * Like what I do? Taboom is free and stays free. If it saved you time or memory, you can support the next release: **[Buy me a coffee ☕](https://buymeacoffee.com/ariva)** — or scan the code.
@@ -32,8 +32,11 @@ Taboom - Tabs Manager frees memory by snoozing (discarding) tabs you haven't use
 2. **Pin it**: click the puzzle-piece 🧩 icon at the right of Chrome's toolbar, then the pin next to **Taboom - Tabs Manager**. The moon icon stays in the toolbar.
 3. **Open it**: click the moon icon. The side panel opens with every tab of every window; it stays open while you switch tabs.
 
+### Firefox
+The same extension builds for Firefox 140+ (`just pack-firefox` → `dist/taboom-tabs-manager-v<version>-firefox.zip`); the Firefox Add-ons listing is in preparation. Until it is published: `about:debugging` → This Firefox → **Load Temporary Add-on** → the `manifest.json` inside the zip's folder (a temporary add-on is gone after a restart). The panel lives in Firefox's sidebar: the toolbar button toggles it, `Ctrl+Shift+Space` opens it. Two Chrome-only things are not there: split view (Chrome 155+) and cached favicons — Firefox rows show the site's initial instead, because showing the site's own icon would mean a request to the site. The same tour filmed in Firefox: [taboom-demo.gif](docs/assets/demo/firefox/taboom-demo.gif) / [taboom-demo.mp4](docs/assets/demo/firefox/taboom-demo.mp4).
+
 ### Local Installation
-* Developers: [docs/LOCAL_DEV.md](docs/LOCAL_DEV.md) — build from source and load unpacked in Chrome, requirements, troubleshooting
+* Developers: [docs/LOCAL_DEV.md](docs/LOCAL_DEV.md) — build from source and load unpacked in Chrome or as a temporary add-on in Firefox, requirements, troubleshooting
 
 ## Features
 
@@ -56,33 +59,33 @@ Taboom - Tabs Manager frees memory by snoozing (discarding) tabs you haven't use
 
 ## Permissions
 
-Taboom is a privacy-first extension. It requests the bare minimum Chrome permissions it can function with — no host permissions, no `scripting`, no content scripts, and it makes zero network requests; everything runs locally, and it never has access to the content of the pages you browse.
+Taboom is a privacy-first extension. It requests the bare minimum permissions it can function with — no host permissions, no `scripting`, no content scripts, and it makes zero network requests; everything runs locally, and it never has access to the content of the pages you browse.
 
-| Permission | Why it's needed |
-|---|---|
-| `tabs` | List tabs (title/URL) in the side panel, snooze (discard), activate, and close them |
-| `tabGroups` | Show Chrome tab groups (title, color, collapsed) in the list, rename/recolor/collapse them, move tabs in or out |
-| `storage` | Save your settings and protection rules locally (`chrome.storage.local`) |
-| `alarms` | Run the periodic automatic-snooze check and the keep-alive reload sweep (survive service-worker sleep) |
-| `contextMenus` | Right-click menu: snooze this tab, protect this site, keep this tab alive |
-| `sidePanel` | Show the tab manager in Chrome's side panel |
-| `favicon` | Show tab favicons from Chrome's local cache — no request ever goes to the site |
+| Permission | Chrome | Firefox | Why it's needed |
+|---|---|---|---|
+| `tabs` | ✓ | ✓ | List tabs (title/URL) in the side panel, snooze (discard), activate, and close them |
+| `tabGroups` | ✓ | ✓ (139+) | Show tab groups (title, color, collapsed) in the list, rename/recolor/collapse them, move tabs in or out |
+| `storage` | ✓ | ✓ | Save your settings and protection rules locally (`storage.local`) |
+| `alarms` | ✓ | ✓ | Run the periodic automatic-snooze check and the keep-alive reload sweep (survive background sleep) |
+| `contextMenus` | ✓ | ✓ | Right-click menu: snooze this tab, protect this site, keep this tab alive |
+| `sidePanel` | ✓ | — | Show the tab manager in Chrome's side panel (Firefox uses its sidebar, declared in the manifest, no permission) |
+| `favicon` | ✓ | — | Show tab favicons from Chrome's local cache — no request ever goes to the site (Firefox has no such cache: rows show the site's initial) |
 
-Nothing else is requested: Taboom cannot read or modify page content, cannot see your browsing beyond open tabs' titles/URLs, and sends nothing anywhere.
+Nothing else is requested: Taboom cannot read or modify page content, cannot see your browsing beyond open tabs' titles/URLs, and sends nothing anywhere. The Firefox listing declares `data_collection_permissions: none` — nothing is collected.
 
 ## Screenshots
 
 Side panel:
 
 <p>
-  <img src="docs/assets/features/readme-panel.png" alt="Side panel" width="360">
-  <img src="docs/assets/features/readme-quick-launch.png" alt="Side panel - Quick launch" width="360">
-  <img src="docs/assets/features/readme-quick-actions.png" alt="Side panel - Quick actions menu" width="360">
+  <img src="docs/assets/features/chrome/readme-panel.png" alt="Side panel" width="360">
+  <img src="docs/assets/features/chrome/readme-quick-launch.png" alt="Side panel - Quick launch" width="360">
+  <img src="docs/assets/features/chrome/readme-quick-actions.png" alt="Side panel - Quick actions menu" width="360">
 </p>
 
 Options page:
 
-<img src="docs/assets/features/readme-settings.png" alt="Settings" width="460">
+<img src="docs/assets/features/chrome/readme-settings.png" alt="Settings" width="460">
 
 More in [Features](docs/FEATURES.md) — the demo retakes every screenshot on each build.
 

@@ -44,6 +44,31 @@ test("Tooling - Justfile - the performance tier builds first, defaults to 2000 t
   );
 });
 
+// T-0152: the same tier in Firefox — the Firefox build, the browser flag, Firefox runs of other refs
+test("Tooling - Justfile - the Firefox performance recipes build the Firefox flavour and pass the browser", () => {
+  assert.match(
+    dryRun("test-perf-firefox"),
+    /TARGET=firefox npx vite build[\s\S]*--tabs 2000 --repeat 15 --label full --browser firefox/,
+  );
+  assert.match(dryRun("perf-quick-firefox"), /--tabs 500 --repeat 3 --label quick --browser firefox/);
+  assert.match(
+    dryRun("perf-at-firefox", "release-v1.0.9"),
+    /BROWSER=firefox tests\/perf\/at-ref\.sh release-v1\.0\.9 2000 15/,
+  );
+  assert.match(
+    dryRun("perf-refs-firefox"),
+    /BROWSER=firefox tests\/perf\/at-ref\.sh \$\(git describe --tags --abbrev=0\) 2000 15\n.*BROWSER=firefox .*at-ref\.sh HEAD 2000 15\n.*compare\.ts/,
+  );
+  assert.match(
+    dryRun("demo-firefox"),
+    /TARGET=firefox npx vite build[\s\S]*record\.ts --browser firefox\s*\n.*DEMO_DIR=dist\/demo\/.*-firefox DEMO_PUBLISH=docs\/assets\/demo\/firefox \.\/demo\/encode\.sh/,
+  );
+  assert.match(dryRun("demo-firefox", "search"), /record\.ts --browser firefox --scene search/);
+  assert.match(dryRun("firefox-lint"), /TARGET=firefox npx vite build[\s\S]*web-ext lint --source-dir dist\/firefox/);
+  assert.match(dryRun("firefox-run"), /web-ext run --source-dir dist\/dev-firefox/);
+  assert.match(dryRun("source-zip"), /scripts\/source-zip\.sh/);
+});
+
 test("Tooling - Justfile - demo-stills takes the stills without filming, all by default", () => {
   assert.match(dryRun("demo-stills"), /node demo\/record\.ts --stills all\n.*encode\.sh --stills/, "no arg: all");
   assert.match(dryRun("demo-stills", "readme"), /node demo\/record\.ts --stills readme\n/, "readme only");
@@ -55,4 +80,13 @@ test("Tooling - Justfile - build packs without the demo, publish records it", ()
   assert.doesNotMatch(dryRun("build"), /RECORD_DEMO=1/, "build does not record");
   assert.match(dryRun("publish"), /MINIFY= RECORD_DEMO=1 \.\/scripts\/build\.sh/, "publish records");
   assert.match(dryRun("publish", "minify=true"), /MINIFY=1 RECORD_DEMO=1 \.\/scripts\/build\.sh/, "publish minified");
+});
+
+test("Tooling - Justfile - dev builds the chrome flavour by default, dev-firefox the Firefox one on its own output", () => {
+  assert.match(dryRun("dev"), /export TARGET=chrome/, "default target");
+  assert.match(dryRun("dev", "target=firefox"), /export TARGET=firefox/, "documented form");
+  assert.match(dryRun("dev", "firefox"), /export TARGET=firefox/, "positional form");
+  assert.match(dryRun("dev-firefox"), /just dev target=firefox/, "the alias");
+  assert.match(dryRun("pack-firefox"), /TARGET=firefox \.\/scripts\/pack\.sh/);
+  assert.match(dryRun("test-firefox"), /vitest run --project firefox/);
 });

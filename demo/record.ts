@@ -1,14 +1,14 @@
-// `node demo/record.ts [--scene <id>]... [--stills all|features|readme] [--out dist/demo]` —
-// builds the world, plays the scenes, films them. Every run starts from a fresh profile; a
+// `node demo/record.ts [--scene <id>]... [--stills all|features|readme] [--out dist/demo] [--browser chrome|firefox]`
+// — builds the world, plays the scenes, films them. Every run starts from a fresh profile; a
 // `--scene` run retakes only those scenes and leaves the other takes on disk for encode.sh.
 // `--stills` films nothing and writes no scenes.json: the stills of the feature scenes, of the
 // stills-only scenes (the README screenshots), or of both.
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
-import { buildWorld, launch, openAside, openPanel, SETTINGS_VIEWPORT, STORY_URL, STORY_VIEWPORT } from "./browser.ts";
+import { buildWorld, launch, PANEL_VIEWPORT, SETTINGS_VIEWPORT, STORY_URL, STORY_VIEWPORT } from "./browser.ts";
 import { buildTabs, WINDOWS } from "./fixture.ts";
-import { Recorder, type Stream } from "./recorder.ts";
+import type { BrowserName, Stream } from "./page-api.ts";
 import { GIF_MAX_SECONDS, orderedForRelease, type Scene, SCENES } from "./scenes/index.ts";
 import { installOverlay, makeStage, storyScene } from "./stage.ts";
 import { storyHtml } from "./story.ts";
@@ -18,31 +18,24 @@ const { values } = parseArgs({
     scene: { type: "string", multiple: true },
     stills: { type: "string" },
     out: { type: "string", default: "dist/demo" },
-    extension: { type: "string", default: "dist/prod" },
+    extension: { type: "string" },
+    browser: { type: "string", default: "chrome" },
   },
 });
 
+if (values.browser !== "chrome" && values.browser !== "firefox") {
+  throw new Error(`--browser ${values.browser}: expected chrome or firefox`);
+}
+const browserName: BrowserName = values.browser;
 const version = (JSON.parse(readFileSync("package.json", "utf8")) as { version: string }).version;
-const outDir = resolve(values.out ?? "dist/demo", version);
-const extensionDir = resolve(values.extension ?? "dist/prod");
+// one take folder per browser: dist/demo/<version>-chrome, dist/demo/<version>-firefox
+const outDir = resolve(values.out ?? "dist/demo", `${version}-${browserName}`);
+const extensionDir = resolve(values.extension ?? (browserName === "firefox" ? "dist/firefox" : "dist/chrome"));
 if (!existsSync(join(extensionDir, "manifest.json"))) {
   throw new Error(`${extensionDir} holds no built extension — run \`just build\` or \`npx vite build\` first`);
 }
 mkdirSync(outDir, { recursive: true });
 const log = (line: string) => console.log(`[demo] ${line}`);
-
-// An unpacked extension wears the "DEV ·" prefix (src/app/env.ts: no update_url in the
-// manifest). The recording shows the store look: a copy of the build with an update_url —
-// Chromium never calls it, background networking is off.
-const stagedExtension = join(outDir, "extension");
-rmSync(stagedExtension, { recursive: true, force: true });
-cpSync(extensionDir, stagedExtension, { recursive: true });
-const manifestFile = join(stagedExtension, "manifest.json");
-const manifest = JSON.parse(readFileSync(manifestFile, "utf8")) as Record<string, unknown>;
-writeFileSync(
-  manifestFile,
-  JSON.stringify({ ...manifest, update_url: "https://clients2.google.com/service/update2/crx" }, null, 2),
-);
 
 const stillsKind = values.stills;
 if (stillsKind !== undefined && !["all", "features", "readme"].includes(stillsKind)) {
@@ -62,14 +55,17 @@ if (unknown.length > 0) {
 const tabs = buildTabs();
 
 const started = Date.now();
-const browser = await launch(stagedExtension, tabs, new Map([[STORY_URL, storyHtml(version)]]));
+const browser = await launch(extensionDir, tabs, new Map([[STORY_URL, storyHtml(version)]]), browserName, log);
 try {
-  log(`extension ${browser.extensionId}, building ${tabs.length} tabs in ${WINDOWS.length} windows`);
+  log(
+    `${browserName}: extension ${browser.extensionOrigin}, building ${tabs.length} tabs in ${WINDOWS.length} windows`,
+  );
   const world = await buildWorld(browser, tabs, log);
-  const panel = await openPanel(browser);
-  const story = await openAside(browser, STORY_URL, STORY_VIEWPORT);
-  const settingsUrl = `chrome-extension://${browser.extensionId}/options/index.html`;
-  const settings = await openAside(browser, settingsUrl, SETTINGS_VIEWPORT);
+  const panel = await browser.openPanel();
+  await panel.setViewportSize(PANEL_VIEWPORT);
+  const story = await browser.openAside(STORY_URL, STORY_VIEWPORT);
+  const settingsUrl = `${browser.extensionOrigin}/options/index.html`;
+  const settings = await browser.openAside(settingsUrl, SETTINGS_VIEWPORT);
   const hidden = {
     tabIds: [world.panelTabId, story.tabId, settings.tabId],
     windowIds: [world.panelWindowId, story.windowId, settings.windowId],
@@ -80,11 +76,6 @@ try {
     }
     return url === settingsUrl ? "settings" : undefined;
   };
-  // Playwright dismisses native confirm() dialogs by default — the panel's bulk confirmations
-  // (Cleanup Duplicates, closing several tabs) must go through
-  panel.on("dialog", (dialog) => {
-    dialog.accept().catch(() => {});
-  });
   await panel.waitForTimeout(1500); // names, badges and counts settle
   // a Set does not survive evaluate's serialization: the worker hands back an array
   const activeUrls = async () =>
@@ -93,11 +84,11 @@ try {
         (await chrome.tabs.query({ active: true })).map((tab) => tab.url ?? ""),
       ),
     );
-  const recorder = new Recorder(browser.context, outDir, streamOfUrl, activeUrls);
+  const recorder = browser.recorder(outDir, streamOfUrl, activeUrls);
   await recorder.start(panel, log);
   const stillsDir = join(outDir, "features");
   mkdirSync(stillsDir, { recursive: true });
-  const stage = makeStage(panel, browser.worker, world, { story: story.page, settings: settings.page }, log, stillsDir);
+  const stage = makeStage(panel, browser, world, { story: story.page, settings: settings.page }, log, stillsDir);
   const takes: {
     id: string;
     title: string;

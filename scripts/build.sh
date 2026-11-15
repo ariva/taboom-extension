@@ -18,12 +18,14 @@ cd "$ROOT_PATH"
 just test-browser # real-Chromium tier: focus, clicks, popovers, dialogs, drag & drop
 
 "$ROOT_PATH/scripts/pack.sh"
-npx playwright test # e2e smoke against the dist/prod that was just packed
+TARGET=firefox "$ROOT_PATH/scripts/pack.sh" # the Firefox zip from the same sources (T-0152)
+npx --no-install web-ext lint --source-dir dist/firefox --no-config-discovery # AMO's validator
+npx playwright test # e2e smoke against the dist/chrome that was just packed
 
 if [ "${RECORD_DEMO:-}" = "1" ]; then
-  # films the dist/prod packed above (no rebuild); a scene that fails fails the release
+  # films the dist/chrome packed above (no rebuild); a scene that fails fails the release
   node demo/record.ts
   ./demo/encode.sh
 else
-  echo "demo not re-recorded (just publish does) — docs/assets/demo/ and docs/assets/features/ keep the previous take"
+  echo "demo not re-recorded (just publish does) — docs/assets/demo/chrome/ and docs/assets/features/chrome/ keep the previous take"
 fi

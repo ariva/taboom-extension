@@ -25,6 +25,18 @@ export function mustQuery<T extends Element = HTMLElement>(root: ParentNode, sel
   return found;
 }
 
+// SVG markup into a host — a whole <svg> into a button, or shapes into an existing <svg> — through
+// the XML parser instead of innerHTML: AMO's validator flags every innerHTML assignment whose
+// right-hand side is not a literal (ours are constants, but a ternary or an imported constant is
+// not a literal to it), and the parser route costs the same for an icon
+export function setSvgMarkup(host: Element, markup: string): void {
+  const parsed = new DOMParser().parseFromString(
+    `<svg xmlns="http://www.w3.org/2000/svg">${markup}</svg>`,
+    "image/svg+xml",
+  );
+  host.replaceChildren(...Array.from(parsed.documentElement.childNodes, (node) => document.importNode(node, true)));
+}
+
 // fold/unfold-all glyphs shared by the sidepanel toolbar and the options
 // What's-new toggle — double chevrons pointing toward/away from collapse
 export const FOLD_ICONS = {

@@ -161,7 +161,9 @@ export async function moveParkedTabs(
   let groupId: number | undefined;
   if ("groupId" in target) {
     groupId = target.groupId;
-    windowId = (await chrome.tabGroups.get(groupId).catch(() => undefined))?.windowId;
+    windowId = capabilities.tabGroups
+      ? (await chrome.tabGroups.get(groupId).catch(() => undefined))?.windowId
+      : undefined;
     if (windowId === undefined) {
       return { error: "the target group is gone" }; // the menu was stale
     }

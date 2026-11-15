@@ -1,31 +1,38 @@
-// The performance tier: `node tests/perf/run.ts [--tabs 2000] [--repeat 15] [--label full]`
-// against dist/prod (build first — the just recipes do). `--extension <dir> --commit <hash>` measures
-// another build (tests/perf/at-ref.sh builds a commit in a worktree) with the same scenarios. One JSON per run under .private/perf/
-// and .private/perf/HISTORY.md (one line per run) + COMPARISONS.md (each version's latest run against the
-// version before) rebuilt from every run.
+// The performance tier: `node tests/perf/run.ts [--tabs 2000] [--repeat 15] [--label full] [--browser chrome|firefox]`
+// against dist/chrome (dist/firefox for Firefox; build first — the just recipes do). `--extension <dir> --commit <hash>`
+// measures another build (tests/perf/at-ref.sh builds a commit in a worktree) with the same scenarios. One JSON per
+// run under .private/perf/ and .private/perf/HISTORY.md (one line per run) + COMPARISONS.md (each version's latest
+// run against the version before, per browser) rebuilt from every run.
 import { execSync } from "node:child_process";
 import { cpus } from "node:os";
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { SCENARIOS } from "./scenarios.ts";
-import { historyTable, localStamp, type PerfRun, releaseComparisons } from "./stats.ts";
-import { DEFAULT_EXTENSION_DIR, launchWorld } from "./world.ts";
+import { historyTable, localStamp, type PerfBrowser, type PerfRun, releaseComparisons } from "./stats.ts";
+import { DEFAULT_EXTENSION_DIR, DEFAULT_FIREFOX_EXTENSION_DIR, launchWorld } from "./world.ts";
 
 const { values } = parseArgs({
   options: {
     tabs: { type: "string", default: process.env.PERF_TABS ?? "2000" },
     repeat: { type: "string", default: process.env.PERF_REPEAT ?? "15" },
     label: { type: "string", default: "full" },
-    extension: { type: "string", default: DEFAULT_EXTENSION_DIR },
+    extension: { type: "string" },
     commit: { type: "string" }, // the label of a build that is not the working tree's
+    browser: { type: "string", default: "chrome" },
   },
 });
+if (values.browser !== "chrome" && values.browser !== "firefox") {
+  throw new Error(`--browser ${values.browser}: expected chrome or firefox`);
+}
+const browser: PerfBrowser = values.browser;
 const wantedTabs = Number(values.tabs);
 const repeat = Number(values.repeat);
 const PERF_DIR = resolve(import.meta.dirname, "../../.private/perf"); // HISTORY.md, COMPARISONS.md
 const OUT_DIR = join(PERF_DIR, "data"); // one JSON per run
-const extensionDir = resolve(values.extension);
+const extensionDir = resolve(
+  values.extension ?? (browser === "firefox" ? DEFAULT_FIREFOX_EXTENSION_DIR : DEFAULT_EXTENSION_DIR),
+);
 // the version of the BUILD measured, not of the checkout running the scenarios
 const { version } = JSON.parse(readFileSync(join(extensionDir, "manifest.json"), "utf8")) as { version: string };
 const ownBuild = values.commit === undefined;
@@ -34,10 +41,10 @@ const dirty = ownBuild && execSync("git status --porcelain -- src", { encoding: 
 const log = (line: string) => console.log(`[perf] ${line}`);
 
 log(
-  `building ${wantedTabs} tabs (${values.label}, ${repeat} repetitions) for ${version} ${commit}${dirty ? "+dirty" : ""}`,
+  `building ${wantedTabs} tabs (${values.label}, ${repeat} repetitions, ${browser}) for ${version} ${commit}${dirty ? "+dirty" : ""}`,
 );
 const started = Date.now();
-const world = await launchWorld(wantedTabs, log, extensionDir);
+const world = await launchWorld(wantedTabs, log, extensionDir, browser);
 try {
   log(`world ready: ${world.tabCount} tabs in ${Math.round((Date.now() - started) / 1000)} s`);
   const run: PerfRun = {
@@ -46,6 +53,7 @@ try {
     date: new Date().toISOString(),
     tabs: world.tabCount,
     repeat,
+    browser,
     machine: { platform: process.platform, cpus: cpus().length, node: process.version },
     scenarios: {},
   };
@@ -56,7 +64,8 @@ try {
   }
   mkdirSync(OUT_DIR, { recursive: true });
   const stamp = localStamp(run.date).replace(/[: ]/g, "-"); // file names read like the table: local time
-  const file = join(OUT_DIR, `${version}-${stamp}-${values.label}.json`);
+  // a Firefox run is marked in its file name too, so the data folder reads at a glance
+  const file = join(OUT_DIR, `${version}-${stamp}-${values.label}${browser === "firefox" ? "-firefox" : ""}.json`);
   writeFileSync(file, `${JSON.stringify(run, null, 2)}\n`);
   // HISTORY.md is rebuilt from every stored run: sorted by version then date, each line judged against the
   // latest earlier run with the same tab count (so a late run of an older commit sorts into place)

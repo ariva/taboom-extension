@@ -38,7 +38,8 @@ for (const event of [
   chrome.tabs.onCreated,
   chrome.tabs.onActivated,
   chrome.tabs.onRemoved,
-  chrome.tabs.onReplaced, // a discard may swap a tab's id (prerender, back/forward cache)
+  // a discard may swap a tab's id (prerender, back/forward cache) — Chromium only, Firefox has no onReplaced
+  ...(capabilities.tabReplacement ? [chrome.tabs.onReplaced] : []),
   chrome.tabs.onMoved,
   chrome.tabs.onAttached,
   chrome.tabs.onDetached,

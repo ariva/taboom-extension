@@ -3,7 +3,7 @@
 `just demo` builds the extension, boots it in headless Chromium, builds a synthetic world (10
 named and colored windows, 500 tabs — pinned, snoozed, protected, grouped, tagged, duplicated,
 one parked window, two keep-alive marks), plays every scene and encodes three files under
-`dist/demo/<version>/`:
+`dist/demo/<version>-chrome/`:
 
 - `taboom-<version>.mp4` — 1440×940: the side panel (600 px wide) left; right, the story pane
   (scene title, the caption on screen, the captions already shown) over the real Settings page,
@@ -19,7 +19,7 @@ The pages are filmed at device scale 2 (`DEVICE_SCALE` in `demo/browser.ts`,
 `devicePixelRatio` 1 (Playwright's viewport emulation), so layout and the stills are the 1:1
 ones. Takes are about four times the size of 1:1 frames.
 
-Every encode also copies the 1440×940 film and the GIF to `docs/assets/demo/taboom-demo.mp4` /
+Every encode also copies the 1440×940 film and the GIF to `docs/assets/demo/chrome/taboom-demo.mp4` /
 `.gif` (no version in the name, so links stay put; the 1080p film stays in `dist/`, too big for
 the repo); `DEMO_PUBLISH=<dir>` sends the copies elsewhere, and an encode of a `DEMO_DIR`
 scratch take copies nothing.
@@ -39,16 +39,22 @@ Scenes also take named screenshots where a feature is on screen — `stage.still
 or `stage.still("settings-tags", "settings")` for the Settings pane (`"settings", 1180` shoots the
 page from its top, that many px tall) — with the cursor and caption hidden.
 The README's screenshots are the `readme-*` stills of the `readme` scene: the dark theme, stills
-only, never filmed (`stillsOnly`); `just demo-stills readme` retakes them on their own. They land in `dist/demo/<version>/features/<name>.png` and every publishing encode
-copies them to `docs/assets/features/`, where `docs/FEATURES.md` embeds every feature still and the
+only, never filmed (`stillsOnly`); `just demo-stills readme` retakes them on their own. They land in `dist/demo/<version>-chrome/features/<name>.png` and every publishing encode
+copies them to `docs/assets/features/chrome/`, where `docs/FEATURES.md` embeds every feature still and the
 README every `readme-*` one (the stills test fails on a still a page does not show, or an
 image no scene takes). Names are
 fixed slugs, unique across scenes, at least one per scene (`tests/demo/stills.test.ts`); a
 `--scene` retake refreshes only that scene's stills.
 
+## Firefox
+
+`just demo-firefox` films the same scenes in a real headless **Firefox** with the Firefox build (`dist/firefox`), into `dist/demo/<version>-firefox/`, and copies the films to `docs/assets/demo/firefox/taboom-demo.mp4` / `.gif` (the Chrome films and the stills the docs embed stay where they are; a Firefox take publishes no stills). `just demo-firefox scene=search` retakes one scene, `just demo-encode-firefox` re-encodes from the takes.
+
+Playwright cannot load an extension into Firefox, so `demo/firefox/` speaks WebDriver BiDi to Firefox itself: a fresh profile whose prefs pin the extension's internal UUID (a known `moz-extension://` origin), send every request through a PAC proxy to the fake-site server (anything outside `*.test` is refused and reported, like Chromium's route) and render at device scale 2 (`layout.css.devPixelsPerPx` — BiDi cannot emulate a scale on an extension page); `webExtension.install` loads the built add-on; BiDi navigates the first tab to the panel page (`MOZ_REMOTE_ALLOW_SYSTEM_ACCESS=1` allows the `moz-extension://` navigation), but that tab only bootstraps: a tab navigated that way never gets the focus in headless Firefox, and without window focus no focus/blur events fire — the inline edits (rename, new group) commit on blur. So the bootstrap page has the extension open the real panel into a popup window of its own (a window the extension opens does take the focus; `windows.update` brings it back after the world's windows and the asides — Firefox ignores `focused: false` on `windows.create`), the bootstrap window is closed, and that panel page doubles as the "worker" the world builder talks to — an extension page has the same `chrome.*`. Pages are sized through their windows (`chrome.windows.update` until the inner size matches; BiDi's viewport emulation refuses extension pages), input goes through `input.performActions` (a locator waits for a stable box like Playwright does — a click into a smooth-scrolling Settings pane would land elsewhere), and the recorder polls `browsingContext.captureScreenshot` every 120 ms per stream, keeping changed frames only — BiDi has no screencast. The system Firefox is used (`FIREFOX_BIN` overrides), Playwright's as a fallback.
+
 ## Rerunning
 
-`just publish` records and encodes as its last step, against the `dist/prod` it packed, so a
+`just publish` records and encodes as its last step, against the `dist/chrome` it packed, so a
 release always ships with a current tour; a plain `just build` stops at the zip and keeps the
 previous film and screenshots.
 
@@ -66,7 +72,7 @@ DEMO_DIR=/tmp/take/1.0.5 ./demo/encode.sh          # encode a take recorded with
 A `--scene` retake starts a fresh story pane: its "done" list holds only that scene's captions,
 not the ones of the scenes before it in the full film.
 
-Takes live in `dist/demo/<version>/scenes/<id>/` (one JPEG per changed frame per stream,
+Takes live in `dist/demo/<version>-chrome/scenes/<id>/` (`-firefox` for the Firefox take) (one JPEG per changed frame per stream,
 `<stream>.txt` concat lists); `scenes.json` is the timeline `encode.sh` reads. A scene's own
 checks (`stage.check`) land there as `warnings` and in the run's log — a recording with warnings
 is a recording to look at.
@@ -76,12 +82,16 @@ is a recording to look at.
 | File | Role |
 |---|---|
 | `fixture.ts` | the synthetic world and the fake page HTML |
-| `browser.ts` | headless Chromium with the built extension; builds the world through the worker; the fake-site server |
-| `recorder.ts` | DevTools screencast per recorded page → frames + concat lists per scene and stream |
+| `page-api.ts` | the interfaces everything is written against: `DemoPage`, `DemoLocator`, `Evaluator`, `DemoBrowser`, `FrameRecorder` |
+| `browser.ts` | `launch(…, browser)`: headless Chromium with the built extension (Playwright) or Firefox (`firefox/`); the fake-site server both use; the viewport constants |
+| `playwright-page.ts` | Playwright's Page / Locator behind the interfaces |
+| `world.ts` | builds the world through the extension's own `chrome.*` (the worker on Chromium, the panel page on Firefox) |
+| `recorder.ts` | Chromium: DevTools screencast per recorded page → frames + concat lists per scene and stream |
+| `firefox/protocol.ts`, `firefox/page.ts`, `firefox/browser.ts`, `firefox/recorder.ts` | Firefox over WebDriver BiDi: the client and value encoding, a page/locator that resolves selectors in the page and types through `input.performActions`, the profile + install + panel tab, screenshot polling |
 | `stage.ts` | the scene API: cursor and caption overlay, human-paced click / type / select, `settings()` to scroll the Settings pane, `still()` feature screenshots, checks |
 | `story.ts` | the story pane (`http://story.test/`): title, current caption, captions already shown |
 | `scenes/` | one module per scene; `index.ts` is the registry (order, `newIn`, `covers`, `gif`) |
-| `record.ts` | the CLI: world → scenes → `scenes.json` |
+| `record.ts` | the CLI: world → scenes → `scenes.json` (`--browser firefox` for the Firefox take) |
 | `encode.sh` | ffmpeg: per-stream clips, the panel + story + Settings composite at 2×, the 1440×940 and 1080p films, the GIF |
 
 ## Adding a scene
