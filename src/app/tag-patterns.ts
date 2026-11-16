@@ -3,12 +3,17 @@
 import { hostnameOf, matchesRule } from "./core.ts";
 import { duplicateKey, NEW_TAB_KEY } from "./duplicates.ts";
 
-// the key a page is tagged by: the address without its fragment. Any page with an address —
-// chrome:// and extension pages included (a label needs no reload, unlike keep-alive) — except
-// the New Tab page: every new tab shares that address, so a tag there would land on all of them
-export function tagPageKey(url: string | undefined): string {
+// the key a page is tagged by: the address, with its fragment when `keepFragment` says so
+// (settings.tagPagesKeepFragment — hash-routed pages differ only there; a lone trailing # is
+// noise) and without it otherwise. Any page with an address — chrome:// and extension pages
+// included (a label needs no reload, unlike keep-alive) — except the New Tab page: every new
+// tab shares that address, so a tag there would land on all of them
+export function tagPageKey(url: string | undefined, keepFragment = false): string {
   const key = duplicateKey(url);
-  return key === NEW_TAB_KEY || !key.includes(":") ? "" : key;
+  if (key === NEW_TAB_KEY || !key.includes(":")) {
+    return "";
+  }
+  return keepFragment ? (url ?? "").replace(/#$/, "") : key;
 }
 
 // ---------- tagged-page patterns ----------
@@ -19,8 +24,9 @@ export function tagPageKey(url: string | undefined): string {
 // dot: every host containing it) or a glob — `*` anywhere, matching anything, `/` and `?`
 // included (`https://github.com/ariva/*/test`). Entries saved before patterns existed are addresses.
 
+// an address has a scheme — `about:debugging#/setup` as much as `https://a.test/x`
 function isAddressPattern(pattern: string): boolean {
-  return pattern.includes("://");
+  return SCHEME.test(pattern);
 }
 
 // what kind of entry a stored pattern is, for the badge glyph: a page address, a domain (a host
@@ -46,9 +52,11 @@ export function siteOf(url: string | undefined): string {
 const SCHEME = /^[a-z][a-z0-9+.-]*:/i;
 
 // a typed pattern (options Add row, the address edit): an address goes through URL() like a
-// tab url (lowercased host, trailing slash, no fragment); a scheme-less path gets https; a
-// glob keeps its path as typed, only the scheme and host are lowered; a bare host is a site.
-// "" for junk, a host with a space, or a glob that would cover every page
+// tab url (lowercased host, trailing slash); a scheme-less path gets https; a glob keeps its
+// path as typed, only the scheme and host are lowered; a bare host is a site. The fragment
+// stays — a stored key may carry one, and a lookup must never lose what the entry has; the
+// Settings page strips it before calling when the setting is off. "" for junk, a host with a
+// space, or a glob that would cover every page
 export function tagPagePatternFromInput(text: string): string {
   const trimmed = text.trim();
   if (trimmed === "" || /\s/.test(trimmed)) {
@@ -61,13 +69,12 @@ export function tagPagePatternFromInput(text: string): string {
   const address = SCHEME.test(trimmed) ? trimmed : `https://${trimmed}`;
   if (!address.includes("*")) {
     try {
-      return tagPageKey(new URL(address).href);
+      return tagPageKey(new URL(address).href, true);
     } catch {
       return "";
     }
   }
-  const glob = address.split("#")[0] ?? "";
-  return glob.replace(/^([a-z][a-z0-9+.-]*:\/\/[^/]*)/i, (authority) => authority.toLowerCase());
+  return address.replace(/^([a-z][a-z0-9+.-]*:\/\/[^/]*)/i, (authority) => authority.toLowerCase());
 }
 
 // what a pattern covers, for a tooltip beside the pattern text
@@ -114,13 +121,14 @@ function globMatches(pattern: string, text: string): boolean {
 // what one url resolves to for matching — computed once per tab, not once per (tab, entry) pair:
 // deriveTabs matches every tab against every entry on each refresh, and the url parse is the cost
 export interface PageKey {
-  key: string; // the page key ("" = never tagged)
+  key: string; // the page key without its fragment ("" = never tagged)
   host: string; // its hostname ("" when the key has none)
+  url: string; // the address with its fragment — what an entry keyed with a # compares against
 }
 
 export function pageKeyOf(url: string | undefined): PageKey {
   const key = tagPageKey(url);
-  return { key, host: key === "" ? "" : hostnameOf(key) };
+  return key === "" ? { key, host: "", url: "" } : { key, host: hostnameOf(key), url: tagPageKey(url, true) };
 }
 
 // the one rule for "is this page under the pattern" — every surface (badges, menus, the
@@ -129,15 +137,18 @@ export function matchesTagPage(pattern: string, url: string | undefined): boolea
   return matchesTagPageKey(pattern, pageKeyOf(url));
 }
 
-export function matchesTagPageKey(pattern: string, { key, host }: PageKey): boolean {
+// like keep-alive: an entry with a # is matched on the full address (hash-routed apps —
+// /#/dashboard is not /#/mail), one without covers every fragment
+export function matchesTagPageKey(pattern: string, { key, host, url }: PageKey): boolean {
   if (key === "" || pattern === "") {
     return false;
   }
   if (isAddressPattern(pattern)) {
+    const text = pattern.includes("#") ? url : key;
     if (pattern.includes("*")) {
-      return globMatches(pattern, key);
+      return globMatches(pattern, text);
     }
-    return pattern.endsWith("/") ? key.startsWith(pattern) : pattern === key;
+    return pattern.endsWith("/") ? text.startsWith(pattern) : pattern === text;
   }
   if (host === "") {
     return false;

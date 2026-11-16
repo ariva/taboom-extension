@@ -10,6 +10,7 @@ import {
   clearTags,
   editTag,
   editTagPage,
+  loadState,
   localStore,
   removeTagPagesToTrash,
   removeTagsToTrash,
@@ -512,7 +513,8 @@ function renderPageRows(tags: Tag[], pages: TagPage[], openTabs: chrome.tabs.Tab
         placeholder: "https://app.example.com/board or example.com or https://x.com/a/*",
         // re-keyed in one write (tags and switch travel with the entry); the same pattern changes
         // nothing; junk or another row's key is refused with a message
-        commit: async (value) => {
+        commit: async (typed) => {
+          const value = await typedPattern(typed);
           const error = tagPageError(pages, value, page.url);
           showError(error, "tag-page-error");
           if (error) {
@@ -599,18 +601,27 @@ async function addTypedTag(): Promise<void> {
   }
 }
 
+// what the user typed, as the setting wants it: with "Keep the #fragment" off a tagged page
+// ignores its hash, so the hash is dropped before the text becomes a key (the normalizer itself
+// keeps it — a stored key may carry one)
+async function typedPattern(text: string): Promise<string> {
+  const { settings } = await loadState();
+  return settings.tagPagesKeepFragment ? text : (text.split("#")[0] ?? "");
+}
+
 // a page tagged by its address — or a site / pattern — without opening it (like the keep-alive
 // Add row). Junk or an address already listed is refused with a message and stays in the input.
 async function addTypedPage(): Promise<void> {
   const input = getElementById<HTMLInputElement>("new-tag-page");
   const tagId = getElementById<HTMLSelectElement>("new-tag-page-tag").value;
   const { tagPages = [] } = await localStore.get("tagPages");
-  const error = tagPageError(tagPages, input.value);
+  const value = await typedPattern(input.value);
+  const error = tagPageError(tagPages, value);
   showError(error, "tag-page-error");
   if (error || tagId === "") {
     return;
   }
-  if (await setPageTagIds(tagPagePatternFromInput(input.value), [tagId])) {
+  if (await setPageTagIds(tagPagePatternFromInput(value), [tagId])) {
     input.value = "";
     flashSaved();
     render();

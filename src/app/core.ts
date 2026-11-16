@@ -29,6 +29,7 @@ export const DEFAULTS = {
     keepAliveEnabled: true, // on as soon as the experimental flag is: nothing happens until a tab is marked
     keepAliveMinutes: 20,
     askBeforePark: true, // the park dialog's "Don't ask again" flips it; Settings turns it back on
+    tagPagesKeepFragment: true, // hash-routed pages (about:debugging#/setup, app/#/mail) are one page per route
   },
   protectionRules: [],
   ui: {

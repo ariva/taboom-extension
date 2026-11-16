@@ -19,6 +19,7 @@ const SETTING_IDS: (keyof Settings)[] = [
   "keepAliveEnabled",
   "keepAliveMinutes", // a <select>: .value / no .min, which the loops below tolerate
   "askBeforePark",
+  "tagPagesKeepFragment",
 ];
 
 export function renderSettings(state: AppState): void {

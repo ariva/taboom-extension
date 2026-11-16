@@ -2,7 +2,7 @@
 // (existing tags only — tags are made in the side panel or Settings). The items follow
 // the tag list; the checks follow the active tab's page.
 import { featureEnabled } from "../app/core.ts";
-import { localStore, toggleTagOnPages } from "../app/storage.ts";
+import { loadState, localStore, toggleTagOnPages } from "../app/storage.ts";
 import { orderedTags, tagPageKey, tagsForUrl } from "../app/tags.ts";
 import type { Tag } from "../app/types.ts";
 import { enqueueMenuOp, registerTagMenuBuilder, removeMenu } from "./context-menus.ts";
@@ -105,7 +105,8 @@ export async function syncTagMenuOnNavigation(
 
 // context menu click: flip that tag on the clicked page
 export async function toggleTagForTab(tab: chrome.tabs.Tab, tagId: string): Promise<void> {
-  const key = tagPageKey(tab.url);
+  const { settings } = await loadState();
+  const key = tagPageKey(tab.url, settings.tagPagesKeepFragment);
   if (key === "") {
     return; // the New Tab page, or no address
   }

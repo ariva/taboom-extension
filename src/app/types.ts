@@ -14,6 +14,7 @@ export interface Settings {
   keepAliveEnabled: boolean;
   keepAliveMinutes: number; // default reload interval; an entry's own `minutes` overrides it
   askBeforePark: boolean; // PARKED_WINDOWS: confirm "Park window…" (the dialog's "Don't ask again" clears it)
+  tagPagesKeepFragment: boolean; // TAGS: a tagged page keeps its #fragment (hash-routed pages are one page per route)
 }
 
 // one keep-it-alive mark (storage.local.keepAlive[]): keyed by page url without
@@ -37,9 +38,10 @@ export type KeepAliveRemoval = Removal<KeepAliveTab>;
 
 // ---------- tags (storage.local.tags[] + tagPages[]) ----------
 // A tag is a colored label; a tagged-page entry carries tag ids. Keyed by page address
-// without the fragment (tagPageKey) — like keep-alive, so a tag survives a restart and covers
-// every tab on that page, parked copies included — or by a site / glob pattern
-// (tagPagePatternFromInput) that covers every page under it.
+// (tagPageKey) — like keep-alive, so a tag survives a restart and covers every tab on that
+// page, parked copies included — with its #fragment when settings.tagPagesKeepFragment says so
+// (then the entry is exact; one without a # covers every fragment) — or by a site / glob
+// pattern (tagPagePatternFromInput) that covers every page under it.
 
 export interface Tag {
   id: string;

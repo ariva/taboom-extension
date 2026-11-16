@@ -27,10 +27,66 @@ test("Tag patterns - page keys: fragment dropped, internal pages allowed, New Ta
   assert.equal(tagPageKey("about:blank"), "");
   assert.equal(tagPageKey(undefined), "");
   assert.equal(tagPageKey("garbage"), "", "no scheme, no page");
-  assert.equal(tagPagePatternFromInput(" a.test/x#frag "), "https://a.test/x");
+  assert.equal(tagPagePatternFromInput(" a.test/x#frag "), "https://a.test/x#frag", "typed: the hash stays");
   assert.equal(tagPagePatternFromInput("chrome://settings/"), "chrome://settings/", "an internal address as typed");
   assert.equal(tagPagePatternFromInput("not a url"), "", "spaces: URL() refuses it");
   assert.equal(tagPagePatternFromInput("   "), "");
+});
+
+test("Tag patterns - keep fragment: the key carries the hash, a typed address keeps it, internal pages whole", () => {
+  assert.equal(tagPageKey("https://a.test/x#frag", true), "https://a.test/x#frag");
+  assert.equal(tagPageKey("https://a.test/x#", true), "https://a.test/x", "a lone trailing # is noise");
+  assert.equal(tagPageKey("https://a.test/x#frag"), "https://a.test/x", "default: dropped, as before");
+  assert.equal(tagPageKey("chrome://newtab/#x", true), "", "the New Tab page stays untaggable");
+  assert.equal(
+    tagPageKey("about:debugging#/runtime/this-firefox", true),
+    "about:debugging#/runtime/this-firefox",
+    "a hash-routed internal page is one page per route",
+  );
+  assert.equal(
+    tagPagePatternFromInput(" about:debugging#/runtime/this-firefox "),
+    "about:debugging#/runtime/this-firefox",
+    "typed: kept as typed (the setting strips before, when off)",
+  );
+  assert.equal(tagPagePatternFromInput("a.test/x#frag"), "https://a.test/x#frag");
+  assert.equal(tagPagePatternFromInput("a.test/x#"), "https://a.test/x");
+  assert.equal(
+    tagPagePatternFromInput("HTTPS://A.test/app/#/mail/*"),
+    "https://a.test/app/#/mail/*",
+    "a glob keeps its hash",
+  );
+  assert.deepEqual(pageKeyOf("https://a.test/x#frag"), {
+    key: "https://a.test/x",
+    host: "a.test",
+    url: "https://a.test/x#frag",
+  });
+  assert.deepEqual(pageKeyOf("chrome://newtab/"), { key: "", host: "", url: "" });
+});
+
+test("Tag patterns - matchesTagPage with a hash: an entry with # is exact on the full address, without it covers every fragment", () => {
+  assert.equal(matchesTagPage("https://a.test/x#frag", "https://a.test/x#frag"), true);
+  assert.equal(
+    matchesTagPage("https://a.test/x#frag", "https://a.test/x#other"),
+    false,
+    "hash-routed: not the same page",
+  );
+  assert.equal(matchesTagPage("https://a.test/x#frag", "https://a.test/x"), false);
+  assert.equal(matchesTagPage("https://a.test/x", "https://a.test/x#frag"), true, "no hash: every fragment, as before");
+  assert.equal(
+    matchesTagPage("https://a.test/app/#/mail/", "https://a.test/app/#/mail/inbox"),
+    true,
+    "a prefix under the hash",
+  );
+  assert.equal(matchesTagPage("https://a.test/app/#/mail/", "https://a.test/app/#/dash"), false);
+  assert.equal(
+    matchesTagPage("https://a.test/app/#/*/inbox", "https://a.test/app/#/mail/inbox"),
+    true,
+    "a glob over the hash",
+  );
+  assert.equal(matchesTagPage("about:debugging#/runtime/this-firefox", "about:debugging#/runtime/this-firefox"), true);
+  assert.equal(matchesTagPage("about:debugging#/runtime/this-firefox", "about:debugging#/setup"), false);
+  assert.equal(tagPatternKind("about:debugging#/runtime/this-firefox"), "page");
+  assert.equal(tagPatternKind("https://a.test/app/#/mail/"), "pattern");
 });
 
 test("Tag patterns - patterns from input: a bare host is a site, *.host its subdomains too, * in an address is a glob", () => {
@@ -48,8 +104,8 @@ test("Tag patterns - patterns from input: a bare host is a site, *.host its subd
   );
   assert.equal(
     tagPagePatternFromInput("https://a.test/x*#frag"),
-    "https://a.test/x*",
-    "the fragment goes like for a page",
+    "https://a.test/x*#frag",
+    "the fragment stays like for a page",
   );
   assert.equal(tagPagePatternFromInput("*"), "", "a glob over everything tags every page: refused");
   assert.equal(tagPagePatternFromInput("has space.com"), "", "not a host");

@@ -23,7 +23,8 @@ export function tagPageUrls(tabIds: number[], scope: TagScope = "page"): string[
       return [];
     }
     const url = tab.url || tab.pendingUrl;
-    const key = scope === "site" ? (isSupportedUrl(url) ? siteOf(url) : "") : tagPageKey(url);
+    const key =
+      scope === "site" ? (isSupportedUrl(url) ? siteOf(url) : "") : tagPageKey(url, state.tagPagesKeepFragment);
     return key === "" ? [] : [key];
   });
   return [...new Set(keys)];

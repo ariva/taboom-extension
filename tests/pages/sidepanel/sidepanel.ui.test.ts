@@ -2822,6 +2822,67 @@ test("UI - Sidepanel - PARKED_WINDOWS: Move tab to ▸ offers the parked windows
   await settle();
 });
 
+test("UI - Sidepanel - TAGS: Tag URL… keys a page with its #fragment while settings.tagPagesKeepFragment is on, without it when off", {
+  skip: !TAGS_ON,
+}, async () => {
+  const menu = byId("ctx-menu");
+  const pick = byId("tag-assign-pop");
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 200)); // 150ms refresh debounce
+  await chrome.storage.local.set({ tags: [{ id: "th", name: "routed", color: "blue" }], tagPages: [] });
+  await chrome.storage.onChanged.fire({ tags: {} }, "local");
+  await settle();
+  const base = {
+    windowId: 1,
+    active: false,
+    discarded: false,
+    pinned: false,
+    audible: false,
+    lastAccessed: NOW - 1000,
+  };
+  tabs.push(
+    { ...base, id: 40, index: 8, url: "https://github.com/pr/2#files", title: "PR 2 files" },
+    { ...base, id: 41, index: 9, url: "https://github.com/pr/3#files", title: "PR 3 files" },
+  );
+  await chrome.tabs.onActivated.fire({});
+  await settle();
+  const tagRow = async (id: number) => {
+    q(document, `.row[data-tab-id="${id}"]`).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+    must(qa(menu, ".ctx-item").find((el) => el.textContent === "Tag URL…")).click();
+    q<HTMLInputElement>(
+      must(qa(pick, ".tag-pick:not(.tag-new)").find((el) => q(el, ".tag-name").textContent === "routed")),
+      "input",
+    ).click();
+    q(pick, ".tag-pick-apply").click();
+    await tick();
+    await tick();
+  };
+  await tagRow(40);
+  let { tagPages } = await chrome.storage.local.get("tagPages");
+  assert.deepEqual(tagPages, [{ url: "https://github.com/pr/2#files", tagIds: ["th"] }], "on: the hash stays");
+  assert.ok(q(document, '.row[data-tab-id="40"] .badge.tag'), "the badge is on the tab");
+  await chrome.storage.local.set({ settings: { tagPagesKeepFragment: false } });
+  await chrome.storage.onChanged.fire({ settings: {} }, "local");
+  await settle();
+  await tagRow(41);
+  ({ tagPages } = await chrome.storage.local.get("tagPages"));
+  assert.deepEqual(
+    tagPages,
+    [
+      { url: "https://github.com/pr/2#files", tagIds: ["th"] },
+      { url: "https://github.com/pr/3", tagIds: ["th"] },
+    ],
+    "off: the hash goes",
+  );
+  await chrome.storage.local.set({ settings: {}, tags: [], tagPages: [] });
+  await chrome.storage.onChanged.fire({ settings: {}, tags: {} }, "local");
+  tabs.splice(
+    tabs.findIndex((t) => t.id === 40),
+    2,
+  );
+  await chrome.tabs.onActivated.fire({});
+  await settle();
+});
+
 test("UI - Sidepanel - TAGS: row menu Tag URL ▸ creates / toggles tags; badge, chip filter, #search, group by tag", {
   skip: !TAGS_ON,
 }, async () => {

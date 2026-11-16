@@ -1189,6 +1189,67 @@ test("UI - Options - PARKED_WINDOWS: 'Ask before parking' checkbox follows the f
   await tick();
 });
 
+test("UI - Options - TAGS: 'Keep the #fragment' checkbox persists settings.tagPagesKeepFragment; off strips the hash from the Add row and the address edit", async () => {
+  const { applyExperimental, featureEnabled } = await import("../../../src/app/core.ts");
+  const flagOn = featureEnabled(applyExperimental(RAW_FEATURES, stored.ui?.showExperimental ?? false), "TAGS");
+  if (!flagOn) {
+    return;
+  }
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 50));
+  const rerender = async () => {
+    await chrome.storage.onChanged.fire({ tags: {} }, "local");
+    await tick();
+    await tick();
+  };
+  stored.tags = [{ id: "tf", name: "firefox", color: "orange" }];
+  stored.tagPages = [];
+  await rerender();
+  const box = byId<HTMLInputElement>("tagPagesKeepFragment");
+  assert.equal(box.checked, true, "default: keep");
+  assert.ok(byId("tags-section").contains(box), "lives in the Tags card");
+  // on: a hash-routed internal page is stored whole
+  byId<HTMLInputElement>("new-tag-page").value = "about:debugging#/runtime/this-firefox";
+  byId<HTMLSelectElement>("new-tag-page-tag").value = "tf";
+  byId("add-tag-page").click();
+  await settle();
+  assert.deepEqual(stored.tagPages, [{ url: "about:debugging#/runtime/this-firefox", tagIds: ["tf"] }]);
+  await rerender();
+  const pageRows = () => qa<HTMLTableRowElement>(document, "#tag-page-rows tr");
+  await chrome.tabs.create({ url: "about:debugging#/runtime/this-firefox" });
+  await chrome.tabs.create({ url: "about:debugging#/setup" });
+  await rerender();
+  assert.equal(q(must(pageRows()[0]), ".tag-page-tabs").textContent, "1", "that route only");
+  // off: persisted; the Add row drops the hash
+  box.checked = false;
+  box.dispatchEvent(new window.Event("change", { bubbles: true }));
+  await tick();
+  assert.ok(calls.some((c) => c.startsWith("storage.set") && c.includes('"tagPagesKeepFragment":false')));
+  byId<HTMLInputElement>("new-tag-page").value = "a.test/x#frag";
+  byId<HTMLSelectElement>("new-tag-page-tag").value = "tf";
+  byId("add-tag-page").click();
+  await settle();
+  assert.deepEqual(stored.tagPages[1], { url: "https://a.test/x", tagIds: ["tf"] }, "off: the hash goes");
+  byId<HTMLInputElement>("new-tag-page").value = "https://a.test/x#other";
+  byId("add-tag-page").click();
+  await settle();
+  assert.equal(byId("tag-page-error").textContent, '"https://a.test/x" is already listed — edit that row instead');
+  // the address edit strips too
+  await rerender();
+  q(must(pageRows()[1]), ".url").click();
+  await tick();
+  const editUrl = q<HTMLInputElement>(document, "#tag-page-rows .rename-input");
+  editUrl.value = "https://a.test/y#frag";
+  editUrl.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+  await settle();
+  assert.equal(stored.tagPages[1]?.url, "https://a.test/y");
+  box.checked = true;
+  box.dispatchEvent(new window.Event("change", { bubbles: true }));
+  await tick();
+  stored.tags = [];
+  stored.tagPages = [];
+  await rerender();
+});
+
 test("UI - Options - TAGS card: tag table (add, rename, recolor, remove), tagged pages (add, toggle, remove), restore, remove all", async () => {
   const { applyExperimental, featureEnabled } = await import("../../../src/app/core.ts");
   const flagOn = featureEnabled(applyExperimental(RAW_FEATURES, stored.ui?.showExperimental ?? false), "TAGS");
@@ -1279,14 +1340,14 @@ test("UI - Options - TAGS card: tag table (add, rename, recolor, remove), tagged
   assert.equal(stored.tags[1]?.name, "bills", "clash refused");
   // Tagged pages: add by address with a tag, toggle the other tag on it, counts follow
   await rerender();
-  byId<HTMLInputElement>("new-tag-page").value = "app.example.com/board#x";
+  byId<HTMLInputElement>("new-tag-page").value = "App.example.com/board#";
   byId<HTMLSelectElement>("new-tag-page-tag").value = work.id;
   byId("add-tag-page").click();
   await settle();
   assert.deepEqual(
     stored.tagPages,
     [{ url: "https://app.example.com/board", tagIds: [work.id] }],
-    "normalized, fragment dropped",
+    "normalized; a lone # is noise (a fragment would stay — the keep-fragment test)",
   );
   await rerender();
   const pageRows = () => qa<HTMLTableRowElement>(document, "#tag-page-rows tr");
@@ -1297,7 +1358,11 @@ test("UI - Options - TAGS card: tag table (add, rename, recolor, remove), tagged
   await chrome.tabs.create({ url: "https://app.example.com/board#x" });
   await chrome.tabs.create({ url: "https://app.example.com/other" });
   await rerender();
-  assert.equal(q(must(pageRows()[0]), ".tag-page-tabs").textContent, "1", "the fragment is no other page");
+  assert.equal(
+    q(must(pageRows()[0]), ".tag-page-tabs").textContent,
+    "1",
+    "an entry without a hash covers every fragment",
+  );
   assert.deepEqual(
     qa(must(pageRows()[0]), "td").map(
       (td) => td.querySelector(".tag-page-enabled, .tag-chips, .tag-page-tabs, .remove-page")?.className ?? "",
@@ -1307,7 +1372,7 @@ test("UI - Options - TAGS card: tag table (add, rename, recolor, remove), tagged
   );
   assert.match(q<HTMLElement>(must(pageRows()[0]), ".tag-page-tabs").title, /app\.example\.com\/board/);
   // the same address again (another form of it) is a duplicate: an error under the Add row, no write
-  byId<HTMLInputElement>("new-tag-page").value = "app.example.com/board#y";
+  byId<HTMLInputElement>("new-tag-page").value = "HTTPS://App.example.com/board";
   byId<HTMLSelectElement>("new-tag-page-tag").value = bills.id;
   byId("add-tag-page").click();
   await settle();
@@ -1317,7 +1382,7 @@ test("UI - Options - TAGS card: tag table (add, rename, recolor, remove), tagged
     '"https://app.example.com/board" is already listed — edit that row instead',
   );
   assert.deepEqual(stored.tagPages, [{ url: "https://app.example.com/board", tagIds: [work.id] }], "nothing written");
-  assert.equal(byId<HTMLInputElement>("new-tag-page").value, "app.example.com/board#y", "the text stays");
+  assert.equal(byId<HTMLInputElement>("new-tag-page").value, "HTTPS://App.example.com/board", "the text stays");
   byId<HTMLInputElement>("new-tag-page").value = "*";
   byId("add-tag-page").click();
   await settle();

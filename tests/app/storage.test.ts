@@ -152,11 +152,15 @@ test("Core - Storage - Tags: add, edit, page tags, remove to trash, clear, resto
   assert.deepEqual(stored.tags?.[0], { id: work.id, name: "Work", color: "red" });
   assert.equal(await editTag(work.id, { color: "red" }), false, "no change, no write");
 
-  assert.equal(await toggleTagOnPages(["https://a.test/", "https://b.test/#x"], work.id, true), true);
-  assert.deepEqual(stored.tagPages, [
-    { url: "https://a.test/", tagIds: [work.id] },
-    { url: "https://b.test/", tagIds: [work.id] },
-  ]);
+  assert.equal(await toggleTagOnPages(["https://a.test/", "https://b.test/#"], work.id, true), true);
+  assert.deepEqual(
+    stored.tagPages,
+    [
+      { url: "https://a.test/", tagIds: [work.id] },
+      { url: "https://b.test/", tagIds: [work.id] },
+    ],
+    "a lone # is noise; a real fragment would stay (the page decides by the setting, the writer keeps the key)",
+  );
   assert.equal(await setPageTagIds("https://a.test/", [work.id, bills.id]), true);
   assert.deepEqual(stored.tagPages?.[0]?.tagIds, [work.id, bills.id]);
   assert.equal(await renameStoredTagPage("https://a.test/", "a.test"), true);

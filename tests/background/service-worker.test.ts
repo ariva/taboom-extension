@@ -96,6 +96,7 @@ const stored: {
     keepAliveEnabled: true,
     keepAliveMinutes: 25,
     askBeforePark: true,
+    tagPagesKeepFragment: true,
   },
   protectionRules: [{ id: "r1", type: "host", pattern: "mail.google.com" }],
 };
@@ -1330,6 +1331,48 @@ test("Service Worker - TAGS: Tag page ▸ items follow the tag list, a click tog
   await tick();
   await tick();
   assert.deepEqual(stored.tagPages, []);
+  // a page with a hash is tagged whole (settings.tagPagesKeepFragment, default on) — off drops it (T-0153)
+  const hashed = (id: number, url: string) => ({
+    id,
+    windowId: 1,
+    active: false,
+    discarded: false,
+    pinned: false,
+    audible: false,
+    autoDiscardable: true,
+    url,
+    title: "Routed",
+    lastAccessed: NOW,
+  });
+  tabs.push(hashed(29, "https://old.example.com/a#sec"), hashed(30, "https://old.example.com/b#sec"));
+  await chrome.contextMenus.onClicked.fire(
+    { menuItemId: "tag-tw" },
+    tabs.find((t) => t.id === 29),
+  );
+  await tick();
+  await tick();
+  assert.deepEqual(stored.tagPages, [{ url: "https://old.example.com/a#sec", tagIds: ["tw"] }]);
+  stored.settings.tagPagesKeepFragment = false;
+  await chrome.contextMenus.onClicked.fire(
+    { menuItemId: "tag-tw" },
+    tabs.find((t) => t.id === 30),
+  );
+  await tick();
+  await tick();
+  assert.deepEqual(
+    stored.tagPages,
+    [
+      { url: "https://old.example.com/a#sec", tagIds: ["tw"] },
+      { url: "https://old.example.com/b", tagIds: ["tw"] },
+    ],
+    "off: the hash-free entry",
+  );
+  stored.settings.tagPagesKeepFragment = true;
+  stored.tagPages = [];
+  tabs.splice(
+    tabs.findIndex((t) => t.id === 29),
+    2,
+  );
   // no tags left: the parent goes (nothing to pick)
   stored.tags = [];
   calls.length = 0;

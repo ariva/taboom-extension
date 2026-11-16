@@ -191,7 +191,8 @@ export function tagOriginSets(pages: TagPage[], url: string | undefined): Map<st
     if (!matchesTagPageKey(page.url, resolved)) {
       continue;
     }
-    const origin: TagOrigin = page.url === resolved.key ? "page" : tagPatternKind(page.url);
+    const own = page.url === resolved.key || page.url === resolved.url; // the entry for this very page, hash or not
+    const origin: TagOrigin = own ? "page" : tagPatternKind(page.url);
     for (const id of page.tagIds) {
       origins.set(id, (origins.get(id) ?? new Set()).add(origin));
     }

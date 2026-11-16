@@ -154,7 +154,12 @@ test("Tags - renameTagPage re-keys one entry, tags and switch kept; undefined wh
     tagIds: ["t1"],
     disabled: true,
   });
-  assert.equal(renameTagPage(pages, "https://a.test/x", "https://a.test/x#frag"), undefined, "same key");
+  assert.equal(renameTagPage(pages, "https://a.test/x", "https://A.test/x#"), undefined, "same key");
+  assert.equal(
+    renameTagPage(pages, "https://a.test/x", "https://a.test/x#frag")?.[0]?.url,
+    "https://a.test/x#frag",
+    "adding the hash makes the entry exact (T-0153)",
+  );
   assert.equal(renameTagPage(pages, "https://a.test/x", "https://b.test/"), undefined, "another row's key");
   assert.equal(renameTagPage(pages, "https://zz.test/", "https://c.test/"), undefined, "no such row");
   assert.equal(renameTagPage(pages, "https://a.test/x", ""), undefined, "junk");
@@ -306,10 +311,11 @@ test("Tags - tagPageError: junk, a key already listed (own row excepted), normal
   assert.equal(tagPageError(PAGES, "   "), "Type an address, a host or a pattern");
   assert.equal(tagPageError(PAGES, "*"), "Type an address, a host or a pattern");
   assert.equal(
-    tagPageError(PAGES, "b.test/#frag"),
+    tagPageError(PAGES, "B.test/#"),
     '"https://b.test/" is already listed — edit that row instead',
-    "the typed form normalizes onto the stored key",
+    "the typed form normalizes onto the stored key (a lone # is noise)",
   );
+  assert.equal(tagPageError(PAGES, "b.test/#frag"), undefined, "with a hash it is another page (T-0153)");
   assert.equal(tagPageError(PAGES, "https://b.test/", "https://b.test/"), undefined, "a row keeps its own key");
   assert.equal(tagPageError(PAGES, "https://a.test/x", "https://b.test/")?.startsWith('"https://a.test/x"'), true);
 });
@@ -386,6 +392,23 @@ test("Tags - tagOrigins: where a tab's tag comes from — its own page entry fir
   );
   assert.deepEqual(tagOrigins(pages, "https://b.test/"), new Map());
   assert.deepEqual(tagOrigins(pages, undefined), new Map());
+});
+
+test("Tags - tagOrigins: an entry keyed with the hash is the page's own entry for that exact address", () => {
+  const pages: TagPage[] = [
+    { url: "https://a.test/x#frag", tagIds: ["t1"] },
+    { url: "https://a.test/x", tagIds: ["t2"] },
+  ];
+  assert.deepEqual(
+    tagOrigins(pages, "https://a.test/x#frag"),
+    new Map([
+      ["t1", "page"],
+      ["t2", "page"],
+    ]),
+    "both entries are this page's own",
+  );
+  assert.deepEqual(tagOrigins(pages, "https://a.test/x#other"), new Map([["t2", "page"]]), "the hash entry is exact");
+  assert.deepEqual(tagsForUrl(pages, [{ id: "t1", name: "a", color: "blue" }], "https://a.test/x#other"), []);
 });
 
 test("Tags - tabsLosingTag: the open tabs that carry the tag now and would not once it is unticked on these entries", () => {
