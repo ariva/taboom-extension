@@ -15,6 +15,7 @@ import {
   removeTagPagesToTrash,
   removeTagsToTrash,
   renameStoredTagPage,
+  reorderTagPages,
   reorderTags,
   restoreTags,
   setPageTag,
@@ -50,6 +51,7 @@ import type {
 import { closest, getElementById } from "../../lib/dom.ts";
 import { onBusyClick } from "../../lib/ui/busy-button.ts";
 import { inlineEdit } from "../../lib/ui/inline-edit.ts";
+import { dragGrip, initRowReorder } from "../../lib/ui/row-reorder.ts";
 import { flashSaved, getFeatures, render, showError } from "./page-state.ts";
 import { pluralize } from "../../app/plural.ts";
 
@@ -131,16 +133,6 @@ function emptyRow(text: string, span: number): HTMLTableRowElement {
   return row;
 }
 
-// six dots: the row is a drag handle
-function dragGrip(): HTMLSpanElement {
-  const grip = document.createElement("span");
-  grip.className = "drag-grip";
-  grip.title = "Drag to reorder";
-  grip.innerHTML =
-    '<svg viewBox="0 0 10 14" fill="currentColor"><circle cx="3" cy="2.5" r="1.3"/><circle cx="7" cy="2.5" r="1.3"/><circle cx="3" cy="7" r="1.3"/><circle cx="7" cy="7" r="1.3"/><circle cx="3" cy="11.5" r="1.3"/><circle cx="7" cy="11.5" r="1.3"/></svg>'; // constant markup
-  return grip;
-}
-
 function renderTagRows(tags: Tag[], pages: TagPage[]): void {
   const rows = getElementById("tag-rows");
   if (rows.querySelector(".rename-input")) {
@@ -211,10 +203,8 @@ function renderTagRows(tags: Tag[], pages: TagPage[]): void {
       }
     });
     const row = document.createElement("tr");
-    // drag onto another row to reorder: the order drives badges, menus, Group by tag — only in the
-    // stored order (a drop in a sorted view would land somewhere else than it looks)
-    row.draggable = tagSort === null;
-    row.dataset.tagId = tag.id;
+    row.draggable = tagSort === null; // initRowReorder
+    row.dataset.key = tag.id;
     if (tag.disabled) {
       row.classList.add("off");
     }
@@ -249,8 +239,7 @@ function renderSortHeaders(tableId: string, sort: { key: string; dir: "asc" | "d
       arrow.textContent = active ? (dir === "asc" ? "▲" : "▼") : "⇅";
     }
     if (stored) {
-      const drag = tableId === "tag-table" ? " (drag rows to change it)" : "";
-      header.title = active ? `The stored order${drag}` : "Click for the stored order";
+      header.title = active ? "The stored order (drag rows to change it)" : "Click for the stored order";
     } else {
       header.title = active
         ? dir === "asc"
@@ -259,58 +248,6 @@ function renderSortHeaders(tableId: string, sort: { key: string; dir: "asc" | "d
         : "Click to sort by this column";
     }
   }
-}
-
-// drag & drop reorder of the tag rows — the dragged row lands at the target's index
-let draggedTagId: string | null = null; // dataTransfer is unreadable during dragover — track here
-let dropRow: HTMLElement | null = null;
-
-function clearDropRow(): void {
-  dropRow?.classList.remove("drop-target");
-  dropRow = null;
-}
-
-function tagRowUnder(event: Event): HTMLElement | null {
-  const row = closest(event.target, "#tag-rows tr[data-tag-id]");
-  return row && draggedTagId !== null && row.dataset.tagId !== draggedTagId ? row : null;
-}
-
-function initTagReorder(): void {
-  const rows = getElementById("tag-rows");
-  rows.addEventListener("dragstart", (event) => {
-    const row = closest(event.target, "tr[data-tag-id]");
-    draggedTagId = row?.dataset.tagId ?? null;
-    row?.classList.add("dragging"); // dimmed while it travels; a re-render or dragend clears it
-  });
-  rows.addEventListener("dragover", (event) => {
-    const row = tagRowUnder(event);
-    if (!row) {
-      clearDropRow();
-      return; // not a target — the browser shows the no-drop cursor
-    }
-    event.preventDefault();
-    if (row !== dropRow) {
-      clearDropRow();
-      dropRow = row;
-      row.classList.add("drop-target");
-    }
-  });
-  rows.addEventListener("drop", async (event) => {
-    const row = tagRowUnder(event);
-    const dragged = draggedTagId;
-    draggedTagId = null;
-    clearDropRow();
-    if (row && dragged !== null && row.dataset.tagId && (await reorderTags(dragged, row.dataset.tagId))) {
-      event.preventDefault();
-      flashSaved();
-      render();
-    }
-  });
-  rows.addEventListener("dragend", (event) => {
-    draggedTagId = null;
-    clearDropRow();
-    closest(event.target, "tr[data-tag-id]")?.classList.remove("dragging");
-  });
 }
 
 // taking a tag off an entry that covers more than one open tab is confirmed first, naming them
@@ -553,11 +490,13 @@ function renderPageRows(tags: Tag[], pages: TagPage[], openTabs: chrome.tabs.Tab
       }
     });
     const row = document.createElement("tr");
+    row.draggable = tagPageSort === null; // initRowReorder; the grip shares the # cell (no column of its own)
+    row.dataset.key = page.url;
     if (page.disabled) {
       row.classList.add("off");
     }
     row.append(
-      cell(String(index + 1)),
+      cell(dragGrip(), String(index + 1)),
       cell(enabled),
       pageCell,
       chips,
@@ -644,7 +583,25 @@ async function clearAllTags(): Promise<void> {
 
 export function initTags(): void {
   fillColorOptions(getElementById<HTMLSelectElement>("new-tag-color"), "blue");
-  initTagReorder();
+  // drag onto another row to reorder: the tag order drives badges, menus, Group by tag; the rule
+  // order is the # column. Only in the stored order (a drop in a sorted view would land somewhere
+  // else than it looks)
+  initRowReorder(getElementById("tag-rows"), async (dragged, target) => {
+    const moved = await reorderTags(dragged, target);
+    if (moved) {
+      flashSaved();
+      render();
+    }
+    return moved;
+  });
+  initRowReorder(getElementById("tag-page-rows"), async (dragged, target) => {
+    const moved = await reorderTagPages(dragged, target);
+    if (moved) {
+      flashSaved();
+      render();
+    }
+    return moved;
+  });
   getElementById("tag-table").addEventListener("click", async (event) => {
     const header = closest(event.target, "th[data-sort]");
     if (!header) {

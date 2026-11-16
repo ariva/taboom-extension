@@ -1,6 +1,6 @@
 // Keep-tabs-alive card: the default-interval dropdown, the table of marks —
 // numbered, each with its pause checkbox, own interval, a live countdown to the
-// next reload and Remove — an Add row for a page that is not open, Remove all and Restore last removal. The enable checkbox and default interval are
+// next reload and Remove, draggable onto another row to reorder — an Add row for a page that is not open, Remove all and Restore last removal. The enable checkbox and default interval are
 // settings — settings-form.ts persists them; this module only shows / hides.
 import { renderRestoreButton } from "./restore-button.ts";
 import { applyExperimental, featureEnabled, hostnameOf } from "../../app/core.ts";
@@ -26,8 +26,10 @@ import {
 import { popRemoval } from "../../app/removal-trash.ts";
 import type { AppState, KeepAliveRemoval, KeepAliveTab } from "../../app/types.ts";
 import { getElementById } from "../../lib/dom.ts";
+import { moveItemTo } from "../../lib/list.ts";
 import { onBusyClick } from "../../lib/ui/busy-button.ts";
 import { inlineEdit } from "../../lib/ui/inline-edit.ts";
+import { dragGrip, initRowReorder } from "../../lib/ui/row-reorder.ts";
 import { flashSaved, getFeatures, render } from "./page-state.ts";
 import { pluralize } from "../../app/plural.ts";
 
@@ -183,8 +185,10 @@ function keepAliveRow(entry: KeepAliveTab, number: number): HTMLTableRowElement 
   });
 
   const row = document.createElement("tr");
+  row.draggable = true; // drag onto another row to reorder (initRowReorder); the grip shares the # cell
+  row.dataset.key = entry.url;
   row.append(
-    cell(String(number)),
+    cell(dragGrip(), String(number)),
     cell(running),
     pageCell(entry),
     cell(select),
@@ -243,6 +247,15 @@ async function restoreLastRemoval(): Promise<void> {
 export function initKeepAlive(): void {
   // the default-interval choices are static — filled once, before the first render sets the value
   minuteOptions(getElementById<HTMLSelectElement>("keepAliveMinutes"));
+  // the stored order is the Alive view's row order and the sweep order
+  initRowReorder(getElementById("keep-alive-rows"), async (dragged, target) => {
+    const moved = await editKeepAlive((list) => moveItemTo(list, (entry) => entry.url, dragged, target));
+    if (moved) {
+      flashSaved();
+      render();
+    }
+    return moved;
+  });
   getElementById("add-keep-alive").addEventListener("click", addTypedMark);
   getElementById("clear-keep-alive").addEventListener("click", clearAllMarks);
   onBusyClick(getElementById<HTMLButtonElement>("restore-keep-alive"), restoreLastRemoval);

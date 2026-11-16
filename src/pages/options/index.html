@@ -292,10 +292,11 @@
     #tag-table button, #tag-page-table button.remove-page { border: 1px solid var(--border); border-radius: 6px; background: none; color: inherit; font: inherit; font-size: 12px; padding: 2px 8px; cursor: pointer; }
     #tag-table button:hover, #tag-page-table button.remove-page:hover { background: var(--hover); }
     #rule-error, #tag-error, #tag-page-error { color: var(--danger, #d93025); margin-top: 4px; }
-    /* drag reorder of the tag rows, like the side panel's tab rows: the dragged row dims, the row
-       under the pointer is highlighted whole (dashed accent frame + tint) */
-    #tag-rows tr[draggable="true"] { cursor: grab; }
-    #tag-rows tr[draggable="false"] .drag-grip { opacity: 0.35; }
+    /* drag reorder of the tag, tagged-page and keep-alive rows, like the side panel's tab rows: the
+       dragged row dims, the row under the pointer is highlighted whole (accent frame + tint). The tag
+       table gives the grip a column; the other two put it in the # cell */
+    :is(#tag-rows, #tag-page-rows, #keep-alive-rows) tr[draggable="true"] { cursor: grab; }
+    :is(#tag-rows, #tag-page-rows, #keep-alive-rows) tr[draggable="false"] .drag-grip { opacity: 0.35; }
     /* sortable headers: a faint ⇅ invites the click, the active one shows ▲ / ▼ */
     /* sortable headers read in the accent in both tables (the tag table did by a comma slip in the old
        selectors; kept on purpose); the arrow is dim until its sort is active */
@@ -303,17 +304,18 @@
     .sort-button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
     #tag-table th[data-sort] .sort-arrow, #tag-page-table th[data-sort] .sort-arrow { font-size: 10px; opacity: 0.45; }
     #tag-table th[data-sort][data-dir] .sort-arrow, #tag-page-table th[data-sort][data-dir] .sort-arrow { opacity: 1; }
-    #tag-rows .drag-grip { display: inline-flex; color: var(--muted); }
-    #tag-rows .drag-grip svg { width: 10px; height: 14px; display: block; }
-    #tag-rows tr.dragging td { opacity: 0.4; }
+    :is(#tag-rows, #tag-page-rows, #keep-alive-rows) .drag-grip { display: inline-flex; color: var(--muted); vertical-align: middle; }
+    :is(#tag-page-rows, #keep-alive-rows) .drag-grip { margin-right: 6px; }
+    :is(#tag-rows, #tag-page-rows, #keep-alive-rows) .drag-grip svg { width: 10px; height: 14px; display: block; }
+    :is(#tag-rows, #tag-page-rows, #keep-alive-rows) tr.dragging td { opacity: 0.4; }
     /* switched off: the row reads muted, the switch itself stays crisp */
     #tag-rows tr.off td:not(:nth-child(3)) { opacity: 0.5; }
-    #tag-rows tr.drop-target td {
+    :is(#tag-rows, #tag-page-rows, #keep-alive-rows) tr.drop-target td {
       background: color-mix(in srgb, var(--accent) 14%, transparent);
       box-shadow: inset 0 2px 0 var(--accent), inset 0 -2px 0 var(--accent);
     }
-    #tag-rows tr.drop-target td:first-child { box-shadow: inset 2px 2px 0 var(--accent), inset 0 -2px 0 var(--accent); border-radius: 6px 0 0 6px; }
-    #tag-rows tr.drop-target td:last-child { box-shadow: inset -2px 2px 0 var(--accent), inset 0 -2px 0 var(--accent); border-radius: 0 6px 6px 0; }
+    :is(#tag-rows, #tag-page-rows, #keep-alive-rows) tr.drop-target td:first-child { box-shadow: inset 2px 2px 0 var(--accent), inset 0 -2px 0 var(--accent); border-radius: 6px 0 0 6px; }
+    :is(#tag-rows, #tag-page-rows, #keep-alive-rows) tr.drop-target td:last-child { box-shadow: inset -2px 2px 0 var(--accent), inset 0 -2px 0 var(--accent); border-radius: 0 6px 6px 0; }
     #keep-alive-table td:last-child { text-align: right; }
     #keep-alive-table button {
       border: 1px solid light-dark(#ddd, #444);

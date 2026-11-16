@@ -1,6 +1,7 @@
 // Tags as pure functions: the color table, the name rules, the tag list and tagged-page
 // edits, the undo stack hooks and the search token split. No DOM, no chrome.* — the side
 // panel, the options page and the worker all go through here.
+import { moveItemTo } from "../lib/list.ts";
 import { popRemoval } from "./removal-trash.ts";
 import {
   matchesTagPage,
@@ -120,17 +121,7 @@ export function setTagEnabled(list: Tag[], id: string, enabled: boolean): Tag[] 
 // dragged down, before it when dragged up (same rule as the quick launch's group rows).
 // The list order is what badges, the menus and Group by tag follow. undefined = no move
 export function moveTagTo(list: Tag[], draggedId: string, targetId: string): Tag[] | undefined {
-  const from = list.findIndex((tag) => tag.id === draggedId);
-  const to = list.findIndex((tag) => tag.id === targetId);
-  if (from === -1 || to === -1 || from === to) {
-    return undefined;
-  }
-  const next = [...list];
-  const [dragged] = next.splice(from, 1);
-  if (dragged) {
-    next.splice(to, 0, dragged);
-  }
-  return next;
+  return moveItemTo(list, (tag) => tag.id, draggedId, targetId);
 }
 
 // the stored entry for a url or pattern (a tab url keys like a typed address; a stored pattern

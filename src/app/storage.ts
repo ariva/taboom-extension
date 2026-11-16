@@ -1,3 +1,4 @@
+import { moveItemTo } from "../lib/list.ts";
 import { createStorage } from "../lib/storage.ts";
 import { DEFAULTS } from "./core.ts";
 import {
@@ -339,6 +340,11 @@ export async function reorderTags(draggedId: string, targetId: string): Promise<
   }
   await localStore.set({ tags: next });
   return true;
+}
+
+// Settings drag reorder of the tagged page rules (display order: the # column); false when the drop changes nothing
+export function reorderTagPages(draggedUrl: string, targetUrl: string): Promise<boolean> {
+  return editPages((pages) => moveItemTo(pages, (page) => page.url, draggedUrl, targetUrl));
 }
 
 async function editPages(edit: (pages: TagPage[]) => TagPage[] | undefined): Promise<boolean> {

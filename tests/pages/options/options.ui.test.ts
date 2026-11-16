@@ -1793,6 +1793,120 @@ test("UI - Options - TAGS: click Color / Tag / Pages headers to sort the table (
   stored.tagPages = [];
 });
 
+test("UI - Options - Keep-alive table: drag a row by its grip onto another to reorder the marks (the Alive view and the sweep follow)", async () => {
+  const { applyExperimental, featureEnabled } = await import("../../../src/app/core.ts");
+  if (!featureEnabled(applyExperimental(RAW_FEATURES, stored.ui?.showExperimental ?? false), "KEEP_ALIVE")) {
+    return;
+  }
+  stored.keepAlive = [
+    { url: "https://a.test/", title: "A", minutes: 5, nextReload: 1 },
+    { url: "https://b.test/", title: "B", minutes: 5, nextReload: 1 },
+    { url: "https://c.test/", title: "C", minutes: 5, nextReload: 1 },
+  ];
+  await chrome.storage.onChanged.fire({ keepAlive: {} }, "local");
+  await tick();
+  await tick();
+  const rows = () => qa<HTMLTableRowElement>(document, "#keep-alive-rows tr");
+  assert.ok(
+    rows().every((row) => row.draggable),
+    "rows are drag handles",
+  );
+  assert.ok(must(rows()[0]).querySelector("td:first-child .drag-grip svg"), "the grip sits in the # cell");
+  assert.equal(qa(must(rows()[0]), "td").length, 7, "no extra column");
+  must(rows()[0]).dispatchEvent(new window.Event("dragstart", { bubbles: true }));
+  must(rows()[2]).dispatchEvent(new window.Event("dragover", { bubbles: true, cancelable: true }));
+  assert.ok(must(rows()[2]).classList.contains("drop-target"), "target row highlighted");
+  must(rows()[2]).dispatchEvent(new window.Event("drop", { bubbles: true, cancelable: true }));
+  await tick();
+  await tick();
+  assert.deepEqual(
+    stored.keepAlive.map((mark) => mark.url),
+    ["https://b.test/", "https://c.test/", "https://a.test/"],
+    "dragged down: lands after the target",
+  );
+  await chrome.storage.onChanged.fire({ keepAlive: {} }, "local");
+  await tick();
+  await tick();
+  must(rows()[2]).dispatchEvent(new window.Event("dragstart", { bubbles: true }));
+  must(rows()[0]).dispatchEvent(new window.Event("dragover", { bubbles: true, cancelable: true }));
+  must(rows()[0]).dispatchEvent(new window.Event("drop", { bubbles: true, cancelable: true }));
+  await tick();
+  await tick();
+  assert.deepEqual(
+    stored.keepAlive.map((mark) => mark.url),
+    ["https://a.test/", "https://b.test/", "https://c.test/"],
+    "dragged up: lands before the target",
+  );
+  stored.keepAlive = [];
+});
+
+test("UI - Options - TAGS: drag a tagged page rule onto another to reorder the rules; no drag while the table is sorted", async () => {
+  const { applyExperimental, featureEnabled } = await import("../../../src/app/core.ts");
+  if (!featureEnabled(applyExperimental(RAW_FEATURES, stored.ui?.showExperimental ?? false), "TAGS")) {
+    return;
+  }
+  stored.tags = [{ id: "tw", name: "work", color: "blue" }];
+  stored.tagPages = [
+    { url: "https://a.test/", tagIds: ["tw"] },
+    { url: "https://b.test/", tagIds: ["tw"] },
+    { url: "https://c.test/", tagIds: ["tw"] },
+  ];
+  await chrome.storage.onChanged.fire({ tagPages: {} }, "local");
+  await tick();
+  await tick();
+  const rows = () => qa<HTMLTableRowElement>(document, "#tag-page-rows tr");
+  assert.ok(
+    rows().every((row) => row.draggable),
+    "rows are drag handles in the stored order",
+  );
+  assert.ok(must(rows()[0]).querySelector("td:first-child .drag-grip svg"), "the grip sits in the # cell");
+  must(rows()[0]).dispatchEvent(new window.Event("dragstart", { bubbles: true }));
+  must(rows()[2]).dispatchEvent(new window.Event("dragover", { bubbles: true, cancelable: true }));
+  assert.ok(must(rows()[2]).classList.contains("drop-target"), "target row highlighted");
+  must(rows()[2]).dispatchEvent(new window.Event("drop", { bubbles: true, cancelable: true }));
+  await tick();
+  await tick();
+  assert.deepEqual(
+    stored.tagPages.map((page) => page.url),
+    ["https://b.test/", "https://c.test/", "https://a.test/"],
+    "dragged down: lands after the target",
+  );
+  await chrome.storage.onChanged.fire({ tagPages: {} }, "local");
+  await tick();
+  await tick();
+  must(rows()[2]).dispatchEvent(new window.Event("dragstart", { bubbles: true }));
+  must(rows()[0]).dispatchEvent(new window.Event("dragover", { bubbles: true, cancelable: true }));
+  must(rows()[0]).dispatchEvent(new window.Event("drop", { bubbles: true, cancelable: true }));
+  await tick();
+  await tick();
+  assert.deepEqual(
+    stored.tagPages.map((page) => page.url),
+    ["https://a.test/", "https://b.test/", "https://c.test/"],
+    "dragged up: lands before the target",
+  );
+  q<HTMLElement>(document, '#tag-page-table th[data-sort="url"]').click();
+  await tick();
+  await tick();
+  assert.ok(
+    rows().every((row) => !row.draggable),
+    "no drag in a sorted view",
+  );
+  q<HTMLElement>(document, '#tag-page-table th[data-sort="stored"]').click();
+  await tick();
+  await tick();
+  assert.ok(
+    rows().every((row) => row.draggable),
+    "drag is back",
+  );
+  assert.match(
+    q<HTMLElement>(document, '#tag-page-table th[data-sort="stored"]').title,
+    /drag rows/,
+    "the # header says so",
+  );
+  stored.tags = [];
+  stored.tagPages = [];
+});
+
 // the page re-rendered every card on any of ten keys: a keep-alive re-arm (every 30 s while a
 // mark is due) queried every tab for the Tags card and ended an address edit in progress
 test("UI - Options - A keepAlive write re-renders only its card and keeps an open address editor", async () => {
