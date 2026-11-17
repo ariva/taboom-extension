@@ -1,13 +1,32 @@
 // Keep-it-alive marks as pure functions: the key a page is matched by, the
 // list edits, and the reload schedule. No DOM, no chrome.* — the worker, the
 // options page and the side panel all go through here.
-import { hostnameOf, isKeptAlive, isSupportedUrl, keepAliveKey, matchesKeepAlive } from "./core.ts";
+import { hostnameOf, isSupportedUrl } from "./core.ts";
 import { popRemoval } from "./removal-trash.ts";
+import { matchesTagPageKey, pageKeyOf, tagPagePatternFromInput, tagPatternKind } from "./tag-patterns.ts";
 import type { KeepAliveRemoval, KeepAliveTab } from "./types.ts";
 
-// the matching half lives in core.ts (auto-snooze eligibility reads it); re-exported
-// so every keep-alive caller imports from one place
-export { isKeptAlive, keepAliveKey, matchesKeepAlive };
+// A mark follows the page, not the tab: one made from a tab drops the fragment so in-page
+// navigation (#section) keeps matching; unsupported urls key to "" and never match
+export function keepAliveKey(url: string | undefined): string {
+  if (!isSupportedUrl(url)) {
+    return "";
+  }
+  return (url ?? "").split("#")[0] ?? "";
+}
+
+// A mark's url is a pattern with the tagged-page vocabulary (tag-patterns.ts): an address (with
+// a # exact — /#/dashboard is not /#/mail —, without one covering every fragment; ending in /
+// everything under it), a host and its subdomains, or a * glob. The one rule for "is this tab
+// the mark's page": every caller compares through here. A reload needs a reloadable page, so an
+// unsupported url never matches whatever the pattern
+export function matchesKeepAlive(markUrl: string, url: string | undefined): boolean {
+  return isSupportedUrl(url) && matchesTagPageKey(markUrl, pageKeyOf(url));
+}
+
+export function isKeptAlive(list: KeepAliveTab[], url: string | undefined): boolean {
+  return list.some((entry) => matchesKeepAlive(entry.url, url));
+}
 
 // the "Default value" dropdown choices (minutes); DEFAULTS.settings.keepAliveMinutes is one of them
 export const KEEP_ALIVE_MINUTES = [1, 5, 10, 15, 20, 25, 30, 45, 60, 90] as const;
@@ -22,21 +41,45 @@ export function keepAliveEntry(list: KeepAliveTab[], url: string | undefined): K
   return list.find((entry) => matchesKeepAlive(entry.url, url));
 }
 
-// a typed address (options "Add") as the mark url: URL() normalizes as Chrome reports
-// tab urls (lowercased host, trailing slash), a bare host gets https. Unlike a mark
-// made from a tab the fragment stays — typing one means that exact address (hash
-// routing); only a lone trailing "#" is noise. "" when it is not a supported address.
+// a typed mark (options Add row, the address edit): the tagged-page normalizer (an address
+// through URL() like a tab url, https assumed for a scheme-less path, a bare host as a site, a
+// glob with its scheme and host lowered; the fragment stays — typing one means that exact
+// address) — then an address must be a reloadable one: http, https or file. "" otherwise
 export function keepAliveUrlFromInput(text: string): string {
-  const trimmed = text.trim();
-  if (trimmed === "") {
-    return "";
+  const pattern = tagPagePatternFromInput(text);
+  return SCHEME.test(pattern) && !isSupportedUrl(pattern) ? "" : pattern;
+}
+
+const SCHEME = /^[a-z][a-z0-9+.-]*:/i;
+
+// a mark's name: an address mark (one page, or everything under a path — marks made from a tab
+// on a site's root end in /) is named by its tab, the hostname until one is seen (Add row); a
+// domain, word or glob mark by the pattern itself (no single tab stands for it)
+export function keepAliveTitle(markUrl: string, tabTitle?: string): string {
+  return isAddressMark(markUrl) ? tabTitle || hostnameOf(markUrl) : markUrl;
+}
+
+// one address, no glob — the kinds a tab's title and address can stand for
+function isAddressMark(markUrl: string): boolean {
+  return SCHEME.test(markUrl) && !markUrl.includes("*");
+}
+
+// how the menus name a mark's kind — the words of the add items (Keep alive URL / domain):
+// one address is a URL (a site root from a tab too), a host a domain, a glob or a word a pattern
+export function keepAliveKindLabel(markUrl: string): "URL" | "domain" | "pattern" {
+  if (isAddressMark(markUrl)) {
+    return "URL";
   }
-  try {
-    const href = new URL(trimmed.includes("://") ? trimmed : `https://${trimmed}`).href.replace(/#$/, "");
-    return isSupportedUrl(href) ? href : "";
-  } catch {
-    return "";
+  return tagPatternKind(markUrl) === "domain" ? "domain" : "pattern";
+}
+
+// what opens for a mark with no open tab (Alive view): the page itself, a site's root, nothing
+// for a glob or a word — no one address stands for those
+export function keepAliveOpenUrl(markUrl: string): string {
+  if (isAddressMark(markUrl)) {
+    return markUrl;
   }
+  return tagPatternKind(markUrl) === "domain" ? `https://${markUrl.replace(/^\*\./, "")}/` : "";
 }
 
 // interval ± 55 s, uniformly random per fire; `random` injectable for tests
@@ -62,7 +105,7 @@ export function markKeepAlive(
       continue;
     }
     known.add(url);
-    added.push({ url, title: title || url, minutes, nextReload });
+    added.push({ url, title: keepAliveTitle(url, title), minutes, nextReload });
   }
   return added.length > 0 ? [...list, ...added] : undefined;
 }
@@ -132,10 +175,13 @@ export function staggerKeepAlive(
   return changed ? next : undefined;
 }
 
-// the sweep passes the reloaded tab's title: a mark named at mark time (or by hostname
-// from the Add row) catches up with the page within one interval; "" / absent keeps it
+// the sweep passes the reloaded tab's title: a page mark named at mark time (or by hostname
+// from the Add row) catches up with the page within one interval; "" / absent keeps it. A
+// domain or pattern mark keeps its own name — the reloaded tab is one of many
 export function rearmKeepAlive(list: KeepAliveTab[], url: string, nextReload: number, title?: string): KeepAliveTab[] {
-  return list.map((entry) => (entry.url === url ? { ...entry, nextReload, title: title || entry.title } : entry));
+  return list.map((entry) =>
+    entry.url === url ? { ...entry, nextReload, title: keepAliveTitle(url, title || entry.title) } : entry,
+  );
 }
 
 // per-mark interval; the schedule restarts so the countdown matches the new value at once
@@ -175,9 +221,9 @@ export function setKeepAliveUrl(list: KeepAliveTab[], url: string, nextUrl: stri
   if (!entry || nextUrl === "" || nextUrl === url || list.some((candidate) => candidate.url === nextUrl)) {
     return undefined;
   }
-  // a hostname title is the Add row's placeholder (no tab seen yet): it follows the new address;
-  // a real page title stays until the sweep sees the page and refreshes it
-  const title = entry.title === hostnameOf(url) ? hostnameOf(nextUrl) : entry.title;
+  // a placeholder title (the hostname from the Add row, a pattern's own name) follows the new
+  // address; a real page title stays until the sweep sees the page and refreshes it
+  const title = entry.title === keepAliveTitle(url) ? keepAliveTitle(nextUrl) : keepAliveTitle(nextUrl, entry.title);
   return list.map((candidate) => (candidate === entry ? { ...entry, url: nextUrl, title } : candidate));
 }
 

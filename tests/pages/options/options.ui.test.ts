@@ -970,6 +970,23 @@ test("UI - Options - Keep-alive add row: url + Add marks a page by hand at the D
   assert.equal(stored.keepAlive?.length, 1, "duplicate ignored");
   assert.ok(!calls.some((c) => c.startsWith("storage.set") && c.includes('"keepAlive"')), "duplicate: no write");
   assert.equal(input.value, "", "input still cleared");
+
+  // a host or a pattern is a mark too (T-0155): named by itself, the hint says what it covers
+  input.value = "Example.com";
+  add.click();
+  await tick();
+  await tick();
+  assert.deepEqual(
+    (stored.keepAlive ?? []).slice(1).map(({ url, title }) => ({ url, title })),
+    [{ url: "example.com", title: "example.com" }],
+  );
+  await chrome.storage.onChanged.fire({ keepAlive: {} }, "local");
+  await tick();
+  await tick();
+  assert.match(
+    must(qa(byId("keep-alive-rows"), "tr")[1]).children[2]?.getAttribute("title") ?? "",
+    /and its subdomains/,
+  );
   stored.keepAlive = [];
 });
 

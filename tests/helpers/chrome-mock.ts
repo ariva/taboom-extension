@@ -39,6 +39,7 @@ export interface ChromeMockOptions {
   stored?: Record<string, unknown>;
   /** flat log of stubbed chrome calls, e.g. ["tabs.reload 3", "storage.set {...}"] */
   calls?: string[];
+  sentMessages?: object[]; // every runtime.sendMessage payload, for asserting more than the type
   experimental?: boolean;
   /** the API shape: Firefox has no sidePanel, tabs.onReplaced, split view or favicon store, but a sidebarAction */
   browser?: "chrome" | "firefox";
@@ -76,7 +77,15 @@ function list<T>(value: T | T[]): T[] {
 export function makeChrome<
   Local extends object = Record<string, unknown>,
   Session extends object = Record<string, unknown>,
->({ tabs = [], stored = {}, calls = [], groups = [], experimental = false, browser = "chrome" }: ChromeMockOptions) {
+>({
+  tabs = [],
+  stored = {},
+  calls = [],
+  sentMessages = [],
+  groups = [],
+  experimental = false,
+  browser = "chrome",
+}: ChromeMockOptions) {
   if (experimental) {
     const ui = stored.ui;
     stored.ui = { ...(typeof ui === "object" ? ui : {}), showExperimental: true };
@@ -336,6 +345,7 @@ export function makeChrome<
       getURL: (path: string) => `${firefox ? "moz-extension" : "chrome-extension"}://test${path}`,
       sendMessage: async (msg: { type: string }) => {
         calls.push(`sendMessage ${msg.type}`);
+        sentMessages.push(msg);
         return {};
       },
       connect: (info?: chrome.runtime.ConnectInfo) => {

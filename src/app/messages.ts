@@ -26,8 +26,9 @@ export type Message =
   | { type: "window-set-color"; windowId: number; color?: string | null }
   | { type: "tabs-woken"; tabIds: number[] }
   | { type: "window-pin"; windowId: number; pinned?: boolean }
-  // keep-it-alive marks for these tabs' pages (closed ids are skipped)
-  | { type: "keep-alive-set"; tabIds: number[]; kept: boolean }
+  // keep-it-alive marks for these tabs' pages — or their sites (scope "site": the host and its
+  // subdomains, like Tag domain…); closed ids are skipped
+  | { type: "keep-alive-set"; tabIds: number[]; kept: boolean; scope?: "site" }
   | { type: "sidebar-focused" }
   | { type: "sidebar-no-focus" }
   // PARKED_WINDOWS: snapshot + close; rebuild (new window, or appended into one); open picked parked tabs

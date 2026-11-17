@@ -1,7 +1,7 @@
 // Keep-it-alive: the 30 s sweep alarm that reloads marked pages when their
 // jittered time comes, the mark/unmark entry points (menu, panel message) and
 // the checkbox menu item's state.
-import { DEFAULTS, featureEnabled } from "../app/core.ts";
+import { DEFAULTS, featureEnabled, isSupportedUrl } from "../app/core.ts";
 import {
   dueKeepAlive,
   isKeptAlive,
@@ -14,12 +14,17 @@ import {
   staggerKeepAlive,
 } from "../app/keep-alive.ts";
 import { loadState, localStore, removeKeepAlive } from "../app/storage.ts";
+import { siteOf } from "../app/tag-patterns.ts";
 import type { KeepAliveTab, Settings } from "../app/types.ts";
 import { enqueueMenuOp } from "./context-menus.ts";
 import { effectiveFeatures } from "./nav-mode.ts";
 
 const ALARM_NAME = "keep-alive";
+// the Keep alive ▸ submenu of the page menu: Page (the address) and Domain (the site)
 export const KEEP_ALIVE_MENU_ID = "keep-alive-tab";
+export const KEEP_ALIVE_SITE_MENU_ID = "keep-alive-site";
+// what a mark made from a tab covers: its page (default) or its site, like Tag URL… / Tag domain…
+export type KeepAliveScope = "site" | undefined;
 // one alarm for every mark: each entry carries its own due time, the sweep
 // only has to look often enough — 30 s is the MV3 floor
 const SWEEP_MINUTES = 0.5;
@@ -120,10 +125,24 @@ export function staggerOverdueKeepAlive(): Promise<void> {
   });
 }
 
-async function markTabs(tabs: chrome.tabs.Tab[]): Promise<boolean> {
+// the site a tab's domain mark names ("" for a page that cannot be reloaded: nothing to keep)
+function siteKeyOf(tab: chrome.tabs.Tab): string {
+  return isSupportedUrl(tab.url) ? siteOf(tab.url) : "";
+}
+
+// the site mark itself, not a page mark that happens to cover the site — the Domain check
+function hasSiteMark(list: KeepAliveTab[], tab: chrome.tabs.Tab): boolean {
+  const site = siteKeyOf(tab);
+  return site !== "" && list.some((entry) => entry.url === site);
+}
+
+async function markTabs(tabs: chrome.tabs.Tab[], scope: KeepAliveScope): Promise<boolean> {
   const [{ settings }, { keepAlive = [] }] = await Promise.all([loadState(), localStore.get("keepAlive")]);
   const minutes = settings.keepAliveMinutes;
-  const pages = tabs.map((tab) => ({ url: keepAliveKey(tab.url), title: tab.title }));
+  const pages = tabs.map((tab) => ({
+    url: scope === "site" ? siteKeyOf(tab) : keepAliveKey(tab.url),
+    title: tab.title,
+  }));
   const next = markKeepAlive(keepAlive, pages, minutes, nextReloadAt(minutes, Date.now()));
   if (!next) {
     return false;
@@ -132,12 +151,14 @@ async function markTabs(tabs: chrome.tabs.Tab[]): Promise<boolean> {
   return true;
 }
 
-export async function setTabsKeepAlive(tabs: chrome.tabs.Tab[], kept: boolean): Promise<void> {
+export async function setTabsKeepAlive(tabs: chrome.tabs.Tab[], kept: boolean, scope?: KeepAliveScope): Promise<void> {
   if (!(await keepAliveActive())) {
     return;
   }
-  // unmark goes through the shared writer so the marks land in the restorable trash
-  const changed = kept ? await markTabs(tabs) : await removeKeepAlive(tabs.map((tab) => tab.url));
+  // unmark goes through the shared writer so the marks land in the restorable trash; a page
+  // unmark hands the tab url in (the writer drops the mark covering it), a site unmark the site
+  const keys = tabs.map((tab) => (scope === "site" ? siteKeyOf(tab) : tab.url));
+  const changed = kept ? await markTabs(tabs, scope) : await removeKeepAlive(keys);
   if (!changed) {
     return;
   }
@@ -145,27 +166,35 @@ export async function setTabsKeepAlive(tabs: chrome.tabs.Tab[], kept: boolean): 
   await syncKeepAliveMenu(tabs.find((tab) => tab.active));
 }
 
-// context menu click: flip the clicked page
-export async function toggleTabKeepAlive(tab: chrome.tabs.Tab): Promise<void> {
+// context menu click: flip the clicked page (Page) or its site (Domain)
+export async function toggleTabKeepAlive(tab: chrome.tabs.Tab, scope?: KeepAliveScope): Promise<void> {
   const { keepAlive = [] } = await localStore.get("keepAlive");
-  await setTabsKeepAlive([tab], !isKeptAlive(keepAlive, tab.url));
+  const kept = scope === "site" ? hasSiteMark(keepAlive, tab) : isKeptAlive(keepAlive, tab.url);
+  await setTabsKeepAlive([tab], !kept, scope);
 }
 
-// Keep the checkbox item matching the active tab's mark.
+// Keep the two checkbox items matching the active tab: Page is checked when any mark covers
+// the page (a site mark too), Domain when the site mark itself exists.
 export async function syncKeepAliveMenu(tab: chrome.tabs.Tab | null | undefined): Promise<void> {
   if (!tab || keepAliveKey(tab.url) === "") {
     return;
   }
-  const checked = isKeptAlive(await activeKeepAliveList(), tab.url);
-  await enqueueMenuOp(
-    () =>
-      new Promise((resolve) =>
-        chrome.contextMenus.update(KEEP_ALIVE_MENU_ID, { checked }, () => {
-          void chrome.runtime.lastError; // item absent while the feature is off — expected
-          resolve(undefined);
-        }),
-      ),
-  );
+  const list = await activeKeepAliveList();
+  const checks: [id: string, checked: boolean][] = [
+    [KEEP_ALIVE_SITE_MENU_ID, hasSiteMark(list, tab)],
+    [KEEP_ALIVE_MENU_ID, isKeptAlive(list, tab.url)],
+  ];
+  for (const [id, checked] of checks) {
+    await enqueueMenuOp(
+      () =>
+        new Promise((resolve) =>
+          chrome.contextMenus.update(id, { checked }, () => {
+            void chrome.runtime.lastError; // item absent while the feature is off — expected
+            resolve(undefined);
+          }),
+        ),
+    );
+  }
 }
 
 // tabs.onUpdated: the active tab navigated — its mark may differ

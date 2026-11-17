@@ -13,6 +13,7 @@ import {
   matchesSearch,
   selectAutoSnoozeTargets,
 } from "../../src/app/core.ts";
+import { isKeptAlive } from "../../src/app/keep-alive.ts";
 import type { Features, ProtectionRule, SearchableTab, Settings, SnoozeTab, TabHistory } from "../../src/app/types.ts";
 
 const NOW = 1_700_000_000_000;
@@ -448,7 +449,9 @@ test("Auto-snooze - manual wake resets the inactivity clock (wakeTimes)", async 
 });
 
 test("Core - Eligibility: keep-it-alive pages are never auto-snoozed", () => {
-  const kept = [{ url: "https://example.com/page", title: "Example", minutes: 25, nextReload: NOW }];
+  // the match rule lives in keep-alive.ts; eligibility takes it as a predicate
+  const kept = (url: string | undefined) =>
+    isKeptAlive([{ url: "https://example.com/page", title: "Example", minutes: 25, nextReload: NOW }], url);
   assert.equal(isEligibleForAutoSnooze(tab(), settings, [], NOW, null, kept), false, "marked page");
   assert.equal(
     isEligibleForAutoSnooze(tab({ url: "https://example.com/page#frag" }), settings, [], NOW, null, kept),

@@ -3,10 +3,12 @@
 // next reload and Remove, draggable onto another row to reorder — an Add row for a page that is not open, Remove all and Restore last removal. The enable checkbox and default interval are
 // settings — settings-form.ts persists them; this module only shows / hides.
 import { renderRestoreButton } from "./restore-button.ts";
-import { applyExperimental, featureEnabled, hostnameOf } from "../../app/core.ts";
+import { applyExperimental, featureEnabled } from "../../app/core.ts";
+import { tagPagePatternHint } from "../../app/tag-patterns.ts";
 import {
   formatCountdown,
   KEEP_ALIVE_MINUTES,
+  keepAliveTitle,
   keepAliveUrlFromInput,
   markKeepAlive,
   nextReloadAt,
@@ -114,14 +116,15 @@ function pageCell(entry: KeepAliveTab): HTMLTableCellElement {
   url.className = "url";
   url.textContent = entry.url;
   const page = cell(entry.title, url);
-  page.title = `${entry.url}\nClick to edit the address`; // the cell clips long addresses to one line
+  // the cell clips long addresses to one line; the hint says what the pattern covers (tag vocabulary)
+  page.title = `${tagPagePatternHint(entry.url)}: ${entry.url}\nClick to edit — an address, a host (subdomains included) or a pattern with *`;
   page.addEventListener("click", () => {
     if (page.querySelector(".rename-input")) {
       return; // a click inside the open editor
     }
     inlineEdit(url, {
       initial: entry.url,
-      placeholder: "https://app.example.com/board",
+      placeholder: "https://app.example.com/board, example.com or https://x.com/a/*",
       commit: async (value) => {
         if (await editKeepAlive((list) => setKeepAliveUrl(list, entry.url, keepAliveUrlFromInput(value)))) {
           flashSaved();
@@ -208,9 +211,10 @@ function tickCountdowns(): void {
   }
 }
 
-// Add row: a page not open anywhere (or a future one) marked by typing its address;
-// the mark takes the Default value like a menu mark would, and the hostname
-// stands in for the title no tab has reported yet. Junk stays in the input.
+// Add row: a page not open anywhere (or a future one) marked by typing its address — or a host /
+// pattern, the tagged-page vocabulary; the mark takes the Default value like a menu mark would,
+// and the hostname (a pattern: itself) stands in for the title no tab has reported yet. Junk
+// stays in the input.
 async function addTypedMark(): Promise<void> {
   const input = getElementById<HTMLInputElement>("new-keep-alive");
   const url = keepAliveUrlFromInput(input.value);
@@ -220,7 +224,7 @@ async function addTypedMark(): Promise<void> {
   const { settings } = await loadState();
   const minutes = settings.keepAliveMinutes;
   await save((list) =>
-    markKeepAlive(list, [{ url, title: hostnameOf(url) }], minutes, nextReloadAt(minutes, Date.now())),
+    markKeepAlive(list, [{ url, title: keepAliveTitle(url) }], minutes, nextReloadAt(minutes, Date.now())),
   );
   input.value = "";
 }

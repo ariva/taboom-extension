@@ -3,6 +3,7 @@
 import { isSupportedUrl, isUnloaded, selectAutoSnoozeTargets } from "../app/core.ts";
 import { loadState, sessionStore } from "../app/storage.ts";
 import type { Settings, WakeTimes } from "../app/types.ts";
+import { isKeptAlive } from "../app/keep-alive.ts";
 import { activeKeepAliveList } from "./keep-alive.ts";
 
 const ALARM_NAME = "auto-snooze";
@@ -35,7 +36,9 @@ export async function autoSnoozePass(onDemand = false): Promise<number> {
     const kept = Object.fromEntries(Object.entries(wakeTimes).filter(([tabId]) => openIds.has(Number(tabId))));
     return Object.keys(kept).length === Object.keys(wakeTimes).length ? undefined : kept;
   });
-  const targets = selectAutoSnoozeTargets(tabs, settings, state.protectionRules, Date.now(), pruned, keepAlive);
+  const targets = selectAutoSnoozeTargets(tabs, settings, state.protectionRules, Date.now(), pruned, (url) =>
+    isKeptAlive(keepAlive, url),
+  );
   await Promise.allSettled(
     targets.map((tabId) => chrome.tabs.discard(tabId).catch((error) => console.debug("discard failed", tabId, error))),
   );

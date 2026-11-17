@@ -58,6 +58,7 @@ export async function handleMessage(
       return setTabsKeepAlive(
         tabs.filter((tab): tab is chrome.tabs.Tab => tab !== null),
         message.kept,
+        message.scope,
       );
     }
     case "sidebar-focused":

@@ -5,7 +5,6 @@ import type {
   AppState,
   FeatureName,
   Features,
-  KeepAliveTab,
   NavMode,
   PerfMetrics,
   ProtectionRule,
@@ -115,30 +114,6 @@ export function isProtected(url: string | undefined, rules: ProtectionRule[]): b
   return rules.some((rule) => matchesUrl(url, rule));
 }
 
-// A keep-it-alive mark follows the page, not the tab: a mark made from a tab drops
-// the fragment so in-page navigation (#section) keeps matching; unsupported urls
-// key to "" and never match. Lives here (not keep-alive.ts) because eligibility needs it.
-export function keepAliveKey(url: string | undefined): string {
-  if (!isSupportedUrl(url)) {
-    return "";
-  }
-  return (url ?? "").split("#")[0] ?? "";
-}
-
-// The one rule for "is this tab the mark's page": a mark typed with a fragment
-// (hash-routed apps — /#/dashboard is not /#/mail) is exact, a mark without one
-// covers every fragment. Every caller compares through here, never by key alone.
-export function matchesKeepAlive(markUrl: string, url: string | undefined): boolean {
-  if (!isSupportedUrl(url)) {
-    return false;
-  }
-  return markUrl.includes("#") ? markUrl === url : markUrl === keepAliveKey(url);
-}
-
-export function isKeptAlive(list: KeepAliveTab[], url: string | undefined): boolean {
-  return list.some((entry) => matchesKeepAlive(entry.url, url));
-}
-
 // Not loaded: discarded by us (chrome.tabs.discard) — or restored by Chrome at startup with
 // its load deferred, which reports status "unloaded" and discarded FALSE (Chromium
 // extension_tab_util.cc: "an unloaded tab [may] not be discarded (session restored tabs whose
@@ -147,6 +122,10 @@ export function isKeptAlive(list: KeepAliveTab[], url: string | undefined): bool
 export function isUnloaded(tab: { discarded?: boolean; status?: string }): boolean {
   return tab.discarded === true || tab.status === "unloaded";
 }
+
+// "is this page kept alive" — handed in by the caller (keep-alive.ts owns the match rule and
+// sits above this module: it reads the tagged-page patterns, which read this file)
+export type KeptPredicate = (url: string | undefined) => boolean;
 
 // wakeTimes: tabId → ms timestamp of a MANUAL wake — a reload of a discarded
 // tab leaves lastAccessed at its pre-snooze value, so without this the next
@@ -157,7 +136,7 @@ export function isEligibleForAutoSnooze(
   rules: ProtectionRule[],
   now = Date.now(),
   wakeTimes: WakeTimes | null = null,
-  keepAlive: KeepAliveTab[] = [],
+  isKept: KeptPredicate = () => false,
 ): boolean {
   if (!tab.id) {
     return false;
@@ -180,7 +159,7 @@ export function isEligibleForAutoSnooze(
   if (isProtected(tab.url, rules)) {
     return false;
   }
-  if (isKeptAlive(keepAlive, tab.url)) {
+  if (isKept(tab.url)) {
     return false; // a reload would wake it anyway — the two features must not fight
   }
   const lastAccessed = Math.max(tab.lastAccessed ?? now, wakeTimes?.[tab.id] ?? 0);
@@ -196,7 +175,7 @@ export function selectAutoSnoozeTargets(
   rules: ProtectionRule[],
   now = Date.now(),
   wakeTimes: WakeTimes | null = null,
-  keepAlive: KeepAliveTab[] = [],
+  isKept: KeptPredicate = () => false,
 ): number[] {
   // the split partner of an active tab is on screen beside it: discarding it would blank
   // half the window (Chrome 155+ split view; splitViewId -1 / absent = not split)
@@ -206,7 +185,7 @@ export function selectAutoSnoozeTargets(
   // type predicate: isEligibleForAutoSnooze rejects tabs without an id
   const eligible = tabs.filter(
     (tab): tab is SnoozeTab & { id: number } =>
-      !onScreenSplits.has(tab.splitViewId) && isEligibleForAutoSnooze(tab, settings, rules, now, wakeTimes, keepAlive),
+      !onScreenSplits.has(tab.splitViewId) && isEligibleForAutoSnooze(tab, settings, rules, now, wakeTimes, isKept),
   );
   const minAwake = settings.minAwakePerWindow ?? 0;
   if (minAwake <= 0) {

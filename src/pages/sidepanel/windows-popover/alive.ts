@@ -2,7 +2,7 @@
 // A mark with an open tab is a Pins-style row (click activates); one without is a
 // muted "not open" row whose click opens the page — a closed or navigated-away tab
 // must not make the mark vanish from the list.
-import { matchesKeepAlive } from "../../../app/keep-alive.ts";
+import { keepAliveOpenUrl, matchesKeepAlive } from "../../../app/keep-alive.ts";
 import type { KeepAliveTab } from "../../../app/types.ts";
 import { winPop } from "../foundation/elements.ts";
 import type { PanelTab } from "../foundation/state.ts";
@@ -28,10 +28,14 @@ export function fillAliveRows(marks: KeepAliveTab[], tabs: PanelTab[], maps: Win
     stats.className = "win-stats muted";
     stats.textContent = "not open"; // nothing reloads anyway — "paused" would add nothing
     row.append(name, stats);
-    row.title = `${mark.url}\nNot open in any window — click to open it`;
+    const openUrl = keepAliveOpenUrl(mark.url); // the page, a site's root; "" for a glob (nothing to open)
+    row.title = `${mark.url}\nNot open in any window${openUrl === "" ? "" : " — click to open it"}`;
     row.addEventListener("click", () => {
+      if (openUrl === "") {
+        return;
+      }
       winPop.hidePopover?.();
-      chrome.tabs.create({ url: mark.url });
+      chrome.tabs.create({ url: openUrl });
     });
     const menuBtn = document.createElement("button");
     menuBtn.type = "button";

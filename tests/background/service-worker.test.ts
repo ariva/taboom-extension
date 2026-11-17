@@ -113,6 +113,8 @@ test("Service Worker - Init: alarm uses configured interval, menus created, prot
   }
   // keep-alive item only with the flag on (settings enable it in the fixture); no marks yet → no sweep alarm
   assert.equal(calls.includes("contextMenus.create keep-alive-tab"), KEEP_ALIVE_ON, "keep-alive menu item");
+  assert.equal(calls.includes("contextMenus.create keep-alive"), KEEP_ALIVE_ON, "the Keep alive ▸ parent");
+  assert.equal(calls.includes("contextMenus.create keep-alive-site"), KEEP_ALIVE_ON, "its Domain child");
   assert.ok(!calls.some((c) => c.startsWith("alarms.create keep-alive")), "empty list arms nothing");
   // protected mail tab gets autoDiscardable:false; others already true → untouched
   assert.ok(calls.some((c) => c.startsWith("tabs.update 3") && c.includes('"autoDiscardable":false')));
@@ -1207,6 +1209,79 @@ test("Service Worker - Keep alive: menu checkbox follows the active tab's mark",
   );
   await tick();
   assert.ok(calls.includes('contextMenus.update keep-alive-tab {"checked":true}'), "navigation: checked");
+});
+
+test("Service Worker - Keep alive: Keep alive ▸ Domain marks the site — the sweep reloads one tab of the domain, the checks follow the active tab, a second click unmarks", {
+  skip: !KEEP_ALIVE_ON,
+}, async () => {
+  stored.keepAlive = [];
+  calls.length = 0;
+  await chrome.contextMenus.onClicked.fire(
+    { menuItemId: "keep-alive-site" },
+    tabs.find((t) => t.id === 2),
+  );
+  await tick();
+  await tick();
+  assert.deepEqual(
+    stored.keepAlive.map(({ url, title }) => ({ url, title })),
+    [{ url: "old.example.com", title: "old.example.com" }],
+    "the site, named by itself",
+  );
+  // another page of the domain counts as kept: both checks on
+  calls.length = 0;
+  await chrome.tabs.onUpdated.fire(
+    2,
+    { url: "https://old.example.com/b" },
+    { id: 2, active: true, url: "https://old.example.com/b" },
+  );
+  await tick();
+  assert.ok(calls.includes('contextMenus.update keep-alive-site {"checked":true}'), "Domain checked");
+  assert.ok(
+    calls.includes('contextMenus.update keep-alive-tab {"checked":true}'),
+    "Page checked: covered by the site mark",
+  );
+  calls.length = 0;
+  await chrome.tabs.onActivated.fire({ tabId: 1 });
+  await tick();
+  assert.ok(calls.includes('contextMenus.update keep-alive-site {"checked":false}'), "other site: Domain unchecked");
+  // due: one tab of the domain reloads (the first found), the mark keeps its own name
+  stored.keepAlive[0]!.nextReload = Date.now() - 1;
+  calls.length = 0;
+  await chrome.alarms.onAlarm.fire({ name: "keep-alive" });
+  await tick();
+  await tick();
+  await tick();
+  assert.deepEqual(
+    calls.filter((c) => c.startsWith("tabs.reload")),
+    ["tabs.reload 2"],
+  );
+  assert.equal(stored.keepAlive[0]?.title, "old.example.com", "a domain mark is not renamed after the reloaded tab");
+  // second click: the site mark goes (to the trash)
+  stored.keepAliveTrash = [];
+  await chrome.contextMenus.onClicked.fire(
+    { menuItemId: "keep-alive-site" },
+    tabs.find((t) => t.id === 2),
+  );
+  await tick();
+  await tick();
+  assert.deepEqual(stored.keepAlive, []);
+  assert.deepEqual(
+    stored.keepAliveTrash.at(-1)?.items.map((entry) => entry.url),
+    ["old.example.com"],
+  );
+});
+
+test("Service Worker - Keep alive: keep-alive-set with scope site marks the tabs' domains", {
+  skip: !KEEP_ALIVE_ON,
+}, async () => {
+  stored.keepAlive = [];
+  const response = await send({ type: "keep-alive-set", tabIds: [1, 2], kept: true, scope: "site" });
+  assert.deepEqual(response, { ok: true });
+  assert.deepEqual(
+    stored.keepAlive.map((entry) => entry.url),
+    ["work.example.com", "old.example.com"],
+  );
+  stored.keepAlive = [];
 });
 
 test("Service Worker - Keep alive: turning the setting off rebuilds the menu without the item and clears the sweep", {

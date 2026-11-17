@@ -1,8 +1,10 @@
 // The page context menu: static items, the "Navigation stack" submenu, and the
 // one queue every menu mutation runs through.
-import { featureEnabled, isKeptAlive, resolveNavMode } from "../app/core.ts";
+import { featureEnabled, isSupportedUrl, resolveNavMode } from "../app/core.ts";
+import { isKeptAlive } from "../app/keep-alive.ts";
 import { DEV_PREFIX, getAppName } from "../app/env.ts";
 import { localStore } from "../app/storage.ts";
+import { siteOf } from "../app/tag-patterns.ts";
 import { effectiveFeatures } from "./nav-mode.ts";
 import { loadHistory } from "./tab-history.ts";
 
@@ -40,9 +42,10 @@ export function createContextMenus(): Promise<unknown> {
   });
 }
 
-// "Keep this tab alive" checkbox, only while the (experimental) feature is on and
-// enabled in settings; checked state seeded from the active tab — background/keep-alive.ts
-// keeps it in sync afterwards (this module sits below it in the import graph)
+// Keep alive ▸ with two checkboxes, Domain (the site, like Tag domain…) and Page (the address),
+// only while the (experimental) feature is on and enabled in settings; checked state seeded from
+// the active tab — background/keep-alive.ts keeps it in sync afterwards (this module sits below
+// it in the import graph, so the ids are spelled here too)
 async function createKeepAliveItem(): Promise<void> {
   const { state, features } = await effectiveFeatures();
   if (!featureEnabled(features, "KEEP_ALIVE") || !state.settings.keepAliveEnabled) {
@@ -53,14 +56,28 @@ async function createKeepAliveItem(): Promise<void> {
     chrome.tabs.query({ active: true, lastFocusedWindow: true }),
   ]);
   chrome.contextMenus.create({
-    id: "keep-alive-tab",
-    title: "Keep this tab alive",
-    type: "checkbox",
-    checked: isKeptAlive(keepAlive, active?.url),
+    id: "keep-alive",
+    title: "Keep alive",
     documentUrlPatterns: PAGE_PATTERNS,
     parentId: "root",
     contexts: ["page"],
   });
+  const site = isSupportedUrl(active?.url) ? siteOf(active?.url) : "";
+  const items: [id: string, title: string, checked: boolean][] = [
+    ["keep-alive-site", "Domain", site !== "" && keepAlive.some((entry) => entry.url === site)],
+    ["keep-alive-tab", "Page", isKeptAlive(keepAlive, active?.url)],
+  ];
+  for (const [id, title, checked] of items) {
+    chrome.contextMenus.create({
+      id,
+      title,
+      type: "checkbox",
+      checked,
+      documentUrlPatterns: PAGE_PATTERNS,
+      parentId: "keep-alive",
+      contexts: ["page"],
+    });
+  }
 }
 
 const MENU_HISTORY_MAX = 15;

@@ -62,12 +62,14 @@ const tabs: NonNullable<ChromeMockOptions["tabs"]> = [
 ];
 
 const calls: string[] = [];
+const messages: object[] = [];
 const groups: Partial<chrome.tabGroups.TabGroup>[] = [
   { id: 7, title: "work", color: "blue", collapsed: false, windowId: 1 },
 ];
 const chrome = makeChrome({
   tabs,
   calls,
+  sentMessages: messages,
   groups,
   stored: {
     protectionRules: [{ id: "r1", type: "host", pattern: "mail.google.com" }],
@@ -1017,7 +1019,7 @@ test("UI - Sidepanel - Right-click row offers move-to-window menu (selection-awa
       "Pin",
       "Close",
       // KEEP_ALIVE: the setting defaults to on, so the experimental pass shows the mark item
-      ...(KEEP_ALIVE_ON ? ["Keep alive"] : []),
+      ...(KEEP_ALIVE_ON ? ["Keep alive domain", "Keep alive URL"] : []),
       // TAGS: the two picker entries (a new tag is made inside the picker)
       ...(TAGS_ON ? ["Tag domain…", "Tag URL…"] : []),
       "Move tab to ▸",
@@ -1937,9 +1939,18 @@ test("UI - Sidepanel - KEEP_ALIVE: row menu marks / unmarks the page, quick laun
   await settle();
   rowOf(1).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
   calls.length = 0;
-  must(qa(menu, ".ctx-item").find((el) => el.textContent === "Keep alive")).click();
+  must(qa(menu, ".ctx-item").find((el) => el.textContent === "Keep alive URL")).click();
   await tick();
   assert.ok(calls.includes("sendMessage keep-alive-set"), "worker asked to mark the page");
+  assert.deepEqual(messages.at(-1), { type: "keep-alive-set", tabIds: [1], kept: true }, "no scope = the page");
+  rowOf(1).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+  must(qa(menu, ".ctx-item").find((el) => el.textContent === "Keep alive domain")).click();
+  await tick();
+  assert.deepEqual(
+    messages.at(-1),
+    { type: "keep-alive-set", tabIds: [1], kept: true, scope: "site" },
+    "Domain: scope site",
+  );
 
   // the worker writes the mark; the panel follows storage
   await chrome.storage.local.set({
@@ -1957,19 +1968,45 @@ test("UI - Sidepanel - KEEP_ALIVE: row menu marks / unmarks the page, quick laun
     qa(menu, ".ctx-item")
       .map((el) => el.textContent)
       .filter((text) => /alive|mark/.test(text)),
-    ["Pause keep-alive", "Remove from keep-alive"],
-    "running mark: one toggle (disable = pause) plus remove, never Enable alongside",
+    ["Pause keep-alive (URL)", "Remove URL from keep-alive"],
+    "running mark: one toggle (disable = pause) plus remove, never Enable alongside; the items name the mark's kind",
   );
-  const disableItem = must(qa(menu, ".ctx-item").find((el) => el.textContent === "Pause keep-alive"));
+  const disableItem = must(qa(menu, ".ctx-item").find((el) => el.textContent === "Pause keep-alive (URL)"));
+  assert.equal(disableItem.title, "https://github.com/pr/1", "hover: the mark itself");
   assert.ok(
     disableItem.previousElementSibling?.classList.contains("ctx-divider"),
     "keep-alive items sit in their own section, divider before",
   );
   rowOf(2).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
-  assert.ok(
-    qa(menu, ".ctx-item").some((el) => el.textContent === "Keep alive"),
-    "other page: mark offered",
+  assert.deepEqual(
+    qa(menu, ".ctx-item")
+      .map((el) => el.textContent)
+      .filter((text) => text.startsWith("Keep alive")),
+    ["Keep alive domain", "Keep alive URL"],
+    "other page: both marks offered, domain first like the tag items",
   );
+
+  // a domain mark covering the row: the items say so, and name the domain on hover
+  await chrome.storage.local.set({
+    keepAlive: [{ url: "github.com", title: "github.com", minutes: 25, nextReload: 1, paused: true }],
+  });
+  await chrome.storage.onChanged.fire({ keepAlive: {} }, "local");
+  await settle();
+  rowOf(1).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+  const domainItems = qa(menu, ".ctx-item").filter((el) => /alive/.test(el.textContent));
+  assert.deepEqual(
+    domainItems.map((el) => el.textContent),
+    ["Resume keep-alive (domain)", "Remove domain from keep-alive"],
+  );
+  assert.deepEqual(
+    domainItems.map((el) => el.title),
+    ["github.com", "github.com"],
+  );
+  await chrome.storage.local.set({
+    keepAlive: [{ url: "https://github.com/pr/1", title: "My Pull Request", minutes: 25, nextReload: 1 }],
+  });
+  await chrome.storage.onChanged.fire({ keepAlive: {} }, "local");
+  await settle();
 
   // multi-selection: no keep-alive items at all — one right-click over a 1000-tab
   // selection must not be able to mark every page for periodic reloads
@@ -2044,9 +2081,9 @@ test("UI - Sidepanel - KEEP_ALIVE: row menu marks / unmarks the page, quick laun
   await tick();
   assert.deepEqual(
     qa(menu, ".ctx-item").map((el) => el.textContent),
-    ["Open", "Pause keep-alive", "Remove from keep-alive"],
+    ["Open", "Pause keep-alive (URL)", "Remove URL from keep-alive"],
   );
-  must(qa(menu, ".ctx-item").find((el) => el.textContent === "Remove from keep-alive")).click();
+  must(qa(menu, ".ctx-item").find((el) => el.textContent === "Remove URL from keep-alive")).click();
   await tick();
   await tick();
   const { keepAlive: afterStop = [] } = await chrome.storage.local.get("keepAlive");
@@ -2080,10 +2117,10 @@ test("UI - Sidepanel - KEEP_ALIVE: row menu marks / unmarks the page, quick laun
     qa(menu, ".ctx-item")
       .map((el) => el.textContent)
       .filter((text) => /alive|mark/.test(text)),
-    ["Resume keep-alive", "Remove from keep-alive"],
+    ["Resume keep-alive (URL)", "Remove URL from keep-alive"],
     "paused mark: Enable replaces Disable",
   );
-  must(qa(menu, ".ctx-item").find((el) => el.textContent === "Resume keep-alive")).click();
+  must(qa(menu, ".ctx-item").find((el) => el.textContent === "Resume keep-alive (URL)")).click();
   await tick();
   await tick();
   const { keepAlive: resumed = [] } = await chrome.storage.local.get("keepAlive");
@@ -2093,7 +2130,7 @@ test("UI - Sidepanel - KEEP_ALIVE: row menu marks / unmarks the page, quick laun
   await settle();
   rowOf(1).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
   assert.ok(
-    qa(menu, ".ctx-item").some((el) => el.textContent === "Pause keep-alive"),
+    qa(menu, ".ctx-item").some((el) => el.textContent === "Pause keep-alive (URL)"),
     "running again: Disable offered",
   );
 

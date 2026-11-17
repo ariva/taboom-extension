@@ -18,7 +18,7 @@ const tab = (
   extra: Partial<{ title: string; pinned: boolean; active: boolean; discarded: boolean; lastAccessed: number }> = {},
 ) => ({ id, windowId, url, title: `T${id}`, lastAccessed: NOW, ...extra });
 
-const noContext = { currentWindowId: 1, keepAlive: [] };
+const noContext = { currentWindowId: 1, isKept: () => false };
 
 test("Duplicates - key drops the fragment, keeps the query; every New Tab flavour is one key; empty for no url", () => {
   assert.equal(duplicateKey("https://a.example.com/x?y=1#top"), "https://a.example.com/x?y=1");
@@ -63,7 +63,7 @@ test("Duplicates - keeper order: pinned, kept alive, active here, active anywher
   const activeHere = tab(6, 1, url, { active: true, discarded: true, lastAccessed: 0 });
   const kept = tab(7, 3, url, { discarded: true, lastAccessed: 0 });
   const pinned = tab(8, 3, url, { pinned: true, discarded: true, lastAccessed: 0 });
-  const context = { currentWindowId: 1, keepAlive: [{ url, title: "A", minutes: 5, nextReload: 0 }] };
+  const context = { currentWindowId: 1, isKept: (candidate: string | undefined) => candidate === url };
   // kept-alive matches by url: every copy here is "kept" — the mark decides nothing between them
   const everyone = rankKeepers([plain, recent, awake, snoozed, activeElsewhere, activeHere, pinned], context);
   assert.deepEqual(
@@ -72,16 +72,13 @@ test("Duplicates - keeper order: pinned, kept alive, active here, active anywher
   );
   // a mark on a different page: kept-alive beats active
   const other = tab(9, 3, "https://a.example.com/#x", { discarded: true, lastAccessed: 0 });
-  const ranked = rankKeepers([activeHere, kept, other], { currentWindowId: 1, keepAlive: [] });
+  const ranked = rankKeepers([activeHere, kept, other], noContext);
   assert.deepEqual(
     ranked.map((t) => t.id),
     [6, 7, 9],
     "no mark: active wins, then first found",
   );
-  const marked = rankKeepers([activeHere, awake, kept], {
-    currentWindowId: 1,
-    keepAlive: [{ url: "https://a.example.com/", title: "A", minutes: 5, nextReload: 0 }],
-  });
+  const marked = rankKeepers([activeHere, awake, kept], { currentWindowId: 1, isKept: () => true });
   assert.equal(marked[0]?.id, 6, "mark covers every copy: falls through to active");
   assert.deepEqual(
     rankKeepers([plain, awake], noContext).map((t) => t.id),

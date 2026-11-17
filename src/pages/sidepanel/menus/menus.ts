@@ -1,7 +1,7 @@
 // Context menus of the tab list: row menu, tab-group menu, window header menu, and the
 // item builders they share with the windows popover's menus.
 import { pluralize } from "../../../app/plural.ts";
-import { keepAliveEntry } from "../../../app/keep-alive.ts";
+import { keepAliveEntry, keepAliveKindLabel, keepAliveOpenUrl } from "../../../app/keep-alive.ts";
 import { parkedGroupRef, parkedNewestFirst, parkedRef, parkedWindowLabel } from "../../../app/parked.ts";
 import { pauseKeepAlive, removeKeepAlive } from "../../../app/storage.ts";
 import type { KeepAliveTab, UiPrefs } from "../../../app/types.ts";
@@ -113,15 +113,22 @@ export function openRowMenu(event: MouseEvent, tabId: number): void {
   // of pages for periodic reloads (bulk unmark goes through Settings)
   if (keepAliveActive() && ids.length === 1) {
     ctxAppend(ctxDivider()); // keep-alive is its own section
-    // one toggle per state: unmarked → Keep, running → Disable (= pause, the mark stays),
-    // paused → Enable. Dropping the mark is its own, separately named action.
+    // unmarked → Keep alive domain / URL (the tag items' order and scopes); covered (by a page or
+    // a site mark) → one toggle per state, running → Pause (the mark stays), paused → Resume.
+    // Dropping the mark is its own, separately named action.
     const mark = keepAliveEntry(state.keepAlive, clicked?.url);
     if (!mark) {
-      ctxAppend(ctxItem("Keep alive", () => keepAlive(ids, true)));
+      ctxAppend(ctxItem("Keep alive domain", () => keepAlive(ids, true, "site")));
+      ctxAppend(ctxItem("Keep alive URL", () => keepAlive(ids, true)));
     } else {
       const paused = mark.paused ?? false;
-      ctxAppend(ctxItem(paused ? "Resume keep-alive" : "Pause keep-alive", () => keepAlivePause(ids, !paused)));
-      ctxAppend(ctxItem("Remove from keep-alive", () => keepAlive(ids, false)));
+      ctxAppend(
+        ...markItems(
+          mark,
+          () => keepAlivePause(ids, !paused),
+          () => keepAlive(ids, false),
+        ),
+      );
     }
   }
   if (tagsActive()) {
@@ -200,21 +207,36 @@ const WINDOW_DOT_COLOR_NAMES = ["Red", "Teal", "Yellow", "Green", "Purple", "Pin
 export function openMarkMenu(event: MouseEvent, mark: KeepAliveTab): void {
   clearCtxMenu();
   ctxAppend(ctxTitle(mark.title || mark.url), ctxDivider());
-  ctxAppend(ctxItem("Open", () => chrome.tabs.create({ url: mark.url })));
+  const openUrl = keepAliveOpenUrl(mark.url); // "" for a glob: no one address to open
+  if (openUrl !== "") {
+    ctxAppend(ctxItem("Open", () => chrome.tabs.create({ url: openUrl })));
+  }
   const paused = mark.paused ?? false;
   ctxAppend(
-    ctxItem(paused ? "Resume keep-alive" : "Pause keep-alive", async () => {
-      await pauseKeepAlive([mark.url], !paused);
-      refresh(true);
-    }),
-  );
-  ctxAppend(
-    ctxItem("Remove from keep-alive", async () => {
-      await removeKeepAlive([mark.url]);
-      refresh(true);
-    }),
+    ...markItems(
+      mark,
+      async () => {
+        await pauseKeepAlive([mark.url], !paused);
+        refresh(true);
+      },
+      async () => {
+        await removeKeepAlive([mark.url]);
+        refresh(true);
+      },
+    ),
   );
   showCtxMenu(event);
+}
+
+// the two items of a covering mark — a toggle per state (running → Pause, paused → Resume) and
+// Remove — named after the mark's kind, so a domain mark's pause reads as the domain's; the mark
+// itself on hover (what gets paused or removed)
+function markItems(mark: KeepAliveTab, togglePause: () => void, remove: () => void): HTMLButtonElement[] {
+  const kind = keepAliveKindLabel(mark.url);
+  const toggle = ctxItem(`${mark.paused ? "Resume" : "Pause"} keep-alive (${kind})`, togglePause);
+  const drop = ctxItem(`Remove ${kind} from keep-alive`, remove);
+  toggle.title = drop.title = mark.url;
+  return [toggle, drop];
 }
 
 export function openTabGroupMenu(

@@ -134,8 +134,12 @@ export async function unprotectTabs(tabIds: number[]): Promise<void> {
 }
 
 // keep-it-alive marks follow the page (by url), so the selection stays — nothing was consumed
-export async function keepAlive(tabIds: number[], kept: boolean): Promise<void> {
-  reportAnswer(await send({ type: "keep-alive-set", tabIds, kept }), kept ? "keep the page alive" : "unmark the page");
+// scope "site": the tabs' domains (Keep alive domain), else their pages
+export async function keepAlive(tabIds: number[], kept: boolean, scope?: "site"): Promise<void> {
+  reportAnswer(
+    await send({ type: "keep-alive-set", tabIds, kept, ...(scope ? { scope } : {}) }),
+    kept ? "keep the page alive" : "unmark the page",
+  );
   refresh(true);
 }
 

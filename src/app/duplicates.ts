@@ -1,8 +1,7 @@
 // Duplicate tabs as pure functions: which open tabs are the same page, which copy a
 // cleanup keeps and which ones it closes. No DOM, no chrome.* — the side panel's
 // Duplicates view (windows-popover/duplicates.ts) is the only caller today.
-import { isKeptAlive, isUnloaded } from "./core.ts";
-import type { KeepAliveTab } from "./types.ts";
+import { isUnloaded, type KeptPredicate } from "./core.ts";
 
 // the slice of chrome.tabs.Tab the rules read; tests build these by hand
 export interface DuplicateTab {
@@ -27,7 +26,7 @@ export interface DuplicateSet<T extends DuplicateTab> {
 
 export interface KeeperContext {
   currentWindowId: number | null;
-  keepAlive: KeepAliveTab[];
+  isKept: KeptPredicate; // keep-alive's match rule, handed in (keep-alive.ts sits above this module)
 }
 
 // "one": a single survivor across every window; "per-window": one survivor in each window
@@ -84,7 +83,7 @@ export function duplicateSets<T extends DuplicateTab>(tabs: readonly T[]): Dupli
 export function rankKeepers<T extends DuplicateTab>(tabs: readonly T[], context: KeeperContext): T[] {
   const score = (tab: T): number =>
     (tab.pinned ? 32 : 0) +
-    (isKeptAlive(context.keepAlive, tab.url) ? 16 : 0) +
+    (context.isKept(tab.url) ? 16 : 0) +
     (tab.active && tab.windowId === context.currentWindowId ? 8 : 0) +
     (tab.active ? 4 : 0) +
     (isUnloaded(tab) ? 0 : 2);

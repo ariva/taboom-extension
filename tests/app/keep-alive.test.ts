@@ -8,6 +8,9 @@ import {
   keepAliveEntry,
   keepAliveKey,
   keepAliveTargets,
+  keepAliveKindLabel,
+  keepAliveOpenUrl,
+  keepAliveTitle,
   keepAliveUrlFromInput,
   markKeepAlive,
   matchesKeepAlive,
@@ -380,4 +383,63 @@ test("Keep alive - setKeepAliveUrl re-keys one mark, rest untouched; undefined w
     undefined,
     "another mark's url",
   );
+});
+
+// ---------- marks as patterns (T-0155): the tagged-page vocabulary, one match rule ----------
+
+test("Keep alive - matchesKeepAlive: a host mark covers the host and its subdomains, a trailing / everything under, * a glob", () => {
+  assert.equal(matchesKeepAlive("example.com", "https://example.com/a"), true);
+  assert.equal(matchesKeepAlive("example.com", "https://mail.example.com/inbox#x"), true, "subdomain");
+  assert.equal(matchesKeepAlive("example.com", "https://notexample.com/"), false);
+  assert.equal(matchesKeepAlive("https://a.test/", "https://a.test/docs/1"), true, "everything under");
+  assert.equal(matchesKeepAlive("https://a.test/docs/*", "https://a.test/docs/2?x=1"), true, "glob");
+  assert.equal(matchesKeepAlive("https://a.test/docs/*", "https://a.test/other"), false);
+  assert.equal(matchesKeepAlive("example.com", "chrome://extensions/"), false, "only a reloadable page");
+  assert.equal(matchesKeepAlive("", "https://example.com/"), false);
+});
+
+test("Keep alive - keepAliveUrlFromInput: a bare host or a pattern is a mark too; an address must stay http(s) / file", () => {
+  assert.equal(keepAliveUrlFromInput(" Example.com "), "example.com");
+  assert.equal(keepAliveUrlFromInput("*.example.com"), "*.example.com");
+  assert.equal(keepAliveUrlFromInput("https://a.test/docs/*"), "https://a.test/docs/*");
+  assert.equal(keepAliveUrlFromInput("a.test/docs/"), "https://a.test/docs/", "scheme-less path: https assumed");
+  assert.equal(keepAliveUrlFromInput("chrome://a/*"), "", "unsupported scheme pattern");
+  assert.equal(keepAliveUrlFromInput("*"), "", "everything is not a mark");
+});
+
+test("Keep alive - keepAliveTitle: an address mark is named by its tab (hostname until one is seen), a domain or glob mark by itself", () => {
+  assert.equal(keepAliveTitle("https://dash.example.com/board", "Board"), "Board");
+  assert.equal(
+    keepAliveTitle("https://mail.example.com/", "Inbox"),
+    "Inbox",
+    "a site root from a tab is still one address",
+  );
+  assert.equal(keepAliveTitle("https://dash.example.com/board"), "dash.example.com");
+  assert.equal(keepAliveTitle("https://dash.example.com/board", ""), "dash.example.com");
+  assert.equal(keepAliveTitle("example.com", "Some tab"), "example.com");
+  assert.equal(keepAliveTitle("https://a.test/docs/*", "Doc 2"), "https://a.test/docs/*");
+});
+
+test("Keep alive - rearmKeepAlive renames a page mark after its tab, never a domain or pattern mark", () => {
+  const site: KeepAliveTab = { url: "example.com", title: "example.com", minutes: 5, nextReload: 1 };
+  assert.equal(rearmKeepAlive([site], "example.com", NOW, "Inbox (3)")[0]?.title, "example.com");
+  assert.equal(rearmKeepAlive([site], "example.com", NOW, "Inbox (3)")[0]?.nextReload, NOW, "re-armed all the same");
+});
+
+test("Keep alive - keepAliveOpenUrl: what the Alive view opens for a mark with no open tab — the page, the site's root, nothing for a glob", () => {
+  assert.equal(keepAliveOpenUrl("https://dash.example.com/board#x"), "https://dash.example.com/board#x");
+  assert.equal(keepAliveOpenUrl("example.com"), "https://example.com/");
+  assert.equal(keepAliveOpenUrl("*.example.com"), "https://example.com/");
+  assert.equal(keepAliveOpenUrl("https://a.test/docs/"), "https://a.test/docs/", "a prefix is an address");
+  assert.equal(keepAliveOpenUrl("https://a.test/docs/*"), "");
+  assert.equal(keepAliveOpenUrl("youtube"), "");
+});
+
+test("Keep alive - keepAliveKindLabel names a mark's kind the way the menu items do: URL (one address, a site root included), domain, pattern", () => {
+  assert.equal(keepAliveKindLabel("https://dash.example.com/board#x"), "URL");
+  assert.equal(keepAliveKindLabel("https://mail.example.com/"), "URL");
+  assert.equal(keepAliveKindLabel("example.com"), "domain");
+  assert.equal(keepAliveKindLabel("*.example.com"), "domain");
+  assert.equal(keepAliveKindLabel("https://a.test/docs/*"), "pattern");
+  assert.equal(keepAliveKindLabel("youtube"), "pattern");
 });

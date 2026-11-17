@@ -20,7 +20,7 @@ export interface Settings {
 // one keep-it-alive mark (storage.local.keepAlive[]): keyed by page url without
 // the fragment — tab ids do not survive a browser restart, the address does
 export interface KeepAliveTab {
-  url: string;
+  url: string; // a pattern (tag-patterns.ts vocabulary): an address, a host and its subdomains, or a * glob
   title: string;
   minutes: number; // settings.keepAliveMinutes as it was when marked; editable per mark
   paused?: boolean; // absent = reloads run; the mark stays listed either way
