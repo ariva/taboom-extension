@@ -97,6 +97,7 @@ const stored: {
     keepAliveMinutes: 25,
     askBeforePark: true,
     tagPagesKeepFragment: true,
+    showDisabledInPanel: true,
   },
   protectionRules: [{ id: "r1", type: "host", pattern: "mail.google.com" }],
 };

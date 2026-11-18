@@ -68,22 +68,32 @@ listEl.addEventListener("mouseover", (event) => {
     }
     hoverTip.append(line);
   }
-  // a row with tags: a last line of colored pills, like the badges
+  // a row with tags: last lines of colored pills like the badges — the live tags on one, the
+  // struck-through ones (a disabled tag, a switched-off rule) on their own line below
   if (carrier.dataset.tipTags) {
     const tags: TipTag[] = JSON.parse(carrier.dataset.tipTags); // written by row.ts from the view model
-    const line = document.createElement("div");
-    line.className = "tip-tags";
-    line.append("Tags: ");
-    for (const tag of tags) {
-      const pill = document.createElement("span");
-      pill.className = tag.dark ? "badge tag dark" : "badge tag";
-      pill.style.background = tag.color;
-      const text = document.createElement("span"); // same markup as the row's pills
-      text.textContent = tag.name;
-      pill.append(text);
-      line.append(pill);
+    const lines: [label: string, pills: TipTag[]][] = [
+      ["Tags: ", tags.filter((tag) => !tag.off)],
+      ["Disabled tags: ", tags.filter((tag) => tag.off)],
+    ];
+    for (const [label, pills] of lines) {
+      if (pills.length === 0) {
+        continue;
+      }
+      const line = document.createElement("div");
+      line.className = "tip-tags";
+      line.append(label);
+      for (const tag of pills) {
+        const pill = document.createElement("span");
+        pill.className = ["badge tag", tag.dark && "dark", tag.off && "off"].filter(Boolean).join(" ");
+        pill.style.background = tag.color;
+        const text = document.createElement("span"); // same markup as the row's pills
+        text.textContent = tag.name;
+        pill.append(text);
+        line.append(pill);
+      }
+      hoverTip.append(line);
     }
-    hoverTip.append(line);
   }
   hoverTip.hidden = false;
   moveHoverTip(event);

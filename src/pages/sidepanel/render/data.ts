@@ -61,11 +61,13 @@ export async function refresh(animate = false, preloaded: AppState | null = null
   state.parked = parkedWindows;
   state.parkedTrashCount = parkedTrash.length;
   state.tags = tags;
-  // a ticked tag removed or disabled in Settings leaves the filter: kept, it would match nothing
-  // while the chip (which names enabled tags only) read "Tags"
-  const enabledIds = new Set(enabledTags(tags).map((tag) => tag.id));
+  // a ticked tag removed in Settings leaves the filter — a disabled one too unless the panel shows
+  // disabled tags (then it is listed, struck through, and its tick keeps matching): kept, it would
+  // match nothing while the chip read "Tags"
+  const listable = persisted.settings.showDisabledInPanel ? tags : enabledTags(tags);
+  const listableIds = new Set(listable.map((tag) => tag.id));
   for (const tagId of [...state.tagFilter]) {
-    if (!enabledIds.has(tagId)) {
+    if (!listableIds.has(tagId)) {
       state.tagFilter.delete(tagId);
     }
   }
@@ -74,6 +76,7 @@ export async function refresh(animate = false, preloaded: AppState | null = null
   state.keepAlive = keepAlive;
   state.keepAliveEnabled = persisted.settings.keepAliveEnabled;
   state.tagPagesKeepFragment = persisted.settings.tagPagesKeepFragment;
+  state.showDisabledInPanel = persisted.settings.showDisabledInPanel;
   // a write of this panel's own may have landed after this refresh read storage: until its echo
   // arrives the panel's ui is the newer one (the fuzzy toggle, Tabs Order must not flip back)
   if (state.pendingUiWrites.size === 0) {
@@ -158,6 +161,7 @@ export async function refresh(animate = false, preloaded: AppState | null = null
     state.rules,
     keepAliveActive() ? state.keepAlive : [],
     tagsActive() ? { tags: state.tags, pages: state.tagPages } : undefined,
+    state.showDisabledInPanel,
   );
   // flag turned off mid-navigation: drop the cursor so no stale outline lingers
   if (!featureEnabled(state.features, "SIDEBAR_KEYBOARD_NAVIGATION")) {

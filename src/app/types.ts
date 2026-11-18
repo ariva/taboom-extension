@@ -15,6 +15,7 @@ export interface Settings {
   keepAliveMinutes: number; // default reload interval; an entry's own `minutes` overrides it
   askBeforePark: boolean; // PARKED_WINDOWS: confirm "Park window…" (the dialog's "Don't ask again" clears it)
   tagPagesKeepFragment: boolean; // TAGS: a tagged page keeps its #fragment (hash-routed pages are one page per route)
+  showDisabledInPanel: boolean; // the side panel shows disabled tags and paused keep-alive marks struck through instead of hiding them
 }
 
 // one keep-it-alive mark (storage.local.keepAlive[]): keyed by page url without

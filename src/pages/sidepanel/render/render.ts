@@ -337,7 +337,10 @@ function renderTagsChip(): void {
   if (!label) {
     return;
   }
-  const ticked = enabledTags(state.tags).filter((tag) => state.tagFilter.has(tag.id));
+  // a disabled tag can be ticked while the panel lists it (struck through in the picker)
+  const ticked = (state.showDisabledInPanel ? state.tags : enabledTags(state.tags)).filter((tag) =>
+    state.tagFilter.has(tag.id),
+  );
   const [one] = ticked;
   label.textContent = ticked.length === 0 ? "Tags" : one && ticked.length === 1 ? one.name : `${ticked.length} tags`;
   const dot = filterBar.querySelector<HTMLElement>('button[data-filter="tags"] .tag-dot');

@@ -27,6 +27,8 @@ import {
   tagPageError,
   inheritedTagIds,
   nextTagSort,
+  offTagsForUrl,
+  orderedTags,
   sortedTagPages,
   tagsForUrl,
   togglePageTags,
@@ -485,4 +487,45 @@ test("Tags - sortedTagPages: stored order, by address (A–Z), by open-tab count
   );
   assert.deepEqual(nextTagSort(null, "tabs"), { key: "tabs", dir: "asc" });
   assert.equal(nextTagSort({ key: "tabs", dir: "desc" }, "tabs"), null);
+});
+
+test("Tags - offTagsForUrl: the tags a page gets only through a disabled tag or a switched-off entry, tag-list order", () => {
+  const extra: Tag = { id: "t3", name: "c", color: "red" };
+  const tags = [work, { ...bills, disabled: true }, extra];
+  const pages: TagPage[] = [
+    { url: "https://a.test/x", tagIds: ["t1", "t2"] },
+    { url: "a.test", tagIds: ["t3"], disabled: true },
+  ];
+  assert.deepEqual(
+    offTagsForUrl(pages, tags, "https://a.test/x#f").map((tag) => tag.id),
+    ["t2", "t3"],
+    "a disabled tag and an off entry's tag; the fragment is ignored like everywhere",
+  );
+  assert.deepEqual(
+    tagsForUrl(pages, tags, "https://a.test/x").map((tag) => tag.id),
+    ["t1"],
+    "the live ones are unchanged",
+  );
+  assert.deepEqual(offTagsForUrl(pages, tags, "https://b.test/"), [], "not covered at all");
+  assert.deepEqual(offTagsForUrl(pages, tags, undefined), []);
+  // a tag an enabled entry hands over as well is live, not off
+  const both: TagPage[] = [...pages, { url: "https://a.test/", tagIds: ["t3"] }];
+  assert.deepEqual(
+    offTagsForUrl(both, tags, "https://a.test/x").map((tag) => tag.id),
+    ["t2"],
+  );
+});
+
+test("Tags - orderedTags: switched-off tags join the list only when asked for, in the same order", () => {
+  const off: Tag = { id: "t3", name: "a", color: "red", disabled: true };
+  const list = [work, bills, off];
+  assert.deepEqual(
+    orderedTags(list, [], { tagPickOrder: "name" }).map((tag) => tag.id),
+    ["t2", "t1"],
+  );
+  assert.deepEqual(
+    orderedTags(list, [], { tagPickOrder: "name" }, true).map((tag) => tag.id),
+    ["t3", "t2", "t1"],
+  );
+  assert.deepEqual(orderedTags(list, [], {}, true), list, "stored order, the off one where it is");
 });

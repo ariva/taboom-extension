@@ -41,7 +41,12 @@ export interface SelectView extends SearchView {
 }
 
 // the tags filter: any tag when nothing is ticked, else one of the ticked ones (OR)
-function hasWantedTag(tags: { id: string }[], wanted: ReadonlySet<string> | undefined): boolean {
+// the Tags filter sees the struck-through tags too (offTags is empty unless the panel shows them)
+function hasWantedTag(
+  d: { tags: { id: string }[]; offTags: { id: string }[] },
+  wanted: ReadonlySet<string> | undefined,
+): boolean {
+  const tags = d.offTags.length > 0 ? [...d.tags, ...d.offTags] : d.tags;
   return wanted && wanted.size > 0 ? tags.some((tag) => wanted.has(tag.id)) : tags.length > 0;
 }
 
@@ -72,7 +77,7 @@ export function selectVisible<T extends Tab>(tabs: T[], view: SelectView): T[] {
       result = result.filter((tab) => derived.get(tab.id)!.protected);
       break;
     case "tags":
-      result = result.filter((tab) => hasWantedTag(derived.get(tab.id)!.tags, view.tagFilter));
+      result = result.filter((tab) => hasWantedTag(derived.get(tab.id)!, view.tagFilter));
       break;
   }
   const last = (tab: Tab): number => tab.lastAccessed ?? now;
@@ -228,7 +233,7 @@ export function countsByFilter(
     if (d.protected) {
       counts.protected++;
     }
-    if (hasWantedTag(d.tags, tagFilter)) {
+    if (hasWantedTag(d, tagFilter)) {
       counts.tags++;
     }
   }

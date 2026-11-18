@@ -5,6 +5,7 @@ import {
   formatCountdown,
   isKeptAlive,
   KEEP_ALIVE_MINUTES,
+  keepAliveEntries,
   keepAliveEntry,
   keepAliveKey,
   keepAliveTargets,
@@ -100,6 +101,16 @@ test("Keep alive - isKeptAlive / keepAliveEntry go through matchesKeepAlive, fra
   assert.equal(keepAliveEntry([hashed], "https://app.example.com/#/dash"), hashed);
   assert.equal(keepAliveEntry([hashed], "https://app.example.com/"), undefined);
   assert.equal(isKeptAlive(list, undefined), false);
+  // a mark's own url finds that mark — a domain or glob is no page address, so matching alone
+  // never found it, and Pause / Resume on such a mark did nothing (T-0156 bug report)
+  const domain: KeepAliveTab = { url: "github.com", title: "github.com", minutes: 5, nextReload: 1 };
+  const page: KeepAliveTab = { url: "https://github.com/pr/1", title: "PR", minutes: 5, nextReload: 1 };
+  assert.equal(keepAliveEntry([page, domain], "github.com"), domain, "the mark itself, not the first covering one");
+  assert.equal(keepAliveEntry([page, domain], "https://github.com/pr/1"), page);
+  // every mark covering a tab, list order: the badge is live while any of them runs
+  assert.deepEqual(keepAliveEntries([page, domain], "https://github.com/pr/1"), [page, domain]);
+  assert.deepEqual(keepAliveEntries([page, domain], "https://github.com/pr/2"), [domain]);
+  assert.deepEqual(keepAliveEntries([page, domain], "chrome://extensions/"), []);
 });
 
 test("Keep alive - nextReloadAt jitters ±55 s around the interval, never under 30 s", () => {

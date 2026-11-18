@@ -2,7 +2,7 @@
 // windows carry it) — click filters the list to that tag, ⋯ / right-click opens the tag menu,
 // whose Rename edits the row in place.
 import { editTag } from "../../../app/storage.ts";
-import { tagColorHex, tagNameError, tagsForUrl } from "../../../app/tags.ts";
+import { offTagsForUrl, tagColorHex, tagNameError, tagsForUrl } from "../../../app/tags.ts";
 import type { Tag } from "../../../app/types.ts";
 import { inlineEdit } from "../../../lib/ui/inline-edit.ts";
 import { toast } from "../../../lib/ui/toast.ts";
@@ -17,13 +17,22 @@ export function fillTagRows(tags: Tag[], tabs: PanelTab[], onMenu: (event: Mouse
   for (const tag of tags) {
     // live tabs: the derived map covers the shown list, which is the parked snapshot in that scope —
     // a live id missing there is derived here
-    const tagsOf = (tab: PanelTab) =>
-      state.derived.get(tab.id)?.tags ?? tagsForUrl(state.tagPages, state.tags, tab.url);
+    const tagsOf = (tab: PanelTab): Tag[] => {
+      const d = state.derived.get(tab.id);
+      if (d) {
+        return [...d.tags, ...d.offTags]; // a disabled tag's row counts the tabs carrying it struck through
+      }
+      const live = tagsForUrl(state.tagPages, state.tags, tab.url);
+      return state.showDisabledInPanel ? [...live, ...offTagsForUrl(state.tagPages, state.tags, tab.url)] : live;
+    };
     const tagged = tabs.filter((tab) => tagsOf(tab).some((known) => known.id === tag.id));
     const windows = new Set(tagged.map((tab) => tab.windowId)).size;
     const row = document.createElement("button");
     row.type = "button";
     row.className = tagged.length === 0 ? "win-row missing" : "win-row";
+    if (tag.disabled) {
+      row.classList.add("off"); // switched off in Settings: struck through, still a filter
+    }
     row.dataset.tagId = tag.id; // right-click → tag menu
     const dot = document.createElement("span");
     dot.className = "win-dot";

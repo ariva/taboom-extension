@@ -20,6 +20,7 @@ export interface TipTag {
   name: string; // the pill label: glyph-prefixed when the tag comes from a domain or pattern entry
   color: string; // hex
   dark: boolean; // dark text on the light fills
+  off?: true; // a disabled tag or a switched-off entry's: struck through
 }
 
 // the glyph before a pill's name says the tag is not the page's own: ⌂ a domain entry, ✱ a
@@ -102,10 +103,11 @@ const TEXT_SCALE = 0.85 / 0.77; // the host and age are set in the meta's font, 
 export function badges(
   tab: Pick<Tab, "discarded" | "status" | "pinned" | "audible" | "splitViewId">,
   isProtectedTab: boolean,
-  isKeptAliveTab = false,
+  isKeptAliveTab: boolean | "paused" = false,
   tags: Tag[] = [],
   hitTagIds: ReadonlySet<string> = new Set(),
   origins: ReadonlyMap<string, TagOrigin> = new Map(),
+  offTags: Tag[] = [], // disabled tags / off entries the panel shows struck through, after the live pills
 ): Badge[] {
   const list: Badge[] = [];
   if (isUnloaded(tab)) {
@@ -115,7 +117,8 @@ export function badges(
     list.push(["protected", "ok"]);
   }
   if (isKeptAliveTab) {
-    list.push(["kept alive", "ok"]); // same colour as protected: both mean "auto-snooze leaves this alone"
+    // same colour as protected: both mean "auto-snooze leaves this alone"; a paused mark is struck through
+    list.push(["kept alive", isKeptAliveTab === "paused" ? "ok off" : "ok"]);
   }
   if (tab.pinned) {
     list.push(["pinned", ""]);
@@ -133,6 +136,14 @@ export function badges(
       ...(origin === "page" ? [] : [origin]),
     ];
     list.push([tagLabel(tag, origins), kind.join(" "), tagColorHex(tag.color)]);
+  }
+  // off pills: no search ring (the tag is not a tag here), no origin glyph (origins come from live entries)
+  for (const tag of offTags) {
+    list.push([
+      tag.name,
+      ["tag", ...(usesDarkText(tag.color) ? ["dark"] : []), "off"].join(" "),
+      tagColorHex(tag.color),
+    ]);
   }
   if (tab.audible) {
     list.push(["🔊", ""]);
@@ -281,7 +292,15 @@ export function rowViewModel(
   const badgeList = fitTagPills(
     [
       ...(parked ? [["parked", ""] satisfies Badge] : []),
-      ...badges(tab, d.protected, d.keptAlive, d.tags, hitTagIds, d.tagOrigins),
+      ...badges(
+        tab,
+        d.protected,
+        d.keepAlivePaused ? "paused" : d.keptAlive,
+        d.tags,
+        hitTagIds,
+        d.tagOrigins,
+        d.offTags,
+      ),
       ...(urlOnlyMatch ? [["url match", ""] satisfies Badge] : []),
     ],
     age,
@@ -315,11 +334,19 @@ export function rowViewModel(
     badges: badgeList,
     tip: tab.url ?? "",
     tipBadges,
-    tipTags: d.tags.map((tag) => ({
-      name: tagLabel(tag, d.tagOrigins),
-      color: tagColorHex(tag.color),
-      dark: usesDarkText(tag.color),
-    })),
+    tipTags: [
+      ...d.tags.map((tag) => ({
+        name: tagLabel(tag, d.tagOrigins),
+        color: tagColorHex(tag.color),
+        dark: usesDarkText(tag.color),
+      })),
+      ...d.offTags.map((tag) => ({
+        name: tag.name,
+        color: tagColorHex(tag.color),
+        dark: usesDarkText(tag.color),
+        off: true as const,
+      })),
+    ],
     canSnooze,
     protected: d.protected,
     protectLabel: d.protected ? "Unprotect site" : "Protect site",

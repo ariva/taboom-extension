@@ -41,6 +41,7 @@ export interface PanelState {
   keepAlive: KeepAliveTab[];
   keepAliveEnabled: boolean;
   tagPagesKeepFragment: boolean;
+  showDisabledInPanel: boolean;
   features: Features;
   rawFeatures: Features;
   navMode: NavMode;
@@ -91,6 +92,7 @@ export const state: PanelState = {
   keepAlive: [], // storage.local.keepAlive — marks the Alive view and row menu read
   keepAliveEnabled: false, // settings.keepAliveEnabled as of the last refresh()
   tagPagesKeepFragment: true, // settings.tagPagesKeepFragment as of the last refresh()
+  showDisabledInPanel: true, // settings.showDisabledInPanel as of the last refresh(): off tags / paused marks struck through
   // placeholder until main.ts assigns the loaded flags right after its top-level await
   // (awaiting them here would queue main.ts's state read behind the fetch);
   // experimental-resolved copy, refreshed in refresh()

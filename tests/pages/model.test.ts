@@ -368,6 +368,33 @@ test("Model - DeriveTabs flags kept-alive pages by url without fragment", () => 
   assert.equal(derived.get(2)?.keptAlive, false);
   assert.equal(derived.get(3)?.keptAlive, false, "a paused mark reloads nothing: no badge");
   assert.equal(deriveTabs(tabs, []).get(1)?.keptAlive, false, "no list = nothing kept");
+  // two marks covering one tab (a page mark and a domain mark): kept while any runs, paused only when all are
+  const twoMarks = (pagePaused: boolean, domainPaused: boolean) =>
+    deriveTabs(
+      tabs,
+      [],
+      [
+        {
+          url: "https://example.com/page",
+          title: "P",
+          minutes: 25,
+          nextReload: 0,
+          ...(pagePaused ? { paused: true } : {}),
+        },
+        {
+          url: "example.com",
+          title: "example.com",
+          minutes: 25,
+          nextReload: 0,
+          ...(domainPaused ? { paused: true } : {}),
+        },
+      ],
+      undefined,
+      true,
+    ).get(1);
+  assert.deepEqual([twoMarks(true, false)?.keptAlive, twoMarks(true, false)?.keepAlivePaused], [true, false]);
+  assert.deepEqual([twoMarks(false, true)?.keptAlive, twoMarks(false, true)?.keepAlivePaused], [true, false]);
+  assert.deepEqual([twoMarks(true, true)?.keptAlive, twoMarks(true, true)?.keepAlivePaused], [false, true]);
 });
 
 test("Model - CountsByFilter", () => {
@@ -1039,4 +1066,33 @@ test("Model - selectVisible window sort ranks the windows once, not per comparis
     elapsed < Math.max(2, plainMs * 15),
     `window sort ${elapsed.toFixed(2)} ms vs plain ${plainMs.toFixed(2)} ms`,
   );
+});
+
+test("Model - badges: a paused mark and off tags are struck through (kind off) — after the live pills, never a hit", () => {
+  assert.deepEqual(badges(tab(), false, "paused"), [["kept alive", "ok off"]]);
+  assert.deepEqual(badges(tab(), false, true), [["kept alive", "ok"]], "a running mark as before");
+  assert.deepEqual(badges(tab(), false, false, [work], new Set(["t2"]), new Map(), [bills]), [
+    ["Work", "tag", "#1a73e8"],
+    ["bills", "tag dark off", "#f9ab00"], // a search hit on an off tag draws no ring: it is not a tag here
+  ]);
+});
+
+test("Model - deriveTabs: offTags and keepAlivePaused when the panel shows disabled things, empty otherwise", () => {
+  const offList = { ...tagging, tags: [{ ...work, disabled: true }, bills] };
+  const marks = [{ url: "https://paused.io/", title: "Paused", minutes: 25, paused: true, nextReload: 0 }];
+  const tabs = [tab({ url: "https://example.com/x" }), tab({ id: 3, url: "https://paused.io/" })];
+  const shown = deriveTabs(tabs, [], marks, offList, true);
+  assert.deepEqual(shown.get(1)?.tags, [bills], "the live tags are what they were");
+  assert.deepEqual(shown.get(1)?.offTags, [{ ...work, disabled: true }]);
+  assert.doesNotMatch(shown.get(1)?.haystack ?? "", /work/, "an off tag is not searchable");
+  assert.equal(shown.get(3)?.keptAlive, false);
+  assert.equal(shown.get(3)?.keepAlivePaused, true);
+  assert.equal(shown.get(1)?.keepAlivePaused, false);
+  // the Tags filter and its counts see the off tags: a ticked disabled tag shows the tabs carrying it
+  assert.equal(countsByFilter(tabs, shown, new Set(["t1"])).tags, 1);
+  assert.equal(countsByFilter(tabs, shown).tags, 1, "no tick: tagged tabs, off tags included");
+  const hidden = deriveTabs(tabs, [], marks, offList);
+  assert.deepEqual(hidden.get(1)?.offTags, []);
+  assert.equal(hidden.get(3)?.keepAlivePaused, false);
+  assert.equal(countsByFilter(tabs, hidden, new Set(["t1"])).tags, 0);
 });

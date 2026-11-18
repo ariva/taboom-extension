@@ -24,7 +24,8 @@ export function isTagsPickerOpen(): boolean {
 
 function fillPicker(): void {
   pop.textContent = "";
-  const tags = orderedTags(state.tags, state.tagPages, state.ui); // Settings → Tags order in pickers
+  // Settings → Tags order in pickers; disabled tags listed struck through while the panel shows them
+  const tags = orderedTags(state.tags, state.tagPages, state.ui, state.showDisabledInPanel);
   if (tags.length === 0) {
     const empty = document.createElement("div");
     empty.className = "muted tag-pick-empty";
@@ -36,7 +37,7 @@ function fillPicker(): void {
   const counted = state.query ? searchCandidates(state.allTabs, state) : state.allTabs;
   for (const tag of tags) {
     const label = document.createElement("label");
-    label.className = "tag-pick";
+    label.className = tag.disabled ? "tag-pick off" : "tag-pick";
     const box = document.createElement("input");
     box.type = "checkbox";
     box.checked = state.tagFilter.has(tag.id);

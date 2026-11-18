@@ -2047,3 +2047,24 @@ test("UI - Options - Protected Sites Add explains junk and duplicates; status re
   await tick();
   await tick();
 });
+
+test("UI - Options - Customizations: 'Show disabled tags and paused keep-alive marks' persists settings.showDisabledInPanel (default on)", async () => {
+  const box = byId<HTMLInputElement>("showDisabledInPanel");
+  assert.equal(box.type, "checkbox");
+  assert.equal(box.checked, true, "default: shown, struck through");
+  assert.equal(
+    box.closest(".card")?.querySelector("h2")?.textContent,
+    "Customizations",
+    "lives in the Customizations card",
+  );
+  box.checked = false;
+  box.dispatchEvent(new window.Event("change", { bubbles: true }));
+  await tick();
+  await tick();
+  assert.equal(stored.settings.showDisabledInPanel, false);
+  box.checked = true;
+  box.dispatchEvent(new window.Event("change", { bubbles: true }));
+  await tick();
+  await tick();
+  assert.equal(stored.settings.showDisabledInPanel, true);
+});

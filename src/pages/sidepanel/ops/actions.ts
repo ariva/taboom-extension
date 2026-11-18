@@ -6,7 +6,6 @@ import { askDialog } from "../../../lib/ui/ask-dialog.ts";
 import { isUnloaded } from "../../../app/core.ts";
 import { send } from "../../../app/messages.ts";
 import { parkedRef } from "../../../app/parked.ts";
-import { pauseKeepAlive } from "../../../app/storage.ts";
 import { toast, toastFailure } from "../../../lib/ui/toast.ts";
 import { refresh } from "../foundation/scheduler.ts";
 import { reportAnswer } from "./answer.ts";
@@ -144,10 +143,6 @@ export async function keepAlive(tabIds: number[], kept: boolean, scope?: "site")
 }
 
 // pause / resume: a storage write the worker follows (alarm, menu checkbox) like an options edit
-export async function keepAlivePause(tabIds: number[], paused: boolean): Promise<void> {
-  await pauseKeepAlive(urlsOf(actionableTabs(), tabIds), paused);
-  refresh(true);
-}
 
 // Must run synchronously from the click: clipboard writes in an extension page ride
 // on the user activation, no clipboardWrite permission needed.

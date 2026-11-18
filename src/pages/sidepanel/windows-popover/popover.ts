@@ -131,7 +131,8 @@ function quickLaunchViews() {
   const pinnedTabs = state.liveTabs.filter((tab) => tab.pinned);
   const aliveMarks = keepAliveActive() ? state.keepAlive : [];
   const dupSets = duplicatesActive() ? duplicateSets(state.liveTabs) : [];
-  const tagList = tagsActive() ? orderedTags(state.tags, state.tagPages, state.ui) : []; // Settings picker order, enabled only
+  // Settings picker order; the disabled ones too (struck through) while the panel shows them
+  const tagList = tagsActive() ? orderedTags(state.tags, state.tagPages, state.ui, state.showDisabledInPanel) : [];
   const parkedCount = parkedActive() ? parkedRowsNewestFirst().length : 0;
   const liveCount = maps.indexes.size;
   // the count is live + parked: the view lists both (the Parked heading carries its own count)

@@ -311,6 +311,9 @@ main.compact .row.in-group { padding: 0.1875rem 0.5rem 0.1875rem 1.5625rem; }
 .badge.tag.dark { color: #202124; }
 .badge.tag.hit { outline: 0.125rem solid var(--accent); outline-offset: 0.0625rem; }
 .badge.tag-more { color: var(--muted); background: none; padding: 0; } /* "+2": the hover tip names them */
+/* a disabled tag, a switched-off rule's tag or a paused keep-alive mark: shown struck through rather
+   than hidden while Settings → Customizations says so (settings.showDisabledInPanel) */
+.badge.off { text-decoration: line-through; opacity: 0.6; }
 
 /* visibility (not display) so reserved height never changes on hover */
 .row .actions {
@@ -863,6 +866,7 @@ body.tag-picking #hover-tip { pointer-events: none; }
 #tags-pop .tag-pick:hover, #tag-assign-pop .tag-pick:hover { background: var(--badge-bg); }
 #tags-pop .tag-pick input, #tag-assign-pop .tag-pick input { margin: 0; }
 #tags-pop .tag-pick .tag-name, #tag-assign-pop .tag-pick .tag-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#tags-pop .tag-pick.off .tag-name { text-decoration: line-through; color: var(--muted); } /* a disabled tag, still tickable */
 #tag-assign-pop .tag-origin { flex: none; font-size: 0.75rem; cursor: help; }
 #tags-pop .tag-pick-empty, #tag-assign-pop .tag-pick-empty { padding: 0.25rem 0.375rem; max-width: 14rem; }
 /* sticky: the list scrolls under the header (the popover itself is the scroll box) */
@@ -1011,6 +1015,7 @@ body.tag-picking #hover-tip { pointer-events: none; }
 /* Alive view: paused = greyed out (reloads off), not open = struck through (no tab) */
 #windows-pop .win-row.paused .win-title { color: var(--muted); }
 #windows-pop .win-row.missing .win-title { text-decoration: line-through; }
+#windows-pop .win-row.off .win-title { text-decoration: line-through; color: var(--muted); } /* Tags view: a disabled tag */
 #windows-pop .win-row.drop-target { border-radius: var(--radius-s); }
 #windows-pop .win-title {
     font-size: 0.85rem;

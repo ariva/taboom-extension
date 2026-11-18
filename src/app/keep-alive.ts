@@ -36,9 +36,17 @@ const JITTER_MS = 55_000;
 // 1-minute interval minus the jitter would land under that
 const MIN_GAP_MS = 30_000;
 
-// the mark behind a url — undefined when the page is not marked
+// the mark behind a key: a mark's own url first (Settings row, Alive view — a domain or glob mark
+// is no page address, so matching alone never found it and its Pause did nothing), else the first
+// mark covering a tab url — undefined when the page is not marked
 export function keepAliveEntry(list: KeepAliveTab[], url: string | undefined): KeepAliveTab | undefined {
-  return list.find((entry) => matchesKeepAlive(entry.url, url));
+  return list.find((entry) => entry.url === url) ?? list.find((entry) => matchesKeepAlive(entry.url, url));
+}
+
+// every mark covering a tab, list order (a page mark and a domain mark can both cover one tab):
+// the tab is kept while any of them runs, its menu acts on each
+export function keepAliveEntries(list: KeepAliveTab[], url: string | undefined): KeepAliveTab[] {
+  return list.filter((entry) => matchesKeepAlive(entry.url, url));
 }
 
 // a typed mark (options Add row, the address edit): the tagged-page normalizer (an address

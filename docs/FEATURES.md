@@ -57,6 +57,16 @@ see them as pills on every tab of that page and in the hover tip, group the list
   <img src="assets/features/chrome/tags-group-by-tag.png" alt="Tags - group by tag" width="360">
 </p>
 
+A tagged page keeps its `#fragment` (Settings → Tags → **Keep the #fragment**, on by default): hash-routed
+pages are one page per route — an entry with a `#` covers that exact address, one without covers every
+fragment. A tag switched off in Settings, or given by a switched-off rule, shows struck through on the row,
+in the hover tip and in the Tags picker (Settings → Customizations decides whether to show or hide them).
+
+<p>
+  <img src="assets/features/chrome/tags-fragment-tip.png" alt="Tags - a tagged page with its #fragment in the hover tip" width="360">
+  <img src="assets/features/chrome/settings-tag-fragment.png" alt="Settings - Tags, Keep the #fragment" width="460">
+</p>
+
 → [Usage: Tags](USAGE.md#tags)
 
 ## Windows and parking
@@ -139,6 +149,31 @@ tables. Every table edits in place; removals can be undone.
 <p>
   <img src="assets/features/chrome/settings-keep-alive.png" alt="Settings - Keep tabs alive" width="460">
   <img src="assets/features/chrome/settings-tags.png" alt="Settings - Tags" width="460">
+</p>
+
+Keep alive by URL or by domain: a row's menu marks the page or the whole site (one tab of it reloads per
+timer); the mark's menu names its kind — *Pause keep-alive (domain)*, *Remove domain from keep-alive* — in
+the row menu and in the quick launch's Alive view. A paused mark keeps its **kept alive** badge, struck
+through; Settings → Customizations can hide struck-through tags and marks instead.
+
+<p>
+  <img src="assets/features/chrome/keep-alive-row-menu.png" alt="Row menu - Keep alive domain / Keep alive URL" width="360">
+  <img src="assets/features/chrome/keep-alive-paused-badge.png" alt="Side panel - a paused mark's badge struck through" width="360">
+</p>
+<p>
+  <img src="assets/features/chrome/alive-mark-menu.png" alt="Alive view - the mark menu names the kind" width="360">
+  <img src="assets/features/chrome/settings-keep-alive-domain.png" alt="Settings - a domain mark in the keep-alive table" width="460">
+</p>
+<p>
+  <img src="assets/features/chrome/settings-show-disabled.png" alt="Settings - Show disabled tags and paused keep-alive marks" width="460">
+</p>
+
+Drag a row by its ⋮⋮ grip to reorder the keep-alive marks (the Alive view's and the catch-up reloads'
+order) and the tagged page rules.
+
+<p>
+  <img src="assets/features/chrome/settings-reorder-keep-alive.png" alt="Settings - dragging a keep-alive mark onto another row" width="460">
+  <img src="assets/features/chrome/settings-reorder-tag-pages.png" alt="Settings - dragging a tagged page rule onto another row" width="460">
 </p>
 
 → [Usage: Automatic snooze](USAGE.md#automatic-snooze) · [Protecting sites](USAGE.md#protecting-sites) · [Keeping tabs alive](USAGE.md#keeping-tabs-alive) · [Tags](USAGE.md#tags)

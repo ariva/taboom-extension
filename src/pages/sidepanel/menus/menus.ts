@@ -1,7 +1,7 @@
 // Context menus of the tab list: row menu, tab-group menu, window header menu, and the
 // item builders they share with the windows popover's menus.
 import { pluralize } from "../../../app/plural.ts";
-import { keepAliveEntry, keepAliveKindLabel, keepAliveOpenUrl } from "../../../app/keep-alive.ts";
+import { keepAliveEntries, keepAliveKindLabel, keepAliveOpenUrl } from "../../../app/keep-alive.ts";
 import { parkedGroupRef, parkedNewestFirst, parkedRef, parkedWindowLabel } from "../../../app/parked.ts";
 import { pauseKeepAlive, removeKeepAlive } from "../../../app/storage.ts";
 import type { KeepAliveTab, UiPrefs } from "../../../app/types.ts";
@@ -20,7 +20,6 @@ import {
   closeTabs,
   copyUrls,
   keepAlive,
-  keepAlivePause,
   pinTabs,
   protectTabs,
   protectUrls,
@@ -113,22 +112,16 @@ export function openRowMenu(event: MouseEvent, tabId: number): void {
   // of pages for periodic reloads (bulk unmark goes through Settings)
   if (keepAliveActive() && ids.length === 1) {
     ctxAppend(ctxDivider()); // keep-alive is its own section
-    // unmarked → Keep alive domain / URL (the tag items' order and scopes); covered (by a page or
-    // a site mark) → one toggle per state, running → Pause (the mark stays), paused → Resume.
-    // Dropping the mark is its own, separately named action.
-    const mark = keepAliveEntry(state.keepAlive, clicked?.url);
-    if (!mark) {
+    // unmarked → Keep alive domain / URL (the tag items' order and scopes); covered → per covering
+    // mark (a page mark and a domain mark can both cover the tab) one toggle for its state —
+    // running → Pause (the mark stays), paused → Resume — and its own, separately named Remove
+    const marks = keepAliveEntries(state.keepAlive, clicked?.url);
+    if (marks.length === 0) {
       ctxAppend(ctxItem("Keep alive domain", () => keepAlive(ids, true, "site")));
       ctxAppend(ctxItem("Keep alive URL", () => keepAlive(ids, true)));
-    } else {
-      const paused = mark.paused ?? false;
-      ctxAppend(
-        ...markItems(
-          mark,
-          () => keepAlivePause(ids, !paused),
-          () => keepAlive(ids, false),
-        ),
-      );
+    }
+    for (const mark of marks) {
+      ctxAppend(...markItems(mark));
     }
   }
   if (tagsActive()) {
@@ -211,30 +204,25 @@ export function openMarkMenu(event: MouseEvent, mark: KeepAliveTab): void {
   if (openUrl !== "") {
     ctxAppend(ctxItem("Open", () => chrome.tabs.create({ url: openUrl })));
   }
-  const paused = mark.paused ?? false;
-  ctxAppend(
-    ...markItems(
-      mark,
-      async () => {
-        await pauseKeepAlive([mark.url], !paused);
-        refresh(true);
-      },
-      async () => {
-        await removeKeepAlive([mark.url]);
-        refresh(true);
-      },
-    ),
-  );
+  ctxAppend(...markItems(mark));
   showCtxMenu(event);
 }
 
 // the two items of a covering mark — a toggle per state (running → Pause, paused → Resume) and
 // Remove — named after the mark's kind, so a domain mark's pause reads as the domain's; the mark
-// itself on hover (what gets paused or removed)
-function markItems(mark: KeepAliveTab, togglePause: () => void, remove: () => void): HTMLButtonElement[] {
+// itself on hover (what gets paused or removed). They act on the mark by its own url: through the
+// tab's url the writers reach the first covering mark only, not this one
+function markItems(mark: KeepAliveTab): HTMLButtonElement[] {
   const kind = keepAliveKindLabel(mark.url);
-  const toggle = ctxItem(`${mark.paused ? "Resume" : "Pause"} keep-alive (${kind})`, togglePause);
-  const drop = ctxItem(`Remove ${kind} from keep-alive`, remove);
+  const paused = mark.paused ?? false;
+  const toggle = ctxItem(`${paused ? "Resume" : "Pause"} keep-alive (${kind})`, async () => {
+    await pauseKeepAlive([mark.url], !paused);
+    refresh(true);
+  });
+  const drop = ctxItem(`Remove ${kind} from keep-alive`, async () => {
+    await removeKeepAlive([mark.url]);
+    refresh(true);
+  });
   toggle.title = drop.title = mark.url;
   return [toggle, drop];
 }

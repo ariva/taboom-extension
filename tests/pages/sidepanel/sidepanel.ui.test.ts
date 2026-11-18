@@ -2002,6 +2002,37 @@ test("UI - Sidepanel - KEEP_ALIVE: row menu marks / unmarks the page, quick laun
     domainItems.map((el) => el.title),
     ["github.com", "github.com"],
   );
+  // the reported bug: Resume on a domain mark changed nothing — the writer looked the mark up as a
+  // page address and never found it; the item acts on the mark itself now
+  must(domainItems.find((el) => el.textContent === "Resume keep-alive (domain)")).click();
+  await tick();
+  await tick();
+  const { keepAlive: resumedDomain = [] } = await chrome.storage.local.get("keepAlive");
+  assert.ok(!("paused" in (resumedDomain[0] ?? {})), "the domain mark itself is resumed");
+  // two marks covering one tab: one pair of items per mark; the badge is live while one of them runs
+  await chrome.storage.local.set({
+    keepAlive: [
+      { url: "https://github.com/pr/1", title: "My Pull Request", minutes: 25, nextReload: 1 },
+      { url: "github.com", title: "github.com", minutes: 25, nextReload: 1, paused: true },
+    ],
+  });
+  await chrome.storage.onChanged.fire({ keepAlive: {} }, "local");
+  await settle();
+  const liveBadge = must(qa(rowOf(1), ".badge").find((el) => el.textContent === "kept alive"));
+  assert.equal(liveBadge.classList.contains("off"), false, "one mark still running: a live badge");
+  rowOf(1).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+  assert.deepEqual(
+    qa(menu, ".ctx-item")
+      .map((el) => el.textContent)
+      .filter((text) => /alive/.test(text)),
+    [
+      "Pause keep-alive (URL)",
+      "Remove URL from keep-alive",
+      "Resume keep-alive (domain)",
+      "Remove domain from keep-alive",
+    ],
+    "both covering marks, each with its own toggle and remove",
+  );
   await chrome.storage.local.set({
     keepAlive: [{ url: "https://github.com/pr/1", title: "My Pull Request", minutes: 25, nextReload: 1 }],
   });
@@ -2102,7 +2133,8 @@ test("UI - Sidepanel - KEEP_ALIVE: row menu marks / unmarks the page, quick laun
   });
   await chrome.storage.onChanged.fire({ keepAlive: {} }, "local");
   await settle();
-  assert.ok(!qa(rowOf(1), ".badge").some((el) => el.textContent === "kept alive"), "paused: badge gone");
+  const pausedBadge = must(qa(rowOf(1), ".badge").find((el) => el.textContent === "kept alive"));
+  assert.ok(pausedBadge.classList.contains("off"), "paused: the badge stays, struck through (T-0156)");
   winBtn.click();
   await tick();
   must(qa(pop, ".win-view").find((el) => el.textContent === "Alive (1)")).click();
@@ -2914,6 +2946,100 @@ test("UI - Sidepanel - TAGS: Tag URL… keys a page with its #fragment while set
   await chrome.storage.onChanged.fire({ settings: {}, tags: {} }, "local");
   tabs.splice(
     tabs.findIndex((t) => t.id === 40),
+    2,
+  );
+  await chrome.tabs.onActivated.fire({});
+  await settle();
+});
+
+test("UI - Sidepanel - TAGS: a disabled tag or a switched-off rule shows struck through on the row, the tip and the Tags picker; ticking it filters; settings.showDisabledInPanel off hides it", {
+  skip: !TAGS_ON,
+}, async () => {
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 200)); // 150ms refresh debounce
+  const rowOf = (id: number) => q(document, `.row[data-tab-id="${id}"]`);
+  const pills = (id: number) =>
+    qa(rowOf(id), ".badge.tag").map((el) => `${el.textContent}${el.classList.contains("off") ? " (off)" : ""}`);
+  const base = {
+    windowId: 1,
+    active: false,
+    discarded: false,
+    pinned: false,
+    audible: false,
+    lastAccessed: NOW - 1000,
+  };
+  tabs.push(
+    { ...base, id: 50, index: 8, url: "https://a.test/one", title: "One" },
+    { ...base, id: 51, index: 9, url: "https://a.test/two", title: "Two" },
+  );
+  await chrome.storage.local.set({
+    settings: {},
+    tags: [
+      { id: "live", name: "live", color: "blue" },
+      { id: "gone", name: "gone", color: "red", disabled: true },
+    ],
+    tagPages: [
+      { url: "https://a.test/one", tagIds: ["live", "gone"] },
+      { url: "https://a.test/two", tagIds: ["live"], disabled: true },
+    ],
+  });
+  await chrome.storage.onChanged.fire({ settings: {}, tags: {}, tagPages: {} }, "local");
+  await chrome.tabs.onActivated.fire({});
+  await settle();
+  assert.deepEqual(pills(50), ["live", "gone (off)"], "a disabled tag: struck through after the live one");
+  assert.deepEqual(pills(51), ["live (off)"], "a switched-off rule: its tag struck through");
+  assert.match(
+    rowOf(50).dataset.tipTags ?? "",
+    /"name":"gone","color":"[^"]+","dark":(true|false),"off":true/,
+    "the tip knows",
+  );
+  // the hover tip: the live tags on the Tags: line, the struck-through ones on their own line below
+  const tipLines = () => qa(byId("hover-tip"), ".tip-tags").map((el) => el.textContent);
+  rowOf(50).dispatchEvent(new window.Event("mouseover", { bubbles: true }));
+  assert.deepEqual(tipLines(), ["Tags: live", "Disabled tags: gone"]);
+  assert.ok(q(byId("hover-tip"), ".tip-tags .badge.tag.off"), "the disabled pill is struck through in the tip too");
+  rowOf(51).dispatchEvent(new window.Event("mouseover", { bubbles: true }));
+  assert.deepEqual(tipLines(), ["Disabled tags: live"], "nothing live: the Tags: line is not shown");
+  // the Tags picker lists it struck through; a tick on it filters to the tabs carrying it
+  const chip = q(document, '#filters button[data-filter="tags"]');
+  const pop = byId("tags-pop");
+  chip.click();
+  await tick();
+  const picks = qa(pop, ".tag-pick");
+  assert.deepEqual(
+    picks.map((el) => `${q(el, ".tag-name").textContent}${el.classList.contains("off") ? " (off)" : ""}`),
+    ["live", "gone (off)"],
+  );
+  const shown = () =>
+    qa(document, ".row")
+      .map((el) => el.dataset.tabId)
+      .sort();
+  assert.deepEqual(shown(), ["50", "51"], "no tick: every tab with a tag, off ones included");
+  q<HTMLInputElement>(must(picks[1]), "input").click();
+  await tick();
+  assert.deepEqual(shown(), ["50"], "ticked disabled tag: the tabs carrying it");
+  assert.equal(q(chip, ".chip-label").textContent, "gone", "the chip names it");
+  // the setting off: today's view — hidden everywhere, the tick dropped
+  await chrome.storage.local.set({ settings: { showDisabledInPanel: false } });
+  await chrome.storage.onChanged.fire({ settings: {} }, "local");
+  await settle();
+  assert.deepEqual(pills(50), ["live"]);
+  assert.equal(document.querySelector('.row[data-tab-id="51"]'), null, "no live tag: out of the Tags filter");
+  assert.equal(rowOf(50).dataset.tipTags?.includes("gone"), false);
+  assert.deepEqual(shown(), ["50"], 'the dropped tick leaves "any tagged tab": the live-tagged one');
+  assert.equal(q(chip, ".chip-label").textContent, "Tags");
+  chip.click();
+  await tick();
+  assert.deepEqual(
+    qa(pop, ".tag-pick").map((el) => q(el, ".tag-name").textContent),
+    ["live"],
+    "the picker hides it",
+  );
+  q(document, '#filters button[data-filter="all"]').click();
+  await tick();
+  await chrome.storage.local.set({ settings: {}, tags: [], tagPages: [] });
+  await chrome.storage.onChanged.fire({ settings: {}, tags: {} }, "local");
+  tabs.splice(
+    tabs.findIndex((t) => t.id === 50),
     2,
   );
   await chrome.tabs.onActivated.fire({});

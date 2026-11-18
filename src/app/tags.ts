@@ -170,6 +170,19 @@ export function tagsForUrl(pages: TagPage[], tags: Tag[], url: string | undefine
   return ids.size === 0 ? [] : enabledTags(tags).filter((tag) => ids.has(tag.id));
 }
 
+// the tags a url gets only through a disabled tag or a switched-off entry — what the panel shows
+// struck through while settings.showDisabledInPanel is on (T-0156); tag-list order. A second pass
+// over the entries after tagsForUrl: run only while the panel shows them
+export function offTagsForUrl(pages: TagPage[], tags: Tag[], url: string | undefined): Tag[] {
+  const page = pageKeyOf(url);
+  const ids = new Set(pages.filter((entry) => matchesTagPageKey(entry.url, page)).flatMap((entry) => entry.tagIds));
+  if (ids.size === 0) {
+    return [];
+  }
+  const live = new Set(tagsForUrl(pages, tags, url).map((tag) => tag.id));
+  return tags.filter((tag) => ids.has(tag.id) && !live.has(tag.id));
+}
+
 // where a tab's tag comes from — the badge glyph and the pickers' hints: its own page entry
 // ("page", an exact key), a domain entry, or a pattern (a prefix or a glob). Every entry kind
 // that hands the tag down, per tag id
@@ -480,11 +493,13 @@ export function sortedTags(tags: Tag[], pageCounts: ReadonlyMap<string, number>,
 
 // every tag list a user picks from (the pickers, the quick launch, the page menu): the enabled
 // tags in the order Settings → "Tags order in pickers" asks for — the stored order, by name, by
-// use (most pages first), or whatever the Settings table is sorted by right now
+// use (most pages first), or whatever the Settings table is sorted by right now. The panel's
+// filter picker and Tags view list the disabled ones too (struck through) while the panel shows them
 export function orderedTags(
   tags: Tag[],
   pages: TagPage[],
   ui: { tagSort?: TagSort; tagPickOrder?: TagPickOrder },
+  includeDisabled = false,
 ): Tag[] {
   const sort: TagSort | null =
     ui.tagPickOrder === "name"
@@ -494,7 +509,7 @@ export function orderedTags(
         : ui.tagPickOrder === "table"
           ? (ui.tagSort ?? null)
           : null;
-  return sortedTags(enabledTags(tags), pageCountByTag(pages), sort);
+  return sortedTags(includeDisabled ? tags : enabledTags(tags), pageCountByTag(pages), sort);
 }
 
 // the tabs a wide untick reaches, as prompt lines: five named, the rest counted (Settings and the
