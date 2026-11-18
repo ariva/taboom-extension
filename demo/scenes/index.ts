@@ -3,6 +3,9 @@
 import type { Stage } from "../stage.ts";
 import { duplicates, snoozeProtect } from "./actions.ts";
 import { grouping } from "./grouping.ts";
+import { keepAliveDomain } from "./keep-alive.ts";
+import { settingsReorder } from "./reorder.ts";
+import { tagFragment } from "./tag-fragment.ts";
 import { filters, search } from "./search.ts";
 import { settings } from "./settings.ts";
 import { sharedView } from "./shared-view.ts";
@@ -27,6 +30,9 @@ export interface Scene {
 // the "new in this release" scenes play first, then the tour of everything else; the outro
 // (no newIn, ever) stays last through the reordering
 export const SCENES: Scene[] = [
+  keepAliveDomain,
+  settingsReorder,
+  tagFragment,
   sharedView,
   snoozeNow,
   tags,
