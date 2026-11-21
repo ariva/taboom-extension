@@ -3,13 +3,13 @@ import type { Scene } from "./index.ts";
 // drag reorder of the Settings tables (T-0154): the Settings pane has no cursor, so the drag is
 // the row-reorder's own events dispatched on the real rows — dragstart + dragover hold the
 // highlight on screen, drop + dragend let the writer move the row
-interface DragArgs {
+export interface DragArgs {
   rows: string; // tbody id
   from: string; // data-key of the dragged row
   to: string; // data-key of the row it lands on
   step: "over" | "drop";
 }
-function dragRows(args: DragArgs): boolean {
+export function dragRows(args: DragArgs): boolean {
   const table = document.getElementById(args.rows);
   const find = (key: string) => table?.querySelector<HTMLElement>(`tr[data-key="${CSS.escape(key)}"]`) ?? null;
   const dragged = find(args.from);

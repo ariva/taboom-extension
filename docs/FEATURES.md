@@ -176,4 +176,27 @@ order) and the tagged page rules.
   <img src="assets/features/chrome/settings-reorder-tag-pages.png" alt="Settings - dragging a tagged page rule onto another row" width="460">
 </p>
 
+Protect or keep alive for a while: hover **Protect domain ▸** / **Protect URL ▸** / **Keep alive domain ▸** /
+**Keep alive URL ▸** in a row's menu for *Always (default)* or 1 hour to 1 week (the click itself is
+Always). The row reads **temporary protected** / **temporary keep alive**, the hover tip adds the time left,
+and the rule or mark removes itself when the time is up (Restore last removal brings it back).
+
+<p>
+  <img src="assets/features/chrome/protect-durations-menu.png" alt="Row menu - Protect domain durations" width="360">
+  <img src="assets/features/chrome/temporary-badges-tip.png" alt="Side panel - temporary badges with the time left in the tip" width="360">
+</p>
+
+Settings → Protected Sites is a table like the keep-alive marks: **Expires** (Never or a duration, counted
+from the pick) and a live **Time left** on both tables, an **On** box that keeps a rule listed but protecting
+nothing (the panel shows the badge struck through), and drag-to-reorder by the ⋮⋮ grip.
+
+<p>
+  <img src="assets/features/chrome/settings-protected-expires.png" alt="Settings - Protected sites with Expires and Time left" width="460">
+  <img src="assets/features/chrome/settings-keep-alive-expires.png" alt="Settings - keep-alive marks with Expires and Time left" width="460">
+</p>
+<p>
+  <img src="assets/features/chrome/protected-disabled-badge.png" alt="Side panel - a disabled rule's badge struck through" width="360">
+  <img src="assets/features/chrome/settings-reorder-protected.png" alt="Settings - dragging a protected site onto another row" width="460">
+</p>
+
 → [Usage: Automatic snooze](USAGE.md#automatic-snooze) · [Protecting sites](USAGE.md#protecting-sites) · [Keeping tabs alive](USAGE.md#keeping-tabs-alive) · [Tags](USAGE.md#tags)

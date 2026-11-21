@@ -6,6 +6,7 @@ import { grouping } from "./grouping.ts";
 import { keepAliveDomain } from "./keep-alive.ts";
 import { settingsReorder } from "./reorder.ts";
 import { tagFragment } from "./tag-fragment.ts";
+import { temporaryProtection } from "./temporary.ts";
 import { filters, search } from "./search.ts";
 import { settings } from "./settings.ts";
 import { sharedView } from "./shared-view.ts";
@@ -30,6 +31,7 @@ export interface Scene {
 // the "new in this release" scenes play first, then the tour of everything else; the outro
 // (no newIn, ever) stays last through the reordering
 export const SCENES: Scene[] = [
+  temporaryProtection,
   keepAliveDomain,
   settingsReorder,
   tagFragment,

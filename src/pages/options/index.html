@@ -290,7 +290,7 @@
     :is(#tag-rows, #tag-page-rows, #keep-alive-rows, #rules) tr.drop-target td:first-child { box-shadow: inset 2px 2px 0 var(--accent), inset 0 -2px 0 var(--accent); border-radius: 6px 0 0 6px; }
     :is(#tag-rows, #tag-page-rows, #keep-alive-rows, #rules) tr.drop-target td:last-child { box-shadow: inset -2px 2px 0 var(--accent), inset 0 -2px 0 var(--accent); border-radius: 0 6px 6px 0; }
     :is(#keep-alive-table, #rules-table) td:last-child { text-align: right; }
-    #keep-alive-table button {
+    :is(#keep-alive-table, #rules-table) button {
       border: 1px solid light-dark(#ddd, #444);
       background: none;
       color: inherit;
@@ -300,7 +300,7 @@
       font-size: 11px;
       transition: background var(--transition);
     }
-    #keep-alive-table button:hover { background: var(--hover); }
+    :is(#keep-alive-table, #rules-table) button:hover { background: var(--hover); }
 
     #links li { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid light-dark(#eee, #333); }
     #links li:last-child { border-bottom: none; }
