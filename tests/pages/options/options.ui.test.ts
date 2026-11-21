@@ -5,6 +5,7 @@ import { byId, q, qa } from "../../helpers/dom.ts";
 import { makeChrome, loadPage, tick, RAW_FEATURES, TEST_EXPERIMENTAL, TEST_FEATURES } from "../../helpers/ui.ts";
 
 const calls: string[] = [];
+const TAB_NAMES_ON = TEST_FEATURES.TAB_NAMES?.enabled === true;
 
 // A lookup that must hit: a miss fails the test with a readable message
 function must<T>(found: T | null | undefined): T {
@@ -26,6 +27,8 @@ const stored: Pick<LocalStorageSchema, "settings" | "ui"> &
     tags?: LocalStorageSchema["tags"];
     tagPages?: LocalStorageSchema["tagPages"];
     tagTrash?: LocalStorageSchema["tagTrash"];
+    tabNames?: LocalStorageSchema["tabNames"];
+    tabNamesTrash?: LocalStorageSchema["tabNamesTrash"];
   } = {
   settings: { autoSnoozeEnabled: false, inactivityMinutes: 45 },
   protectionRules: [{ id: "r1", type: "domain", pattern: "*.github.com" }],
@@ -2229,4 +2232,154 @@ test("UI - Options - Protected sites table: drag a row by its grip onto another 
   await chrome.storage.onChanged.fire({ protectionRules: {} }, "local");
   await tick();
   await tick();
+});
+
+test("UI - Options - TAB_NAMES: the Tab names card after Tags — #, On, Pattern, Name, Tabs, Remove; the On box, in-place edits, the Add row, Remove to the trash and Restore, drag to reorder", {
+  skip: !TAB_NAMES_ON,
+}, async () => {
+  const section = byId("tab-names-section");
+  assert.equal(section.hidden, false, "shown while the flag is on");
+  assert.equal(section.previousElementSibling?.id, "tags-section", "right after the Tags card");
+  stored.tabNames = [
+    { id: "a", pattern: "https://docs.test/x", name: "Docs", createdAt: 1 },
+    { id: "b", pattern: "docs.test", name: "Docs site", createdAt: 1, disabled: true },
+  ];
+  await chrome.storage.onChanged.fire({ tabNames: {} }, "local");
+  await tick();
+  await tick();
+  const rows = () => qa<HTMLTableRowElement>(byId("tab-names"), "tr");
+  assert.deepEqual(
+    qa(byId("tab-names-table"), "thead th").map((th) => th.textContent),
+    ["#", "On", "Pattern", "Name", "Tabs", ""],
+  );
+  assert.equal(rows().length, 2);
+  assert.deepEqual(
+    rows().map((row) => q(row, "td").textContent),
+    ["1", "2"],
+    "rows numbered",
+  );
+  assert.ok(must(rows()[0]).querySelector("td:first-child .drag-grip svg"), "the grip shares the # cell");
+  assert.equal(q(must(rows()[0]), ".pattern").textContent, "https://docs.test/x");
+  assert.equal(q(must(rows()[0]), ".name").textContent, "Docs");
+  assert.equal(q(must(rows()[0]), ".tab-name-tabs").textContent, "0", "no open tab covered (the mock has none)");
+  assert.equal(q<HTMLButtonElement>(must(rows()[0]), "button").textContent, "Remove");
+  const onBox = (row: Element) => q<HTMLInputElement>(row, "input[type=checkbox]");
+  assert.equal(onBox(must(rows()[1])).checked, false, "a disabled rule is off");
+  onBox(must(rows()[1])).click();
+  await tick();
+  await tick();
+  assert.ok(!("disabled" in (stored.tabNames?.[1] ?? {})), "ticked: the key goes");
+  onBox(must(rows()[0])).click();
+  await tick();
+  await tick();
+  assert.equal(stored.tabNames?.[0]?.disabled, true, "unticked: kept, names nothing");
+  // in-place edits: the name and the pattern, blur commits
+  q(must(rows()[0]), ".name").click();
+  const nameInput = q<HTMLInputElement>(must(rows()[0]), "input.rename-input");
+  assert.equal(nameInput.value, "Docs");
+  nameInput.value = " Handbook ";
+  nameInput.dispatchEvent(new window.Event("blur"));
+  await tick();
+  await tick();
+  assert.equal(stored.tabNames?.[0]?.name, "Handbook", "trimmed");
+  assert.equal(q(must(rows()[0]), ".name").textContent, "Handbook", "re-rendered as text");
+  q(must(rows()[0]), ".pattern").click();
+  const patternInput = q<HTMLInputElement>(must(rows()[0]), "input.rename-input");
+  patternInput.value = " Docs.test/y ";
+  patternInput.dispatchEvent(new window.Event("blur"));
+  await tick();
+  await tick();
+  assert.equal(stored.tabNames?.[0]?.pattern, "https://docs.test/y", "normalized like a tagged page rule");
+  // the Add row at the table's foot: pattern + name; junk, a blank name and a listed pattern are explained
+  const pattern = byId<HTMLInputElement>("new-tab-name-pattern");
+  const name = byId<HTMLInputElement>("new-tab-name");
+  const add = byId<HTMLButtonElement>("add-tab-name");
+  const error = byId("tab-name-error");
+  pattern.value = "not a url";
+  name.value = "X";
+  add.click();
+  await tick();
+  assert.equal(error.hidden, false);
+  assert.match(error.textContent, /address, a host or a pattern/);
+  pattern.value = "docs.test";
+  add.click();
+  await tick();
+  assert.match(error.textContent, /already listed/);
+  pattern.value = "a.test";
+  name.value = "   ";
+  add.click();
+  await tick();
+  assert.match(error.textContent, /name/i);
+  name.value = " Alpha ";
+  add.click();
+  await tick();
+  await tick();
+  assert.equal(error.hidden, true);
+  assert.deepEqual(
+    stored.tabNames?.map((rule) => [rule.pattern, rule.name]),
+    [
+      ["https://docs.test/y", "Handbook"],
+      ["docs.test", "Docs site"],
+      ["a.test", "Alpha"],
+    ],
+    "appended last",
+  );
+  assert.equal(pattern.value, "", "inputs cleared");
+  assert.equal(name.value, "");
+  await chrome.storage.onChanged.fire({ tabNames: {} }, "local");
+  await tick();
+  await tick();
+  assert.equal(rows().length, 3);
+  // Remove → the trash; Restore brings it back
+  q<HTMLButtonElement>(must(rows()[2]), "button").click();
+  await tick();
+  await tick();
+  assert.equal(stored.tabNames?.length, 2);
+  assert.equal(stored.tabNamesTrash?.length, 1);
+  await chrome.storage.onChanged.fire({ tabNames: {}, tabNamesTrash: {} }, "local");
+  await tick();
+  await tick();
+  const restore = byId<HTMLButtonElement>("restore-tab-names");
+  assert.equal(restore.hidden, false);
+  assert.equal(restore.textContent, "Restore last removal (1 name)");
+  restore.click();
+  await tick();
+  await tick();
+  assert.equal(stored.tabNames?.length, 3, "back");
+  assert.deepEqual(stored.tabNamesTrash, []);
+  await chrome.storage.onChanged.fire({ tabNames: {}, tabNamesTrash: {} }, "local");
+  await tick();
+  await tick();
+  assert.equal(restore.hidden, true);
+  // drag the last row onto the first: it lands before it (dragged up)
+  assert.ok(
+    rows().every((row) => row.draggable),
+    "rows are drag handles",
+  );
+  must(rows()[2]).dispatchEvent(new window.Event("dragstart", { bubbles: true }));
+  must(rows()[0]).dispatchEvent(new window.Event("dragover", { bubbles: true, cancelable: true }));
+  must(rows()[0]).dispatchEvent(new window.Event("drop", { bubbles: true, cancelable: true }));
+  await tick();
+  await tick();
+  assert.deepEqual(
+    stored.tabNames?.map((rule) => rule.name),
+    ["Alpha", "Handbook", "Docs site"],
+  );
+  // Remove all (confirmed) empties the list into the trash
+  const globals = globalThis as { confirm: () => boolean }; // `as`: the harness installs confirm
+  const confirmBefore = globals.confirm;
+  globals.confirm = () => true;
+  byId<HTMLButtonElement>("clear-tab-names").click();
+  await tick();
+  await tick();
+  globals.confirm = confirmBefore;
+  assert.deepEqual(stored.tabNames, []);
+  // read back through storage: the deepEqual([]) above narrowed stored.tabNamesTrash to never[]
+  const { tabNamesTrash: trashed = [] } = await chrome.storage.local.get("tabNamesTrash");
+  assert.equal(trashed[0]?.items.length, 3);
+  stored.tabNamesTrash = [];
+  await chrome.storage.onChanged.fire({ tabNames: {}, tabNamesTrash: {} }, "local");
+  await tick();
+  await tick();
+  assert.equal(q(byId("tab-names"), "td").textContent, "No tab names yet.");
 });

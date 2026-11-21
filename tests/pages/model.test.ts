@@ -20,7 +20,7 @@ import {
   windowMaps,
 } from "../../src/pages/sidepanel/model/index.ts";
 import type { Badge, RowContext, RowViewModel, SearchView, SelectView } from "../../src/pages/sidepanel/model/index.ts";
-import type { ProtectionRule, Tag, TagPage, UiPrefs } from "../../src/app/types.ts";
+import type { ProtectionRule, TabName, Tag, TagPage, UiPrefs } from "../../src/app/types.ts";
 import { tagGroupName } from "../../src/pages/sidepanel/model/index.ts";
 import { nextTagSort, orderedTags, sortedTags } from "../../src/app/tags.ts";
 import type { TagSort } from "../../src/app/types.ts";
@@ -1134,4 +1134,44 @@ test("Model - Temporary states (T-0157): badges read temporary protected / tempo
     false,
     "a live rule beside it: plain protected",
   );
+});
+
+test("Model - DeriveTabs: a tab-name rule gives the row its name (first enabled rule in order wins) and the name joins the haystack", () => {
+  const names: TabName[] = [
+    { id: "off", pattern: "https://example.com/x", name: "Switched off", createdAt: 0, disabled: true },
+    { id: "page", pattern: "https://example.com/x", name: "Work hub", createdAt: 0 },
+    { id: "site", pattern: "example.com", name: "Example site", createdAt: 0 },
+  ];
+  const tabs = [tab(), tab({ id: 2, url: "https://example.com/other" }), tab({ id: 3, url: "https://other.io/" })];
+  const derived = deriveTabs(tabs, [], [], undefined, false, NOW, names);
+  assert.equal(derived.get(1)?.name, "Work hub", "the first enabled rule covering the page");
+  assert.ok(derived.get(1)?.haystack.includes("work hub"), "searchable, lowercased");
+  assert.equal(derived.get(2)?.name, "Example site", "the site rule covers the rest of the host");
+  assert.equal(derived.get(3)?.name, undefined);
+  assert.equal(deriveTabs(tabs, []).get(1)?.name, undefined, "no list = no names");
+});
+
+test("Model - RowViewModel: a named tab shows the name as its title (search marks it) and keeps the real title in the tip", () => {
+  const names: TabName[] = [{ id: "n", pattern: "https://example.com/x", name: "Work hub", createdAt: 0 }];
+  const maps = windowMaps([tab()], 1);
+  const ctx: RowContext = {
+    index: 0,
+    cursor: -1,
+    now: NOW,
+    currentWindowId: 1,
+    derived: deriveTabs([tab()], [], [], undefined, false, NOW, names),
+    selected: new Set(),
+    dotColors: maps.dotColors,
+    indexes: maps.indexes,
+    queryTokens: ["hub"],
+  };
+  const vm = rowViewModel(tab(), ctx);
+  assert.equal(vm.title, "Work hub");
+  assert.deepEqual(vm.titleRanges, [[5, 8]], "the search token is marked in the shown name");
+  assert.equal(vm.tip, "Example\nhttps://example.com/x", "the tip opens with the tab's own title");
+  const snoozed = rowViewModel(tab({ discarded: true }), ctx);
+  assert.equal(snoozed.title, "⏸ Work hub", "the snoozed prefix stays");
+  const plain = rowViewModel(tab(), { ...ctx, derived: deriveTabs([tab()], []), queryTokens: [] });
+  assert.equal(plain.title, "Example");
+  assert.equal(plain.tip, "https://example.com/x", "unnamed: the url alone, as before");
 });

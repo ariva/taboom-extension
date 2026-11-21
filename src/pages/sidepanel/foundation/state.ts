@@ -9,6 +9,7 @@ import type {
   NavMode,
   ParkedWindow,
   ProtectionRule,
+  TabName,
   Tag,
   TagPage,
   UiPrefs,
@@ -75,6 +76,7 @@ export interface PanelState {
   tags: Tag[];
   tagPages: TagPage[];
   tagFilter: Set<string>;
+  tabNames: TabName[]; // TAB_NAMES: storage.local.tabNames — the custom names the rows show
   pendingUiWrites: Set<string>; // JSON of each ui object this panel wrote and has not seen echoed yet
   tabsById: Map<number, PanelTab>; // shown ∪ live tabs by id, rebuilt per refresh (ids never collide: parked rows are negative)
   liveWindowMaps: WindowMaps; // windowMaps over the live set, computed once per refresh (labels, menus, quick launch)
@@ -139,6 +141,7 @@ export const state: PanelState = {
   parkedTrashCount: 0, // forgotten parked windows waiting in parkedTrash
   tags: [], // storage.local.tags
   tagPages: [], // storage.local.tagPages
+  tabNames: [],
   tagFilter: new Set(), // session only: the ticked tags of the Tags chip (empty = any tagged tab)
   pendingUiWrites: new Set(),
   tabsById: new Map(),
@@ -184,6 +187,11 @@ export function parkedActive(): boolean {
 // TAGS resolved flag — Tag URL ▸ in the row menu, the Tags chip, the badges, the quick launch view
 export function tagsActive(): boolean {
   return featureEnabled(state.features, "TAGS");
+}
+
+// TAB_NAMES: custom names in place of tab titles (the row menu's Rename tab…, Settings → Tab names)
+export function tabNamesActive(): boolean {
+  return featureEnabled(state.features, "TAB_NAMES");
 }
 
 // SPLIT_VIEW resolved flag — the row menu's Split view / Unsplit items

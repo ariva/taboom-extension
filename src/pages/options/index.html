@@ -151,18 +151,25 @@
 
     /* keep-it-alive marks as a table: number, running, page, its interval, countdown, expiry, remove —
        the protected sites share the shape (number, on, pattern, expiry, time left, remove) */
-    :is(#keep-alive-table, #rules-table) { width: 100%; border-collapse: collapse; margin-top: 8px; }
-    :is(#keep-alive-table, #rules-table) th { text-align: left; font-weight: 500; color: var(--muted); font-size: 11px; padding: 2px 6px 4px 0; }
-    :is(#keep-alive-table, #rules-table) td { padding: 4px 6px 4px 0; border-top: 1px solid light-dark(#eee, #333); vertical-align: middle; white-space: nowrap; }
-    :is(#keep-alive-table, #rules-table) td:first-child { color: var(--muted); font-variant-numeric: tabular-nums; }
+    :is(#keep-alive-table, #rules-table, #tab-names-table) { width: 100%; border-collapse: collapse; margin-top: 8px; }
+    :is(#keep-alive-table, #rules-table, #tab-names-table) th { text-align: left; font-weight: 500; color: var(--muted); font-size: 11px; padding: 2px 6px 4px 0; }
+    :is(#keep-alive-table, #rules-table, #tab-names-table) td { padding: 4px 6px 4px 0; border-top: 1px solid light-dark(#eee, #333); vertical-align: middle; white-space: nowrap; }
+    :is(#keep-alive-table, #rules-table, #tab-names-table) td:first-child { color: var(--muted); font-variant-numeric: tabular-nums; }
     /* the # header over the number, past the grip and its gap, like the tag tables */
-    :is(#keep-alive-table, #rules-table) th:first-child { padding-left: 16px; }
+    :is(#keep-alive-table, #rules-table, #tab-names-table) th:first-child { padding-left: 16px; }
     /* the pattern column takes the width, clipping long addresses to one line; monospace like the mark urls;
        the same left padding as the keep-alive page cell: room after the On box, the editor's outline inside the box */
     #rules-table td:nth-child(3) { width: 100%; max-width: 0; overflow: hidden; text-overflow: ellipsis; cursor: text; padding-left: 8px; padding-right: 12px; }
-    #rules-table .pattern, #rules-table .rename-input { font-family: ui-monospace, monospace; font-size: 12px; }
-    #rules-table .pattern { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; cursor: text; }
-    #rules-table .rename-input { width: calc(100% + 5px); margin-left: -5px; padding: 0 4px; border: 1px solid var(--border); border-radius: var(--radius-s); background: var(--card-bg); color: inherit; }
+    :is(#rules-table, #tab-names-table) :is(.pattern, .name, .rename-input) { font-family: ui-monospace, monospace; font-size: 12px; }
+    :is(#rules-table, #tab-names-table) :is(.pattern, .name) { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; cursor: text; }
+    :is(#rules-table, #tab-names-table) .rename-input { width: calc(100% + 5px); margin-left: -5px; padding: 0 4px; border: 1px solid var(--border); border-radius: var(--radius-s); background: var(--card-bg); color: inherit; }
+    /* tab names: the pattern and the name share the width, each clipped to one line; the name in the page font */
+    #tab-names-table td:nth-child(3) { width: 55%; max-width: 0; overflow: hidden; text-overflow: ellipsis; cursor: text; padding-left: 8px; padding-right: 12px; }
+    #tab-names-table td:nth-child(4) { width: 45%; max-width: 0; overflow: hidden; text-overflow: ellipsis; cursor: text; padding-right: 12px; }
+    #tab-names-table .name, #tab-names-table td:nth-child(4) .rename-input { font-family: inherit; font-size: 13px; }
+    #tab-names-table .tab-name-tabs { font-variant-numeric: tabular-nums; cursor: default; }
+    #tab-names-table tfoot td { border-top: 1px solid light-dark(#eee, #333); padding-top: 8px; }
+    #tab-names-table tfoot input { width: calc(100% - 12px); box-sizing: border-box; }
     /* max-width: 0 lets the 100%-wide cell shrink below its content so title and url clip to one line each */
     /* left padding: breathing room after the toggle, and the editor's focus outline stays inside the clipping box */
     #keep-alive-table td:nth-child(3) { width: 100%; max-width: 0; overflow: hidden; text-overflow: ellipsis; cursor: text; padding-left: 8px; padding-right: 12px; }
@@ -179,7 +186,7 @@
       width: calc(100% + 5px); margin-left: -5px; padding: 0 4px;
       border: 1px solid var(--border); border-radius: var(--radius-s); background: var(--card-bg); color: inherit;
     }
-    :is(#keep-alive-table, #rules-table) :is(.countdown, .time-left) { font-variant-numeric: tabular-nums; }
+    :is(#keep-alive-table, #rules-table, #tab-names-table) :is(.countdown, .time-left) { font-variant-numeric: tabular-nums; }
     /* tags: two tables in the keep-alive shape — tag list (color select, click-to-edit name, pages
        count) and tagged pages (click-to-edit address, one toggle chip per tag) */
     #tags-section h3 { margin: 16px 0 4px; font-size: 13px; font-weight: 600; }
@@ -264,12 +271,12 @@
     #tag-page-pick .muted { padding: 4px 6px; }
     #tag-table button:not(.sort-button), #tag-page-table button.remove-page { border: 1px solid var(--border); border-radius: 6px; background: none; color: inherit; font: inherit; font-size: 12px; padding: 2px 8px; cursor: pointer; }
     #tag-table button:not(.sort-button):hover, #tag-page-table button.remove-page:hover { background: var(--hover); }
-    #rule-error, #tag-error, #tag-page-error { color: var(--danger, #d93025); margin-top: 4px; }
+    #rule-error, #tag-error, #tag-page-error, #tab-name-error { color: var(--danger, #d93025); margin-top: 4px; }
     /* drag reorder of the tag, tagged-page and keep-alive rows, like the side panel's tab rows: the
        dragged row dims, the row under the pointer is highlighted whole (accent frame + tint). The tag
        table gives the grip a column; the other three put it in the # cell */
-    :is(#tag-rows, #tag-page-rows, #keep-alive-rows, #rules) tr[draggable="true"] { cursor: grab; }
-    :is(#tag-rows, #tag-page-rows, #keep-alive-rows, #rules) tr[draggable="false"] .drag-grip { opacity: 0.35; }
+    :is(#tag-rows, #tag-page-rows, #keep-alive-rows, #rules, #tab-names) tr[draggable="true"] { cursor: grab; }
+    :is(#tag-rows, #tag-page-rows, #keep-alive-rows, #rules, #tab-names) tr[draggable="false"] .drag-grip { opacity: 0.35; }
     /* sortable headers: a faint ⇅ invites the click, the active one shows ▲ / ▼ */
     /* sortable headers read in the accent in both tables (the tag table did by a comma slip in the old
        selectors; kept on purpose); the arrow is dim until its sort is active */
@@ -277,20 +284,20 @@
     .sort-button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
     #tag-table th[data-sort] .sort-arrow, #tag-page-table th[data-sort] .sort-arrow { font-size: 10px; opacity: 0.45; }
     #tag-table th[data-sort][data-dir] .sort-arrow, #tag-page-table th[data-sort][data-dir] .sort-arrow { opacity: 1; }
-    :is(#tag-rows, #tag-page-rows, #keep-alive-rows, #rules) .drag-grip { display: inline-flex; color: var(--muted); vertical-align: middle; }
-    :is(#tag-page-rows, #keep-alive-rows, #rules) .drag-grip { margin-right: 6px; }
-    :is(#tag-rows, #tag-page-rows, #keep-alive-rows, #rules) .drag-grip svg { width: 10px; height: 14px; display: block; }
-    :is(#tag-rows, #tag-page-rows, #keep-alive-rows, #rules) tr.dragging td { opacity: 0.4; }
+    :is(#tag-rows, #tag-page-rows, #keep-alive-rows, #rules, #tab-names) .drag-grip { display: inline-flex; color: var(--muted); vertical-align: middle; }
+    :is(#tag-page-rows, #keep-alive-rows, #rules, #tab-names) .drag-grip { margin-right: 6px; }
+    :is(#tag-rows, #tag-page-rows, #keep-alive-rows, #rules, #tab-names) .drag-grip svg { width: 10px; height: 14px; display: block; }
+    :is(#tag-rows, #tag-page-rows, #keep-alive-rows, #rules, #tab-names) tr.dragging td { opacity: 0.4; }
     /* switched off: the row reads muted, the switch itself stays crisp */
     #tag-rows tr.off td:not(:nth-child(3)) { opacity: 0.5; }
-    :is(#tag-rows, #tag-page-rows, #keep-alive-rows, #rules) tr.drop-target td {
+    :is(#tag-rows, #tag-page-rows, #keep-alive-rows, #rules, #tab-names) tr.drop-target td {
       background: color-mix(in srgb, var(--accent) 14%, transparent);
       box-shadow: inset 0 2px 0 var(--accent), inset 0 -2px 0 var(--accent);
     }
-    :is(#tag-rows, #tag-page-rows, #keep-alive-rows, #rules) tr.drop-target td:first-child { box-shadow: inset 2px 2px 0 var(--accent), inset 0 -2px 0 var(--accent); border-radius: 6px 0 0 6px; }
-    :is(#tag-rows, #tag-page-rows, #keep-alive-rows, #rules) tr.drop-target td:last-child { box-shadow: inset -2px 2px 0 var(--accent), inset 0 -2px 0 var(--accent); border-radius: 0 6px 6px 0; }
-    :is(#keep-alive-table, #rules-table) td:last-child { text-align: right; }
-    :is(#keep-alive-table, #rules-table) button {
+    :is(#tag-rows, #tag-page-rows, #keep-alive-rows, #rules, #tab-names) tr.drop-target td:first-child { box-shadow: inset 2px 2px 0 var(--accent), inset 0 -2px 0 var(--accent); border-radius: 6px 0 0 6px; }
+    :is(#tag-rows, #tag-page-rows, #keep-alive-rows, #rules, #tab-names) tr.drop-target td:last-child { box-shadow: inset -2px 2px 0 var(--accent), inset 0 -2px 0 var(--accent); border-radius: 0 6px 6px 0; }
+    :is(#keep-alive-table, #rules-table, #tab-names-table) td:last-child { text-align: right; }
+    :is(#keep-alive-table, #rules-table, #tab-names-table) button {
       border: 1px solid light-dark(#ddd, #444);
       background: none;
       color: inherit;
@@ -300,7 +307,7 @@
       font-size: 11px;
       transition: background var(--transition);
     }
-    :is(#keep-alive-table, #rules-table) button:hover { background: var(--hover); }
+    :is(#keep-alive-table, #rules-table, #tab-names-table) button:hover { background: var(--hover); }
 
     #links li { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid light-dark(#eee, #333); }
     #links li:last-child { border-bottom: none; }
@@ -558,6 +565,32 @@
     <div class="row">
       <button id="clear-tags">Remove all tags</button>
       <button id="restore-tags" hidden>Restore last removal</button>
+    </div>
+  </section>
+
+  <section class="card" id="tab-names-section" hidden>
+    <h2>Tab names</h2>
+    <p class="muted">Give a tab your own name: the side panel shows it in place of the page title (the browser's own tab strip keeps the page title — an extension cannot change it without a content script), the hover tip keeps the real title and search finds both. Rename a tab from its side panel row menu (<strong>Rename tab…</strong>, a blank name removes it), or add a rule here: a pattern in the tagged-page forms — an exact address, an address ending in <code>/</code> for every page under it, a host (<code>example.com</code>, with a port <code>app.test:9000</code>), <code>*.example.com</code> or a pattern with <code>*</code> anywhere — and the name every tab it covers shows. The first rule covering a page wins: drag a row by its grip onto another to reorder. Untick <strong>On</strong> to keep a rule without using it. <strong>Tabs</strong> counts the open tabs a rule covers right now.</p>
+    <table id="tab-names-table">
+      <thead><tr><th>#</th><th>On</th><th>Pattern</th><th>Name</th><th>Tabs</th><th></th></tr></thead>
+      <tbody id="tab-names"></tbody>
+      <!-- the Add row is a table row: the pattern under Pattern, the name under Name -->
+      <tfoot>
+        <tr id="new-tab-name-row">
+          <td colspan="2" class="muted">New</td>
+          <td><input type="text" id="new-tab-name-pattern" placeholder="https://app.example.com/board, example.com or https://x.com/a/*" /></td>
+          <td><input type="text" id="new-tab-name" placeholder="Name" maxlength="80" /></td>
+          <td></td>
+          <td><button id="add-tab-name">Add</button></td>
+        </tr>
+      </tfoot>
+    </table>
+    <p class="muted" id="tab-name-error" hidden></p>
+    <hr class="card-divider" />
+    <p class="muted">Removes every tab name. Settings stay unchanged. Any removal (a row's Remove, a blank Rename tab…, Remove all) can be undone, newest first.</p>
+    <div class="row">
+      <button id="clear-tab-names">Remove all tab names</button>
+      <button id="restore-tab-names" hidden>Restore last removal</button>
     </div>
   </section>
 

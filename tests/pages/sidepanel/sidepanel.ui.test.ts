@@ -18,6 +18,7 @@ const KEEP_ALIVE_ON = TEST_FEATURES.KEEP_ALIVE?.enabled === true;
 const DUPLICATES_ON = TEST_FEATURES.DUPLICATES?.enabled === true;
 const PARKED_ON = TEST_FEATURES.PARKED_WINDOWS?.enabled === true;
 const TAGS_ON = TEST_FEATURES.TAGS?.enabled === true;
+const TAB_NAMES_ON = TEST_FEATURES.TAB_NAMES?.enabled === true;
 // the duration submenu of Protect domain / Protect URL / Keep alive domain / Keep alive URL (T-0157)
 const DURATIONS = ["Always (default)", "1 hour", "2 hours", "3 hours", "6 hours", "12 hours", "1 day", "1 week"];
 // split view needs Chrome's API (tabs.createSplit): absent on Firefox, whatever the flag says
@@ -1110,6 +1111,7 @@ test("UI - Sidepanel - Right-click row offers move-to-window menu (selection-awa
   assert.deepEqual(
     items,
     [
+      ...(TAB_NAMES_ON ? ["Rename tab…"] : []), // a single tab's name, before Copy URL
       "Copy URL",
       "Snooze",
       "Wake",
@@ -4557,4 +4559,77 @@ test("UI - Sidepanel - The current window is asked for among normal and popup wi
   await new Promise((resolve) => setTimeout(resolve, 200));
   const asked = calls.find((c) => c.startsWith("windows.getLastFocused")) ?? "";
   assert.match(asked, /"windowTypes":\["normal","popup"\]/);
+});
+
+test("UI - Sidepanel - TAB_NAMES: Rename tab… (single tab, before Copy URL) asks the name, the row shows it, search finds it, a blank name drops the rule", {
+  skip: !TAB_NAMES_ON,
+}, async () => {
+  const rowOf = (id: number) => q(document, `.row[data-tab-id="${id}"]`);
+  const menu = byId("ctx-menu");
+  const pick = (label: string) => must(qa(menu, ".ctx-item").find((el) => el.textContent.startsWith(label))).click();
+  const ask = byId<HTMLDialogElement>("ask-dialog");
+  // a storage write refreshes the list after the 150 ms debounce
+  const settleStore = () => new Promise((resolve) => setTimeout(resolve, 250));
+  rowOf(1).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+  assert.deepEqual(
+    qa(menu, ".ctx-item")
+      .map((el) => el.textContent)
+      .slice(0, 2),
+    ["Rename tab…", "Copy URL"],
+  );
+  pick("Rename tab…");
+  assert.equal(ask.open, true, "the in-page dialog asks");
+  assert.equal(q<HTMLInputElement>(ask, ".ask-input").value, "My Pull Request", "prefilled with the shown title");
+  q<HTMLInputElement>(ask, ".ask-input").value = " Zebra review ";
+  q(ask, ".ask-input").dispatchEvent(new window.KeyboardEvent("keydown", { key: "Enter" }));
+  await tick();
+  await tick();
+  const { tabNames = [] } = await chrome.storage.local.get("tabNames");
+  await chrome.storage.onChanged.fire({ tabNames: { newValue: tabNames } }, "local"); // the mock's set fires nothing
+  await settleStore();
+  assert.equal(tabNames.length, 1);
+  assert.equal(tabNames[0]?.pattern, "https://github.com/pr/1", "a rule for the exact page");
+  assert.equal(tabNames[0]?.name, "Zebra review", "trimmed");
+  assert.equal(q(rowOf(1), ".title").textContent, "Zebra review", "the row shows the name");
+  assert.equal(rowOf(1).dataset.tip?.split("\n")[0], "My Pull Request", "the tip keeps the real title");
+  const search = byId<HTMLInputElement>("search");
+  search.value = "zebra";
+  search.dispatchEvent(new window.Event("input", { bubbles: true }));
+  await settleStore();
+  assert.deepEqual(
+    qa(document, ".row").map((row) => row.dataset.tabId),
+    ["1"],
+    "the custom name is searchable",
+  );
+  assert.ok(q(rowOf(1), ".title mark"), "and marked");
+  search.value = "";
+  search.dispatchEvent(new window.Event("input", { bubbles: true }));
+  await settleStore();
+  // a selection has no single name: the item is not offered
+  const selectAll = byId<HTMLInputElement>("select-all");
+  selectAll.checked = true;
+  selectAll.dispatchEvent(new window.Event("change", { bubbles: true }));
+  rowOf(1).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+  assert.match(qa(menu, ".ctx-item")[0]?.textContent ?? "", /^Copy \d+ URLs$/, "no Rename over a selection");
+  byId("ctx-menu").hidden = true;
+  selectAll.checked = false;
+  selectAll.dispatchEvent(new window.Event("change", { bubbles: true }));
+  await settleStore();
+  // the menu names the tab by its custom name; a blank answer drops the page's rule (restorable in Settings)
+  rowOf(1).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+  assert.equal(q(menu, ".ctx-title").textContent, "Zebra review");
+  pick("Rename tab…");
+  assert.equal(q<HTMLInputElement>(ask, ".ask-input").value, "Zebra review", "prefilled with the current name");
+  q<HTMLInputElement>(ask, ".ask-input").value = "   ";
+  q(ask, ".ask-input").dispatchEvent(new window.KeyboardEvent("keydown", { key: "Enter" }));
+  await tick();
+  await tick();
+  const after = await chrome.storage.local.get(["tabNames", "tabNamesTrash"]);
+  await chrome.storage.onChanged.fire({ tabNames: { newValue: after.tabNames } }, "local");
+  await settleStore();
+  assert.deepEqual(after.tabNames, []);
+  assert.equal(after.tabNamesTrash?.length, 1, "the dropped rule waits in the trash");
+  assert.equal(q(rowOf(1), ".title").textContent, "My Pull Request", "the real title is back");
+  await chrome.storage.local.set({ tabNamesTrash: [] });
+  await settleStore();
 });

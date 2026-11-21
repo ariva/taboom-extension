@@ -199,4 +199,18 @@ nothing (the panel shows the badge struck through), and drag-to-reorder by the �
   <img src="assets/features/chrome/settings-reorder-protected.png" alt="Settings - dragging a protected site onto another row" width="460">
 </p>
 
+Name a tab yourself: **Rename tab…** in a row's menu (before Copy URL) asks for the name, the row shows it in
+place of the page title (the hover tip keeps the real one, search finds both), and Settings → Tab names
+lists every rule — a pattern in the tagged-page forms and its name, an **On** box, how many open tabs it
+covers, drag-to-reorder (the first rule covering a page wins) and an Add row.
+
+<p>
+  <img src="assets/features/chrome/rename-tab-menu.png" alt="Row menu - Rename tab… before Copy URL" width="360">
+  <img src="assets/features/chrome/rename-tab-dialog.png" alt="Side panel - the Rename tab dialog" width="360">
+</p>
+<p>
+  <img src="assets/features/chrome/tab-name-row-tip.png" alt="Side panel - a renamed row, the real title in the hover tip" width="360">
+  <img src="assets/features/chrome/settings-tab-names.png" alt="Settings - the Tab names table" width="460">
+</p>
+
 → [Usage: Automatic snooze](USAGE.md#automatic-snooze) · [Protecting sites](USAGE.md#protecting-sites) · [Keeping tabs alive](USAGE.md#keeping-tabs-alive) · [Tags](USAGE.md#tags)

@@ -84,6 +84,18 @@ export interface TagRemoval {
   pages: TagPage[];
 }
 
+// ---------- custom tab names (storage.local.tabNames[]) ----------
+// A rule names the tabs its pattern covers (tag-patterns vocabulary): the side panel shows the
+// name in place of the tab's title (the browser's own tab strip cannot be renamed without a
+// content script). The first enabled rule in stored order wins — Settings drag order matters.
+export interface TabName {
+  id: string;
+  pattern: string; // a page address, a host, *.host or a * glob (matchesTagPage)
+  name: string;
+  createdAt: number;
+  disabled?: boolean; // absent = on; off = kept in Settings, names nothing until switched on
+}
+
 // ---------- parked windows (storage.local.parkedWindows[]) ----------
 // A parked window is a closed window kept as data: its tabs in strip order, its tab
 // groups and its identity (name / color / pin), enough to rebuild it. Tabs carry no ids —
@@ -181,6 +193,8 @@ export interface LocalStorageSchema {
   tags: Tag[];
   tagPages: TagPage[];
   tagTrash: Removal<TagRemoval>[]; // removed tags / tagged pages, newest last — Restore last removal
+  tabNames: TabName[];
+  tabNamesTrash: Removal<TabName>[]; // removed name rules, newest last — Restore last removal
   windowProfiles: WindowProfiles;
   tabHistory: TabHistory;
   perfMetrics: PerfMetrics;

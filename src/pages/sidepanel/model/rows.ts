@@ -287,7 +287,8 @@ export function rowViewModel(
       )
       .map((tag) => tag.id),
   );
-  const title = (isUnloaded(tab) ? "⏸ " : "") + (tab.title || tab.url || "(untitled)");
+  // a custom name (TAB_NAMES) stands in for the title; the tab's own title then opens the hover tip
+  const title = (isUnloaded(tab) ? "⏸ " : "") + (d.name ?? (tab.title || tab.url || "(untitled)"));
   const host = d.host || tab.url || "";
   const titleRanges = highlightRanges(title, queryTokens, fuzzy);
   const hostRanges = highlightRanges(host, queryTokens, fuzzy);
@@ -349,7 +350,7 @@ export function rowViewModel(
     hostRanges,
     age,
     badges: badgeList,
-    tip: tab.url ?? "",
+    tip: d.name !== undefined && tab.title ? `${tab.title}\n${tab.url ?? ""}` : (tab.url ?? ""),
     tipBadges,
     tipTags: [
       ...d.tags.map((tag) => ({

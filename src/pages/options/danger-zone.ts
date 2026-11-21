@@ -14,9 +14,14 @@ export async function renderDangerZone(): Promise<void> {
     protectionTrash = [],
     parkedTrash = [],
     tagTrash = [],
-  } = await localStore.get(["keepAliveTrash", "protectionTrash", "parkedTrash", "tagTrash"]);
+    tabNamesTrash = [],
+  } = await localStore.get(["keepAliveTrash", "protectionTrash", "parkedTrash", "tagTrash", "tabNamesTrash"]);
   getElementById<HTMLButtonElement>("delete-restore-data").disabled =
-    keepAliveTrash.length === 0 && protectionTrash.length === 0 && parkedTrash.length === 0 && tagTrash.length === 0;
+    keepAliveTrash.length === 0 &&
+    protectionTrash.length === 0 &&
+    parkedTrash.length === 0 &&
+    tagTrash.length === 0 &&
+    tabNamesTrash.length === 0;
 }
 
 export function initDangerZone(): void {

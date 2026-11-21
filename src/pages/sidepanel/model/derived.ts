@@ -3,8 +3,9 @@
 import { coveringRules, hostnameOf } from "../../../app/core.ts";
 import { temporaryUntil } from "../../../app/expiry.ts";
 import { keepAliveEntries } from "../../../app/keep-alive.ts";
+import { tabNameFor } from "../../../app/tab-names.ts";
 import { offTagsForUrl, type TagOrigin, tagOrigins, tagsForUrl } from "../../../app/tags.ts";
-import type { KeepAliveTab, ProtectionRule, Tag, TagPage } from "../../../app/types.ts";
+import type { KeepAliveTab, ProtectionRule, TabName, Tag, TagPage } from "../../../app/types.ts";
 
 type Tab = chrome.tabs.Tab;
 
@@ -24,6 +25,7 @@ export interface DerivedTab {
   tags: Tag[]; // TAGS: the page's tags in tag-list order (empty while the flag is off)
   offTags: Tag[]; // the tags only a disabled tag or a switched-off entry gives the page: struck-through pills (empty unless shown)
   tagOrigins: Map<string, TagOrigin>; // tag id → the entry kind it comes from (the badge glyph)
+  name?: string; // TAB_NAMES: the custom name the row shows in place of the tab's title (the first enabled rule covering the page)
 }
 
 // the tag list and the tagged pages, as refresh() read them
@@ -44,6 +46,7 @@ export function deriveTabs(
   tagging: Tagging = { tags: [], pages: [] },
   showDisabled = false, // settings.showDisabledInPanel
   now = Date.now(), // expired rules and marks still stored count for nothing
+  names: TabName[] = [], // TAB_NAMES: the name rules (empty while the flag is off)
 ): DerivedTabs {
   return new Map(
     tabs.map((tab) => {
@@ -55,11 +58,13 @@ export function deriveTabs(
       const tags = tagsForUrl(tagging.pages, tagging.tags, tab.url);
       // tag names end the haystack: a plain word finds tagged tabs (the #token path is separate)
       const tagNames = tags.map((tag) => ` ${tag.name}`).join("");
+      const name = tabNameFor(names, tab.url)?.name;
       return [
         tab.id,
         {
           host,
-          haystack: `${tab.title ?? ""} ${tab.url ?? ""} ${host}${tagNames}`.toLocaleLowerCase(),
+          // the custom name joins the haystack: what the row shows is what a search finds
+          haystack: `${name ?? ""} ${tab.title ?? ""} ${tab.url ?? ""} ${host}${tagNames}`.toLocaleLowerCase(),
           protected: covering.length > 0,
           protectedUntil: temporaryUntil(covering),
           protectionOff: showDisabled && covering.length === 0 && matching.length > 0,
@@ -69,6 +74,7 @@ export function deriveTabs(
           tags,
           offTags: showDisabled ? offTagsForUrl(tagging.pages, tagging.tags, tab.url) : [],
           tagOrigins: tags.length > 0 ? tagOrigins(tagging.pages, tab.url) : new Map(),
+          ...(name === undefined ? {} : { name }),
         },
       ];
     }),

@@ -14,6 +14,7 @@ import {
   effectiveSort,
   FLAG_GATED_SORTS,
   keepAliveActive,
+  tabNamesActive,
   namesActive,
   parkedActive,
   parkedScope,
@@ -37,7 +38,15 @@ export async function refresh(animate = false, preloaded: AppState | null = null
     tabs,
     win,
     panelWindowId,
-    { windowProfiles = {}, keepAlive = [], parkedWindows = [], parkedTrash = [], tags = [], tagPages = [] },
+    {
+      windowProfiles = {},
+      keepAlive = [],
+      parkedWindows = [],
+      parkedTrash = [],
+      tags = [],
+      tagPages = [],
+      tabNames = [],
+    },
     { windowSessionMap = {} },
     groups,
   ] = await Promise.all([
@@ -45,7 +54,7 @@ export async function refresh(animate = false, preloaded: AppState | null = null
     chrome.tabs.query({}),
     chrome.windows.getLastFocused({ windowTypes: ["normal", "popup"] }), // not a focused DevTools / app window: the list never shows those
     state.panelWindowId ?? chrome.windows.getCurrent().then((own) => own.id ?? null), // read once: a panel never changes window
-    localStore.get(["windowProfiles", "keepAlive", "parkedWindows", "parkedTrash", "tags", "tagPages"]),
+    localStore.get(["windowProfiles", "keepAlive", "parkedWindows", "parkedTrash", "tags", "tagPages", "tabNames"]),
     sessionStore.get("windowSessionMap"),
     capabilities.tabGroups ? chrome.tabGroups.query({}).catch(() => []) : [],
   ]);
@@ -72,6 +81,7 @@ export async function refresh(animate = false, preloaded: AppState | null = null
     }
   }
   state.tagPages = tagPages;
+  state.tabNames = tabNames;
   state.rules = persisted.protectionRules;
   state.keepAlive = keepAlive;
   state.keepAliveEnabled = persisted.settings.keepAliveEnabled;
@@ -162,6 +172,8 @@ export async function refresh(animate = false, preloaded: AppState | null = null
     keepAliveActive() ? state.keepAlive : [],
     tagsActive() ? { tags: state.tags, pages: state.tagPages } : undefined,
     state.showDisabledInPanel,
+    Date.now(),
+    tabNamesActive() ? state.tabNames : [],
   );
   // flag turned off mid-navigation: drop the cursor so no stale outline lingers
   if (!featureEnabled(state.features, "SIDEBAR_KEYBOARD_NAVIGATION")) {

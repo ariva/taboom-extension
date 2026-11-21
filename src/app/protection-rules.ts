@@ -1,6 +1,7 @@
 // Edits to the protection rule list: what toggling / protecting / unprotecting
 // hosts does to the rules. Pure — the service worker persists the result.
 import { isSupportedUrl, isUrlRule, makeRule, matchesRule, matchesUrl } from "./core.ts";
+import { setItemEnabled } from "../lib/list.ts";
 import { popRemoval } from "./removal-trash.ts";
 import type { ProtectionRule, Removal } from "./types.ts";
 
@@ -64,12 +65,11 @@ export function addUrlRules(current: ProtectionRule[], urls: string[], expiresAt
 // Settings "On" checkbox: off keeps the rule listed but it protects nothing (the panel shows it
 // struck through); the key is absent when on. undefined when the rule is unknown or nothing changes
 export function setRuleEnabled(rules: ProtectionRule[], id: string, enabled: boolean): ProtectionRule[] | undefined {
-  const rule = rules.find((candidate) => candidate.id === id);
-  if (!rule || (rule.disabled ?? false) === !enabled) {
-    return undefined;
-  }
-  const { disabled: _previous, ...live } = rule;
-  return rules.map((candidate) => (candidate === rule ? (enabled ? live : { ...live, disabled: true }) : candidate));
+  return setItemEnabled(
+    rules,
+    rules.find((candidate) => candidate.id === id),
+    enabled,
+  );
 }
 
 // Settings "Expires" dropdown: a new time (re-based from now by the caller) or permanent again

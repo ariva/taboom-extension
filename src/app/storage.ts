@@ -20,6 +20,7 @@ import {
 } from "./parked.ts";
 import { restoreRuleRemoval } from "./protection-rules.ts";
 import { recordRemoval } from "./removal-trash.ts";
+import { restoreTabNameRemoval } from "./tab-names.ts";
 import {
   createTag,
   moveTagTo,
@@ -45,6 +46,7 @@ import type {
   ProtectionRule,
   SessionStorageSchema,
   Tag,
+  TabName,
   TagPage,
   TagRemoval,
 } from "./types.ts";
@@ -138,7 +140,7 @@ export async function editKeepAlive(edit: (list: KeepAliveTab[]) => KeepAliveTab
 
 // Settings → Delete restore data: every undo stack at once (parked windows / groups / tabs included)
 export function clearRemovalTrash(): Promise<void> {
-  return localStore.set({ keepAliveTrash: [], protectionTrash: [], parkedTrash: [], tagTrash: [] });
+  return localStore.set({ keepAliveTrash: [], protectionTrash: [], parkedTrash: [], tagTrash: [], tabNamesTrash: [] });
 }
 
 // Options "Clear all". False when the list was already empty.
@@ -215,6 +217,43 @@ export function restoreProtectionRules(): Promise<boolean> {
 async function restoreProtectionRulesNow(): Promise<boolean> {
   const { protectionRules = [], protectionTrash = [] } = await localStore.get(["protectionRules", "protectionTrash"]);
   const restored = restoreRuleRemoval(protectionRules, protectionTrash);
+  if (!restored) {
+    return false;
+  }
+  await localStore.set(restored);
+  return true;
+}
+
+// ---------- custom tab names: the only writers of storage.local.tabNames ----------
+
+// the row menu's Rename tab and the Settings row edits / Add / drag. False when nothing changed
+export async function editTabNames(edit: (list: TabName[]) => TabName[] | undefined): Promise<boolean> {
+  const { tabNames = [] } = await localStore.get("tabNames");
+  const next = edit(tabNames);
+  if (!next) {
+    return false;
+  }
+  await localStore.set({ tabNames: next });
+  return true;
+}
+
+// the one door for dropping name rules (a row's Remove, Remove all, a blank rename): what leaves
+// lands in the trash for Settings → Restore. False when nothing left
+export async function dropTabNames(keep: (list: TabName[]) => TabName[]): Promise<boolean> {
+  const { tabNames = [], tabNamesTrash = [] } = await localStore.get(["tabNames", "tabNamesTrash"]);
+  const remaining = keep(tabNames);
+  const removed = tabNames.filter((rule) => !remaining.includes(rule));
+  if (removed.length === 0) {
+    return false;
+  }
+  await localStore.set({ tabNames: remaining, tabNamesTrash: recordRemoval(tabNamesTrash, removed, Date.now()) });
+  return true;
+}
+
+// Options "Restore last removal" (Tab names). False when the trash is empty.
+export async function restoreTabNames(): Promise<boolean> {
+  const { tabNames = [], tabNamesTrash = [] } = await localStore.get(["tabNames", "tabNamesTrash"]);
+  const restored = restoreTabNameRemoval(tabNames, tabNamesTrash);
   if (!restored) {
     return false;
   }

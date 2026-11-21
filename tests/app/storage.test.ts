@@ -204,3 +204,28 @@ test("Core - Storage - Tags: add, edit, page tags, remove to trash, clear, resto
   assert.equal(stored.tagPages?.length, 2);
   assert.equal(await clearTags(), true, "clearing a filled list is a change");
 });
+
+test("Core - Storage - tab names: editTabNames writes a changed list only, dropTabNames fills the trash, restoreTabNames pops it", async () => {
+  const stored: Partial<LocalStorageSchema> = {};
+  Object.assign(globalThis, { chrome: makeChrome({ stored, calls: [] }) });
+  const { editTabNames, dropTabNames, restoreTabNames, clearRemovalTrash } = await import("../../src/app/storage.ts");
+  const rule = { id: "a", pattern: "a.test", name: "A", createdAt: 1 };
+  assert.equal(await editTabNames(() => undefined), false, "nothing to write");
+  assert.equal(stored.tabNames, undefined);
+  assert.equal(await editTabNames((list) => [...list, rule]), true);
+  assert.deepEqual(stored.tabNames, [rule]);
+  assert.equal(await dropTabNames((list) => list), false, "nothing left: no write");
+  assert.equal(await dropTabNames((list) => list.filter((candidate) => candidate.id !== "a")), true);
+  assert.deepEqual(stored.tabNames, []);
+  assert.deepEqual(
+    stored.tabNamesTrash?.map((removal) => removal.items),
+    [[rule]],
+  );
+  assert.equal(await restoreTabNames(), true);
+  assert.deepEqual(stored.tabNames, [rule]);
+  assert.deepEqual(stored.tabNamesTrash, []);
+  assert.equal(await restoreTabNames(), false, "trash empty");
+  await dropTabNames(() => []);
+  await clearRemovalTrash();
+  assert.deepEqual(stored.tabNamesTrash, [], "Clear restore data forgets name removals too");
+});

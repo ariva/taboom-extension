@@ -14,6 +14,7 @@ import { initUiPrefs, renderUiPrefs } from "./ui-prefs.ts";
 import { initRules, renderRules } from "./rules.ts";
 import { initKeepAlive, renderKeepAlive } from "./keep-alive.ts";
 import { initTags, renderTags } from "./tags.ts";
+import { initTabNames, renderTabNames } from "./tab-names.ts";
 import { initPerfPanel } from "./perf-panel.ts";
 import { initDangerZone, renderDangerZone } from "./danger-zone.ts";
 import { initWhatsNew } from "./whats-new.ts";
@@ -31,6 +32,7 @@ async function render() {
   renderUiPrefs(state);
   await renderKeepAlive(state);
   await renderTags(state);
+  await renderTabNames(state);
   await renderDangerZone();
 
   getElementById("about").textContent = aboutText(getReleaseVersion());
@@ -43,6 +45,7 @@ initUiPrefs();
 initRules();
 initKeepAlive();
 initTags();
+initTabNames();
 
 // chrome:// URLs can't be plain hrefs — open via tabs API
 getElementById("links").addEventListener("click", (event) => {
@@ -96,9 +99,10 @@ chrome.storage.onChanged.addListener(async (changes, area) => {
     rules: has("protectionRules", "protectionTrash"),
     keepAlive: has("keepAlive", "keepAliveTrash", "settings"), // settings: the keep-alive switch hides the card body
     tags: has("tags", "tagPages", "tagTrash"),
+    tabNames: has("tabNames", "tabNamesTrash"),
     // the undo stacks drive the Restore buttons and "Clear restore data" — an undo or a removal made in
     // the side panel (parked windows, keep-alive, unprotect) must show here too
-    danger: has("keepAliveTrash", "protectionTrash", "parkedTrash", "tagTrash"),
+    danger: has("keepAliveTrash", "protectionTrash", "parkedTrash", "tagTrash", "tabNamesTrash"),
   };
   if (!Object.values(cards).some(Boolean)) {
     return;
@@ -115,6 +119,9 @@ chrome.storage.onChanged.addListener(async (changes, area) => {
   }
   if (cards.tags) {
     await renderTags(state);
+  }
+  if (cards.tabNames) {
+    await renderTabNames(state);
   }
   if (cards.danger) {
     await renderDangerZone();

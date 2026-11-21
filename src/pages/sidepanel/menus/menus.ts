@@ -28,6 +28,7 @@ import {
   unprotectTabs,
   wake,
 } from "../ops/actions.ts";
+import { renameTab } from "../ops/tab-name-ops.ts";
 import { TAB_GROUP_COLORS, WINDOW_DOT_COLORS, windowGroupName } from "../model/index.ts";
 import { refresh, render } from "../foundation/scheduler.ts";
 import {
@@ -38,6 +39,7 @@ import {
   parkedScope,
   pinActive,
   state,
+  tabNamesActive,
   tabById,
   tabGroupsActive,
   tagsActive,
@@ -129,7 +131,13 @@ export function openRowMenu(event: MouseEvent, tabId: number): void {
   const maps = state.liveWindowMaps; // computed once per refresh
   clearCtxMenu();
   const clicked = tabById(tabId);
-  ctxAppend(ctxTitle(ids.length > 1 ? `${ids.length} tabs selected` : clicked?.title || "Tab"), ctxDivider());
+  // the title reads as the row does: a custom name (TAB_NAMES) over the tab's own title
+  const shownTitle = state.derived.get(tabId)?.name ?? clicked?.title;
+  ctxAppend(ctxTitle(ids.length > 1 ? `${ids.length} tabs selected` : shownTitle || "Tab"), ctxDivider());
+  // one tab's name only: a selection shares no name
+  if (tabNamesActive() && ids.length === 1) {
+    ctxAppend(ctxItem("Rename tab…", () => renameTab(tabId)));
+  }
   ctxAppend(ctxItem(ids.length > 1 ? `Copy ${ids.length} URLs` : "Copy URL", () => copyUrls(ids)));
   appendCtxActions(ids);
   // single tab only: one right-click over a big selection must never mark hundreds
