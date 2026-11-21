@@ -1,6 +1,8 @@
 // Context menus of the tab list: row menu, tab-group menu, window header menu, and the
 // item builders they share with the windows popover's menus.
+import { isUrlRule, protectingRules } from "../../../app/core.ts";
 import { EXPIRY_CHOICES } from "../../../app/expiry.ts";
+import type { RuleKind } from "../../../app/protection-rules.ts";
 import { pluralize } from "../../../app/plural.ts";
 import { keepAliveEntries, keepAliveKindLabel, keepAliveOpenUrl } from "../../../app/keep-alive.ts";
 import { parkedGroupRef, parkedNewestFirst, parkedRef, parkedWindowLabel } from "../../../app/parked.ts";
@@ -75,9 +77,6 @@ export function appendCtxActions(ids: number[], alwaysCount = false): void {
   const actions: Action[] = [
     ["Snooze", () => snooze(ids)],
     ["Wake", () => wake(ids)],
-    ["Protect domain", (hours) => protectTabs(ids, hours), true],
-    ["Protect URL", (hours) => protectUrls(ids, hours), true],
-    ["Unprotect", () => unprotectTabs(ids)],
     // Pin/Unpin only when they would do something for at least one target tab
     ...(targets.some((tab) => !tab.pinned) ? [["Pin", () => pinTabs(ids, true)] satisfies Action] : []),
     ...(targets.some((tab) => tab.pinned) ? [["Unpin", () => pinTabs(ids, false)] satisfies Action] : []),
@@ -86,13 +85,38 @@ export function appendCtxActions(ids: number[], alwaysCount = false): void {
   const suffix = ` ${pluralize(ids.length, "tab")}`;
   // a selection or a window menu protects permanently: one click over many tabs stays one click
   const single = ids.length === 1 && !alwaysCount;
-  for (const [label, run, durations] of actions) {
+  // protection is its own section under Close: rules outlive the tab, the actions above do not.
+  // One row toggles per rule kind — a live host / domain rule covering it turns Protect domain ▸
+  // into Unprotect domain, an address rule turns Protect URL ▸ into Unprotect URL (each kind on its
+  // own: a page under a domain rule can still get its exact-address rule). A selection or a window
+  // keeps the bulk items, Unprotect among them only while a rule covers one of its tabs
+  const covering = single ? protectingRules(targets[0]?.url, state.rules) : [];
+  const kindItems = (kind: RuleKind, label: string, protect: (hours?: number) => void): Action =>
+    covering.some((rule) => isUrlRule(rule) === (kind === "url"))
+      ? [`Unprotect ${label}`, () => unprotectTabs(ids, kind)]
+      : [`Protect ${label}`, protect, true];
+  const protection: Action[] = single
+    ? [
+        kindItems("host", "domain", (hours) => protectTabs(ids, hours)),
+        kindItems("url", "URL", (hours) => protectUrls(ids, hours)),
+      ]
+    : [
+        ["Protect domain", (hours) => protectTabs(ids, hours), true],
+        ["Protect URL", (hours) => protectUrls(ids, hours), true],
+        ...(ids.some((id) => state.derived.get(id)?.protected)
+          ? [["Unprotect", () => unprotectTabs(ids)] satisfies Action]
+          : []),
+      ];
+  const append = ([label, run, durations]: Action): void => {
     if (single && durations) {
       appendWithDurations(label, run);
     } else {
       ctxAppend(ctxItem(ids.length > 1 || alwaysCount ? label + suffix : label, () => run()));
     }
-  }
+  };
+  actions.forEach(append);
+  ctxAppend(ctxDivider());
+  protection.forEach(append);
 }
 
 // Protect / Keep alive on a single row (T-0157): the parent click is the permanent action, as

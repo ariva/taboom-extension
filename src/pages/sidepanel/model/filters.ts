@@ -65,13 +65,16 @@ export function selectVisible<T extends Tab>(tabs: T[], view: SelectView): T[] {
   const { filter, sort, currentWindowId, derived, now, sortDir } = view;
   const s = sortDir === "desc" ? -1 : 1;
   let result = searchCandidates(tabs, view);
+  // a parked snapshot is neither open nor snoozed: in the Parked scope both chips stay (clicking one
+  // explains the empty list) but select nothing
+  const parked = view.scope === "parked-windows";
   // derived.get()! below: derived is built from these same tabs (deriveTabs, once per refresh)
   switch (filter) {
     case "awake":
-      result = result.filter((tab) => !isUnloaded(tab));
+      result = parked ? [] : result.filter((tab) => !isUnloaded(tab));
       break;
     case "snoozed":
-      result = result.filter((tab) => isUnloaded(tab));
+      result = parked ? [] : result.filter((tab) => isUnloaded(tab));
       break;
     case "protected":
       result = result.filter((tab) => derived.get(tab.id)!.protected);
@@ -221,10 +224,13 @@ export function countsByFilter(
   tabs: Tab[],
   derived: DerivedTabs,
   tagFilter?: ReadonlySet<string>,
+  parked = false, // the Parked scope: its rows are neither awake nor snoozed (selectVisible agrees)
 ): Record<FilterName, number> {
   const counts: Record<FilterName, number> = { all: tabs.length, awake: 0, snoozed: 0, protected: 0, tags: 0 };
   for (const tab of tabs) {
-    if (isUnloaded(tab)) {
+    if (parked) {
+      // neither chip counts a snapshot
+    } else if (isUnloaded(tab)) {
       counts.snoozed++;
     } else {
       counts.awake++;

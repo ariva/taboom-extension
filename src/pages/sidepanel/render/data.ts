@@ -136,7 +136,8 @@ export async function refresh(animate = false, preloaded: AppState | null = null
   state.liveWindowMeta = state.windowMeta;
   state.liveWindowMaps = windowMaps(state.liveTabs, state.currentWindowId, state.liveWindowMeta);
   // Parked windows scope: the list shows the snapshots as rows (negative ids, one synthetic
-  // window per parked window) — search, filters, sorts and headers work unchanged on them
+  // window per parked window) — search, filters, sorts and headers work unchanged on them (Awake
+  // and Snoozed select nothing there: a snapshot is neither — model/filters.ts)
   // static markup: the scope <select> has the parked-windows option
   mustQuery<HTMLOptionElement>(scopeSelect, 'option[value="parked-windows"]').hidden = !parkedActive();
   if (parkedScope()) {
@@ -144,13 +145,6 @@ export async function refresh(animate = false, preloaded: AppState | null = null
     state.allTabs = panel.tabs;
     state.tabGroups = panel.groups;
     state.windowMeta = panel.meta;
-    if (state.filter === "awake" || state.filter === "snoozed") {
-      state.filter = "all"; // nothing parked is awake or snoozed; not persisted — the user did not choose it
-    }
-  }
-  for (const name of ["awake", "snoozed"]) {
-    // static markup: both chips exist in #filters
-    mustQuery(filterBar, `button[data-filter="${name}"]`).hidden = parkedScope();
   }
   // static markup: the Tags chip exists in #filters; a stored "tags" filter with the flag off reads as All
   mustQuery(filterBar, 'button[data-filter="tags"]').hidden = !tagsActive();

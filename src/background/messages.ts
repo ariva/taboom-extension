@@ -37,7 +37,7 @@ export async function handleMessage(
       await protectUrls(message.urls, expiresIn(message.hours));
       return ensureExpiryAlarm();
     case "unprotect-urls":
-      return unprotectUrls(message.urls);
+      return unprotectUrls(message.urls, message.kind);
     case "snooze-all-inactive":
       return { snoozed: await autoSnoozePass(true) };
     case "history-back":

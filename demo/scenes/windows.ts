@@ -93,12 +93,12 @@ export const parked: Scene = {
     await stage.select("#scope", "parked-windows");
     await stage.pause(1500);
     await stage.still("parked-scope");
-    await stage.caption("Restore brings it back with its groups, name and color", 1000);
+    await stage.caption("Unpark brings it back with its groups, name and color", 1000);
     const parkedHeader = stage.panel.locator("#tab-list .group-header", { hasText: "Shopping" }).first();
     await stage.hover(parkedHeader);
     await stage.click(parkedHeader.locator(".group-menu-btn"));
     await stage.pause(400);
-    await stage.click(stage.menuItem("Restore window"));
+    await stage.click(stage.menuItem("Unpark as new window"));
     await stage.pause(1200);
     const ok = stage.panel.locator("#ask-dialog .ask-ok");
     if (await ok.isVisible()) {

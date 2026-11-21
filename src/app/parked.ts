@@ -223,18 +223,6 @@ export function parkedNewestFirst(list: ParkedWindow[]): number[] {
   return list.map((_parked, index) => index).sort((a, b) => (list[b]?.parkedAt ?? 0) - (list[a]?.parkedAt ?? 0));
 }
 
-// empty name = back to the "Parked <date>" label
-export function renameParkedWindow(list: ParkedWindow[], id: string, name: string): ParkedWindow[] | undefined {
-  const trimmed = name.trim();
-  return patchParked(list, id, (parked) => {
-    if ((parked.name ?? "") === trimmed) {
-      return undefined;
-    }
-    const { name: _old, ...rest } = parked;
-    return trimmed ? { ...rest, name: trimmed } : rest;
-  });
-}
-
 // rename one of a parked window's groups (the Chrome group it becomes on restore takes the title)
 export function renameParkedGroup(
   list: ParkedWindow[],

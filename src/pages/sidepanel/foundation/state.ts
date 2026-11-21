@@ -59,6 +59,7 @@ export interface PanelState {
   focusHint: FocusHint | null; // shown as current instead of Chrome's focus record while it lives (model/focus-intent.ts)
   activeTabId: number | null; // active tab of the current window as of the last refresh()
   filterBeforeSearch: string | null; // the filter a search replaced by All (toolbar-events setQuery); null = the user's own choice is showing
+  filterBeforeParked: string | null; // the filter the Parked scope replaced by All; back when a live scope is picked again
   followCurrent: boolean;
   revealCurrent: boolean; // after the next render: the current row at the top of the list (reveal.ts "start")
   pendingScroll: number | null;
@@ -126,6 +127,7 @@ export const state: PanelState = {
   // back — the user never chose All, storage never saw it, and every panel of a shared view
   // ends the search on the same filter (T-0151)
   filterBeforeSearch: null,
+  filterBeforeParked: null,
   followCurrent: false,
   // the active tab changed outside the panel (keyboard history command, Ctrl+Tab), the panel
   // opened, or the view changed (filter / scope / sort): the current row — with its Split or

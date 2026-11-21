@@ -229,6 +229,13 @@ export function emptyMessage(query: string, filter: string, parked = false, tags
   if (query) {
     return "No tabs match — press Esc to clear the search.";
   }
+  // the Parked scope keeps the Awake / Snoozed chips; a parked tab is neither, so the list says why
+  if (parked && filter === "awake") {
+    return "No awake tabs in parked windows — a parked tab is not open.";
+  }
+  if (parked && filter === "snoozed") {
+    return "No snoozed tabs in parked windows — a parked tab is not open.";
+  }
   if (parked) {
     return "No parked windows. Park one from a window header's ⋯ menu.";
   }

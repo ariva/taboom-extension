@@ -39,7 +39,7 @@ import { keepAliveEntry } from "../../../app/keep-alive.ts";
 import { fillAliveRows } from "./alive.ts";
 import { fillDuplicateRows, openDuplicateMenuForKey, resetDuplicateSelection } from "./duplicates.ts";
 import { fillPinRows } from "./pins.ts";
-import { fillParkedRows, parkedRowsNewestFirst, startRenameParkedInList } from "./parked.ts";
+import { fillParkedRows, parkedRowsNewestFirst } from "./parked.ts";
 import { fillTagRows, startRenameTagInList } from "./tags.ts";
 import { orderedTags } from "../../../app/tags.ts";
 import { pluralize } from "../../../app/plural.ts";
@@ -321,7 +321,6 @@ function openTagListMenu(event: MouseEvent, tagId: string): void {
 function openAnyWindowListMenu(event: MouseEvent, windowId: number): void {
   if (windowId < 0) {
     openParkedWindowMenu(event, windowId, {
-      rename: (id) => startRenameParkedInList(id, fillWindowsPopover),
       showInList: () => {
         winPop.hidePopover?.();
         scopeSelect.value = "parked-windows";

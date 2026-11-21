@@ -351,6 +351,19 @@ test("Service Worker - Protect-urls adds exact rules, unprotect-urls removes the
     ["https://app.example.net/board", "mail.google.com"],
     "both dropped rules in one restorable action",
   );
+  // a kind drops that kind only: the panel's Unprotect URL leaves the host rule, Unprotect domain the address rule
+  stored.protectionRules.push({ id: "r1", type: "host", pattern: "mail.google.com" });
+  await send({ type: "protect-urls", urls: ["https://mail.google.com/inbox"] });
+  await send({ type: "unprotect-urls", urls: ["https://mail.google.com/inbox"], kind: "url" });
+  patterns = stored.protectionRules.map((r) => r.pattern);
+  assert.ok(!patterns.includes("https://mail.google.com/inbox"), "kind url: the address rule goes");
+  assert.ok(patterns.includes("mail.google.com"), "kind url: the host rule stays");
+  await send({ type: "protect-urls", urls: ["https://mail.google.com/inbox"] });
+  await send({ type: "unprotect-urls", urls: ["https://mail.google.com/inbox"], kind: "host" });
+  patterns = stored.protectionRules.map((r) => r.pattern);
+  assert.ok(patterns.includes("https://mail.google.com/inbox"), "kind host: the address rule stays");
+  assert.ok(!patterns.includes("mail.google.com"), "kind host: the host rule goes");
+  stored.protectionRules = stored.protectionRules.filter((r) => r.pattern !== "https://mail.google.com/inbox");
   stored.protectionRules.push({ id: "r1", type: "host", pattern: "mail.google.com" }); // restore fixture
 });
 

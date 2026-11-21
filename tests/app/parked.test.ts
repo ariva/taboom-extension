@@ -13,7 +13,6 @@ import {
   removedParkedSlice,
   removeParkedTabs,
   removeParkedWindow,
-  renameParkedWindow,
   restoreParkedRemoval,
   restorePlan,
   snapshotWindow,
@@ -134,13 +133,7 @@ test("Parked - remove tabs: by index, window gone with its last tab, undefined w
   assert.deepEqual(removeParkedTabs(list, "p2", [0]), [parked], "last tab out = window out");
 });
 
-test("Parked - rename / remove window: absent key for an empty name, undefined when unchanged", () => {
-  const renamed = renameParkedWindow([parked, other], "p2", "Later");
-  assert.equal(renamed?.[1]?.name, "Later");
-  const cleared = renameParkedWindow([parked], "p1", "  ");
-  assert.deepEqual(Object.keys(cleared?.[0] ?? {}), ["id", "parkedAt", "tabs", "groups"]);
-  assert.equal(renameParkedWindow([parked], "p1", "Research"), undefined);
-  assert.equal(renameParkedWindow([parked], "nope", "X"), undefined);
+test("Parked - remove window: the entry goes, undefined when unknown", () => {
   assert.deepEqual(removeParkedWindow([parked, other], "p1"), [other]);
   assert.equal(removeParkedWindow([parked], "nope"), undefined);
 });

@@ -96,7 +96,7 @@ function renderList(): void {
   hideCtxMenuForRender();
   // active search: chips count found items (what clicking each filter would show)
   const counted = state.query ? searchCandidates(state.allTabs, state) : state.allTabs;
-  const byFilter = countsByFilter(counted, state.derived, state.tagFilter);
+  const byFilter = countsByFilter(counted, state.derived, state.tagFilter, parkedScope());
   for (const button of filterBar.querySelectorAll("button")) {
     const name = button.dataset.filter;
     // static markup: every filter button has its count span (the Tags chip's is .tag-count, so

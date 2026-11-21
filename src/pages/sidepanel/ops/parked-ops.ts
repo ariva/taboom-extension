@@ -9,7 +9,6 @@ import {
   appendParkedTabs,
   forgetParkedWindow,
   loadState,
-  renameParked,
   renameParkedGroupTitle,
   removeParkedTabsToTrash,
   restoreParkedWindows,
@@ -20,9 +19,9 @@ import { closingWindows } from "../../../app/duplicates.ts";
 import { askDialog } from "../../../lib/ui/ask-dialog.ts";
 import { inlineEdit } from "../../../lib/ui/inline-edit.ts";
 import { toast } from "../../../lib/ui/toast.ts";
-import { listEl } from "../foundation/elements.ts";
+import { listEl, scopeSelect } from "../foundation/elements.ts";
 import { refresh } from "../foundation/scheduler.ts";
-import { state } from "../foundation/state.ts";
+import { parkedScope, state } from "../foundation/state.ts";
 import { closeTabs } from "./actions.ts";
 import { reportAnswer } from "./answer.ts";
 import { windowLabel } from "./window-ops.ts";
@@ -73,7 +72,15 @@ export async function restoreParked(syntheticWindowId: number, intoCurrentWindow
     return;
   }
   const into = intoCurrentWindow && state.currentWindowId != null ? { intoWindowId: state.currentWindowId } : {};
-  reportAnswer(await send({ type: "restore-parked", id: parked.id, ...into }), "restore the window");
+  const restored = reportAnswer(await send({ type: "restore-parked", id: parked.id, ...into }), "restore the window");
+  // the window is open again: the Parked scope would show the rest (or nothing), so the list goes
+  // back to the open windows — through the toolbar's change handler, which also brings back the
+  // filter from before the Parked scope and refreshes
+  if (restored && parkedScope()) {
+    scopeSelect.value = "all-windows";
+    scopeSelect.dispatchEvent(new Event("change"));
+    return;
+  }
   refresh(true);
 }
 
@@ -192,21 +199,6 @@ export function startRenameParkedGroup(groupId: number): void {
     initial: found.parked.groups[found.index]?.title ?? "",
     placeholder: "Group name",
     commit: (title) => renameParkedGroupTitle(found.parked.id, found.index, title),
-    finish: () => refresh(false),
-  });
-}
-
-// same inline edit as a live window header; the name lands in the snapshot
-export function startRenameParked(syntheticWindowId: number): void {
-  const parked = parkedOf(syntheticWindowId);
-  const label = listEl.querySelector(`.group-header[data-window-id="${syntheticWindowId}"] .group-label`);
-  if (!parked || !label) {
-    return;
-  }
-  inlineEdit(label, {
-    initial: parked.name ?? "",
-    placeholder: "Window name",
-    commit: (name) => renameParked(parked.id, name),
     finish: () => refresh(false),
   });
 }

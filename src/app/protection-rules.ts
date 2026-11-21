@@ -90,9 +90,15 @@ export function setRuleExpiry(
 
 // removes every rule covering any of the urls — the menu's "Remove site protection"
 // and the panel's Unprotect alike (a wildcard rule covering the host goes away with
-// it, so does the exact url rule)
-export function removeRulesFor(current: ProtectionRule[], urls: string[]): ProtectionRule[] {
-  return current.filter((rule) => !urls.some((url) => url && matchesUrl(url, rule)));
+// it, so does the exact url rule); `kind` keeps it to one kind — the row menu's
+// Unprotect domain (host / domain rules) or Unprotect URL (exact-address rules)
+export type RuleKind = "host" | "url";
+
+export function removeRulesFor(current: ProtectionRule[], urls: string[], kind?: RuleKind): ProtectionRule[] {
+  return current.filter((rule) => {
+    const otherKind = kind !== undefined && isUrlRule(rule) !== (kind === "url");
+    return otherKind || !urls.some((url) => url && matchesUrl(url, rule));
+  });
 }
 
 // Settings → Restore: the newest removal's rules back, except a pattern that exists

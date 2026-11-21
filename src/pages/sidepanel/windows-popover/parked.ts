@@ -1,16 +1,13 @@
 // Parked rows of the quick launch's Windows view: under the live windows, one row per
 // parked window (newest first) — click restores it (confirmed), ⋯ / right-click opens the
-// parked window menu, whose Rename edits the row in place.
+// parked window menu.
 import { parkedNewestFirst, parkedWindowId, parkedWindowLabel } from "../../../app/parked.ts";
-import { renameParked } from "../../../app/storage.ts";
-import { inlineEdit } from "../../../lib/ui/inline-edit.ts";
 import { winPop } from "../foundation/elements.ts";
-import { refresh } from "../foundation/scheduler.ts";
 import { state } from "../foundation/state.ts";
 import { parkedOf, restoreParkedPrompt } from "../ops/parked-ops.ts";
 import { pluralize } from "../../../app/plural.ts";
 
-// parked windows, newest first, as the synthetic ids their menu / rename works on
+// parked windows, newest first, as the synthetic ids their menu works on
 export function parkedRowsNewestFirst(): number[] {
   return parkedNewestFirst(state.parked).map(parkedWindowId);
 }
@@ -69,23 +66,4 @@ export function fillParkedRows(onMenu: (event: MouseEvent, windowId: number) => 
     item.append(row, menuBtn);
     winPop.append(item);
   }
-}
-
-// rename without leaving the popover: swap the parked row's name for the input
-export function startRenameParkedInList(windowId: number, refill: () => void): void {
-  const parked = parkedOf(windowId);
-  const title = winPop.querySelector(`.win-row[data-window-id="${windowId}"] .win-title`);
-  if (!parked || !title) {
-    return;
-  }
-  inlineEdit(title, {
-    initial: parked.name ?? "",
-    placeholder: "Window name",
-    commit: (name) => renameParked(parked.id, name),
-    // the name is read back from storage: refill only once state.parked carries it (a live
-    // window's rename can refill at once — its storage change refills the popover again)
-    finish: () => {
-      refresh(false).then(refill);
-    },
-  });
 }

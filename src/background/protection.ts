@@ -1,7 +1,7 @@
 // Site protection: rule edits, the autoDiscardable flag on tabs, and the
 // protect menu item's title.
 import { hostOf, isProtected, isSupportedUrl } from "../app/core.ts";
-import { addHostRules, addUrlRules, removeRulesFor } from "../app/protection-rules.ts";
+import { addHostRules, addUrlRules, removeRulesFor, type RuleKind } from "../app/protection-rules.ts";
 import { dropProtectionRules, editProtectionRules, loadState } from "../app/storage.ts";
 import type { ProtectionRule } from "../app/types.ts";
 import { enqueueMenuOp } from "./context-menus.ts";
@@ -49,8 +49,8 @@ export async function protectUrls(urls: string[], expiresAt?: number): Promise<v
 }
 
 // drops host rules covering the pages as well as exact url rules for them
-export async function unprotectUrls(urls: string[]): Promise<void> {
-  await applyAutoDiscardable(await dropProtectionRules((rules) => removeRulesFor(rules, urls)));
+export async function unprotectUrls(urls: string[], kind?: RuleKind): Promise<void> {
+  await applyAutoDiscardable(await dropProtectionRules((rules) => removeRulesFor(rules, urls, kind)));
 }
 
 // Keep the protect menu item's title matching the active tab's protection state.

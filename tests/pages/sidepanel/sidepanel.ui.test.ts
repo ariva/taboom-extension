@@ -1115,14 +1115,15 @@ test("UI - Sidepanel - Right-click row offers move-to-window menu (selection-awa
       "Copy URL",
       "Snooze",
       "Wake",
-      // T-0157: Protect / Keep alive open a duration submenu (its items follow the parent in the DOM)
+      "Pin",
+      "Close",
+      // protection is its own section under Close; Protect / Keep alive open a duration submenu
+      // (its items follow the parent in the DOM)
       "Protect domain ▸",
       ...DURATIONS,
       "Protect URL ▸",
       ...DURATIONS,
-      "Unprotect",
-      "Pin",
-      "Close",
+      // no Unprotect: nothing protects this tab (row 3, mail.google.com, gets it — see the actions test)
       // KEEP_ALIVE: the setting defaults to on, so the experimental pass shows the mark item
       ...(KEEP_ALIVE_ON ? ["Keep alive domain ▸", ...DURATIONS, "Keep alive URL ▸", ...DURATIONS] : []),
       // TAGS: the two picker entries (a new tag is made inside the picker)
@@ -1255,11 +1256,43 @@ test("UI - Sidepanel - Context menu actions act on the clicked tab / whole selec
   );
   must(tabs.find((t) => t.id === 1)).pinned = false; // restore fixture
 
-  calls.length = 0;
+  // a single row toggles per rule kind: a host rule covers Inbox, so its menu offers Unprotect domain
+  // in place of Protect domain ▸ (Protect URL ▸ stays: no address rule yet); row 1 has neither
+  rowOf(1).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+  assert.ok(
+    !qa(menu, ".ctx-item").some((el) => el.textContent?.startsWith("Unprotect")),
+    "unprotected tab: no Unprotect entry of any kind",
+  );
   rowOf(3).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
-  pick("Unprotect");
+  const inboxItems = qa(menu, ".ctx-item").map((el) => el.textContent);
+  assert.ok(inboxItems.includes("Unprotect domain"), "host rule: Unprotect domain");
+  assert.ok(!inboxItems.includes("Protect domain ▸"), "…in place of Protect domain");
+  assert.ok(inboxItems.includes("Protect URL ▸"), "no address rule: Protect URL stays");
+  assert.ok(!inboxItems.includes("Unprotect"), "no plain Unprotect on a single row");
+  calls.length = 0;
+  pick("Unprotect domain");
   await tick();
   await tick();
+  assert.deepEqual(messages.at(-1), { type: "unprotect-urls", urls: ["https://mail.google.com/inbox"], kind: "host" });
+  // an address rule on row 1: Unprotect URL in place of Protect URL ▸, Protect domain ▸ stays
+  await chrome.storage.local.set({
+    protectionRules: [
+      { id: "r1", type: "host", pattern: "mail.google.com" },
+      { id: "u1", type: "url", pattern: "https://github.com/pr/1" },
+    ],
+  });
+  await chrome.storage.onChanged.fire({ protectionRules: {} }, "local");
+  await new Promise((resolve) => setTimeout(resolve, 250));
+  rowOf(1).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+  const prItems = qa(menu, ".ctx-item").map((el) => el.textContent);
+  assert.ok(prItems.includes("Unprotect URL") && !prItems.includes("Protect URL ▸"), "address rule: Unprotect URL");
+  assert.ok(prItems.includes("Protect domain ▸"), "no host rule: Protect domain stays");
+  pick("Unprotect URL");
+  await tick();
+  assert.deepEqual(messages.at(-1), { type: "unprotect-urls", urls: ["https://github.com/pr/1"], kind: "url" });
+  await chrome.storage.local.set({ protectionRules: [{ id: "r1", type: "host", pattern: "mail.google.com" }] });
+  await chrome.storage.onChanged.fire({ protectionRules: {} }, "local");
+  await new Promise((resolve) => setTimeout(resolve, 250));
   assert.ok(calls.includes("sendMessage unprotect-urls"), "unprotect via service worker");
 
   calls.length = 0;
@@ -1384,11 +1417,10 @@ test("UI - Sidepanel - Window header right-click: window-wide actions + Change o
       ...(PARKED_ON ? ["Park window…"] : []),
       "Snooze 2 tabs",
       "Wake 2 tabs",
-      "Protect domain 2 tabs",
-      "Protect URL 2 tabs",
-      "Unprotect 2 tabs",
       "Pin 2 tabs",
       "Close 2 tabs", // both unpinned → no Unpin offered
+      "Protect domain 2 tabs",
+      "Protect URL 2 tabs", // no Unprotect: neither tab of window 1 is protected
       "Tabs Order ▸",
       "Recently used",
       "Same as window",
@@ -1449,7 +1481,7 @@ test("UI - Sidepanel - Window header right-click: window-wide actions + Change o
     .filter((t) => /^(Snooze|Wake|Protect domain|Protect URL|Unprotect|Close)( \d+ tabs?)?$/.test(t));
   assert.deepEqual(
     actionLabels,
-    ["Snooze 1 tab", "Wake 1 tab", "Protect domain 1 tab", "Protect URL 1 tab", "Unprotect 1 tab", "Close 1 tab"],
+    ["Snooze 1 tab", "Wake 1 tab", "Close 1 tab", "Protect domain 1 tab", "Protect URL 1 tab"],
     "1 of 2 selected — actions name the single-tab scope explicitly",
   );
   calls.length = 0;
@@ -2645,7 +2677,12 @@ test("UI - Sidepanel - PARKED_WINDOWS: Park window… asks first; the Parked win
     ],
     parkedTrash: [],
   });
+  // entering the Parked scope remembers the filter and shows All; leaving it brings the filter back
+  q(document, '#filters [data-filter="awake"]').click();
+  await settle();
   await setScope("parked-windows");
+  const pressedFilter = () => q(document, '#filters button[aria-pressed="true"]').dataset.filter;
+  assert.equal(pressedFilter(), "all", "the Parked scope opens on All");
   const rows = () => qa(document, ".row");
   assert.equal(rows().length, 3, "three parked tabs listed");
   assert.ok(
@@ -2666,8 +2703,19 @@ test("UI - Sidepanel - PARKED_WINDOWS: Park window… asks first; the Parked win
   assert.equal(labels.length, 2);
   assert.match(must(labels[0]), /^Parked /, "unnamed: parked date");
   assert.equal(labels[1], "Research");
-  assert.equal(q(document, '#filters [data-filter="awake"]').hidden, true, "Awake / Snoozed chips make no sense here");
-  assert.equal(q(document, '#filters [data-filter="snoozed"]').hidden, true);
+  // the Awake / Snoozed chips stay, counting 0: a parked tab is neither; the filter shows an empty list that says why
+  const awakeChip = q<HTMLButtonElement>(document, '#filters [data-filter="awake"]');
+  assert.equal(awakeChip.hidden, false, "the chips stay in the Parked scope");
+  assert.equal(q(awakeChip, ".count").textContent, "0");
+  assert.equal(q(document, '#filters [data-filter="snoozed"] .count').textContent, "0");
+  awakeChip.click();
+  await settle();
+  assert.equal(scope.value, "parked-windows", "the scope stays");
+  assert.equal(awakeChip.getAttribute("aria-pressed"), "true");
+  assert.equal(qa(document, ".row").length, 0, "nothing parked is awake");
+  assert.match(q(document, "#tab-list .empty").textContent, /No awake tabs in parked windows/);
+  q(document, '#filters [data-filter="all"]').click();
+  await settle();
   assert.equal(byId("bulk-close").hidden, true, "bulk tab actions hidden for parked rows");
   // search works over parked tabs
   const search = byId<HTMLInputElement>("search");
@@ -2689,7 +2737,7 @@ test("UI - Sidepanel - PARKED_WINDOWS: Park window… asks first; the Parked win
       .slice(0, 2),
     ["Copy URL", "Move parked tab to ▸"],
   );
-  assert.ok(items().includes("Open parked tab in ▸"), "copy variant offered");
+  assert.ok(items().includes("Open parked tab as copy in ▸"), "copy variant offered");
   assert.ok(items().includes("Remove parked tab"));
   assert.ok(items().includes("Window Current #1"), "live windows are the targets");
   assert.ok(items().includes("New window"));
@@ -2789,12 +2837,20 @@ test("UI - Sidepanel - PARKED_WINDOWS: Park window… asks first; the Parked win
   await settle();
   headerP1 = findHeaderP1(); // re-rendered: the earlier node is detached
   headerP1.dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
-  assert.deepEqual(items(), ["Restore window", "Restore into this window", "Rename window…", "Remove parked window"]);
+  assert.deepEqual(items(), ["Unpark as new window", "Unpark into this window", "Remove parked window"]);
   calls.length = 0;
-  must(qa(ctx, ".ctx-item").find((el) => el.textContent === "Restore window")).click();
+  must(qa(ctx, ".ctx-item").find((el) => el.textContent === "Unpark as new window")).click();
   await tick();
   await tick();
   assert.ok(calls.includes("sendMessage restore-parked"));
+  // unparking leaves the Parked scope by itself: the open windows are back, with the filter from before
+  await settle();
+  assert.equal(scope.value, "all-windows", "unpark switches the scope to the open windows");
+  assert.equal(pressedFilter(), "awake", "…and brings back the filter from before the Parked scope");
+  q(document, '#filters [data-filter="all"]').click();
+  await settle();
+  await setScope("parked-windows");
+  headerP1 = findHeaderP1();
   headerP1.dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
   must(qa(ctx, ".ctx-item").find((el) => el.textContent === "Remove parked window")).click();
   await settle();
@@ -2822,8 +2878,8 @@ test("UI - Sidepanel - PARKED_WINDOWS: Park window… asks first; the Parked win
   await chrome.storage.local.set({ ui: uiBefore });
   await chrome.storage.onChanged.fire({ ui: { newValue: {} } }, "local");
   await setScope("all-windows");
+  assert.equal(pressedFilter(), "all", "back in a live scope: the filter from before this Parked visit (All)");
   assert.ok(qa(document, ".row").every((row) => !row.classList.contains("parked")));
-  assert.equal(q(document, '#filters [data-filter="awake"]').hidden, false);
   assert.equal(byId("bulk-snooze").hidden, false);
   assert.equal(byId("bulk-close").hidden, false);
   assert.equal(byId("parked-undo").hidden, true);
@@ -2898,9 +2954,8 @@ test("UI - Sidepanel - PARKED_WINDOWS: the quick launch Windows view lists parke
   const items = () => qa<HTMLButtonElement>(ctx, ".ctx-item").map((el) => el.textContent);
   must(parkedRows()[1]).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
   assert.deepEqual(items(), [
-    "Restore window",
-    "Restore into this window",
-    "Rename window…",
+    "Unpark as new window",
+    "Unpark into this window",
     "Show in Parked windows",
     "Remove parked window",
   ]);
@@ -2911,19 +2966,11 @@ test("UI - Sidepanel - PARKED_WINDOWS: the quick launch Windows view lists parke
   must(menuBtns[live]).click();
   await tick();
   assert.equal(q(ctx, ".ctx-title").textContent, "Research");
-  // Rename in place, inside the popover
-  must(qa(ctx, ".ctx-item").find((el) => el.textContent === "Rename window…")).click();
-  await tick();
-  const input = q<HTMLInputElement>(pop, ".rename-input");
-  input.value = "Reading";
-  input.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
-  await settle();
-  const stored = (await chrome.storage.local.get("parkedWindows")).parkedWindows;
-  assert.equal(stored?.find((parked) => parked.id === "p1")?.name, "Reading", "name lands in the snapshot");
   assert.ok(
-    parkedRows().some((el) => q(el, ".win-title").textContent === "Reading"),
-    "popover shows the new name in place",
+    !qa(ctx, ".ctx-item").some((el) => el.textContent === "Rename window…"),
+    "a parked window keeps the name it was parked with: no rename",
   );
+  q(ctx, ".ctx-close").click();
   // Show in Parked windows switches the scope
   must(parkedRows()[0]).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
   must(qa(ctx, ".ctx-item").find((el) => el.textContent === "Show in Parked windows")).click();
@@ -4338,7 +4385,7 @@ test("UI - Sidepanel - An older refresh resolving last does not overwrite the ne
 // the live filter may differ from the stored one on purpose (the Parked scope shows All for a
 // stored awake / snoozed): a ui write that changes something else (theme) must not re-apply the
 // stored trio over it — only a trio that changed in storage is adopted
-test("UI - Sidepanel - PARKED_WINDOWS: a theme-only ui write does not re-apply a stored filter the scope overrides", {
+test("UI - Sidepanel - PARKED_WINDOWS: a stored Snoozed filter holds in the Parked scope (empty list); a theme-only ui write re-applies nothing", {
   skip: !PARKED_ON,
 }, async () => {
   const settle = () => new Promise((resolve) => setTimeout(resolve, 200));
@@ -4364,7 +4411,8 @@ test("UI - Sidepanel - PARKED_WINDOWS: a theme-only ui write does not re-apply a
   );
   await settle();
   assert.equal(byId<HTMLSelectElement>("scope").value, "parked-windows");
-  assert.equal(pressed(), "all", "the Parked scope shows All for a stored snoozed filter");
+  assert.equal(pressed(), "snoozed", "the stored filter holds: the chip stays in the Parked scope");
+  assert.match(q(document, "#tab-list .empty").textContent, /No snoozed tabs in parked windows/);
 
   const list = byId("tab-list");
   list.scrollTop = 500; // somewhere down the list
@@ -4372,7 +4420,7 @@ test("UI - Sidepanel - PARKED_WINDOWS: a theme-only ui write does not re-apply a
   await chrome.storage.local.set({ ui: themed });
   await chrome.storage.onChanged.fire({ ui: { oldValue: parkedSnoozed, newValue: themed } }, "local");
   await settle();
-  assert.equal(pressed(), "all");
+  assert.equal(pressed(), "snoozed");
   assert.equal(list.scrollTop, 500, "nothing in the trio changed in storage: no adoption, no scroll reset");
 
   const restore = { ...before, panelView: "shared" };

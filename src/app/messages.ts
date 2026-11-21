@@ -2,6 +2,7 @@
 // side panel and options pages): the message union, the response map, and the
 // typed send() built from them.
 // Payload fields are exactly what handleMessage() in background/messages.ts reads.
+import type { RuleKind } from "./protection-rules.ts";
 import { createMessenger } from "../lib/messaging.ts";
 
 export type { MessageError } from "../lib/messaging.ts";
@@ -13,7 +14,7 @@ export type Message =
   // hours: a temporary rule / mark that expires after that long (the row menu's durations); absent = permanent
   | { type: "protect-hosts"; hosts: string[]; hours?: number }
   | { type: "protect-urls"; urls: string[]; hours?: number }
-  | { type: "unprotect-urls"; urls: string[] }
+  | { type: "unprotect-urls"; urls: string[]; kind?: RuleKind } // kind: one rule kind only (the row menu's Unprotect domain / URL)
   | { type: "snooze-all-inactive" }
   | { type: "history-back" }
   | { type: "history-forward" }

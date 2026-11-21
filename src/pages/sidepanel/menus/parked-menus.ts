@@ -23,17 +23,14 @@ import {
   parkedOf,
   restoreLastForgotten,
   restoreParked,
-  startRenameParked,
   startRenameParkedGroup,
 } from "../ops/parked-ops.ts";
 import { orderedWindowIds } from "../ops/window-ops.ts";
 import { appendTagItems } from "./tag-menu.ts";
 import { pluralize } from "../../../app/plural.ts";
 
-// the quick launch opens the same menu from its parked rows: rename edits the row there,
-// not a list header, and "Show in Parked windows" jumps to the scope
+// the quick launch opens the same menu from its parked rows: "Show in Parked windows" jumps to the scope
 export interface ParkedMenuHost {
-  rename: (windowId: number) => void;
   showInList: () => void;
 }
 
@@ -45,9 +42,8 @@ export function openParkedWindowMenu(event: MouseEvent, windowId: number, host?:
   clearCtxMenu();
   ctxAppend(ctxTitle(parkedWindowLabel(parked)), ctxDivider());
   ctxAppend(
-    ctxItem("Restore window", () => restoreParked(windowId, false)),
-    ctxItem("Restore into this window", () => restoreParked(windowId, true)),
-    ctxItem("Rename window…", () => (host ? host.rename(windowId) : startRenameParked(windowId))),
+    ctxItem("Unpark as new window", () => restoreParked(windowId, false)),
+    ctxItem("Unpark into this window", () => restoreParked(windowId, true)),
     ...(host ? [ctxItem("Show in Parked windows", host.showInList)] : []),
     ctxDivider(),
     ctxItem("Remove parked window", () => forgetParked(windowId)),
@@ -131,7 +127,7 @@ export function openParkedTabMenu(event: MouseEvent, tabId: number): void {
       groupMenu.submenu.append(item);
     }
   }
-  const open = ctxSubmenu(`Open ${plural} in`);
+  const open = ctxSubmenu(`Open ${plural} as ${ids.length > 1 ? "copies" : "copy"} in`);
   ctxAppend(open.btn, open.submenu);
   appendWindowTargets(open.submenu, (target) => moveParkedTabs(ids, target, true));
   ctxAppend(ctxDivider());

@@ -6,6 +6,7 @@ import { askDialog } from "../../../lib/ui/ask-dialog.ts";
 import { isUnloaded } from "../../../app/core.ts";
 import { send } from "../../../app/messages.ts";
 import { parkedRef } from "../../../app/parked.ts";
+import type { RuleKind } from "../../../app/protection-rules.ts";
 import { toast, toastFailure } from "../../../lib/ui/toast.ts";
 import { refresh } from "../foundation/scheduler.ts";
 import { reportAnswer } from "./answer.ts";
@@ -134,9 +135,11 @@ export async function protectUrls(tabIds: number[], hours?: number): Promise<voi
   refresh(true);
 }
 
-// by url: removes the host rule covering the page and its exact url rule alike
-export async function unprotectTabs(tabIds: number[]): Promise<void> {
-  reportAnswer(await send({ type: "unprotect-urls", urls: urlsOf(actionableTabs(), tabIds) }), "unprotect");
+// by url: removes the host rule covering the page and its exact url rule alike — or, with a
+// kind, that kind only (the single row's Unprotect domain / Unprotect URL)
+export async function unprotectTabs(tabIds: number[], kind?: RuleKind): Promise<void> {
+  const urls = urlsOf(actionableTabs(), tabIds);
+  reportAnswer(await send({ type: "unprotect-urls", urls, ...(kind ? { kind } : {}) }), "unprotect");
   unselect(tabIds);
   refresh(true);
 }

@@ -191,11 +191,21 @@ function resetScrollPositions(): void {
 scopeSelect.addEventListener("change", () => {
   const wasParked = parkedActive() && state.scope === "parked-windows";
   state.scope = scopeSelect.value;
+  const nowParked = parkedActive() && state.scope === "parked-windows";
+  // the Parked scope opens on All — a snapshot is neither awake nor snoozed, so the filter in use
+  // would show an empty list — and remembers the filter; a live scope brings it back
+  if (nowParked && !wasParked) {
+    state.filterBeforeParked = state.filter;
+    state.filter = "all";
+  } else if (wasParked && !nowParked && state.filterBeforeParked !== null) {
+    state.filter = state.filterBeforeParked;
+    state.filterBeforeParked = null;
+  }
   resetScrollPositions();
   persistUiPrefs();
   // the parked scope lists a different data set (refresh swaps it in / out); the other two
   // only filter the live list
-  if (wasParked || (parkedActive() && state.scope === "parked-windows")) {
+  if (wasParked || nowParked) {
     state.selected.clear(); // ids of one set mean nothing in the other
     refresh(!state.query);
     return;

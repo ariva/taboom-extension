@@ -40,7 +40,7 @@ test("Core - Storage - LoadState on empty storage returns full defaults; saveSta
   assert.equal(reloaded.ui.theme, DEFAULTS.ui.theme, "untouched prefs keep defaults");
 });
 
-test("Core - Storage - Parked windows: add, rename, drop tabs, take, forget to trash, restore last removal", async () => {
+test("Core - Storage - Parked windows: add, rename a group, drop tabs, take, forget to trash, restore last removal", async () => {
   const stored: Partial<LocalStorageSchema> = {};
   const calls: string[] = [];
   Object.assign(globalThis, { chrome: makeChrome({ stored, calls }) });
@@ -48,7 +48,6 @@ test("Core - Storage - Parked windows: add, rename, drop tabs, take, forget to t
     addParkedWindow,
     dropParkedTabsByUrl,
     forgetParkedWindow,
-    renameParked,
     renameParkedGroupTitle,
     removeParkedTabsToTrash,
     restoreParkedWindows,
@@ -75,9 +74,6 @@ test("Core - Storage - Parked windows: add, rename, drop tabs, take, forget to t
     ["p1", "p2"],
   );
 
-  assert.equal(await renameParked("p1", "Work"), true);
-  assert.equal(stored.parkedWindows?.[0]?.name, "Work");
-  assert.equal(await renameParked("p1", "Work"), false, "same name = no write");
   assert.equal(await renameParkedGroupTitle("p2", 0, "later"), true);
   assert.equal(stored.parkedWindows?.[1]?.groups[0]?.title, "later");
   assert.equal(await renameParkedGroupTitle("p2", 3, "x"), false);

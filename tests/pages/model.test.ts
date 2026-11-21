@@ -263,6 +263,10 @@ test("Model - EmptyMessage picks the right hint", () => {
   assert.match(emptyMessage("", "tags"), /No tagged tabs/);
   assert.match(emptyMessage("", "protected"), /No protected tabs/);
   assert.equal(emptyMessage("", "all"), "No open tabs.");
+  // the Parked scope keeps the Awake / Snoozed chips: a parked tab is neither, the list says why it is empty
+  assert.match(emptyMessage("", "awake", true), /No awake tabs in parked windows/);
+  assert.match(emptyMessage("", "snoozed", true), /No snoozed tabs in parked windows/);
+  assert.match(emptyMessage("", "all", true), /No parked windows/);
 });
 
 test("Model - RowViewModel maps tab state to plain data", () => {
@@ -1174,4 +1178,22 @@ test("Model - RowViewModel: a named tab shows the name as its title (search mark
   const plain = rowViewModel(tab(), { ...ctx, derived: deriveTabs([tab()], []), queryTokens: [] });
   assert.equal(plain.title, "Example");
   assert.equal(plain.tip, "https://example.com/x", "unnamed: the url alone, as before");
+});
+
+test("Model - Parked scope: Awake and Snoozed select nothing and count 0 — a parked tab is neither open nor snoozed", () => {
+  const tabs = [tab({ id: -1, discarded: false }), tab({ id: -2, discarded: true })];
+  const derived = deriveTabs(tabs, []);
+  assert.deepEqual(selectVisible(tabs, view(tabs, { scope: "parked-windows", filter: "awake" })), []);
+  assert.deepEqual(selectVisible(tabs, view(tabs, { scope: "parked-windows", filter: "snoozed" })), []);
+  assert.equal(selectVisible(tabs, view(tabs, { scope: "parked-windows", filter: "all" })).length, 2);
+  assert.equal(
+    selectVisible(tabs, view(tabs, { scope: "all-windows", filter: "awake" })).length,
+    1,
+    "live scope: as before",
+  );
+  const counts = countsByFilter(tabs, derived, undefined, true);
+  assert.equal(counts.all, 2);
+  assert.equal(counts.awake, 0);
+  assert.equal(counts.snoozed, 0);
+  assert.equal(countsByFilter(tabs, derived).awake, 1, "live scope: as before");
 });

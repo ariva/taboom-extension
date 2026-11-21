@@ -54,6 +54,17 @@ test("Core - RemoveRulesFor: drops host rules covering a url and url rules equal
     ["r3", "r5"],
   );
   assert.deepEqual(removeRulesFor(current, []), current);
+  // a kind: the row menu's Unprotect domain / Unprotect URL drop that kind only
+  assert.deepEqual(
+    removeRulesFor(current, ["https://c.com/page", "https://a.com/"], "url").map((r) => r.id),
+    ["r1", "r2", "r3", "r5"],
+    "url: the exact-address rule only, the host rule stays",
+  );
+  assert.deepEqual(
+    removeRulesFor(current, ["https://c.com/page", "https://a.com/"], "host").map((r) => r.id),
+    ["r2", "r3", "r4", "r5"],
+    "host: the host rule only, the address rule stays",
+  );
 });
 
 test("Core - RestoreRuleRemoval: the newest removal's rules come back unless the pattern exists again; undefined when empty", () => {

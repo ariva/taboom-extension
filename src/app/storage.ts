@@ -15,7 +15,6 @@ import {
   removeParkedWindow,
   removedParkedSlice,
   renameParkedGroup,
-  renameParkedWindow,
   restoreParkedRemoval,
 } from "./parked.ts";
 import { restoreRuleRemoval } from "./protection-rules.ts";
@@ -278,10 +277,6 @@ async function editParked(edit: (list: ParkedWindow[]) => ParkedWindow[] | undef
   }
   await localStore.set({ parkedWindows: next });
   return true;
-}
-
-export function renameParked(id: string, name: string): Promise<boolean> {
-  return editParked((list) => renameParkedWindow(list, id, name));
 }
 
 export function renameParkedGroupTitle(id: string, groupIndex: number, title: string): Promise<boolean> {

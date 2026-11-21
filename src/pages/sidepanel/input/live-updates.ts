@@ -149,8 +149,8 @@ chrome.storage.onChanged.addListener((changes, area) => {
     const stored = changes.ui.newValue as Partial<UiPrefs>;
     const before = changes.ui.oldValue as Partial<UiPrefs> | undefined;
     // only a filter / scope / sort that changed IN STORAGE is adopted: the live trio may differ from
-    // the stored one on purpose (the Parked scope shows All for a stored snoozed, a flag off, a
-    // search that auto-selected All), and a theme write must not re-apply the stored one over it
+    // the stored one on purpose (a flag off, a search that auto-selected All), and a theme write
+    // must not re-apply the stored one over it
     const { defaultFilter, scope, sort, ...rest } = stored;
     const view: Partial<UiPrefs> = rest;
     if (before?.defaultFilter !== defaultFilter) {
