@@ -32,7 +32,7 @@ export function dragRows(args: DragArgs): boolean {
 export const settingsReorder: Scene = {
   id: "settings-reorder",
   settings: "#keep-alive-table",
-  title: "New: reorder keep-alive marks and tagged page rules",
+  title: "Reorder keep-alive marks and tagged page rules",
   newIn: "1.1.0",
   covers: /reorder/i,
   async run(stage) {
@@ -59,7 +59,7 @@ export const settingsReorder: Scene = {
       await stage.pause(1200);
       stage.check((await keysOf(rows))[0] === from, `${rows}: the dragged row did not land first`);
     };
-    await stage.caption("New in 1.1.0 — drag a row by its grip to reorder the keep-alive marks…", 1800);
+    await stage.caption(`${stage.release} — drag a row by its grip to reorder the keep-alive marks…`, 1800);
     await drag("keep-alive-rows", () => stage.still("settings-reorder-keep-alive", "settings"));
     await stage.caption("The order is the Alive view's and the catch-up reloads' order", 1400);
     await stage.caption("…and the tagged page rules the same way", 1000);

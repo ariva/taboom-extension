@@ -87,6 +87,20 @@
     }
     h2 { font-size: 15px; margin: 0 0 10px; }
 
+    /* the tab strip under the title: one pane of cards at a time; it scrolls sideways when a narrow
+       window cannot fit every tab (no wrapping — a second row would read as two groups) */
+    .tabs { display: flex; gap: 4px; margin: 4px 0 0; overflow-x: auto; scrollbar-width: none; border-bottom: 1px solid rgb(255 255 255 / 0.25); }
+    .tabs::-webkit-scrollbar { display: none; }
+    .tabs [role="tab"] {
+      flex: none; background: none; border: none; border-bottom: 2px solid transparent; margin-bottom: -1px;
+      color: rgb(255 255 255 / 0.75); font: inherit; font-size: 14px; padding: 8px 12px; cursor: pointer; white-space: nowrap;
+      border-radius: var(--radius-s) var(--radius-s) 0 0;
+    }
+    .tabs [role="tab"]:hover { color: #fff; background: rgb(255 255 255 / 0.08); }
+    .tabs [role="tab"][aria-selected="true"] { color: #fff; border-bottom-color: #fff; font-weight: 600; }
+    .tabs [role="tab"]:focus-visible { outline: 2px solid #fff; outline-offset: -2px; }
+    .pane[hidden] { display: none; }
+
     /* frosted glass cards over the gradient */
     .card {
       background: color-mix(in srgb, var(--card-bg) 82%, transparent);
@@ -385,6 +399,17 @@
 <body>
   <h1 id="page-title">Taboom Settings</h1>
 
+  <!-- one pane at a time; the URL hash is the state (#tags, or an element id inside a pane) — options/nav.ts -->
+  <nav id="settings-tabs" class="tabs" role="tablist" aria-label="Settings sections">
+    <button type="button" role="tab" id="tab-general" data-pane="general" aria-controls="pane-general" aria-selected="true">General</button>
+    <button type="button" role="tab" id="tab-protected" data-pane="protected" aria-controls="pane-protected" aria-selected="false" tabindex="-1">Protected sites</button>
+    <button type="button" role="tab" id="tab-keep-alive" data-pane="keep-alive" aria-controls="pane-keep-alive" aria-selected="false" tabindex="-1">Keep alive</button>
+    <button type="button" role="tab" id="tab-tags" data-pane="tags" aria-controls="pane-tags" aria-selected="false" tabindex="-1">Tags</button>
+    <button type="button" role="tab" id="tab-tab-names" data-pane="tab-names" aria-controls="pane-tab-names" aria-selected="false" tabindex="-1">Tab names</button>
+    <button type="button" role="tab" id="tab-changes" data-pane="changes" aria-controls="pane-changes" aria-selected="false" tabindex="-1">Changes</button>
+  </nav>
+
+  <div id="pane-general" class="pane" role="tabpanel" aria-labelledby="tab-general">
   <section class="card">
     <h2>Interface</h2>
     <!-- for= so a click on the text focuses the dropdown, not the first button -->
@@ -476,6 +501,44 @@
   </section>
 
   <section class="card">
+    <h2>Useful Links</h2>
+    <ul id="links">
+      <li><a href="#" data-url="chrome://extensions/shortcuts">chrome://extensions/shortcuts</a><span class="muted">configure keyboard shortcuts</span></li>
+      <li><a href="#" data-url="chrome://settings/performance">chrome://settings/performance</a><span class="muted">Memory Saver — native ring indicator on snoozed tabs</span></li>
+      <li><a href="#" data-url="chrome://settings/appearance">chrome://settings/appearance</a><span class="muted">side panel position: left / right</span></li>
+      <li><a href="#" data-url="chrome://discards">chrome://discards</a><span class="muted">per-tab discard state, verify snoozing</span></li>
+      <li><a href="#" data-url="chrome://extensions">chrome://extensions</a><span class="muted">reload extension, view service-worker logs</span></li>
+    </ul>
+    <p class="muted">Chrome Task Manager (<kbd>Shift+Esc</kbd>) shows per-tab memory; snoozed tabs have no process row.</p>
+  </section>
+
+  <section class="card danger-zone">
+    <h2>Data</h2>
+    <p class="muted">Forgets every undoable removal (protected sites, keep-alive marks, removed parked windows, tags): the Restore / Undo buttons go away. Disabled when there is nothing to forget.</p>
+    <button id="delete-restore-data">Clear restore data</button>
+    <p class="muted">Restores all settings and appearance to their defaults. Protected sites, keep-alive marks, parked windows and tags stay unchanged.</p>
+    <button id="restore-defaults">Restore default settings</button>
+    <p class="muted">Removes everything: settings, protected sites, keep-alive marks, parked windows, tags, window names and colors, tab history and the undo data. Cannot be undone.</p>
+    <button id="danger">Delete all Extension data</button>
+  </section>
+
+  <section class="card" id="perf-section" hidden>
+    <h2>Performance</h2>
+    <button id="perf-show">Show performance metrics</button>
+    <button id="perf-reset-snapshot">Reset current snapshot</button>
+    <button id="perf-reset">Reset all</button>
+    <pre class="muted" id="perf-out"></pre>
+  </section>
+
+  <section class="card">
+    <h2>About</h2>
+    <p class="muted" id="about"></p>
+    <p class="muted">Tab information and settings are processed locally in the browser.
+      Taboom - Tabs Manager does not send browsing information to a remote service.</p>
+  </section>
+  </div>
+  <div id="pane-protected" class="pane" role="tabpanel" aria-labelledby="tab-protected" hidden>
+  <section class="card">
     <h2>Protected Sites</h2>
     <p class="muted">Exact host (<code>mail.google.com</code>), domain with subdomains (<code>*.github.com</code>) or one exact page (<code>https://app.example.com/board</code>). A host may name a port (<code>app.test:9000</code>, <code>*.dev.test:8443</code>): then only that port; without one, every port.</p>
     <table id="rules-table">
@@ -494,7 +557,8 @@
       <button id="restore-protected" hidden>Restore last removal</button>
     </div>
   </section>
-
+  </div>
+  <div id="pane-keep-alive" class="pane" role="tabpanel" aria-labelledby="tab-keep-alive" hidden>
   <section class="card" id="keep-alive-section" hidden>
     <h2>Keep Tabs Alive</h2>
     <p class="muted">Some sites log you out after a few idle minutes (banking, intranets, admin consoles) and dashboards stop updating once the tab sleeps. Mark such a tab to keep it alive: it reloads on a timer (±55 s), so the session never expires and the data stays fresh, and it is never auto-snoozed. Mark a tab from its right-click menu or the side panel row menu, or add an address below. Pages with unsaved forms may ask "Leave site?" on each reload.</p>
@@ -517,7 +581,8 @@
       </div>
     </div>
   </section>
-
+  </div>
+  <div id="pane-tags" class="pane" role="tabpanel" aria-labelledby="tab-tags" hidden>
   <section class="card" id="tags-section" hidden>
     <h2>Tags</h2>
     <p class="muted">A tag is a colored label on a page: tag a tab from its side panel row menu (<strong>Tag URL ▸</strong>) or the page's right-click menu (<strong>Tag page ▸</strong>), filter the list by tag with the <strong>Tags ▾</strong> chip, search with <code>#name</code>. Tags stick to the page address, so they survive a restart and cover every tab on that page — any page but the New Tab page, which every new tab shares. <strong>Tag domain…</strong> in the row menu tags the whole host instead; an address ending in <code>/</code> covers every page under it (<code>https://www.example.com/</code> is the whole site); here an entry can also be a host (<code>example.com</code>), a host with its subdomains (<code>*.example.com</code>) or a pattern with <code>*</code> anywhere (<code>https://github.com/ariva/*/test</code>, <code>*</code> matches anything, <code>/</code> included). A host may name a port (<code>app.test:9000</code>, <code>*.dev.test:8443</code>): then only that port; without one, every port. A tab carries the tags of every entry covering it.</p>
@@ -567,7 +632,8 @@
       <button id="restore-tags" hidden>Restore last removal</button>
     </div>
   </section>
-
+  </div>
+  <div id="pane-tab-names" class="pane" role="tabpanel" aria-labelledby="tab-tab-names" hidden>
   <section class="card" id="tab-names-section" hidden>
     <h2>Tab names</h2>
     <p class="muted">Give a tab your own name: the side panel shows it in place of the page title (the browser's own tab strip keeps the page title — an extension cannot change it without a content script), the hover tip keeps the real title and search finds both. Rename a tab from its side panel row menu (<strong>Rename tab…</strong>, a blank name removes it), or add a rule here: a pattern in the tagged-page forms — an exact address, an address ending in <code>/</code> for every page under it, a host (<code>example.com</code>, with a port <code>app.test:9000</code>), <code>*.example.com</code> or a pattern with <code>*</code> anywhere — and the name every tab it covers shows. The first rule covering a page wins: drag a row by its grip onto another to reorder. Untick <strong>On</strong> to keep a rule without using it. <strong>Tabs</strong> counts the open tabs a rule covers right now.</p>
@@ -593,44 +659,14 @@
       <button id="restore-tab-names" hidden>Restore last removal</button>
     </div>
   </section>
-
+  </div>
+  <div id="pane-changes" class="pane" role="tabpanel" aria-labelledby="tab-changes" hidden>
   <section class="card">
-    <h2>Useful Links</h2>
-    <ul id="links">
-      <li><a href="#" data-url="chrome://extensions/shortcuts">chrome://extensions/shortcuts</a><span class="muted">configure keyboard shortcuts</span></li>
-      <li><a href="#" data-url="chrome://settings/performance">chrome://settings/performance</a><span class="muted">Memory Saver — native ring indicator on snoozed tabs</span></li>
-      <li><a href="#" data-url="chrome://settings/appearance">chrome://settings/appearance</a><span class="muted">side panel position: left / right</span></li>
-      <li><a href="#" data-url="chrome://discards">chrome://discards</a><span class="muted">per-tab discard state, verify snoozing</span></li>
-      <li><a href="#" data-url="chrome://extensions">chrome://extensions</a><span class="muted">reload extension, view service-worker logs</span></li>
-    </ul>
-    <p class="muted">Chrome Task Manager (<kbd>Shift+Esc</kbd>) shows per-tab memory; snoozed tabs have no process row.</p>
-  </section>
-
-  <section class="card danger-zone">
-    <h2>Data</h2>
-    <p class="muted">Forgets every undoable removal (protected sites, keep-alive marks, removed parked windows, tags): the Restore / Undo buttons go away. Disabled when there is nothing to forget.</p>
-    <button id="delete-restore-data">Clear restore data</button>
-    <p class="muted">Restores all settings and appearance to their defaults. Protected sites, keep-alive marks, parked windows and tags stay unchanged.</p>
-    <button id="restore-defaults">Restore default settings</button>
-    <p class="muted">Removes everything: settings, protected sites, keep-alive marks, parked windows, tags, window names and colors, tab history and the undo data. Cannot be undone.</p>
-    <button id="danger">Delete all Extension data</button>
-  </section>
-
-  <section class="card" id="perf-section" hidden>
-    <h2>Performance</h2>
-    <button id="perf-show">Show performance metrics</button>
-    <button id="perf-reset-snapshot">Reset current snapshot</button>
-    <button id="perf-reset">Reset all</button>
-    <pre class="muted" id="perf-out"></pre>
-  </section>
-
-  <section class="card">
-    <h2>About</h2>
-    <p class="muted" id="about"></p>
-    <p class="muted">Tab information and settings are processed locally in the browser.
-      Taboom - Tabs Manager does not send browsing information to a remote service.</p>
+    <h2>Changes</h2>
+    <p class="muted">What changed in each release, newest first.</p>
     <div id="whats-new" hidden></div>
   </section>
+  </div>
 
   <div id="saved" role="status" hidden>Saved ✓</div>
   <div id="toast" role="status" hidden></div>

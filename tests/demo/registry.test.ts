@@ -2,9 +2,10 @@
 // must cover every New Features bullet of the current CHANGES.md entry, ids are unique, the
 // GIF clips fit the budget. Runs once (flag-independent).
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { test } from "vitest";
-import { GIF_MAX_SECONDS, orderedForRelease, SCENES } from "../../demo/scenes/index.ts";
+import { GIF_MAX_SECONDS, orderedForRelease, releaseMark, SCENES, sceneHeading } from "../../demo/scenes/index.ts";
 
 const version = (JSON.parse(readFileSync("package.json", "utf8")) as { version: string }).version;
 
@@ -93,5 +94,25 @@ test("Demo - Registry - every scene names a Settings anchor that exists in the o
   for (const scene of SCENES) {
     assert.match(scene.settings, /^#[\w-]+$/, `${scene.id}: settings is an #id selector of options/index.html`);
     assert.ok(ids.has(scene.settings.slice(1)), `${scene.id}: ${scene.settings} is not in options/index.html`);
+  }
+});
+
+test("Demo - Registry - a scene names its release relative to the recorded one: New in … for the current release, Since … after it; no scene hard-codes the words", () => {
+  assert.equal(releaseMark("1.1.0", "1.1.0"), "New in 1.1.0");
+  assert.equal(releaseMark("1.0.5", "1.1.0"), "Since 1.0.5");
+  assert.equal(releaseMark(undefined, "1.1.0"), "");
+  assert.equal(sceneHeading({ title: "Custom tags", newIn: "1.0.5" }, "1.1.0"), "Since 1.0.5 · Custom tags");
+  assert.equal(sceneHeading({ title: "The tour" }, "1.1.0"), "The tour");
+  for (const scene of SCENES) {
+    assert.doesNotMatch(
+      scene.title,
+      /^New\b/i,
+      `${scene.id}: the recorder prefixes the release mark, the title stays plain`,
+    );
+  }
+  // index.ts holds the helper (and names the words in its comment); every scene module is checked
+  for (const file of readdirSync("demo/scenes").filter((name) => name.endsWith(".ts") && name !== "index.ts")) {
+    const source = readFileSync(join("demo/scenes", file), "utf8");
+    assert.doesNotMatch(source, /"New in \d/, `${file}: captions open with \${stage.release}, never a literal release`);
   }
 });

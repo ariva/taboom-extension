@@ -5,11 +5,11 @@ import type { Scene } from "./index.ts";
 export const tagFragment: Scene = {
   id: "tag-fragment",
   settings: "#tagPagesKeepFragment",
-  title: "New: tagged pages keep their #fragment",
+  title: "Tagged pages keep their #fragment",
   newIn: "1.1.0",
   covers: /fragment/i,
   async run(stage) {
-    await stage.caption("New in 1.1.0 — a tag can sit on one route of a hash-routed page", 1800);
+    await stage.caption(`${stage.release} — a tag can sit on one route of a hash-routed page`, 1800);
     // an awake wiki tab moves to an anchor: the row keeps its title, the address gains #review
     const tabId = await stage.worker.evaluate(async () => {
       const [tab] = await chrome.tabs.query({ url: "http://wiki.example.test/*", discarded: false });

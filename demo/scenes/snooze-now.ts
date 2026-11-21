@@ -6,11 +6,11 @@ import type { Scene } from "./index.ts";
 export const snoozeNow: Scene = {
   id: "snooze-now",
   settings: "#snooze-now",
-  title: "New: snooze inactive tabs now",
+  title: "Snooze inactive tabs now",
   newIn: "1.0.6",
   covers: /snooze now/i,
   async run(stage) {
-    await stage.caption("New in 1.0.6 — snooze every inactive tab right now, no waiting for the timer", 1800);
+    await stage.caption(`${stage.release} — snooze every inactive tab right now, no waiting for the timer`, 1800);
     await stage.caption("Settings → Automatic Snooze: the button runs the check at once", 1200);
     await stage.pause(600);
     await stage.still("settings-snooze-now", "settings");

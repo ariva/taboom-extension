@@ -34,6 +34,7 @@ export interface Stage {
   still: (name: string, pane?: "panel" | "settings", height?: number) => Promise<void>;
   stills: string[];
   warnings: string[];
+  release: string; // "New in 1.1.0" / "Since 1.0.5" / "" for the running scene (scenes/index.ts releaseMark) — captions open with it
 }
 
 interface OverlayApi {
@@ -159,6 +160,12 @@ function focusSettingsCard(selector: string): boolean {
     return false;
   }
   const card = element.closest(".card") ?? element;
+  // the Settings page shows one pane at a time: open the pane holding the card first (its tab's
+  // click runs the page's own handler)
+  const pane = element.closest<HTMLElement>(".pane");
+  if (pane?.hidden) {
+    document.querySelector<HTMLElement>(`#settings-tabs [aria-controls="${pane.id}"]`)?.click();
+  }
   if (!document.getElementById("demo-focus-style")) {
     const style = document.createElement("style");
     style.id = "demo-focus-style";
@@ -375,5 +382,6 @@ export function makeStage(
     },
     stills,
     warnings,
+    release: "",
   };
 }

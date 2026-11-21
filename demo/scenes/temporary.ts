@@ -7,11 +7,11 @@ import { type DragArgs, dragRows } from "./reorder.ts";
 export const temporaryProtection: Scene = {
   id: "temporary-protection",
   settings: "#rules-table",
-  title: "New: protect or keep alive for a while",
+  title: "Protect or keep alive for a while",
   newIn: "1.1.0",
   covers: /temporar|expir|duration|disabled protected|protected sites/i,
   async run(stage) {
-    await stage.caption("New in 1.1.0 — protect a site for a while, not for good", 1800);
+    await stage.caption(`${stage.release} — protect a site for a while, not for good`, 1800);
     // an awake tab of each site, whatever the world's seed snoozed: the shop (unprotected, unmarked)
     // gets the temporary rule and mark, a docs tab shows the fixture's docs rule switched off
     const awakeTitle = (host: string, fallback: string) =>

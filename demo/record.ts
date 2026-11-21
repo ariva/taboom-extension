@@ -9,7 +9,7 @@ import { parseArgs } from "node:util";
 import { buildWorld, launch, PANEL_VIEWPORT, SETTINGS_VIEWPORT, STORY_URL, STORY_VIEWPORT } from "./browser.ts";
 import { buildTabs, WINDOWS } from "./fixture.ts";
 import type { BrowserName, Stream } from "./page-api.ts";
-import { GIF_MAX_SECONDS, orderedForRelease, type Scene, SCENES } from "./scenes/index.ts";
+import { GIF_MAX_SECONDS, orderedForRelease, releaseMark, type Scene, SCENES, sceneHeading } from "./scenes/index.ts";
 import { installOverlay, makeStage, storyScene } from "./stage.ts";
 import { storyHtml } from "./story.ts";
 
@@ -108,8 +108,9 @@ try {
     if (filmed) {
       await recorder.startScene(scene.id);
     }
+    stage.release = releaseMark(scene.newIn, version);
     try {
-      await storyScene(stage.aside, scene.title);
+      await storyScene(stage.aside, sceneHeading(scene, version));
       await stage.settings(scene.settings);
       await scene.run(stage);
     } catch (error) {
@@ -120,7 +121,7 @@ try {
     if (filmed) {
       takes.push({
         ...recorder.endScene(),
-        title: scene.title,
+        title: sceneHeading(scene, version),
         stills: [...stage.stills],
         ...(scene.gif ? { gif: scene.gif } : {}),
         ...(scene.newIn ? { newIn: scene.newIn } : {}),
@@ -160,7 +161,7 @@ try {
         const { gif: _gif, newIn: _newIn, ...kept } = take;
         return {
           ...kept,
-          title: scene.title,
+          title: sceneHeading(scene, version),
           ...(scene.gif ? { gif: scene.gif } : {}),
           ...(scene.newIn ? { newIn: scene.newIn } : {}),
         };

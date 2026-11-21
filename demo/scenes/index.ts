@@ -60,3 +60,19 @@ export function orderedForRelease(version: string, scenes: Scene[] = SCENES): Sc
   const fresh = scenes.filter((scene) => scene.newIn === version);
   return [...fresh, ...scenes.filter((scene) => scene.newIn !== version)];
 }
+
+// how a scene names its release: "New in 1.1.0" while that is the release being recorded,
+// "Since 1.0.5" once it is older (a caption saying "new" about a two-release-old feature reads
+// stale), nothing for a scene of no particular release. Scenes read it as `stage.release`
+export function releaseMark(newIn: string | undefined, version: string): string {
+  if (!newIn) {
+    return "";
+  }
+  return newIn === version ? `New in ${newIn}` : `Since ${newIn}`;
+}
+
+// the story pane's heading: the release mark before the title
+export function sceneHeading(scene: Pick<Scene, "title" | "newIn">, version: string): string {
+  const mark = releaseMark(scene.newIn, version);
+  return mark ? `${mark} · ${scene.title}` : scene.title;
+}

@@ -6,12 +6,12 @@ import type { Scene } from "./index.ts";
 export const sharedView: Scene = {
   id: "shared-view",
   settings: "#panelView",
-  title: "New: open side panels share one view",
+  title: "Open side panels share one view",
   newIn: "1.0.8",
   covers: /across side panels/i,
   async run(stage) {
     await stage.caption(
-      "New in 1.0.8 — open side panels share one view: filter, scope, sort, tag ticks and the search",
+      `${stage.release} — open side panels share one view: filter, scope, sort, tag ticks and the search`,
       2000,
     );
     await stage.caption("Settings → Customizations: on by default; off, each panel keeps its own view", 1200);

@@ -5,11 +5,11 @@ import type { Scene } from "./index.ts";
 export const tabNames: Scene = {
   id: "tab-names",
   settings: "#tab-names-table",
-  title: "New: name a tab yourself",
+  title: "Name a tab yourself",
   newIn: "1.1.0",
   covers: /tab name|rename/i,
   async run(stage) {
-    await stage.caption("New in 1.1.0 — give a tab the name you want to see", 1800);
+    await stage.caption(`${stage.release} — give a tab the name you want to see`, 1800);
     // an awake docs tab, whatever the world's seed snoozed
     const title = await stage.worker.evaluate(
       async ([pattern, fallback]) =>

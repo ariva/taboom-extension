@@ -6,11 +6,11 @@ import type { Scene } from "./index.ts";
 export const keepAliveDomain: Scene = {
   id: "keep-alive-domain",
   settings: "#keep-alive-section",
-  title: "New: keep alive by domain",
+  title: "Keep alive by domain",
   newIn: "1.1.0",
   covers: /keep alive.*domain|disabled tags|paused keep-alive|struck/i,
   async run(stage) {
-    await stage.caption("New in 1.1.0 — keep a whole site alive, not just one page", 1800);
+    await stage.caption(`${stage.release} — keep a whole site alive, not just one page`, 1800);
     // an awake news tab: the mark will cover every news.example.test tab
     const title = await stage.worker.evaluate(
       async () =>

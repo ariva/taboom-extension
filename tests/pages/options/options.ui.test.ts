@@ -2239,7 +2239,7 @@ test("UI - Options - TAB_NAMES: the Tab names card after Tags — #, On, Pattern
 }, async () => {
   const section = byId("tab-names-section");
   assert.equal(section.hidden, false, "shown while the flag is on");
-  assert.equal(section.previousElementSibling?.id, "tags-section", "right after the Tags card");
+  assert.equal(byId("tab-tab-names").previousElementSibling?.id, "tab-tags", "its tab follows the Tags tab");
   stored.tabNames = [
     { id: "a", pattern: "https://docs.test/x", name: "Docs", createdAt: 1 },
     { id: "b", pattern: "docs.test", name: "Docs site", createdAt: 1, disabled: true },
@@ -2382,4 +2382,81 @@ test("UI - Options - TAB_NAMES: the Tab names card after Tags — #, On, Pattern
   await tick();
   await tick();
   assert.equal(q(byId("tab-names"), "td").textContent, "No tab names yet.");
+});
+
+test("UI - Options - Settings tabs: General first; a tab shows its pane and sets the hash; a hash naming an element opens the pane holding it; arrows move between tabs; flag-hidden panes have no tab", async () => {
+  const { applyExperimental, featureEnabled } = await import("../../../src/app/core.ts");
+  const effective = applyExperimental(RAW_FEATURES, stored.ui?.showExperimental ?? false);
+  const strip = byId("settings-tabs");
+  assert.equal(strip.getAttribute("role"), "tablist");
+  assert.equal(strip.previousElementSibling?.id, "page-title", "the strip sits right under the title");
+  const tabs = () => qa<HTMLButtonElement>(strip, "[role=tab]");
+  const shown = () =>
+    tabs()
+      .filter((tab) => !tab.hidden)
+      .map((tab) => tab.textContent);
+  assert.deepEqual(shown(), [
+    "General",
+    "Protected sites",
+    ...(featureEnabled(effective, "KEEP_ALIVE") ? ["Keep alive"] : []),
+    ...(featureEnabled(effective, "TAGS") ? ["Tags"] : []),
+    ...(featureEnabled(effective, "TAB_NAMES") ? ["Tab names"] : []),
+    "Changes",
+  ]);
+  const pane = (name: string) => byId(`pane-${name}`);
+  const selected = () => tabs().find((tab) => tab.getAttribute("aria-selected") === "true")?.dataset.pane;
+  assert.equal(selected(), "general", "no hash: General");
+  assert.equal(pane("general").hidden, false);
+  assert.equal(pane("protected").hidden, true);
+  assert.ok(
+    pane("general").contains(byId("links")) && pane("general").contains(byId("danger")),
+    "Useful Links and Data live in General",
+  );
+  assert.ok(pane("general").contains(byId("about")), "About is the last card of General");
+  assert.ok(pane("changes").contains(byId("whats-new")), "What's new moved to the Changes pane");
+  assert.ok(pane("protected").contains(byId("rules-table")));
+  // click: the pane shows, the hash follows
+  must(tabs().find((tab) => tab.dataset.pane === "protected")).click();
+  assert.equal(selected(), "protected");
+  assert.equal(pane("protected").hidden, false);
+  assert.equal(pane("general").hidden, true);
+  assert.equal(window.location.hash, "#protected");
+  assert.equal(must(tabs().find((tab) => tab.dataset.pane === "protected")).getAttribute("aria-selected"), "true");
+  // a hash naming an element inside a pane (a deep link): that pane opens
+  window.location.hash = "#whats-new";
+  window.dispatchEvent(new window.Event("hashchange"));
+  await tick();
+  assert.equal(selected(), "changes", "#whats-new opens Changes");
+  assert.equal(pane("changes").hidden, false);
+  window.location.hash = "#general";
+  window.dispatchEvent(new window.Event("hashchange"));
+  await tick();
+  assert.equal(selected(), "general");
+  // keyboard: arrows move the selection over the visible tabs, Home / End jump
+  const general = must(tabs().find((tab) => tab.dataset.pane === "general"));
+  general.focus();
+  general.dispatchEvent(new window.KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
+  assert.equal(selected(), "protected", "ArrowRight: the next visible tab");
+  must(tabs().find((tab) => tab.dataset.pane === "protected")).dispatchEvent(
+    new window.KeyboardEvent("keydown", { key: "End", bubbles: true }),
+  );
+  assert.equal(selected(), "changes", "End: the last tab");
+  must(tabs().find((tab) => tab.dataset.pane === "changes")).dispatchEvent(
+    new window.KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }),
+  );
+  assert.equal(selected(), "general", "ArrowRight wraps to the first");
+  assert.equal(window.location.hash, "#general");
+  // a selected pane whose flag turns off falls back to General
+  if (featureEnabled(effective, "TAGS")) {
+    must(tabs().find((tab) => tab.dataset.pane === "tags")).click();
+    assert.equal(selected(), "tags");
+    byId("tags-section").hidden = true;
+    const { syncSettingsTabs } = await import("../../../src/pages/options/nav.ts");
+    syncSettingsTabs();
+    assert.equal(selected(), "general", "its tab hid: General again");
+    byId("tags-section").hidden = false;
+    syncSettingsTabs();
+    assert.equal(must(tabs().find((tab) => tab.dataset.pane === "tags")).hidden, false);
+  }
+  window.location.hash = "";
 });

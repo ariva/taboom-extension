@@ -131,9 +131,10 @@ threshold does not apply, and a toast says how many.
 
 ## Settings
 
-Zoom, density and theme (the panel follows at once), automatic snooze thresholds and
-exclusions, protected sites, keep-alive marks that reload a page on a timer, and the tags
-tables. Every table edits in place; removals can be undone.
+Six tabs under the title: **General** (zoom, density and theme — the panel follows at once —, automatic
+snooze thresholds and exclusions, customizations, useful links, data), **Protected sites**, **Keep alive**
+(marks that reload a page on a timer), **Tags**, **Tab names** and **Changes**. Every table edits in place;
+removals can be undone.
 
 <p>
   <img src="assets/features/chrome/settings-interface-dark.png" alt="Settings - Interface, dark theme" width="460">

@@ -3,12 +3,12 @@ import type { Scene } from "./index.ts";
 export const tags: Scene = {
   id: "tags",
   settings: "#tags-section",
-  title: "New: custom tags",
+  title: "Custom tags",
   newIn: "1.0.5",
   covers: /tag/i,
   gif: [0, 8],
   async run(stage) {
-    await stage.caption("New in 1.0.5 — tag any page with your own colored labels", 1800);
+    await stage.caption(`${stage.release} — tag any page with your own colored labels`, 1800);
     const row = stage.awakeRow("Roadmap 2027");
     await stage.click(row, { button: "right" });
     await stage.pause(400);

@@ -76,11 +76,11 @@ export const moveTab: Scene = {
 export const parked: Scene = {
   id: "parked",
   settings: "#askBeforePark",
-  title: "New: park a window, restore it later",
+  title: "Park a window, restore it later",
   newIn: "1.0.5",
   covers: /park/i,
   async run(stage) {
-    await stage.caption("New in 1.0.5 — park a whole window: its tabs wait, closed, until you need them", 2000);
+    await stage.caption(`${stage.release} — park a whole window: its tabs wait, closed, until you need them`, 2000);
     const header = stage.panel.locator("#tab-list .group-header", { hasText: "Shopping" }).first();
     await stage.hover(header);
     await stage.click(header.locator(".group-menu-btn"));

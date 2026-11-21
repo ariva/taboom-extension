@@ -18,6 +18,7 @@ import { initTabNames, renderTabNames } from "./tab-names.ts";
 import { initPerfPanel } from "./perf-panel.ts";
 import { initDangerZone, renderDangerZone } from "./danger-zone.ts";
 import { initWhatsNew } from "./whats-new.ts";
+import { initSettingsTabs, syncSettingsTabs } from "./nav.ts";
 
 // before markDevPage: the dev prefix goes in front of the final heading
 getElementById("page-title").textContent = settingsTitle(getReleaseVersion());
@@ -34,6 +35,7 @@ async function render() {
   await renderTags(state);
   await renderTabNames(state);
   await renderDangerZone();
+  syncSettingsTabs(); // the flag-hidden cards decided above take their tabs along
 
   getElementById("about").textContent = aboutText(getReleaseVersion());
 }
@@ -59,6 +61,7 @@ getElementById("links").addEventListener("click", (event) => {
 
 initPerfPanel();
 initDangerZone();
+initSettingsTabs();
 
 render();
 
@@ -126,6 +129,7 @@ chrome.storage.onChanged.addListener(async (changes, area) => {
   if (cards.danger) {
     await renderDangerZone();
   }
+  syncSettingsTabs();
 });
 
 initWhatsNew();
