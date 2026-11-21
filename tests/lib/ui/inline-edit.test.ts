@@ -51,10 +51,10 @@ beforeEach(() => {
 
 test("Lib - UI - Inline edit - The label becomes a focused input carrying initial and placeholder", () => {
   const { input } = startEdit();
-  assert.equal(document.querySelector(".label"), null);
+  assert.ok(document.querySelector(".label") === null);
   assert.equal(input.value, "Old");
   assert.equal(input.placeholder, "Name");
-  assert.equal(document.activeElement, input);
+  assert.ok(document.activeElement === input);
 });
 
 test("Lib - UI - Inline edit - Enter commits the value, then finishes", async () => {

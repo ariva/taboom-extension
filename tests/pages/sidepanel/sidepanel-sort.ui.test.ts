@@ -146,7 +146,7 @@ test("UI - Sidepanel Sort - Group by window: current window first, headers with 
   search.value = "";
   search.dispatchEvent(new window.Event("input", { bubbles: true }));
   setSort("recent");
-  assert.equal(document.querySelector(".group-header"), null, "headers only in window mode");
+  assert.ok(document.querySelector(".group-header") === null, "headers only in window mode");
 });
 
 test("UI - Sidepanel Sort - Collapse hides a group's rows; search auto-expands", () => {
@@ -245,7 +245,7 @@ test("UI - Sidepanel Sort - WINDOW_GROUP_SELECT off: headers carry no checkbox",
   skip: GROUP_SELECT_ON, // WINDOW_GROUP_SELECT enabled in features.json
 }, () => {
   setSort("window");
-  assert.equal(document.querySelector(".group-header .group-select"), null);
+  assert.ok(document.querySelector(".group-header .group-select") === null);
 });
 
 test("UI - Sidepanel Sort - Window headers carry the window color dot", () => {
@@ -555,10 +555,9 @@ test("UI - Sidepanel Sort - Tab groups sort: ABC groups, ungrouped last, group m
   const header = document.querySelector('.group-header[data-tab-group-id="7"]');
   assert.ok(header, "group header carries its group id");
   assert.ok(header.querySelector(".tg-square"), "group header marker is a square");
-  assert.equal(header.querySelector(".win-dot"), null, "…not a circle");
-  assert.equal(
-    document.querySelector('.row[data-tab-id="1"] .tg-square'),
-    null,
+  assert.ok(header.querySelector(".win-dot") === null, "…not a circle");
+  assert.ok(
+    document.querySelector('.row[data-tab-id="1"] .tg-square') === null,
     "rows under a group header carry no redundant square",
   );
   header.dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
@@ -623,7 +622,7 @@ test("UI - Sidepanel Sort - Tab groups sort: ABC groups, ungrouped last, group m
     await tick();
   }
   assert.ok(document.querySelector('.row[data-tab-id="1"] .tg-square'), "grouped row carries the group square");
-  assert.equal(document.querySelector('.row[data-tab-id="3"] .tg-square'), null, "ungrouped row has none");
+  assert.ok(document.querySelector('.row[data-tab-id="3"] .tg-square') === null, "ungrouped row has none");
 
   // flat sorts: square sits AFTER the window dot, no indent
   setSort("recent");

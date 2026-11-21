@@ -4,6 +4,12 @@
 
 set shell := ["bash", "-uc"]
 
+# A failing node:assert on a happy-dom node allocates off-heap without end (tests/structure/assert-dom-nodes.test.ts
+# keeps nodes out of equality asserts; V8's heap limit does not stop it), and a runaway test of any other kind is no
+# better: where systemd can, the Node test tiers run in a memory-capped scope, so the run dies instead of the machine.
+# The whole suite peaks far below the cap. No user systemd (CI containers, macOS): plain vitest
+vitest := if `systemd-run --user --scope -q true 2>/dev/null && echo yes || true` == "yes" { "systemd-run --user --scope -q -p MemoryMax=8G -p MemorySwapMax=0 npx vitest" } else { "npx vitest" }
+
 default: check
 
 # lint + typecheck + test
@@ -22,29 +28,37 @@ format:
 typecheck:
     npx tsc -p tsconfig.json
 
-# the three flag scenarios below + the flag-independent unit tests, as parallel Vitest projects (vitest.config.ts)
-test:
-    npx vitest run
+# the three flag scenarios below + the flag-independent unit tests, as parallel Vitest projects (vitest.config.ts);
+# `just test tests/pages/options --project enabled` passes files and flags through, memory cap included
+test *args:
+    {{ vitest }} run {{ args }}
+
+# memory hunt: one worker, one file at a time, so the V8 heap figure printed per file (logHeapUsage, vitest.config.ts)
+# belongs to that file alone and the files run in a stable order — slow (minutes for the whole suite), pass a folder.
+# The reporter is named because the one Vitest picks without a terminal lists no passing file, hence no figure;
+# `--reporter=verbose` after it gives the figure per test
+test-heap *args:
+    {{ vitest }} run --maxWorkers=1 --no-file-parallelism --reporter=default {{ args }}
 
 # flags exactly as shipped in features.json (+ the flag-independent unit tests)
 test-enabled:
-    npx vitest run --project unit --project enabled
+    {{ vitest }} run --project unit --project enabled
 
 # experimental flags treated as enabled (ui.showExperimental injected)
 test-experimental:
-    npx vitest run --project experimental
+    {{ vitest }} run --project experimental
 
 # every feature flag disabled
 test-disabled:
-    npx vitest run --project disabled
+    {{ vitest }} run --project disabled
 
 # flags as shipped against the Firefox-shaped chrome mock (no sidePanel / onReplaced / split view / favicon store)
 test-firefox:
-    npx vitest run --project firefox
+    {{ vitest }} run --project firefox
 
 # rerun affected tests on save
 test-watch:
-    npx vitest
+    {{ vitest }}
 
 # real-browser tier (Vitest Browser Mode, headless Chromium): focus, clicks, popovers, dialogs
 test-browser:

@@ -50,6 +50,10 @@ const flagProject = (name: string, env: Record<string, string>, define = BOTH) =
 
 export default defineConfig({
   test: {
+    // heap after each test file, printed next to it by the reporters that list files: a leaking suite shows as a
+    // number that keeps climbing. V8 heap only — off-heap growth (a DOM node in an equality assert,
+    // docs/TESTING.md) does not show here
+    logHeapUsage: true,
     projects: [
       { define: BOTH, test: { name: "unit", environment: "node", include: FLAG_INDEPENDENT } },
       flagProject("enabled", {}),

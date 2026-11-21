@@ -46,16 +46,16 @@ test("UI - Sidepanel Keyboard - No window dots when all tabs share one window", 
 test("UI - Sidepanel Keyboard - Slash focuses search", () => {
   byId("search").blur();
   key("/");
-  assert.equal(document.activeElement, document.getElementById("search"));
+  assert.ok(document.activeElement === document.getElementById("search"));
 });
 
 test("UI - Sidepanel Keyboard - Arrows do nothing while flag off", { skip: KEY_NAV_ON }, () => {
   key("ArrowDown");
-  assert.equal(document.querySelector(".row.cursor"), null, "no cursor appears");
+  assert.ok(document.querySelector(".row.cursor") === null, "no cursor appears");
 });
 
 test("UI - Sidepanel Keyboard - Arrow keys move the cursor and clamp at both ends", keyNavSkip, () => {
-  assert.equal(document.querySelector(".row.cursor"), null, "no cursor initially");
+  assert.ok(document.querySelector(".row.cursor") === null, "no cursor initially");
   key("ArrowDown");
   assert.equal(cursorTitle(), "Alpha");
   key("ArrowDown");

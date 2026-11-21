@@ -148,7 +148,7 @@ test("UI - Sidepanel - A tab Chrome restored but never loaded (status unloaded) 
     qa(row, ".badge").some((el) => el.textContent === "snoozed"),
     "the snoozed badge",
   );
-  assert.equal(row.querySelector('[data-action="snooze"]'), null, "nothing to snooze");
+  assert.ok(row.querySelector('[data-action="snooze"]') === null, "nothing to snooze");
   assert.equal(q(document, '#filters button[data-filter="snoozed"] .count').textContent, "2", "counted as snoozed");
   inbox.status = statusBefore;
   await chrome.tabs.onUpdated.fire(3, { title: "Inbox" });
@@ -549,9 +549,9 @@ test("UI - Sidepanel - Row action buttons dispatch per-tab actions without activ
   const row = (id: number) => q(document, `.row[data-tab-id="${id}"]`);
 
   // template prunes per row: no snooze on discarded, one protect variant kept
-  assert.equal(row(2).querySelector('[data-action="snooze"]'), null, "no snooze button on discarded tab");
+  assert.ok(row(2).querySelector('[data-action="snooze"]') === null, "no snooze button on discarded tab");
   assert.ok(row(1).querySelector('[data-icon="protect"]'), "unprotected tab keeps protect icon");
-  assert.equal(row(1).querySelector('[data-icon="unprotect"]'), null);
+  assert.ok(row(1).querySelector('[data-icon="unprotect"]') === null);
   assert.ok(row(3).querySelector('[data-icon="unprotect"]'), "protected tab keeps unprotect icon");
   assert.equal(q(row(3), '[data-action="toggle-protect"]').title, "Unprotect site");
   assert.equal(q(row(1), '[data-action="toggle-protect"]').title, "Protect site");
@@ -591,12 +591,12 @@ test("UI - Sidepanel - Own ui-prefs storage echo is ignored; foreign ui change r
   const { ui }: Pick<LocalStorageSchema, "ui"> = JSON.parse(must(lastSet).slice("storage.set ".length));
   await chrome.storage.onChanged.fire({ ui: { newValue: ui } }, "local");
   await new Promise((resolve) => setTimeout(resolve, 200)); // past the 150ms debounce
-  assert.equal(document.querySelector(".row"), firstRow, "own echo: no second render");
+  assert.ok(document.querySelector(".row") === firstRow, "own echo: no second render");
 
   // a change written elsewhere (e.g. options page) must still re-render
   await chrome.storage.onChanged.fire({ ui: { newValue: { ...ui, density: "comfortable" } } }, "local");
   await new Promise((resolve) => setTimeout(resolve, 200));
-  assert.notEqual(document.querySelector(".row"), firstRow, "foreign ui change re-renders");
+  assert.ok(document.querySelector(".row") !== firstRow, "foreign ui change re-renders");
 
   q(document, '#filters button[data-filter="all"]').click();
 });
@@ -893,7 +893,7 @@ test("UI - Sidepanel - Search highlights the found tokens in the list", async ()
   search.value = "";
   search.dispatchEvent(new window.Event("input", { bubbles: true }));
   await tick();
-  assert.equal(document.querySelector(".row mark"), null, "no marks without a search");
+  assert.ok(document.querySelector(".row mark") === null, "no marks without a search");
 });
 
 test("UI - Sidepanel - Row hover shows the full URL in the custom tip", async () => {
@@ -1703,7 +1703,7 @@ test("UI - Sidepanel - WINDOW_NAMES: named headers, custom dots, overview list, 
   await tick();
   assert.match(q(pop, ".win-view.on").textContent, /^Groups/, "view switched");
   assert.ok(!calls.includes("sendMessage window-rename"), "view switch cancels the rename, nothing sent");
-  assert.equal(document.querySelector(".rename-input"), null, "rename input gone");
+  assert.ok(document.querySelector(".rename-input") === null, "rename input gone");
   document.body.click();
 
   // Groups view: group row navigates to the group's first tab
@@ -1735,7 +1735,7 @@ test("UI - Sidepanel - WINDOW_NAMES: named headers, custom dots, overview list, 
   assert.ok(calls.includes('tabGroups.update 7 {"title":"play"}'), "in-list group rename sent to Chrome");
   await chrome.tabGroups.update(7, { title: "work" }); // shared fixture — later tests pick "work"
   assert.match(q(pop, ".win-view.on").textContent, /^Groups/, "popover stays on Groups");
-  assert.equal(pop.querySelector(".rename-input"), null, "input gone after commit");
+  assert.ok(pop.querySelector(".rename-input") === null, "input gone after commit");
 
   // bottom "+ New group…" row: inline name input. Esc / empty name create nothing…
   const newGroupInput = () => {
@@ -1945,7 +1945,7 @@ test("UI - Sidepanel - WINDOW_NAMES: named headers, custom dots, overview list, 
     document.querySelector('.group-header[data-window-id="3"] .win-pin'),
     "pinned group header carries the 📌 marker",
   );
-  assert.equal(document.querySelector('.group-header[data-window-id="2"] .win-pin'), null, "unpinned header has none");
+  assert.ok(document.querySelector('.group-header[data-window-id="2"] .win-pin') === null, "unpinned header has none");
 
   // cleanup: profiles away, extra window gone, sort back
   tabs.splice(
@@ -3126,7 +3126,7 @@ test("UI - Sidepanel - TAGS: a disabled tag or a switched-off rule shows struck 
   await chrome.storage.onChanged.fire({ settings: {} }, "local");
   await settle();
   assert.deepEqual(pills(50), ["live"]);
-  assert.equal(document.querySelector('.row[data-tab-id="51"]'), null, "no live tag: out of the Tags filter");
+  assert.ok(document.querySelector('.row[data-tab-id="51"]') === null, "no live tag: out of the Tags filter");
   assert.equal(rowOf(50).dataset.tipTags?.includes("gone"), false);
   assert.deepEqual(shown(), ["50"], 'the dropped tick leaves "any tagged tab": the live-tagged one');
   assert.equal(q(chip, ".chip-label").textContent, "Tags");
@@ -3198,7 +3198,7 @@ test("UI - Sidepanel - TAGS: row menu Tag URL ▸ creates / toggles tags; badge,
   assert.equal(q<HTMLInputElement>(pickRow("Work"), "input").checked, true, "the new tag comes ticked");
   assert.equal(q<HTMLInputElement>(newRow(), ".tag-new-name").value, "", "the row is ready for the next one");
   assert.equal(q<HTMLButtonElement>(pick, ".tag-pick-apply").disabled, false, "a staged tick: Apply is on");
-  assert.equal(rowOf(1).querySelector(".badge.tag"), null);
+  assert.ok(rowOf(1).querySelector(".badge.tag") === null);
   // a duplicate name says so under the row; nothing written
   await addNew("work");
   assert.match(q(pick, ".tag-new-error").textContent ?? "", /exists/);
@@ -3213,7 +3213,7 @@ test("UI - Sidepanel - TAGS: row menu Tag URL ▸ creates / toggles tags; badge,
   assert.equal(menu.hidden, false, "Cancel brings the row menu back");
   menu.hidden = true;
   assert.equal((await chrome.storage.local.get("tags")).tags?.length, 1, "the tag exists");
-  assert.equal(rowOf(1).querySelector(".badge.tag"), null, "…but Cancel put nothing on the tab");
+  assert.ok(rowOf(1).querySelector(".badge.tag") === null, "…but Cancel put nothing on the tab");
   // ticking it and Apply: the badge appears
   open(1);
   assert.equal(q<HTMLInputElement>(pickRow("Work"), "input").checked, false, "Cancel dropped the staged tick");
@@ -3226,7 +3226,7 @@ test("UI - Sidepanel - TAGS: row menu Tag URL ▸ creates / toggles tags; badge,
   const badge = q(rowOf(1), ".badge.tag");
   assert.equal(badge.textContent, "Work");
   assert.equal(badge.style.background, "#188038", "solid fill in the tag color (happy-dom keeps the hex)");
-  assert.equal(rowOf(2).querySelector(".badge.tag"), null);
+  assert.ok(rowOf(2).querySelector(".badge.tag") === null);
   // the existing tag is a checkbox: ticked when the tab has it; a tick is staged until Apply
   open(2);
   const workBox = q<HTMLInputElement>(pickRow("Work"), "input");
@@ -3239,7 +3239,7 @@ test("UI - Sidepanel - TAGS: row menu Tag URL ▸ creates / toggles tags; badge,
   workBox.click(); // back to stored = no change
   assert.equal(q<HTMLButtonElement>(pick, ".tag-pick-apply").disabled, true);
   workBox.click();
-  assert.equal(rowOf(2).querySelector(".badge.tag"), null, "nothing written before Apply");
+  assert.ok(rowOf(2).querySelector(".badge.tag") === null, "nothing written before Apply");
   q(pick, ".tag-pick-cancel").click();
   await tick();
   assert.equal(menu.hidden, false, "…and the menu is back");
@@ -3292,7 +3292,7 @@ test("UI - Sidepanel - TAGS: row menu Tag URL ▸ creates / toggles tags; badge,
     ["Work", "No tag"],
   );
   assert.equal(q(headers[0] ?? document.body, ".tg-square").style.background, "#188038");
-  assert.equal(headers[1]?.querySelector(".tg-square, .win-dot"), null, "the untagged bucket has no marker");
+  assert.ok(headers[1]?.querySelector(".tg-square, .win-dot") === null, "the untagged bucket has no marker");
   sort.value = "recent";
   sort.dispatchEvent(new window.Event("change"));
   await tick();
@@ -3302,7 +3302,7 @@ test("UI - Sidepanel - TAGS: row menu Tag URL ▸ creates / toggles tags; badge,
   q(pick, ".tag-pick-apply").click();
   await tick();
   await tick();
-  assert.equal(rowOf(1).querySelector(".badge.tag"), null);
+  assert.ok(rowOf(1).querySelector(".badge.tag") === null);
   stored = await chrome.storage.local.get(["tagPages"]);
   assert.deepEqual(
     stored.tagPages?.map((page) => page.url),
@@ -3340,7 +3340,7 @@ test("UI - Sidepanel - TAGS: row menu Tag URL ▸ creates / toggles tags; badge,
   q(pick, ".tag-pick-apply").click();
   await tick();
   await tick();
-  assert.equal(rowOf(1).querySelector(".badge.tag"), null);
+  assert.ok(rowOf(1).querySelector(".badge.tag") === null);
   stored = await chrome.storage.local.get(["tagPages"]);
   assert.deepEqual(
     stored.tagPages?.map((page) => page.url),
@@ -3423,7 +3423,7 @@ test("UI - Sidepanel - TAGS: row menu Tag URL ▸ creates / toggles tags; badge,
     ["https://github.com/*"],
     "both page entries lost their only tag",
   );
-  assert.equal(rowOf(2).querySelector(".badge.tag"), null);
+  assert.ok(rowOf(2).querySelector(".badge.tag") === null);
   assert.deepEqual(
     qa(rowOf(1), ".badge.tag").map((el) => el.textContent),
     ["✱ temp"],
@@ -3578,7 +3578,7 @@ test("UI - Sidepanel - TAGS: quick launch Tags view — rows filter, menu rename
     tags.map((tag) => tag.name),
     ["bills"],
   );
-  assert.equal(q(document, '.row[data-tab-id="2"]').querySelector(".badge.tag"), null, "its badge is gone");
+  assert.ok(q(document, '.row[data-tab-id="2"]').querySelector(".badge.tag") === null, "its badge is gone");
   await openTagsView();
   assert.deepEqual(
     tagRows().map((el) => q(el, ".win-title").textContent),
@@ -3673,8 +3673,8 @@ test("UI - Sidepanel - SPLIT_VIEW: row menu pairs two tabs into Chrome's split v
   assert.equal(q(splitHeader, ".tg-title").textContent, "Split");
   assert.ok(q(splitHeader, "svg"), "divided-window icon");
   assert.equal(q(splitHeader, ".tg-count").textContent, "2/2", "visible/total, like a group header");
-  assert.equal(splitHeader.nextElementSibling, rowOf(1), "first member right under the header");
-  assert.equal(rowOf(1).nextElementSibling, rowOf(2), "second member next");
+  assert.ok(splitHeader.nextElementSibling === rowOf(1), "first member right under the header");
+  assert.ok(rowOf(1).nextElementSibling === rowOf(2), "second member next");
   assert.ok(rowOf(1).classList.contains("in-split") && rowOf(2).classList.contains("in-split"), "nested rows");
   assert.ok(!rowOf(3).classList.contains("in-split"));
   // hover: "Split view", a rule, then the two tabs numbered with their urls
@@ -3719,7 +3719,7 @@ test("UI - Sidepanel - SPLIT_VIEW: row menu pairs two tabs into Chrome's split v
   await settle();
   const order = qa(document, ".row").map((el) => el.dataset.tabId);
   assert.equal(order.indexOf("2"), order.indexOf("1") + 1, "partner right after the first member");
-  assert.equal(q(document, ".split-header").nextElementSibling, rowOf(1), "the sub-header in a flat sort too");
+  assert.ok(q(document, ".split-header").nextElementSibling === rowOf(1), "the sub-header in a flat sort too");
   sortSel.value = "window";
   sortSel.dispatchEvent(new window.Event("change"));
   await settle();
@@ -3733,7 +3733,7 @@ test("UI - Sidepanel - SPLIT_VIEW: row menu pairs two tabs into Chrome's split v
   await settle();
   assert.ok(calls.includes("tabs.unsplit 500"));
   assert.ok(!qa(rowOf(1), ".badge").some((el) => el.textContent === "split"), "badge gone");
-  assert.equal(document.querySelector(".split-header"), null, "sub-header gone");
+  assert.ok(document.querySelector(".split-header") === null, "sub-header gone");
   assert.ok(
     !rowOf(1).classList.contains("in-split") && !rowOf(2).classList.contains("in-split"),
     "rows back at the top level",
@@ -3777,7 +3777,7 @@ test("UI - Sidepanel - SPLIT_VIEW: row menu pairs two tabs into Chrome's split v
   must(qa(ctx, ".ctx-item").find((el) => el.textContent === "Unsplit")).click();
   await settle();
   assert.ok(calls.includes("tabs.unsplit 500"), "the header menu unsplits the pair");
-  assert.equal(document.querySelector(".split-header"), null);
+  assert.ok(document.querySelector(".split-header") === null);
   // a pinned anchor and an unpinned partner further down its own window: the partner is moved
   // beside it, pinned to match, then seated beside it again (pinning moves a tab into the
   // pinned run — the mock never renumbers indexes, so the re-read still finds it at index 3)
@@ -4216,7 +4216,7 @@ test("UI - Sidepanel - A hidden panel coalesces changes into one refresh when it
   await tick();
   await tick();
   assert.equal(refreshes(), 1, "shown: one refresh at once");
-  assert.equal(document.querySelector("#tab-list [data-sentinel]"), null, "shown: rendered");
+  assert.ok(document.querySelector("#tab-list [data-sentinel]") === null, "shown: rendered");
   assert.deepEqual(
     Array.from(document.querySelectorAll(".row .title")).map((el) => el.textContent),
     ["Inbox"],
@@ -4261,7 +4261,7 @@ test("UI - Sidepanel - WINDOW_NAMES: a profile rename elsewhere refreshes the he
   await chrome.storage.local.set({ windowProfiles: churned });
   await chrome.storage.onChanged.fire({ windowProfiles: { oldValue: renamed, newValue: churned } }, "local");
   await settle();
-  assert.equal(document.querySelector(".row"), firstRow, "fingerprint bookkeeping: no render");
+  assert.ok(document.querySelector(".row") === firstRow, "fingerprint bookkeeping: no render");
 
   sort.value = previousSort;
   sort.dispatchEvent(new window.Event("change", { bubbles: true }));
@@ -4291,13 +4291,13 @@ test("UI - Sidepanel - A drag ended on a detached row still resets; tabs.onRepla
     const before = document.querySelector(".row");
     await chrome.tabs.onReplaced.fire(99, 1);
     await new Promise((resolve) => setTimeout(resolve, 200));
-    assert.notEqual(document.querySelector(".row"), before, "onReplaced re-renders");
+    assert.ok(document.querySelector(".row") !== before, "onReplaced re-renders");
   }
 
   const settled = document.querySelector(".row");
   await chrome.storage.onChanged.fire({ wakeTimes: { newValue: { 1: Date.now() } } }, "session");
   await new Promise((resolve) => setTimeout(resolve, 200));
-  assert.equal(document.querySelector(".row"), settled, "a storage.session write does not render");
+  assert.ok(document.querySelector(".row") === settled, "a storage.session write does not render");
 });
 
 // two refreshes in flight (an explicit one racing the debounced one): the older result must not
@@ -4465,7 +4465,7 @@ test("UI - Sidepanel - TAGS: a slash typed in the picker's new-tag field is not 
   const slash = new window.KeyboardEvent("keydown", { key: "/", bubbles: true, cancelable: true });
   name.dispatchEvent(slash);
   assert.equal(slash.defaultPrevented, false, "the character is typed");
-  assert.equal(document.activeElement, name, "focus stays in the field");
+  assert.ok(document.activeElement === name, "focus stays in the field");
   q(pick, ".tag-pick-cancel").click();
   await tick();
 });

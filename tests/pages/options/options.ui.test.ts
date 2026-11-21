@@ -102,7 +102,7 @@ test("UI - Options - Protected site row: click the pattern to edit it in place; 
   await tick();
   const chip = () => qa(document, "#rules tr")[0]!;
   const key = (name: string) => new window.KeyboardEvent("keydown", { key: name, bubbles: true });
-  assert.equal(chip().querySelector("input"), null, "pattern shown as text at first");
+  assert.ok(chip().querySelector("input.rename-input") === null, "pattern shown as text at first");
   assert.equal(
     q(chip(), ".pattern").title,
     "Domain and its subdomains: *.github.com\nClick to edit the pattern",
@@ -126,9 +126,9 @@ test("UI - Options - Protected site row: click the pattern to edit it in place; 
     { id: "r1", type: "url", pattern: "https://app.example.com/board" },
     "normalized through makeRule, id kept, type follows",
   );
-  assert.equal(q(chip(), "span").textContent, "https://app.example.com/board", "chip re-rendered as text");
+  assert.equal(q(chip(), ".pattern").textContent, "https://app.example.com/board", "chip re-rendered as text");
 
-  q(chip(), "span").click();
+  q(chip(), ".pattern").click();
   const second = q<HTMLInputElement>(chip(), "input.rename-input");
   second.value = "*.github.com";
   second.dispatchEvent(key("Enter"));
@@ -142,7 +142,7 @@ test("UI - Options - Protected site row: click the pattern to edit it in place; 
     ["   ", "blur"],
     ["*.github.com", "blur"],
   ] as const) {
-    q(chip(), "span").click();
+    q(chip(), ".pattern").click();
     const editing = q<HTMLInputElement>(chip(), "input.rename-input");
     editing.value = value;
     calls.length = 0;
@@ -150,11 +150,11 @@ test("UI - Options - Protected site row: click the pattern to edit it in place; 
     await tick();
     await tick();
     assert.ok(!calls.some((c) => c.startsWith("storage.set")), `${value} via ${how}: no write`);
-    assert.equal(q(chip(), "span").textContent, "*.github.com", `${value} via ${how}: text back`);
+    assert.equal(q(chip(), ".pattern").textContent, "*.github.com", `${value} via ${how}: text back`);
   }
   // a rule added elsewhere between the render and the commit (side panel, worker) must survive
   // the commit: the edit is applied to the stored list, not to the one the chip was rendered from
-  q(chip(), "span").click();
+  q(chip(), ".pattern").click();
   const stale = q<HTMLInputElement>(chip(), "input.rename-input");
   stored.protectionRules = [...stored.protectionRules, { id: "r3", type: "host", pattern: "late.example.com" }];
   stale.value = "docs.example.com";
@@ -590,7 +590,7 @@ test("UI - Options - What's new paginates: initial count, then a page per click 
   }
 
   if (total <= SHOW_INITIAL_CHANGES) {
-    assert.equal(box.querySelector("#changes-more"), null, "no Show-more at the initial count or fewer releases");
+    assert.ok(box.querySelector("#changes-more") === null, "no Show-more at the initial count or fewer releases");
     return;
   }
   let clicks = 0;
@@ -638,9 +638,9 @@ test("UI - Options - What's new flag off: entries always expanded, no fold UI", 
   skip: CHANGES_COLLAPSABLE, // OPTION_COLLAPSABLE_CHANGE_LOG_ITEMS enabled in features.json
 }, () => {
   const box = byId("whats-new");
-  assert.equal(document.getElementById("changes-toggle"), null, "no fold-all toggle");
-  assert.equal(box.querySelector("details"), null, "no collapsibles at all");
-  assert.equal(box.querySelector("summary"), null, "no chevron carriers");
+  assert.ok(document.getElementById("changes-toggle") === null, "no fold-all toggle");
+  assert.ok(box.querySelector("details") === null, "no collapsibles at all");
+  assert.ok(box.querySelector("summary") === null, "no chevron carriers");
   const entries = qa(box, ".changes-entry");
   assert.ok(entries.length > 0, "entries rendered as plain blocks");
   assert.ok(
@@ -1005,7 +1005,7 @@ test("UI - Options - Keep-alive url: click turns it into an input; blur / Enter 
   await tick();
   const row = () => qa(byId("keep-alive-rows"), "tr")[0]!;
   const key = (name: string) => new window.KeyboardEvent("keydown", { key: name, bubbles: true });
-  assert.equal(row().querySelector("input.rename-input"), null, "url shown as text at first");
+  assert.ok(row().querySelector("input.rename-input") === null, "url shown as text at first");
   qa(row(), "td")[2]!.click(); // the title text, not the url span: the whole Page cell is the handle
   const input = q<HTMLInputElement>(row(), "input.rename-input");
   assert.equal(input.value, "https://dash.example.com/board", "the input starts with the current url");
@@ -1960,7 +1960,7 @@ test("UI - Options - A keepAlive write re-renders only its card and keeps an ope
     editor.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
     await tick();
     await tick();
-    assert.equal(row().querySelector("input.rename-input"), null, "Escape ends it and the table catches up");
+    assert.ok(row().querySelector("input.rename-input") === null, "Escape ends it and the table catches up");
   } finally {
     chrome.tabs.query = realQuery;
   }
@@ -1987,7 +1987,7 @@ test("UI - Options - A ui write that moves only the panel's view renders nothing
     await tick();
     await tick();
     assert.equal(queries, 0, "a scope click in the panel is not Settings' business");
-    assert.equal(byId("rules").firstElementChild, rulesBefore, "no card re-rendered");
+    assert.ok(byId("rules").firstElementChild === rulesBefore, "no card re-rendered");
   } finally {
     chrome.tabs.query = realQuery;
   }

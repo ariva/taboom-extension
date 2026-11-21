@@ -42,7 +42,7 @@ test("Lib - UI - Dropdown - A press opens the list instead of the native popup; 
   assert.equal(pop.hidden, false);
   assert.deepEqual(labels(), ["Alpha", "Beta"]);
   assert.equal(pop.querySelector(".dd-item.current")?.textContent, "Alpha");
-  assert.equal(document.activeElement, select, "preventDefault swallowed the focus — restored by hand");
+  assert.ok(document.activeElement === select, "preventDefault swallowed the focus — restored by hand");
 });
 
 test("Lib - UI - Dropdown - Picking an item sets the value, fires change once and closes", () => {

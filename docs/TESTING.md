@@ -44,6 +44,13 @@ npx vitest run tests/pages/sidepanel        # a whole folder
 npx vitest run -t "Service Worker"
 ```
 
+`just test <files / flags>` runs the same thing inside a memory-capped systemd scope (8 GB; `justfile`), e.g. `just test tests/pages/options --project enabled` — prefer it to a bare `npx vitest`: a runaway test then kills the run, not the machine.
+
+`logHeapUsage` is on (`vitest.config.ts`): reporters that list files print the V8 heap after each one. `just test-heap <folder>` is the memory hunt — one worker, one file at a time, default reporter — so the files run in a stable order and every one is listed with its figure (add `--reporter=verbose` for a figure per test). It shows JS-heap growth only; the off-heap runaway below never reaches a figure.
+
+**Never hand a DOM node to `assert.equal` / `deepEqual` / `notEqual`.** When such an assert fails, `node:assert` inspects both values to build its message; a happy-dom node reaches the whole document and window, the inspection never ends and allocates over 1 GB/s off-heap (V8's heap limit does not stop it). Compare inside `assert.ok(node === null, "…")` / `assert.ok(a === b, "…")`; `tests/structure/assert-dom-nodes.test.ts` fails on the direct forms (`querySelector(…)`, `q(…)`, `byId(…)`, `activeElement`, sibling / child / parent links) — a node held in a variable is not detected, so the rule is yours to keep.
+
+
 ## The feature-flag matrix
 
 Every flag-dependent test runs four times, as four parallel Vitest projects (`vitest.config.ts`):
@@ -68,7 +75,7 @@ Tests that do not depend on flags (tooling, release packaging, changelog format)
 | `tests/background/` | `service-worker.test.ts` — the worker driven by fired chrome events (alarms, messages, menus) |
 | `tests/pages/` | `model.test.ts` (both pages' view models); `sidepanel/` mirrors the source subfolders — `model/` (`lookups`, `window-order`, `sort-direction`, `tab-hosts`), `dnd/` (`dnd-model`), `foundation/` (`state`, `elements`, `scheduler`) — with the `*.ui.test.ts` suites on the real page at its top; `options/` — `page-state`, `options.ui.test.ts` |
 | `tests/tooling/` | `dev-reload.test.ts` — what a rebuild means for the loaded extension |
-| `tests/structure/` | Repo-wide guards: `lib-boundary` (generic code imports nothing Taboom), `no-import-cycles`, `changes` (CHANGES.md format), `release-snapshot` — packs through the real `scripts/pack.sh` and pins WHAT SHIPS (zip file list + manifest, no dev/tooling files, no dev-loop or network code, no source maps). Intended change: `UPDATE_SNAPSHOT=1 npx vitest run tests/structure/release-snapshot.test.ts` |
+| `tests/structure/` | Repo-wide guards: `lib-boundary` (generic code imports nothing Taboom), `no-import-cycles`, `assert-dom-nodes` (no DOM node in an equality assert), `changes` (CHANGES.md format), `release-snapshot` — packs through the real `scripts/pack.sh` and pins WHAT SHIPS (zip file list + manifest, no dev/tooling files, no dev-loop or network code, no source maps). Intended change: `UPDATE_SNAPSHOT=1 npx vitest run tests/structure/release-snapshot.test.ts` |
 | `tests/browser/` | Real-browser tier; `mount.ts` mounts the real side panel (HTML + CSS + entry module) in the test page |
 | `tests/e2e/` | Playwright on the built extension: `smoke.spec.ts`, `behaviour.spec.ts`; `fixtures.ts` is a generic "one unpacked MV3 extension" fixture. Sites are faked with `context.route` on `*.test` hosts — no network. Keep this tier small (seconds, under ~10 tests): UI behaviour belongs in `tests/browser/` |
 | `tests/helpers/` | `chrome-mock.ts` — the typed `chrome.*` stub (capturing events, flat call log), browser-safe, shared by the ui and browser tiers; `ui.ts` — happy-dom harness: `loadPage("src/pages/…/index.html")` (repo-root-relative), binds the mock to the current flag scenario |

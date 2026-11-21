@@ -17,7 +17,7 @@ test("Lib - UI - Ask dialog - OK resolves true without an input and the input's 
   assert.equal(part(".ask-message").textContent, "Close 12 tabs?");
   assert.equal(part(".ask-ok").textContent, "Close");
   assert.equal(part(".ask-cancel").textContent, "Cancel");
-  assert.equal(dialog.querySelector(".ask-input"), null);
+  assert.ok(dialog.querySelector(".ask-input") === null);
   part(".ask-ok").click();
   assert.equal(await confirmed, true);
   assert.equal(isAskDialogOpen(), false);
