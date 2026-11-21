@@ -4681,3 +4681,39 @@ test("UI - Sidepanel - TAB_NAMES: Rename tab… (single tab, before Copy URL) as
   await chrome.storage.local.set({ tabNamesTrash: [] });
   await settleStore();
 });
+
+test("Sidepanel - audio indicator: a playing tab shows 🔊 right after its host, not as a badge", async () => {
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 200));
+  tabs.push({
+    id: 60,
+    windowId: 1,
+    index: 20,
+    active: false,
+    discarded: false,
+    pinned: true,
+    audible: true,
+    url: "https://music.test/play",
+    title: "Playing",
+    lastAccessed: NOW - 1000,
+  });
+  await chrome.tabs.onActivated.fire({});
+  await settle();
+  const row = q(document, '.row[data-tab-id="60"]');
+  const host = q(row, ".host");
+  assert.equal(q(host, ".host-text").textContent, "music.test");
+  assert.equal(q(host, ".audio").textContent, "🔊");
+  assert.equal(q(host, ".audio").getAttribute("aria-label"), "Playing audio");
+  assert.ok(!qa(row, ".badge").some((badge) => badge.textContent === "🔊"), "no 🔊 badge on the meta line");
+  assert.deepEqual(
+    qa(row, ".badge").map((badge) => badge.textContent),
+    ["pinned"],
+    "the other badges are untouched",
+  );
+  assert.ok(q(document, '.row[data-tab-id="1"]').querySelector(".audio") === null, "a silent tab has no icon");
+  tabs.splice(
+    tabs.findIndex((t) => t.id === 60),
+    1,
+  );
+  await chrome.tabs.onActivated.fire({});
+  await settle();
+});

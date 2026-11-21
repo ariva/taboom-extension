@@ -347,8 +347,7 @@ test("Model - Badges order and kinds", () => {
     ["protected", "ok"],
     ["kept alive", "ok"],
     ["pinned", ""],
-    ["🔊", ""],
-  ]);
+  ]); // playing audio is not a badge: the row shows it after the host (vm.audio)
   assert.deepEqual(badges(tab(), false), [], "kept-alive flag defaults to off");
   assert.deepEqual(badges(tab({ splitViewId: 5 }), false), [["split", ""]], "a split-view member");
   assert.deepEqual(badges(tab({ splitViewId: -1 }), false), [], "SPLIT_VIEW_ID_NONE is not a split");
@@ -961,6 +960,8 @@ test("Model - RowViewModel tip: the url, the row's plain badges as a states line
   };
   const vm = rowViewModel(tabs[0]!, ctx);
   assert.equal(vm.tip, "https://example.com/x", "the text is the url; states and tags are their own lines");
+  assert.equal(vm.audio, true, "playing audio: the icon after the host, not a badge");
+  assert.ok(!vm.badges.some(([label]) => label === "🔊"));
   assert.deepEqual(vm.tipBadges, [
     ["snoozed", "warn"],
     ["protected", "ok"],
@@ -972,6 +973,7 @@ test("Model - RowViewModel tip: the url, the row's plain badges as a states line
     { name: "bills", color: "#f9ab00", dark: true },
   ]);
   assert.equal(rowViewModel(tabs[1]!, ctx).tip, "https://none.io/", "nothing to say: the url alone");
+  assert.equal(rowViewModel(tabs[1]!, ctx).audio, false);
   assert.deepEqual(rowViewModel(tabs[1]!, ctx).tipBadges, []);
   assert.deepEqual(rowViewModel(tabs[1]!, ctx).tipTags, []);
   assert.equal(

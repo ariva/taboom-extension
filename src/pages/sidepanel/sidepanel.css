@@ -266,7 +266,19 @@ main.compact .row.in-group { padding: 0.1875rem 0.5rem 0.1875rem 1.5625rem; }
 
 /* the one flexible item: 6rem floor (HOST_FLOOR), grows into what the pills leave, absorbs the
    sub-pixel difference between the measured fit and the layout */
-.row .host { flex: 1 1 6rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row .host { flex: 1 1 6rem; display: flex; align-items: center; gap: 0.25rem; min-width: 0; }
+/* the text ellipsizes on its own, so the 🔊 of a playing tab after it stays in view however long the host */
+.row .host-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* a fixed box: the emoji's own font metrics would add ~5px to the meta line, and every row must be as tall */
+.row .host .audio {
+  flex: none;
+  height: 1.125rem;
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.77rem;
+  line-height: 1;
+  transform: translateY(-0.0625rem); /* the emoji's ink sits low in its box: lift it onto the text's middle */
+}
 .row .age { flex: none; white-space: nowrap; } /* "1h 0m" never folds: only the host gives way */
 /* the tip's states and tags lines: the same pills as the rows, each on its own line */
 #hover-tip .tip-states, #hover-tip .tip-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem; margin-top: 0.25rem; }

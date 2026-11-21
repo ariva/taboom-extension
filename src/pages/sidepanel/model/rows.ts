@@ -68,6 +68,7 @@ export interface RowViewModel {
   host: string;
   hostRanges: HighlightRange[];
   age: string | null;
+  audio: boolean; // playing audio: a 🔊 right after the host on the meta line
   badges: Badge[];
   tip: string; // hover tip text: the url ("" for a url-less tab)
   tipBadges: Badge[]; // the tip's states line: the row's plain badges, same colors (no tags, no "url match")
@@ -151,9 +152,6 @@ export function badges(
       ["tag", ...(usesDarkText(tag.color) ? ["dark"] : []), "off"].join(" "),
       tagColorHex(tag.color),
     ]);
-  }
-  if (tab.audible) {
-    list.push(["🔊", ""]);
   }
   if (isSplit(tab)) {
     list.push(["split", ""]); // one half of a Chrome split view
@@ -330,12 +328,15 @@ export function rowViewModel(
     "temporary protected": d.protectedUntil,
     "temporary keep alive": d.keptUntil,
   };
-  const tipBadges = badgeList
-    .filter(([label, kind]) => label !== "url match" && !kind.startsWith("tag"))
-    .map(([label, kind]): Badge => {
-      const ends = until[label];
-      return ends === undefined ? [label, kind] : [`${label} · ${formatTimeLeft(ends, now)} left`, kind];
-    });
+  const tipBadges: Badge[] = [
+    ...badgeList
+      .filter(([label, kind]) => label !== "url match" && !kind.startsWith("tag"))
+      .map(([label, kind]): Badge => {
+        const ends = until[label];
+        return ends === undefined ? [label, kind] : [`${label} · ${formatTimeLeft(ends, now)} left`, kind];
+      }),
+    ...(tab.audible ? [["🔊", ""] satisfies Badge] : []), // the row's 🔊 follows the host; the tip lists it with the states
+  ];
   return {
     classes: [
       "row",
@@ -356,6 +357,7 @@ export function rowViewModel(
     host,
     hostRanges,
     age,
+    audio: tab.audible === true,
     badges: badgeList,
     tip: d.name !== undefined && tab.title ? `${tab.title}\n${tab.url ?? ""}` : (tab.url ?? ""),
     tipBadges,

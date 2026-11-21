@@ -86,6 +86,9 @@ function renderRowImpl(tab: Tab, vm: RowViewModel): HTMLElement {
   }
 
   const favicon = mustQuery(row, ".favicon");
+  if (!vm.audio) {
+    mustQuery(row, ".host .audio").remove(); // silent: the host line ends with the host
+  }
   // grouped rows carry a small square in the group's color. Placement per view:
   // window view — leftmost + indent (nested under the sub-header's square);
   // Tab groups sort — none (the rows already sit under their group header);
@@ -117,7 +120,7 @@ function renderRowImpl(tab: Tab, vm: RowViewModel): HTMLElement {
   }
 
   setTextWithMarks(mustQuery(row, ".title"), vm.title, vm.titleRanges);
-  setTextWithMarks(mustQuery(row, ".host"), vm.host, vm.hostRanges);
+  setTextWithMarks(mustQuery(row, ".host-text"), vm.host, vm.hostRanges);
   const meta = mustQuery(row, ".meta");
   if (vm.age) {
     const age = document.createElement("span");
