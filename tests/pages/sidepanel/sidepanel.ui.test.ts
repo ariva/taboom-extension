@@ -402,6 +402,37 @@ test("UI - Sidepanel - A press inside the panel corrects a stale current window 
   }
 });
 
+test("UI - Sidepanel - The right-click that brings the panel's window forward opens no menu; the next one does", async () => {
+  const originalGetLastFocused = chrome.windows.getLastFocused;
+  const ctx = byId("ctx-menu");
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 200)); // 150ms refresh debounce
+  const rightClick = (target: Element) => {
+    const press: Event & { button?: number } = new window.Event("pointerdown", { bubbles: true });
+    press.button = 2;
+    target.dispatchEvent(press);
+    target.dispatchEvent(new window.Event("contextmenu", { bubbles: true, cancelable: true }));
+  };
+  try {
+    chrome.windows.getLastFocused = async () => ({ id: 2 });
+    await chrome.windows.onFocusChanged.fire(2);
+    await settle();
+    // Chrome's record: window 2 holds the focus. The user right-clicks a row in THIS panel (window 1):
+    // the press itself is the window switch, so the menu stays shut — the user aimed at the window
+    rightClick(q(document, '.row[data-tab-id="3"]'));
+    assert.equal(ctx.hidden, true, "no menu for the press that brought the window forward");
+    await settle();
+    assert.ok(q(document, '.row[data-tab-id="1"]').classList.contains("current"), "the panel's own window is current");
+    // the window already focused: the next right-click is a real menu request
+    rightClick(q(document, '.row[data-tab-id="3"]'));
+    assert.equal(ctx.hidden, false, "the menu opens once the window holds the focus");
+    q(ctx, ".ctx-close").click();
+  } finally {
+    chrome.windows.getLastFocused = originalGetLastFocused;
+    await chrome.windows.onFocusChanged.fire(1);
+    await settle();
+  }
+});
+
 test("UI - Sidepanel - Activating a row on another window shows that window as current whatever Chrome's focus record says, and tells the other panels", async () => {
   const currentRowId = () => qa(document, ".row").find((r) => r.classList.contains("current"))?.dataset.tabId;
   const settle = () => new Promise((resolve) => setTimeout(resolve, 200)); // 150ms refresh debounce

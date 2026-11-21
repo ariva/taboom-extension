@@ -55,18 +55,38 @@ for (const event of [
 // record says (a Linux workspace switch leaves it naming the window focused before, with no
 // windows.onFocusChanged until a real click elsewhere and back). Corrected at once — a row
 // click right after reads the right origin — and told to the other panels.
-for (const type of ["pointerdown", "keydown"]) {
-  document.addEventListener(
-    type,
-    () => {
-      if (state.panelWindowId != null && state.currentWindowId !== state.panelWindowId) {
-        askFocus(state.panelWindowId);
-        scheduleRefresh();
-      }
-    },
-    true,
-  );
+function proveFocus(): boolean {
+  const own = state.panelWindowId;
+  if (own == null || state.currentWindowId === own) {
+    return false;
+  }
+  askFocus(own);
+  scheduleRefresh();
+  return true;
 }
+document.addEventListener("keydown", proveFocus, true);
+// The right press that brings this window forward aimed at the window, not at the row under
+// the pointer: its contextmenu opens nothing (capture — ahead of the list's and the quick
+// launch's menus). The next right-click, in a focused window, is a real menu request.
+let menuSwallowed = false;
+document.addEventListener(
+  "pointerdown",
+  (event) => {
+    menuSwallowed = proveFocus() && event.button === 2;
+  },
+  true,
+);
+document.addEventListener(
+  "contextmenu",
+  (event) => {
+    if (menuSwallowed) {
+      menuSwallowed = false;
+      event.preventDefault();
+      event.stopPropagation();
+    }
+  },
+  true,
+);
 // a focus change after the settle window is the user moving focus for real: the record rules again
 chrome.windows.onFocusChanged.addListener((windowId) => {
   if (state.focusHint && !hintSurvives(state.focusHint, windowId, Date.now())) {
