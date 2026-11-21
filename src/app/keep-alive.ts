@@ -4,7 +4,13 @@
 import { isExpired } from "./expiry.ts";
 import { hostnameOf, isSupportedUrl } from "./core.ts";
 import { popRemoval } from "./removal-trash.ts";
-import { matchesTagPageKey, pageKeyOf, tagPagePatternFromInput, tagPatternKind } from "./tag-patterns.ts";
+import {
+  isAddressPattern,
+  matchesTagPageKey,
+  pageKeyOf,
+  tagPagePatternFromInput,
+  tagPatternKind,
+} from "./tag-patterns.ts";
 import type { KeepAliveRemoval, KeepAliveTab } from "./types.ts";
 
 // A mark follows the page, not the tab: one made from a tab drops the fragment so in-page
@@ -58,10 +64,8 @@ export function keepAliveEntries(list: KeepAliveTab[], url: string | undefined, 
 // address) — then an address must be a reloadable one: http, https or file. "" otherwise
 export function keepAliveUrlFromInput(text: string): string {
   const pattern = tagPagePatternFromInput(text);
-  return SCHEME.test(pattern) && !isSupportedUrl(pattern) ? "" : pattern;
+  return isAddressPattern(pattern) && !isSupportedUrl(pattern) ? "" : pattern;
 }
-
-const SCHEME = /^[a-z][a-z0-9+.-]*:/i;
 
 // a mark's name: an address mark (one page, or everything under a path — marks made from a tab
 // on a site's root end in /) is named by its tab, the hostname until one is seen (Add row); a
@@ -72,7 +76,7 @@ export function keepAliveTitle(markUrl: string, tabTitle?: string): string {
 
 // one address, no glob — the kinds a tab's title and address can stand for
 function isAddressMark(markUrl: string): boolean {
-  return SCHEME.test(markUrl) && !markUrl.includes("*");
+  return isAddressPattern(markUrl) && !markUrl.includes("*");
 }
 
 // how the menus name a mark's kind — the words of the add items (Keep alive URL / domain):

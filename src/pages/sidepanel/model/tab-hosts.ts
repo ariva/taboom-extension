@@ -1,6 +1,6 @@
-// Pure: the unique hostnames / addresses behind a set of tab ids — what protect and
+// Pure: the unique hosts (with a non-default port) / addresses behind a set of tab ids — what protect and
 // unprotect act on.
-import { hostnameOf, isSupportedUrl } from "../../../app/core.ts";
+import { hostOf, isSupportedUrl } from "../../../app/core.ts";
 
 interface HostTab {
   id: number;
@@ -10,7 +10,7 @@ interface HostTab {
 export function hostsOf(allTabs: readonly HostTab[], tabIds: readonly number[]): string[] {
   const byId = new Map(allTabs.map((tab) => [tab.id, tab]));
   const hosts = (tabIds.map((tabId) => byId.get(tabId)).filter(Boolean) as HostTab[]) // filter(Boolean) drops the misses — TS cannot see that
-    .map((tab) => hostnameOf(tab.url))
+    .map((tab) => hostOf(tab.url))
     .filter(Boolean);
   return [...new Set(hosts)];
 }

@@ -1,6 +1,6 @@
 // Site protection: rule edits, the autoDiscardable flag on tabs, and the
 // protect menu item's title.
-import { hostnameOf, isProtected, isSupportedUrl } from "../app/core.ts";
+import { hostOf, isProtected, isSupportedUrl } from "../app/core.ts";
 import { addHostRules, addUrlRules, removeRulesFor } from "../app/protection-rules.ts";
 import { dropProtectionRules, editProtectionRules, loadState } from "../app/storage.ts";
 import type { ProtectionRule } from "../app/types.ts";
@@ -27,7 +27,7 @@ export async function applyAutoDiscardable(rules: ProtectionRule[]): Promise<voi
 // (through the trash writer, so it is restorable); otherwise one new host rule
 export async function toggleSiteProtection(tab: chrome.tabs.Tab): Promise<{ protected: boolean }> {
   const url = tab.url;
-  if (!url || !hostnameOf(url)) {
+  if (!url || !hostOf(url)) {
     return { protected: false };
   }
   const { protectionRules } = await loadState();
@@ -35,7 +35,7 @@ export async function toggleSiteProtection(tab: chrome.tabs.Tab): Promise<{ prot
     await applyAutoDiscardable(await dropProtectionRules((rules) => removeRulesFor(rules, [url])));
     return { protected: false };
   }
-  await protectHosts([hostnameOf(url)]);
+  await protectHosts([hostOf(url)]); // the port stays: a dev server per port is its own site
   return { protected: true };
 }
 

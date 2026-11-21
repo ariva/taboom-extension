@@ -1,6 +1,6 @@
 // Tagged-page patterns as pure functions: what an entry's `url` may be, how a typed one is
 // normalized, and the one rule saying whether a page falls under it. No DOM, no chrome.*.
-import { hostnameOf, matchesRule } from "./core.ts";
+import { hasPort, hostOf, matchesRule } from "./core.ts";
 import { duplicateKey, NEW_TAB_KEY } from "./duplicates.ts";
 
 // the key a page is tagged by: the address, with its fragment when `keepFragment` says so
@@ -24,9 +24,15 @@ export function tagPageKey(url: string | undefined, keepFragment = false): strin
 // dot: every host containing it) or a glob — `*` anywhere, matching anything, `/` and `?`
 // included (`https://github.com/ariva/*/test`). Entries saved before patterns existed are addresses.
 
-// an address has a scheme — `about:debugging#/setup` as much as `https://a.test/x`
-function isAddressPattern(pattern: string): boolean {
+// an address has a scheme — `about:debugging#/setup` as much as `https://a.test/x`; `localhost:9000`
+// (digits up to the end or a /) is a host with a port, not a scheme. Keep-alive asks the same question
+export function isAddressPattern(pattern: string): boolean {
   return SCHEME.test(pattern);
+}
+
+// a host (a dot, or a port: `localhost:9000`) as opposed to a word (`youtube`)
+function isHostPattern(pattern: string): boolean {
+  return pattern.includes(".") || hasPort(pattern);
 }
 
 // what kind of entry a stored pattern is, for the badge glyph: a page address, a domain (a host
@@ -38,18 +44,18 @@ export function tagPatternKind(pattern: string): "page" | "domain" | "pattern" {
   if (pattern.startsWith("*.") && !pattern.slice(2).includes("*")) {
     return "domain";
   }
-  return pattern.includes("*") || !pattern.includes(".") ? "pattern" : "domain";
+  return pattern.includes("*") || !isHostPattern(pattern) ? "pattern" : "domain";
 }
 
 // the host a row's Tag domain… tags: a leading www. is dropped so the entry names the site and
 // covers www and bare alike (kept when nothing else would be left, `www.com`)
 export function siteOf(url: string | undefined): string {
-  const host = hostnameOf(url);
+  const host = hostOf(url);
   const bare = host.replace(/^www\./, "");
   return bare.includes(".") ? bare : host;
 }
 
-const SCHEME = /^[a-z][a-z0-9+.-]*:/i;
+const SCHEME = /^[a-z][a-z0-9+.-]*:(?!\d+(\/|$))/i;
 
 // a typed pattern (options Add row, the address edit): an address goes through URL() like a
 // tab url (lowercased host, trailing slash); a scheme-less path gets https; a glob keeps its
@@ -62,11 +68,11 @@ export function tagPagePatternFromInput(text: string): string {
   if (trimmed === "" || /\s/.test(trimmed)) {
     return "";
   }
-  if (!SCHEME.test(trimmed) && !trimmed.includes("/")) {
+  if (!isAddressPattern(trimmed) && !trimmed.includes("/")) {
     const site = trimmed.toLowerCase();
     return site.replace(/\*/g, "") === "" || site.replace(/^\*\./, "") === "" ? "" : site;
   }
-  const address = SCHEME.test(trimmed) ? trimmed : `https://${trimmed}`;
+  const address = isAddressPattern(trimmed) ? trimmed : `https://${trimmed}`;
   if (!address.includes("*")) {
     try {
       return tagPageKey(new URL(address).href, true);
@@ -90,7 +96,7 @@ export function tagPagePatternHint(pattern: string): string {
       ? `${pattern.slice(2)} and its subdomains`
       : "Hosts matching the pattern";
   }
-  return pattern.includes(".") ? `${pattern} and its subdomains` : `Hosts containing ${pattern}`;
+  return isHostPattern(pattern) ? `${pattern} and its subdomains` : `Hosts containing ${pattern}`;
 }
 
 // `*` matches anything, so the glob is walked segment by segment: the first segment must open
@@ -128,7 +134,7 @@ export interface PageKey {
 
 export function pageKeyOf(url: string | undefined): PageKey {
   const key = tagPageKey(url);
-  return key === "" ? { key, host: "", url: "" } : { key, host: hostnameOf(key), url: tagPageKey(url, true) };
+  return key === "" ? { key, host: "", url: "" } : { key, host: hostOf(key), url: tagPageKey(url, true) };
 }
 
 // the one rule for "is this page under the pattern" — every surface (badges, menus, the
@@ -156,5 +162,5 @@ export function matchesTagPageKey(pattern: string, { key, host, url }: PageKey):
   if (pattern.includes("*")) {
     return matchesRule(host, { pattern }) || globMatches(pattern, host);
   }
-  return pattern.includes(".") ? matchesRule(host, { pattern: `*.${pattern}` }) : host.includes(pattern);
+  return isHostPattern(pattern) ? matchesRule(host, { pattern: `*.${pattern}` }) : host.includes(pattern);
 }

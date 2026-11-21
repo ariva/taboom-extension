@@ -240,3 +240,26 @@ test("Tag patterns - siteOf: the host without a leading www., what Tag domain…
   assert.equal(siteOf("https://a.test/"), "a.test");
   assert.equal(siteOf(undefined), "");
 });
+
+test("Tag patterns - a host with a port (T-0158) is a domain pattern for that port only; a scheme still reads as an address", () => {
+  assert.equal(tagPagePatternFromInput(" LocalHost:9000 "), "localhost:9000", "a port is not a scheme");
+  assert.equal(
+    tagPagePatternFromInput("localhost:9000/*"),
+    "https://localhost:9000/*",
+    "a path: https assumed, as without a port",
+  );
+  assert.equal(tagPagePatternFromInput("about:debugging"), "about:debugging", "a scheme stays an address");
+  assert.equal(tagPatternKind("localhost:9000"), "domain");
+  assert.equal(tagPatternKind("*.dev.test:8443"), "domain");
+  assert.equal(tagPagePatternHint("localhost:9000"), "localhost:9000 and its subdomains");
+  assert.equal(pageKeyOf("http://localhost:9000/x").host, "localhost:9000");
+  assert.equal(matchesTagPage("localhost:9000", "http://localhost:9000/x"), true);
+  assert.equal(matchesTagPage("localhost:9000", "http://localhost:8080/x"), false, "another port");
+  assert.equal(matchesTagPage("localhost:9000", "http://localhost:90001/x"), false, "not a prefix match");
+  assert.equal(matchesTagPage("localhost", "http://localhost:9000/x"), true, "no port: every port");
+  assert.equal(matchesTagPage("*.dev.test:8443", "https://a.dev.test:8443/"), true);
+  assert.equal(matchesTagPage("*.dev.test:8443", "https://a.dev.test/"), false);
+  assert.equal(matchesTagPage("dev.test", "https://a.dev.test:8443/"), true);
+  assert.equal(matchesTagPage("https://localhost:9000/*", "https://localhost:9000/x"), true);
+  assert.equal(siteOf("http://www.dev.test:8443/x"), "dev.test:8443", "Tag domain… keeps the port");
+});

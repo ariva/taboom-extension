@@ -70,6 +70,22 @@ export function hostnameOf(url: string | undefined): string {
   }
 }
 
+// the host a pattern is matched against: the hostname plus a non-default port (`localhost:9000` —
+// a dev server per port is a different site; URL() drops default ports and lowercases)
+export function hostOf(url: string | undefined): string {
+  try {
+    return new URL(url ?? "").host.toLowerCase().replace(/\.(?=(:\d+)?$)/, "");
+  } catch {
+    return "";
+  }
+}
+
+// a pattern naming a port (`localhost:9000`, `*.dev.test:8443`) covers that port only; one
+// without covers every port, as every rule saved before ports were understood expects
+export function hasPort(pattern: string): boolean {
+  return /:\d+$/.test(pattern);
+}
+
 export function isSupportedUrl(url: string | undefined): boolean {
   if (!url) {
     return false;
@@ -83,8 +99,8 @@ export function isUrlRule(rule: Pick<ProtectionRule, "pattern">): boolean {
   return rule.pattern.includes("://");
 }
 
-// host-level match: does this hostname fall under the rule?
-// "host"  → exact hostname match, e.g. "mail.google.com"
+// host-level match: does this host (hostOf: with its port, when not the default) fall under the rule?
+// "host"  → exact hostname match, e.g. "mail.google.com"; "localhost:9000" that port only
 // "domain"→ "*.github.com" matches github.com and any subdomain
 // "url"   → never (a bare host is not an address)
 export function matchesRule(host: string, rule: Pick<ProtectionRule, "pattern">): boolean {
@@ -92,6 +108,9 @@ export function matchesRule(host: string, rule: Pick<ProtectionRule, "pattern">)
     return false;
   }
   const pattern = rule.pattern.toLowerCase();
+  if (!hasPort(pattern)) {
+    host = host.replace(/:\d+$/, "");
+  }
   if (pattern.startsWith("*.")) {
     const base = pattern.slice(2);
     return host === base || host.endsWith("." + base);
@@ -106,7 +125,7 @@ export function matchesUrl(url: string, rule: Pick<ProtectionRule, "pattern">): 
   if (isUrlRule(rule)) {
     return url === rule.pattern;
   }
-  return matchesRule(hostnameOf(url), rule);
+  return matchesRule(hostOf(url), rule);
 }
 
 // a temporary rule protects until its time; an expired one still stored (the sweep runs every

@@ -4,6 +4,7 @@ import {
   formatAge,
   coveringRules,
   hostnameOf,
+  hostOf,
   isEligibleForAutoSnooze,
   isUnloaded,
   isProtected,
@@ -478,4 +479,26 @@ test("Core - Eligibility: keep-it-alive pages are never auto-snoozed", () => {
   );
   assert.equal(isEligibleForAutoSnooze(tab({ url: "https://example.com/other" }), settings, [], NOW, null, kept), true);
   assert.deepEqual(selectAutoSnoozeTargets([tab()], settings, [], NOW, null, kept), [], "targets skip marked pages");
+});
+
+test("Core - hosts with a port (T-0158): a pattern naming the port matches that port only, one without matches every port", () => {
+  assert.equal(hostOf("http://localhost:9000/app/x"), "localhost:9000");
+  assert.equal(
+    hostOf("https://Example.com./x"),
+    "example.com",
+    "default port dropped, case and trailing dot normalized",
+  );
+  assert.equal(hostOf("not a url"), "");
+  const port = partialRule({ id: "p", type: "host", pattern: "localhost:9000" });
+  const wild = partialRule({ id: "w", type: "domain", pattern: "*.dev.test:8443" });
+  assert.equal(matchesUrl("http://localhost:9000/app/x", port), true);
+  assert.equal(matchesUrl("http://localhost:8080/app/x", port), false, "another port");
+  assert.equal(matchesUrl("http://localhost/app/x", port), false, "no port");
+  assert.equal(matchesUrl("https://a.dev.test:8443/", wild), true);
+  assert.equal(matchesUrl("https://dev.test:8443/", wild), true);
+  assert.equal(matchesUrl("https://a.dev.test/", wild), false);
+  const any = partialRule({ id: "d", type: "domain", pattern: "*.dev.test" });
+  assert.equal(matchesUrl("https://a.dev.test:8443/", any), true, "no port in the pattern: every port");
+  assert.equal(makeRule("LocalHost:9000")?.pattern, "localhost:9000");
+  assert.deepEqual(coveringRules("http://localhost:9000/", [port, wild]), [port]);
 });

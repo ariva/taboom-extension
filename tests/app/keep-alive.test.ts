@@ -482,3 +482,12 @@ test("Keep alive - keepAliveKindLabel names a mark's kind the way the menu items
   assert.equal(keepAliveKindLabel("https://a.test/docs/*"), "pattern");
   assert.equal(keepAliveKindLabel("youtube"), "pattern");
 });
+
+test("Keep alive - a host with a port (T-0158) is a mark for that port only", () => {
+  assert.equal(keepAliveUrlFromInput("localhost:9000"), "localhost:9000");
+  assert.equal(matchesKeepAlive("localhost:9000", "http://localhost:9000/x"), true);
+  assert.equal(matchesKeepAlive("localhost:9000", "http://localhost:8080/x"), false);
+  assert.equal(matchesKeepAlive("localhost", "http://localhost:9000/x"), true, "no port: every port");
+  assert.equal(keepAliveOpenUrl("localhost:9000"), "https://localhost:9000/");
+  assert.equal(keepAliveKindLabel("localhost:9000"), "domain");
+});
