@@ -10,8 +10,9 @@ export type Message =
   | { type: "snooze-tab"; tabId: number }
   | { type: "snooze-tabs"; tabIds: number[] } // the panel's bulk snooze: one round trip, the refusals back
   | { type: "toggle-site-protection"; tabId: number }
-  | { type: "protect-hosts"; hosts: string[] }
-  | { type: "protect-urls"; urls: string[] }
+  // hours: a temporary rule / mark that expires after that long (the row menu's durations); absent = permanent
+  | { type: "protect-hosts"; hosts: string[]; hours?: number }
+  | { type: "protect-urls"; urls: string[]; hours?: number }
   | { type: "unprotect-urls"; urls: string[] }
   | { type: "snooze-all-inactive" }
   | { type: "history-back" }
@@ -28,7 +29,7 @@ export type Message =
   | { type: "window-pin"; windowId: number; pinned?: boolean }
   // keep-it-alive marks for these tabs' pages — or their sites (scope "site": the host and its
   // subdomains, like Tag domain…); closed ids are skipped
-  | { type: "keep-alive-set"; tabIds: number[]; kept: boolean; scope?: "site" }
+  | { type: "keep-alive-set"; tabIds: number[]; kept: boolean; scope?: "site"; hours?: number }
   | { type: "sidebar-focused" }
   | { type: "sidebar-no-focus" }
   // PARKED_WINDOWS: snapshot + close; rebuild (new window, or appended into one); open picked parked tabs

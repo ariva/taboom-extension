@@ -27,6 +27,7 @@ export interface KeepAliveTab {
   paused?: boolean; // absent = reloads run; the mark stays listed either way
   reloadAll?: boolean; // absent = one tab per reload (pinned first, else first found); true = every open tab on the page
   nextReload: number; // ms timestamp the sweep compares against
+  expiresAt?: number; // a temporary mark: ignored from this time on and dropped by the expiry sweep; absent = permanent
 }
 
 // one undoable removal from a list (keep-alive marks, protection rules): Settings → Restore
@@ -120,6 +121,8 @@ export interface ProtectionRule {
   type: "host" | "domain" | "url";
   pattern: string;
   createdAt: number;
+  disabled?: boolean; // absent = on; off = kept in Settings, protects nothing until switched on (the panel strikes its badge through)
+  expiresAt?: number; // a temporary rule: ignored from this time on and dropped by the expiry sweep; absent = permanent
 }
 
 // legacy installs stored true/false instead of the mode name

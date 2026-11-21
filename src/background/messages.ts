@@ -5,9 +5,15 @@ import type { Message, MessageError } from "../app/messages.ts";
 import { setTabsKeepAlive } from "./keep-alive.ts";
 import { moveParkedTabs, parkWindow, restoreParked } from "./parked.ts";
 import { protectHosts, protectUrls, toggleSiteProtection, unprotectUrls } from "./protection.ts";
+import { expiryAt } from "../app/expiry.ts";
+import { ensureExpiryAlarm } from "./expiry.ts";
 import { autoSnoozePass, recordWakes, snoozeTab, snoozeTabs } from "./snooze.ts";
 import { historyJump, historyStep, withHistory } from "./tab-history.ts";
 import { panelsToRestore, patchWindowProfiles, setPanelOpen } from "./window-profiles.ts";
+
+// the menu's duration → the entry's expiry time; no duration = permanent
+const expiresIn = (hours: number | undefined): number | undefined =>
+  hours === undefined ? undefined : expiryAt(hours, Date.now());
 
 // a handler answers its result, nothing (→ { ok }), or a MessageError reason when nothing happened
 export async function handleMessage(
@@ -22,10 +28,14 @@ export async function handleMessage(
       return snoozeTabs(message.tabIds);
     case "toggle-site-protection":
       return toggleSiteProtection(await chrome.tabs.get(message.tabId));
+    // a temporary rule / mark arms the expiry sweep here (expiry.ts cannot be imported by the feature
+    // modules it sweeps: a cycle); the storage listener does the same for Settings-made expiries
     case "protect-hosts":
-      return protectHosts(message.hosts);
+      await protectHosts(message.hosts, expiresIn(message.hours));
+      return ensureExpiryAlarm();
     case "protect-urls":
-      return protectUrls(message.urls);
+      await protectUrls(message.urls, expiresIn(message.hours));
+      return ensureExpiryAlarm();
     case "unprotect-urls":
       return unprotectUrls(message.urls);
     case "snooze-all-inactive":
@@ -55,11 +65,13 @@ export async function handleMessage(
       return patchWindowProfiles([message.windowId], { pinnedWindow: message.pinned || undefined });
     case "keep-alive-set": {
       const tabs = await Promise.all(message.tabIds.map((tabId) => chrome.tabs.get(tabId).catch(() => null)));
-      return setTabsKeepAlive(
+      await setTabsKeepAlive(
         tabs.filter((tab): tab is chrome.tabs.Tab => tab !== null),
         message.kept,
         message.scope,
+        expiresIn(message.hours),
       );
+      return ensureExpiryAlarm();
     }
     case "sidebar-focused":
     case "sidebar-no-focus":

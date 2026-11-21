@@ -4,15 +4,41 @@ import { isSupportedUrl, isUrlRule, makeRule, matchesRule, matchesUrl } from "./
 import { popRemoval } from "./removal-trash.ts";
 import type { ProtectionRule, Removal } from "./types.ts";
 
+// a new rule, temporary when the menu picked a duration (expiresAt); permanent otherwise (no key)
+function stamped(rule: ProtectionRule, expiresAt: number | undefined): ProtectionRule {
+  return expiresAt === undefined ? rule : { ...rule, expiresAt };
+}
+
+// Protect over a page: nothing when a live rule covers it; a page only disabled rules cover gets
+// those rules back on with the pick's duration (Always clears an old one) — a second rule for the
+// same site would be a puzzle in Settings; otherwise the fresh rule, stamped
+function protectWith(
+  rules: ProtectionRule[],
+  covering: ProtectionRule[],
+  fresh: () => ProtectionRule | null,
+  expiresAt: number | undefined,
+): ProtectionRule[] {
+  if (covering.some((rule) => !rule.disabled)) {
+    return rules;
+  }
+  if (covering.length > 0) {
+    return rules.map((rule) => {
+      const { disabled: _off, expiresAt: _old, ...live } = rule;
+      return covering.includes(rule) ? stamped(live, expiresAt) : rule;
+    });
+  }
+  const rule = fresh();
+  return rule ? [...rules, stamped(rule, expiresAt)] : rules;
+}
+
 // one rule per host that no rule covers yet (blank hosts skipped)
-export function addHostRules(current: ProtectionRule[], hosts: string[]): ProtectionRule[] {
-  const rules = [...current];
+export function addHostRules(current: ProtectionRule[], hosts: string[], expiresAt?: number): ProtectionRule[] {
+  let rules = current;
   for (const host of hosts) {
-    if (!host || rules.some((rule) => matchesRule(host, rule))) {
-      continue;
+    if (host) {
+      const covering = rules.filter((rule) => matchesRule(host, rule));
+      rules = protectWith(rules, covering, () => makeRule(host), expiresAt);
     }
-    // makeRule is null only for a blank pattern — empty hosts were skipped above
-    rules.push(makeRule(host)!);
   }
   return rules;
 }
@@ -20,18 +46,46 @@ export function addHostRules(current: ProtectionRule[], hosts: string[]): Protec
 // one exact-address rule per url; only an identical url rule counts as "already
 // there" — a host rule covering the page does not, so the url stays protected
 // after the user unprotects the domain later. Blank / non-web urls skipped.
-export function addUrlRules(current: ProtectionRule[], urls: string[]): ProtectionRule[] {
-  const rules = [...current];
+export function addUrlRules(current: ProtectionRule[], urls: string[], expiresAt?: number): ProtectionRule[] {
+  let rules = current;
   for (const url of urls) {
-    if (!isSupportedUrl(url) || rules.some((rule) => isUrlRule(rule) && matchesUrl(url, rule))) {
-      continue;
-    }
-    const rule = makeRule(url);
-    if (rule?.type === "url") {
-      rules.push(rule);
+    if (isSupportedUrl(url)) {
+      const covering = rules.filter((rule) => isUrlRule(rule) && matchesUrl(url, rule));
+      const fresh = () => {
+        const rule = makeRule(url);
+        return rule?.type === "url" ? rule : null;
+      };
+      rules = protectWith(rules, covering, fresh, expiresAt);
     }
   }
   return rules;
+}
+
+// Settings "On" checkbox: off keeps the rule listed but it protects nothing (the panel shows it
+// struck through); the key is absent when on. undefined when the rule is unknown or nothing changes
+export function setRuleEnabled(rules: ProtectionRule[], id: string, enabled: boolean): ProtectionRule[] | undefined {
+  const rule = rules.find((candidate) => candidate.id === id);
+  if (!rule || (rule.disabled ?? false) === !enabled) {
+    return undefined;
+  }
+  const { disabled: _previous, ...live } = rule;
+  return rules.map((candidate) => (candidate === rule ? (enabled ? live : { ...live, disabled: true }) : candidate));
+}
+
+// Settings "Expires" dropdown: a new time (re-based from now by the caller) or permanent again
+// (the key removed). undefined when the rule is unknown or nothing changes
+export function setRuleExpiry(
+  rules: ProtectionRule[],
+  id: string,
+  expiresAt: number | undefined,
+): ProtectionRule[] | undefined {
+  const rule = rules.find((candidate) => candidate.id === id);
+  if (!rule || rule.expiresAt === expiresAt) {
+    return undefined;
+  }
+  const { expiresAt: _previous, ...permanent } = rule;
+  const next = expiresAt === undefined ? permanent : { ...permanent, expiresAt };
+  return rules.map((candidate) => (candidate === rule ? next : candidate));
 }
 
 // removes every rule covering any of the urls — the menu's "Remove site protection"

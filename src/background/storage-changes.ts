@@ -4,6 +4,7 @@ import { dedupeHistory } from "../app/core.ts";
 import { DEFAULTS } from "../app/core.ts";
 import type { ProtectionRule, Settings, UiPrefs } from "../app/types.ts";
 import { createContextMenus, rebuildHistoryMenu } from "./context-menus.ts";
+import { ensureExpiryAlarm } from "./expiry.ts";
 import { ensureKeepAliveAlarm, keepAliveSettingChanged, restartKeepAlive, syncKeepAliveMenu } from "./keep-alive.ts";
 import { invalidateNavMode, navMode } from "./nav-mode.ts";
 import { applyAutoDiscardable, syncProtectMenu } from "./protection.ts";
@@ -45,14 +46,16 @@ export async function onStorageChanged(
     }
   }
   if (changes.keepAlive) {
-    // options-page edits (remove, interval override) and the panel's marks
+    // options-page edits (remove, interval override, an expiry) and the panel's marks
     await ensureKeepAliveAlarm();
+    await ensureExpiryAlarm();
     const [active] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
     await syncKeepAliveMenu(active);
   }
   if (changes.protectionRules) {
     // StorageChange values are `unknown`; "protectionRules" is only ever written as ProtectionRule[]
     await applyAutoDiscardable((changes.protectionRules.newValue as ProtectionRule[] | undefined) ?? []);
+    await ensureExpiryAlarm(); // a Settings-set expiry, or the last temporary rule gone
     const [active] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
     await syncProtectMenu(active);
   }

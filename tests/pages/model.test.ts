@@ -1096,3 +1096,42 @@ test("Model - deriveTabs: offTags and keepAlivePaused when the panel shows disab
   assert.equal(hidden.get(3)?.keepAlivePaused, false);
   assert.equal(countsByFilter(tabs, hidden, new Set(["t1"])).tags, 0);
 });
+
+test("Model - Temporary states (T-0157): badges read temporary protected / temporary keep alive; deriveTabs knows until when", () => {
+  assert.deepEqual(badges(tab(), "temporary", "temporary"), [
+    ["temporary protected", "ok"],
+    ["temporary keep alive", "ok"],
+  ]);
+  assert.deepEqual(badges(tab(), true, "paused"), [
+    ["protected", "ok"],
+    ["kept alive", "ok off"],
+  ]);
+  assert.deepEqual(badges(tab(), "off"), [["protected", "ok off"]], "a disabled rule: struck through");
+  const tabs = [tab({ url: "https://example.com/page" })];
+  const temporary = rule({ id: "t", type: "host", pattern: "example.com", expiresAt: NOW + HOUR });
+  const permanent = rule({ id: "p", type: "host", pattern: "example.com" });
+  const marks = [
+    { url: "https://example.com/page", title: "P", minutes: 25, nextReload: 0, expiresAt: NOW + 2 * HOUR },
+  ];
+  const d = deriveTabs(tabs, [temporary], marks, undefined, false, NOW).get(1);
+  assert.equal(d?.protected, true);
+  assert.equal(d?.protectedUntil, NOW + HOUR);
+  assert.equal(d?.keptAlive, true);
+  assert.equal(d?.keptUntil, NOW + 2 * HOUR);
+  const both = deriveTabs(tabs, [temporary, permanent], [], undefined, false, NOW).get(1);
+  assert.equal(both?.protectedUntil, undefined, "a permanent rule beside a temporary one: not temporary");
+  const expired = deriveTabs(tabs, [temporary], marks, undefined, false, NOW + 3 * HOUR).get(1);
+  assert.equal(expired?.protected, false, "an expired rule still stored protects nothing");
+  assert.equal(expired?.keptAlive, false);
+  // a disabled rule: no protection; struck-through badge only while the panel shows disabled things
+  const off = rule({ id: "o", type: "host", pattern: "example.com", disabled: true });
+  const shown = deriveTabs(tabs, [off], [], undefined, true, NOW).get(1);
+  assert.equal(shown?.protected, false);
+  assert.equal(shown?.protectionOff, true);
+  assert.equal(deriveTabs(tabs, [off], [], undefined, false, NOW).get(1)?.protectionOff, false, "setting off: hidden");
+  assert.equal(
+    deriveTabs(tabs, [off, permanent], [], undefined, true, NOW).get(1)?.protectionOff,
+    false,
+    "a live rule beside it: plain protected",
+  );
+});

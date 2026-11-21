@@ -1,6 +1,7 @@
 // Pure logic shared by service worker, side panel, options.
 // No chrome.* usage here so it stays unit-testable under plain node.
 
+import { isExpired } from "./expiry.ts";
 import type {
   AppState,
   FeatureName,
@@ -108,11 +109,24 @@ export function matchesUrl(url: string, rule: Pick<ProtectionRule, "pattern">): 
   return matchesRule(hostnameOf(url), rule);
 }
 
-export function isProtected(url: string | undefined, rules: ProtectionRule[]): boolean {
+// a temporary rule protects until its time; an expired one still stored (the sweep runs every
+// minute) must not count — `now` is a parameter so the pure callers and tests can say when
+export function isProtected(url: string | undefined, rules: ProtectionRule[], now = Date.now()): boolean {
+  return protectingRules(url, rules, now).length > 0;
+}
+
+// every rule in force that covers the url (the panel reads until when they protect)
+export function protectingRules(url: string | undefined, rules: ProtectionRule[], now = Date.now()): ProtectionRule[] {
+  return coveringRules(url, rules, now).filter((rule) => !rule.disabled);
+}
+
+// the unexpired rules matching the url, disabled ones included: a disabled rule protects nothing,
+// but the panel still shows it struck through (T-0157)
+export function coveringRules(url: string | undefined, rules: ProtectionRule[], now = Date.now()): ProtectionRule[] {
   if (!url || !hostnameOf(url)) {
-    return false;
+    return [];
   }
-  return rules.some((rule) => matchesUrl(url, rule));
+  return rules.filter((rule) => !isExpired(rule, now) && matchesUrl(url, rule));
 }
 
 // Not loaded: discarded by us (chrome.tabs.discard) — or restored by Chrome at startup with

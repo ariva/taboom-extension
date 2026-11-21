@@ -18,6 +18,8 @@ const KEEP_ALIVE_ON = TEST_FEATURES.KEEP_ALIVE?.enabled === true;
 const DUPLICATES_ON = TEST_FEATURES.DUPLICATES?.enabled === true;
 const PARKED_ON = TEST_FEATURES.PARKED_WINDOWS?.enabled === true;
 const TAGS_ON = TEST_FEATURES.TAGS?.enabled === true;
+// the duration submenu of Protect domain / Protect URL / Keep alive domain / Keep alive URL (T-0157)
+const DURATIONS = ["Always (default)", "1 hour", "2 hours", "3 hours", "6 hours", "12 hours", "1 day", "1 week"];
 // split view needs Chrome's API (tabs.createSplit): absent on Firefox, whatever the flag says
 const SPLIT_ON = TEST_FEATURES.SPLIT_VIEW?.enabled === true && !FIREFOX;
 
@@ -1000,6 +1002,104 @@ test("UI - Sidepanel - Drag a tab onto another window's row moves it there", asy
   await new Promise((resolve) => setTimeout(resolve, 200));
 });
 
+test("UI - Sidepanel - Temporary protection / keep-alive (T-0157): duration submenus send hours, the parent click none; temporary badges and the time left in the tip", async () => {
+  const rowOf = (id: number) => q(document, `.row[data-tab-id="${id}"]`);
+  const menu = byId("ctx-menu");
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 200));
+  const HOUR = 3_600_000;
+  const open = () => rowOf(1).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+  const submenuOf = (label: string) => {
+    const parent = must(qa(menu, ".ctx-item").find((el) => el.textContent === `${label} ▸`));
+    return must(parent.nextElementSibling as HTMLElement | null);
+  };
+  open();
+  const protectDomain = submenuOf("Protect domain");
+  assert.deepEqual(
+    qa(protectDomain, ".ctx-item").map((el) => el.textContent),
+    DURATIONS,
+  );
+  assert.ok(
+    q(protectDomain, ".ctx-item").nextElementSibling?.classList.contains("ctx-divider"),
+    "a divider between Always and the durations",
+  );
+  must(qa(protectDomain, ".ctx-item").find((el) => el.textContent === "6 hours")).click();
+  await tick();
+  await tick();
+  assert.deepEqual(messages.at(-1), { type: "protect-hosts", hosts: ["github.com"], hours: 6 });
+  open();
+  must(qa(submenuOf("Protect URL"), ".ctx-item").find((el) => el.textContent === "1 day")).click();
+  await tick();
+  await tick();
+  assert.deepEqual(messages.at(-1), { type: "protect-urls", urls: ["https://github.com/pr/1"], hours: 24 });
+  open();
+  must(qa(menu, ".ctx-item").find((el) => el.textContent === "Protect domain ▸")).click();
+  await tick();
+  await tick();
+  assert.deepEqual(messages.at(-1), { type: "protect-hosts", hosts: ["github.com"] }, "the parent itself = Always");
+  assert.equal(menu.hidden, true, "the parent click runs the action and closes the menu");
+  if (KEEP_ALIVE_ON) {
+    open();
+    must(qa(submenuOf("Keep alive domain"), ".ctx-item").find((el) => el.textContent === "1 week")).click();
+    await tick();
+    await tick();
+    assert.deepEqual(messages.at(-1), { type: "keep-alive-set", tabIds: [1], kept: true, scope: "site", hours: 168 });
+  }
+  // the worker wrote temporary entries: the badges say so, the tip adds the time left
+  const now = Date.now();
+  await chrome.storage.local.set({
+    protectionRules: [{ id: "temp", type: "host", pattern: "github.com", expiresAt: now + 5 * HOUR + 30 * 60_000 }],
+    keepAlive: [
+      { url: "https://github.com/pr/1", title: "PR", minutes: 25, nextReload: now + HOUR, expiresAt: now + 2 * HOUR },
+    ],
+  });
+  await chrome.storage.onChanged.fire({ protectionRules: {}, keepAlive: {} }, "local");
+  await settle();
+  const labels = () => qa(rowOf(1), ".badge").map((el) => el.textContent);
+  assert.ok(labels().includes("temporary protected"), `badge: ${labels().join(", ")}`);
+  assert.ok(!labels().includes("protected"));
+  assert.match(rowOf(1).dataset.tipBadges ?? "", /"temporary protected · 5h 29m left","ok"/);
+  if (KEEP_ALIVE_ON) {
+    assert.ok(labels().includes("temporary keep alive"), `badge: ${labels().join(", ")}`);
+    assert.match(rowOf(1).dataset.tipBadges ?? "", /"temporary keep alive · 1h 59m left","ok"/);
+  }
+  // a permanent rule beside a temporary one: plain "protected"; an expired one (not swept yet): nothing
+  await chrome.storage.local.set({
+    protectionRules: [
+      { id: "temp", type: "host", pattern: "github.com", expiresAt: now + HOUR },
+      { id: "forever", type: "url", pattern: "https://github.com/pr/1" },
+    ],
+  });
+  await chrome.storage.onChanged.fire({ protectionRules: {} }, "local");
+  await settle();
+  assert.ok(labels().includes("protected") && !labels().includes("temporary protected"), "permanent wins");
+  await chrome.storage.local.set({
+    protectionRules: [{ id: "temp", type: "host", pattern: "github.com", expiresAt: now - 1 }],
+    keepAlive: [],
+  });
+  await chrome.storage.onChanged.fire({ protectionRules: {}, keepAlive: {} }, "local");
+  await settle();
+  assert.ok(!labels().some((label) => /protected|keep alive/.test(label)), "expired: no badge");
+  // a disabled rule (Settings → On unticked): "protected" struck through while the panel shows disabled things, nothing otherwise
+  await chrome.storage.local.set({
+    protectionRules: [{ id: "off", type: "host", pattern: "github.com", disabled: true }],
+  });
+  await chrome.storage.onChanged.fire({ protectionRules: {} }, "local");
+  await settle();
+  const offBadge = must(qa(rowOf(1), ".badge").find((el) => el.textContent === "protected"));
+  assert.ok(offBadge.classList.contains("off"), "disabled: the badge stays, struck through");
+  assert.match(rowOf(1).dataset.tipBadges ?? "", /"protected","ok off"/);
+  await chrome.storage.local.set({ settings: { showDisabledInPanel: false } });
+  await chrome.storage.onChanged.fire({ settings: {} }, "local");
+  await settle();
+  assert.ok(!labels().includes("protected"), "setting off: hidden");
+  await chrome.storage.local.set({ settings: {} });
+  await chrome.storage.onChanged.fire({ settings: {} }, "local");
+  await settle();
+  await chrome.storage.local.set({ protectionRules: [{ id: "r1", type: "host", pattern: "mail.google.com" }] });
+  await chrome.storage.onChanged.fire({ protectionRules: {} }, "local");
+  await settle();
+});
+
 test("UI - Sidepanel - Right-click row offers move-to-window menu (selection-aware)", async () => {
   const rowOf = (id: number) => q(document, `.row[data-tab-id="${id}"]`);
   const menu = byId("ctx-menu");
@@ -1013,13 +1113,16 @@ test("UI - Sidepanel - Right-click row offers move-to-window menu (selection-awa
       "Copy URL",
       "Snooze",
       "Wake",
-      "Protect domain",
-      "Protect URL",
+      // T-0157: Protect / Keep alive open a duration submenu (its items follow the parent in the DOM)
+      "Protect domain ▸",
+      ...DURATIONS,
+      "Protect URL ▸",
+      ...DURATIONS,
       "Unprotect",
       "Pin",
       "Close",
       // KEEP_ALIVE: the setting defaults to on, so the experimental pass shows the mark item
-      ...(KEEP_ALIVE_ON ? ["Keep alive domain", "Keep alive URL"] : []),
+      ...(KEEP_ALIVE_ON ? ["Keep alive domain ▸", ...DURATIONS, "Keep alive URL ▸", ...DURATIONS] : []),
       // TAGS: the two picker entries (a new tag is made inside the picker)
       ...(TAGS_ON ? ["Tag domain…", "Tag URL…"] : []),
       "Move tab to ▸",
@@ -1034,7 +1137,7 @@ test("UI - Sidepanel - Right-click row offers move-to-window menu (selection-awa
     ],
     "bulk actions first, then the Move-to dropdown (own window excluded)",
   );
-  const submenu = q(menu, ".ctx-submenu:not(.tags)"); // TAGS adds its own submenu before Move tab to
+  const submenu = q(menu, ".ctx-submenu:not(.tags):not(.durations)"); // TAGS adds its own submenu before Move tab to
   assert.equal(submenu.hidden, true, "move targets folded by default");
   const moveToggle = must(qa(menu, ".ctx-item").find((el) => el.textContent.startsWith("Move tab to")));
   moveToggle.dispatchEvent(new window.Event("mouseenter"));
@@ -1548,7 +1651,7 @@ test("UI - Sidepanel - WINDOW_NAMES: named headers, custom dots, overview list, 
   // "Move tab to" targets follow the windows-list order: ABC by display name…
   const moveTargets = () => {
     q(document, '.row[data-tab-id="1"]').dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
-    const names = qa(q(ctx, ".ctx-submenu:not(.tags)"), ".ctx-item").map((el) => el.textContent);
+    const names = qa(q(ctx, ".ctx-submenu:not(.tags):not(.durations)"), ".ctx-item").map((el) => el.textContent);
     document.body.click();
     return names;
   };
@@ -1939,12 +2042,12 @@ test("UI - Sidepanel - KEEP_ALIVE: row menu marks / unmarks the page, quick laun
   await settle();
   rowOf(1).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
   calls.length = 0;
-  must(qa(menu, ".ctx-item").find((el) => el.textContent === "Keep alive URL")).click();
+  must(qa(menu, ".ctx-item").find((el) => el.textContent === "Keep alive URL ▸")).click();
   await tick();
   assert.ok(calls.includes("sendMessage keep-alive-set"), "worker asked to mark the page");
   assert.deepEqual(messages.at(-1), { type: "keep-alive-set", tabIds: [1], kept: true }, "no scope = the page");
   rowOf(1).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
-  must(qa(menu, ".ctx-item").find((el) => el.textContent === "Keep alive domain")).click();
+  must(qa(menu, ".ctx-item").find((el) => el.textContent === "Keep alive domain ▸")).click();
   await tick();
   assert.deepEqual(
     messages.at(-1),
@@ -1982,7 +2085,7 @@ test("UI - Sidepanel - KEEP_ALIVE: row menu marks / unmarks the page, quick laun
     qa(menu, ".ctx-item")
       .map((el) => el.textContent)
       .filter((text) => text.startsWith("Keep alive")),
-    ["Keep alive domain", "Keep alive URL"],
+    ["Keep alive domain ▸", "Keep alive URL ▸"],
     "other page: both marks offered, domain first like the tag items",
   );
 
@@ -2858,7 +2961,7 @@ test("UI - Sidepanel - PARKED_WINDOWS: Move tab to ▸ offers the parked windows
   const menu = byId("ctx-menu");
   const row = q(document, '.row[data-tab-id="1"]');
   row.dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
-  const submenu = q(menu, ".ctx-submenu:not(.tags)");
+  const submenu = q(menu, ".ctx-submenu:not(.tags):not(.durations)");
   assert.ok(submenu.querySelector(".ctx-divider"), "a divider separates the parked targets");
   assert.equal(q(submenu, ".ctx-title").textContent, "Parked:");
   const parkedItems = qa(submenu, ".ctx-item")
@@ -3957,7 +4060,9 @@ test("UI - Sidepanel - PARKED_WINDOWS: quick launch Pins and Groups menus act on
   await tick();
   assert.equal(q(ctx, ".ctx-title").textContent, pinTitle, 'the live tab\'s own title, not "Tab"');
   const liveWindows = new Set(tabs.map((tab) => tab.windowId));
-  const moveTargets = qa(q(ctx, ".ctx-submenu:not(.tags)"), ".ctx-item").map((el) => el.textContent ?? "");
+  const moveTargets = qa(q(ctx, ".ctx-submenu:not(.tags):not(.durations)"), ".ctx-item").map(
+    (el) => el.textContent ?? "",
+  );
   assert.ok(
     moveTargets.filter((label) => /^Window/.test(label)).length === liveWindows.size - 1,
     `live windows as Move-to targets (own window skipped): ${moveTargets.join(" | ")}`,

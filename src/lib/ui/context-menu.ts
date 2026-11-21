@@ -64,12 +64,13 @@ export function ctxItem(label: string, run: () => void): HTMLButtonElement {
   return item;
 }
 
-// "<label> ▸" toggle + nested dropdown: hover auto-expands, click toggles.
+// "<label> ▸" toggle + nested dropdown: hover auto-expands, click toggles — or, with `onClick`,
+// the click is the parent's own action (the menu closes) and only hover opens the dropdown.
 // Accordion: opening one folds the menu's other submenus; wandering over
 // plain items leaves it open (deliberate — see ctx menu handlers below)
 const SUBMENU_HOVER_DELAY_MS = 500;
 
-export function ctxSubmenu(label: string): { btn: HTMLButtonElement; submenu: HTMLDivElement } {
+export function ctxSubmenu(label: string, onClick?: () => void): { btn: HTMLButtonElement; submenu: HTMLDivElement } {
   const btn = document.createElement("button");
   btn.className = "ctx-item ctx-move";
   const caret = document.createElement("span");
@@ -116,8 +117,13 @@ export function ctxSubmenu(label: string): { btn: HTMLButtonElement; submenu: HT
   };
   let hoverTimer: ReturnType<typeof setTimeout> | undefined;
   btn.addEventListener("click", (clickEvent) => {
-    clickEvent.stopPropagation(); // the document click-away handler must not close the menu
     clearTimeout(hoverTimer); // a pending hover-open must not undo a click-fold
+    if (onClick) {
+      hideCtxMenu();
+      onClick();
+      return;
+    }
+    clickEvent.stopPropagation(); // the document click-away handler must not close the menu
     setOpen(submenu.hidden as boolean); // only ever set to a boolean here ("until-found" unused)
   });
   // hover intent: a cursor traveling past the toggle (e.g. down to Focus

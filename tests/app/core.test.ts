@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "vitest";
 import {
   formatAge,
+  coveringRules,
   hostnameOf,
   isEligibleForAutoSnooze,
   isUnloaded,
@@ -132,6 +133,23 @@ test("Core - Protection rules", () => {
   assert.equal(matchesRule("gist.github.com", domain), true);
   assert.equal(matchesRule("notgithub.com", domain), false);
 
+  // a temporary rule protects until its time; an expired one (still stored until the sweep) does not
+  const until = { ...host, expiresAt: NOW + 1000 };
+  assert.equal(isProtected("https://mail.google.com/inbox", [until], NOW), true, "temporary, still running");
+  assert.equal(isProtected("https://mail.google.com/inbox", [until], NOW + 1000), false, "expired");
+  // a disabled rule (Settings → On unticked) protects nothing but still covers the page: the panel strikes its badge through
+  const off = { ...host, disabled: true };
+  assert.equal(isProtected("https://mail.google.com/inbox", [off]), false, "disabled rule: not protected");
+  assert.deepEqual(
+    coveringRules("https://mail.google.com/inbox", [off, until], NOW),
+    [off, until],
+    "covering: disabled included",
+  );
+  assert.deepEqual(
+    coveringRules("https://mail.google.com/inbox", [off, until], NOW + 1000),
+    [off],
+    "covering: expired excluded",
+  );
   assert.equal(isProtected("https://MAIL.GOOGLE.COM/inbox", [host]), true, "case normalized");
   assert.equal(isProtected("https://mail.google.com./inbox", [host]), true, "trailing dot");
   assert.equal(

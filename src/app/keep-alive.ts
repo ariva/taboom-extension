@@ -1,6 +1,7 @@
 // Keep-it-alive marks as pure functions: the key a page is matched by, the
 // list edits, and the reload schedule. No DOM, no chrome.* — the worker, the
 // options page and the side panel all go through here.
+import { isExpired } from "./expiry.ts";
 import { hostnameOf, isSupportedUrl } from "./core.ts";
 import { popRemoval } from "./removal-trash.ts";
 import { matchesTagPageKey, pageKeyOf, tagPagePatternFromInput, tagPatternKind } from "./tag-patterns.ts";
@@ -24,8 +25,10 @@ export function matchesKeepAlive(markUrl: string, url: string | undefined): bool
   return isSupportedUrl(url) && matchesTagPageKey(markUrl, pageKeyOf(url));
 }
 
-export function isKeptAlive(list: KeepAliveTab[], url: string | undefined): boolean {
-  return list.some((entry) => matchesKeepAlive(entry.url, url));
+// a temporary mark counts until its time: an expired one still stored (the sweep runs every
+// minute) covers nothing — `now` is a parameter for the pure callers and the tests
+export function isKeptAlive(list: KeepAliveTab[], url: string | undefined, now = Date.now()): boolean {
+  return list.some((entry) => !isExpired(entry, now) && matchesKeepAlive(entry.url, url));
 }
 
 // the "Default value" dropdown choices (minutes); DEFAULTS.settings.keepAliveMinutes is one of them
@@ -45,8 +48,8 @@ export function keepAliveEntry(list: KeepAliveTab[], url: string | undefined): K
 
 // every mark covering a tab, list order (a page mark and a domain mark can both cover one tab):
 // the tab is kept while any of them runs, its menu acts on each
-export function keepAliveEntries(list: KeepAliveTab[], url: string | undefined): KeepAliveTab[] {
-  return list.filter((entry) => matchesKeepAlive(entry.url, url));
+export function keepAliveEntries(list: KeepAliveTab[], url: string | undefined, now = Date.now()): KeepAliveTab[] {
+  return list.filter((entry) => !isExpired(entry, now) && matchesKeepAlive(entry.url, url));
 }
 
 // a typed mark (options Add row, the address edit): the tagged-page normalizer (an address
@@ -105,6 +108,7 @@ export function markKeepAlive(
   pages: { url: string; title?: string }[],
   minutes: number,
   nextReload: number,
+  expiresAt?: number, // a temporary mark (the menu's duration); absent = permanent
 ): KeepAliveTab[] | undefined {
   const known = new Set(list.map((entry) => entry.url));
   const added: KeepAliveTab[] = [];
@@ -113,7 +117,13 @@ export function markKeepAlive(
       continue;
     }
     known.add(url);
-    added.push({ url, title: keepAliveTitle(url, title), minutes, nextReload });
+    added.push({
+      url,
+      title: keepAliveTitle(url, title),
+      minutes,
+      nextReload,
+      ...(expiresAt === undefined ? {} : { expiresAt }),
+    });
   }
   return added.length > 0 ? [...list, ...added] : undefined;
 }
@@ -154,8 +164,28 @@ export function keepAliveTargets<T extends { id?: number; pinned?: boolean; url?
 // its interval (a quick restart included) still reloads on time: a session timeout does not wait.
 export function dueKeepAlive(list: KeepAliveTab[], now: number): KeepAliveTab[] {
   return list.filter(
-    (entry) => !entry.paused && entry.nextReload <= now && now - entry.nextReload <= entry.minutes * 60_000,
+    (entry) =>
+      !entry.paused &&
+      !isExpired(entry, now) &&
+      entry.nextReload <= now &&
+      now - entry.nextReload <= entry.minutes * 60_000,
   );
+}
+
+// Settings "Expires" dropdown: a new time (re-based from now by the caller) or permanent again
+// (the key removed). undefined when the mark is unknown or nothing changes
+export function setKeepAliveExpiry(
+  list: KeepAliveTab[],
+  url: string,
+  expiresAt: number | undefined,
+): KeepAliveTab[] | undefined {
+  const entry = list.find((candidate) => candidate.url === url);
+  if (!entry || entry.expiresAt === expiresAt) {
+    return undefined;
+  }
+  const { expiresAt: _previous, ...permanent } = entry;
+  const next = expiresAt === undefined ? permanent : { ...permanent, expiresAt };
+  return list.map((candidate) => (candidate === entry ? next : candidate));
 }
 
 const STAGGER_MS = 30_000;

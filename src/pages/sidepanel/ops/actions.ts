@@ -112,15 +112,24 @@ export async function pinTabs(tabIds: number[], pinned: boolean): Promise<void> 
   refresh(true);
 }
 
-export async function protectTabs(tabIds: number[]): Promise<void> {
-  reportAnswer(await send({ type: "protect-hosts", hosts: hostsOf(actionableTabs(), tabIds) }), "protect the site");
+// hours: a temporary rule from the row menu's duration submenu; absent = permanent (T-0157)
+const forHours = (hours: number | undefined) => (hours === undefined ? {} : { hours });
+
+export async function protectTabs(tabIds: number[], hours?: number): Promise<void> {
+  reportAnswer(
+    await send({ type: "protect-hosts", hosts: hostsOf(actionableTabs(), tabIds), ...forHours(hours) }),
+    "protect the site",
+  );
   unselect(tabIds);
   refresh(true);
 }
 
 // exact addresses, so two tabs on one host can differ; the host stays snoozable
-export async function protectUrls(tabIds: number[]): Promise<void> {
-  reportAnswer(await send({ type: "protect-urls", urls: urlsOf(actionableTabs(), tabIds) }), "protect the page");
+export async function protectUrls(tabIds: number[], hours?: number): Promise<void> {
+  reportAnswer(
+    await send({ type: "protect-urls", urls: urlsOf(actionableTabs(), tabIds), ...forHours(hours) }),
+    "protect the page",
+  );
   unselect(tabIds);
   refresh(true);
 }
@@ -134,9 +143,9 @@ export async function unprotectTabs(tabIds: number[]): Promise<void> {
 
 // keep-it-alive marks follow the page (by url), so the selection stays — nothing was consumed
 // scope "site": the tabs' domains (Keep alive domain), else their pages
-export async function keepAlive(tabIds: number[], kept: boolean, scope?: "site"): Promise<void> {
+export async function keepAlive(tabIds: number[], kept: boolean, scope?: "site", hours?: number): Promise<void> {
   reportAnswer(
-    await send({ type: "keep-alive-set", tabIds, kept, ...(scope ? { scope } : {}) }),
+    await send({ type: "keep-alive-set", tabIds, kept, ...(scope ? { scope } : {}), ...forHours(hours) }),
     kept ? "keep the page alive" : "unmark the page",
   );
   refresh(true);

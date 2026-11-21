@@ -1,6 +1,7 @@
 // Pure per-tab derived data: the tab-id key type and the host / search haystack /
 // protected / kept-alive flags computed once per refresh. No DOM, no chrome.*.
-import { hostnameOf, isProtected } from "../../../app/core.ts";
+import { coveringRules, hostnameOf } from "../../../app/core.ts";
+import { temporaryUntil } from "../../../app/expiry.ts";
 import { keepAliveEntries } from "../../../app/keep-alive.ts";
 import { offTagsForUrl, type TagOrigin, tagOrigins, tagsForUrl } from "../../../app/tags.ts";
 import type { KeepAliveTab, ProtectionRule, Tag, TagPage } from "../../../app/types.ts";
@@ -15,7 +16,10 @@ export interface DerivedTab {
   host: string;
   haystack: string;
   protected: boolean;
+  protectedUntil?: number; // every rule covering the tab is temporary: when the last one ends (badge "temporary protected")
+  protectionOff: boolean; // only disabled rules cover the tab — struck-through badge while the panel shows disabled things, else nothing
   keptAlive: boolean; // a running mark covers the tab
+  keptUntil?: number; // every running mark is temporary: when the last one ends (badge "temporary keep alive")
   keepAlivePaused: boolean; // a paused mark does — struck-through badge while the panel shows disabled things, else nothing
   tags: Tag[]; // TAGS: the page's tags in tag-list order (empty while the flag is off)
   offTags: Tag[]; // the tags only a disabled tag or a switched-off entry gives the page: struck-through pills (empty unless shown)
@@ -39,12 +43,15 @@ export function deriveTabs(
   keepAlive: KeepAliveTab[] = [],
   tagging: Tagging = { tags: [], pages: [] },
   showDisabled = false, // settings.showDisabledInPanel
+  now = Date.now(), // expired rules and marks still stored count for nothing
 ): DerivedTabs {
   return new Map(
     tabs.map((tab) => {
       const host = hostnameOf(tab.url);
-      const marks = keepAliveEntries(keepAlive, tab.url);
-      const running = marks.some((mark) => !mark.paused);
+      const marks = keepAliveEntries(keepAlive, tab.url, now);
+      const running = marks.filter((mark) => !mark.paused);
+      const matching = coveringRules(tab.url, rules, now);
+      const covering = matching.filter((rule) => !rule.disabled);
       const tags = tagsForUrl(tagging.pages, tagging.tags, tab.url);
       // tag names end the haystack: a plain word finds tagged tabs (the #token path is separate)
       const tagNames = tags.map((tag) => ` ${tag.name}`).join("");
@@ -53,9 +60,12 @@ export function deriveTabs(
         {
           host,
           haystack: `${tab.title ?? ""} ${tab.url ?? ""} ${host}${tagNames}`.toLocaleLowerCase(),
-          protected: isProtected(tab.url, rules),
-          keptAlive: running, // a paused mark reloads nothing — no live badge
-          keepAlivePaused: showDisabled && !running && marks.length > 0,
+          protected: covering.length > 0,
+          protectedUntil: temporaryUntil(covering),
+          protectionOff: showDisabled && covering.length === 0 && matching.length > 0,
+          keptAlive: running.length > 0, // a paused mark reloads nothing — no live badge
+          keptUntil: temporaryUntil(running),
+          keepAlivePaused: showDisabled && running.length === 0 && marks.length > 0,
           tags,
           offTags: showDisabled ? offTagsForUrl(tagging.pages, tagging.tags, tab.url) : [],
           tagOrigins: tags.length > 0 ? tagOrigins(tagging.pages, tab.url) : new Map(),

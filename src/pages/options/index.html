@@ -149,49 +149,20 @@
 
     ul { list-style: none; padding: 0; margin: 8px 0; }
 
-    /* protected-site rules as chips */
-    #rules { display: flex; flex-wrap: wrap; gap: 6px; }
-    #rules li {
-      display: inline-flex;
-      align-items: center;
-      gap: 2px;
-      max-width: 100%; /* a url rule has no break points: cap the chip at the card, clip inside */
-      background: var(--badge-bg);
-      border-radius: 999px;
-      padding: 2px 4px 2px 10px;
-      font-family: ui-monospace, monospace;
-      font-size: 12px;
-    }
-    /* text and editor share one box (height = the ✕ button's), the chip keeps its measured width
-       while editing (rules.ts), so swapping them moves nothing */
-    #rules li span, #rules li .rename-input { min-width: 0; height: 22px; line-height: 22px; }
-    #rules li span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; cursor: text; }
-    #rules li .rename-input {
-      flex: 1; width: 0; font: inherit; padding: 0 4px; margin-left: -5px; line-height: 20px;
-      border: 1px solid var(--border); border-radius: var(--radius-s); background: var(--card-bg); color: inherit;
-    }
-    #rules li.muted { background: none; padding: 0; font-family: inherit; font-size: inherit; }
-    #rules button {
-      flex: none; /* the wrapping url text must not squeeze the × */
-      border: none;
-      background: none;
-      cursor: pointer;
-      border-radius: 50%;
-      width: 22px;
-      height: 22px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      transition: background var(--transition);
-    }
-    #rules button:hover { background: var(--hover); }
-    #rules button svg { width: 14px; height: 14px; display: block; }
-
-    /* keep-it-alive marks as a table: number, running, page, its interval, countdown, remove */
-    #keep-alive-table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-    #keep-alive-table th { text-align: left; font-weight: 500; color: var(--muted); font-size: 11px; padding: 2px 6px 4px 0; }
-    #keep-alive-table td { padding: 4px 6px 4px 0; border-top: 1px solid light-dark(#eee, #333); vertical-align: middle; white-space: nowrap; }
-    #keep-alive-table td:first-child { color: var(--muted); font-variant-numeric: tabular-nums; }
+    /* keep-it-alive marks as a table: number, running, page, its interval, countdown, expiry, remove —
+       the protected sites share the shape (number, on, pattern, expiry, time left, remove) */
+    :is(#keep-alive-table, #rules-table) { width: 100%; border-collapse: collapse; margin-top: 8px; }
+    :is(#keep-alive-table, #rules-table) th { text-align: left; font-weight: 500; color: var(--muted); font-size: 11px; padding: 2px 6px 4px 0; }
+    :is(#keep-alive-table, #rules-table) td { padding: 4px 6px 4px 0; border-top: 1px solid light-dark(#eee, #333); vertical-align: middle; white-space: nowrap; }
+    :is(#keep-alive-table, #rules-table) td:first-child { color: var(--muted); font-variant-numeric: tabular-nums; }
+    /* the # header over the number, past the grip and its gap, like the tag tables */
+    :is(#keep-alive-table, #rules-table) th:first-child { padding-left: 16px; }
+    /* the pattern column takes the width, clipping long addresses to one line; monospace like the mark urls;
+       the same left padding as the keep-alive page cell: room after the On box, the editor's outline inside the box */
+    #rules-table td:nth-child(3) { width: 100%; max-width: 0; overflow: hidden; text-overflow: ellipsis; cursor: text; padding-left: 8px; padding-right: 12px; }
+    #rules-table .pattern, #rules-table .rename-input { font-family: ui-monospace, monospace; font-size: 12px; }
+    #rules-table .pattern { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; cursor: text; }
+    #rules-table .rename-input { width: calc(100% + 5px); margin-left: -5px; padding: 0 4px; border: 1px solid var(--border); border-radius: var(--radius-s); background: var(--card-bg); color: inherit; }
     /* max-width: 0 lets the 100%-wide cell shrink below its content so title and url clip to one line each */
     /* left padding: breathing room after the toggle, and the editor's focus outline stays inside the clipping box */
     #keep-alive-table td:nth-child(3) { width: 100%; max-width: 0; overflow: hidden; text-overflow: ellipsis; cursor: text; padding-left: 8px; padding-right: 12px; }
@@ -208,7 +179,7 @@
       width: calc(100% + 5px); margin-left: -5px; padding: 0 4px;
       border: 1px solid var(--border); border-radius: var(--radius-s); background: var(--card-bg); color: inherit;
     }
-    #keep-alive-table .countdown { font-variant-numeric: tabular-nums; }
+    :is(#keep-alive-table, #rules-table) :is(.countdown, .time-left) { font-variant-numeric: tabular-nums; }
     /* tags: two tables in the keep-alive shape — tag list (color select, click-to-edit name, pages
        count) and tagged pages (click-to-edit address, one toggle chip per tag) */
     #tags-section h3 { margin: 16px 0 4px; font-size: 13px; font-weight: 600; }
@@ -219,7 +190,7 @@
     #tag-table tbody td:nth-child(5) { width: 100%; max-width: 0; overflow: hidden; text-overflow: ellipsis; cursor: text; padding-right: 12px; }
     /* tagged pages: fixed columns — the address takes what the 40 % Tags column leaves; chips wrap inside it */
     #tag-page-table { table-layout: fixed; }
-    #tag-page-table th:nth-child(1) { width: 2.25rem; } /* the # and its sort arrow */
+    #tag-page-table th:nth-child(1) { width: 3.5rem; } /* 8px air + grip + 6px gap + a two-digit # + padding; narrower and the switch runs into the number */
     /* the on / off switch is 32px wide (fixed layout: a narrower column lets it run into the address) + a gap */
     #tag-page-table th:nth-child(2) { width: calc(32px + 1rem); }
     #tag-page-table td:nth-child(2) { padding-right: 1rem; }
@@ -238,7 +209,9 @@
     /* rows: a little left air before the number, rounded ends (separate borders — collapse has no radius),
        a faint zebra tint and a hover ring */
     #tag-page-table { border-collapse: separate; border-spacing: 0; }
-    #tag-page-table th:first-child, #tag-page-table td:first-child { padding-left: 8px; }
+    #tag-page-table td:first-child { padding-left: 8px; }
+    /* the # header sits over the number, not the grip: 8px air + 10px grip + its 6px gap */
+    #tag-page-table th:first-child { padding-left: 24px; }
     #tag-page-table td:first-child { border-radius: 6px 0 0 6px; }
     #tag-page-table td:last-child { border-radius: 0 6px 6px 0; padding-right: 6px; }
     #tag-page-rows tr:nth-child(even) td { background: light-dark(rgb(0 0 0 / 0.025), rgb(255 255 255 / 0.03)); }
@@ -289,14 +262,14 @@
     #tag-page-pick .tag-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex: none; }
     #tag-page-pick .tag-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     #tag-page-pick .muted { padding: 4px 6px; }
-    #tag-table button, #tag-page-table button.remove-page { border: 1px solid var(--border); border-radius: 6px; background: none; color: inherit; font: inherit; font-size: 12px; padding: 2px 8px; cursor: pointer; }
-    #tag-table button:hover, #tag-page-table button.remove-page:hover { background: var(--hover); }
+    #tag-table button:not(.sort-button), #tag-page-table button.remove-page { border: 1px solid var(--border); border-radius: 6px; background: none; color: inherit; font: inherit; font-size: 12px; padding: 2px 8px; cursor: pointer; }
+    #tag-table button:not(.sort-button):hover, #tag-page-table button.remove-page:hover { background: var(--hover); }
     #rule-error, #tag-error, #tag-page-error { color: var(--danger, #d93025); margin-top: 4px; }
     /* drag reorder of the tag, tagged-page and keep-alive rows, like the side panel's tab rows: the
        dragged row dims, the row under the pointer is highlighted whole (accent frame + tint). The tag
-       table gives the grip a column; the other two put it in the # cell */
-    :is(#tag-rows, #tag-page-rows, #keep-alive-rows) tr[draggable="true"] { cursor: grab; }
-    :is(#tag-rows, #tag-page-rows, #keep-alive-rows) tr[draggable="false"] .drag-grip { opacity: 0.35; }
+       table gives the grip a column; the other three put it in the # cell */
+    :is(#tag-rows, #tag-page-rows, #keep-alive-rows, #rules) tr[draggable="true"] { cursor: grab; }
+    :is(#tag-rows, #tag-page-rows, #keep-alive-rows, #rules) tr[draggable="false"] .drag-grip { opacity: 0.35; }
     /* sortable headers: a faint ⇅ invites the click, the active one shows ▲ / ▼ */
     /* sortable headers read in the accent in both tables (the tag table did by a comma slip in the old
        selectors; kept on purpose); the arrow is dim until its sort is active */
@@ -304,19 +277,19 @@
     .sort-button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
     #tag-table th[data-sort] .sort-arrow, #tag-page-table th[data-sort] .sort-arrow { font-size: 10px; opacity: 0.45; }
     #tag-table th[data-sort][data-dir] .sort-arrow, #tag-page-table th[data-sort][data-dir] .sort-arrow { opacity: 1; }
-    :is(#tag-rows, #tag-page-rows, #keep-alive-rows) .drag-grip { display: inline-flex; color: var(--muted); vertical-align: middle; }
-    :is(#tag-page-rows, #keep-alive-rows) .drag-grip { margin-right: 6px; }
-    :is(#tag-rows, #tag-page-rows, #keep-alive-rows) .drag-grip svg { width: 10px; height: 14px; display: block; }
-    :is(#tag-rows, #tag-page-rows, #keep-alive-rows) tr.dragging td { opacity: 0.4; }
+    :is(#tag-rows, #tag-page-rows, #keep-alive-rows, #rules) .drag-grip { display: inline-flex; color: var(--muted); vertical-align: middle; }
+    :is(#tag-page-rows, #keep-alive-rows, #rules) .drag-grip { margin-right: 6px; }
+    :is(#tag-rows, #tag-page-rows, #keep-alive-rows, #rules) .drag-grip svg { width: 10px; height: 14px; display: block; }
+    :is(#tag-rows, #tag-page-rows, #keep-alive-rows, #rules) tr.dragging td { opacity: 0.4; }
     /* switched off: the row reads muted, the switch itself stays crisp */
     #tag-rows tr.off td:not(:nth-child(3)) { opacity: 0.5; }
-    :is(#tag-rows, #tag-page-rows, #keep-alive-rows) tr.drop-target td {
+    :is(#tag-rows, #tag-page-rows, #keep-alive-rows, #rules) tr.drop-target td {
       background: color-mix(in srgb, var(--accent) 14%, transparent);
       box-shadow: inset 0 2px 0 var(--accent), inset 0 -2px 0 var(--accent);
     }
-    :is(#tag-rows, #tag-page-rows, #keep-alive-rows) tr.drop-target td:first-child { box-shadow: inset 2px 2px 0 var(--accent), inset 0 -2px 0 var(--accent); border-radius: 6px 0 0 6px; }
-    :is(#tag-rows, #tag-page-rows, #keep-alive-rows) tr.drop-target td:last-child { box-shadow: inset -2px 2px 0 var(--accent), inset 0 -2px 0 var(--accent); border-radius: 0 6px 6px 0; }
-    #keep-alive-table td:last-child { text-align: right; }
+    :is(#tag-rows, #tag-page-rows, #keep-alive-rows, #rules) tr.drop-target td:first-child { box-shadow: inset 2px 2px 0 var(--accent), inset 0 -2px 0 var(--accent); border-radius: 6px 0 0 6px; }
+    :is(#tag-rows, #tag-page-rows, #keep-alive-rows, #rules) tr.drop-target td:last-child { box-shadow: inset -2px 2px 0 var(--accent), inset 0 -2px 0 var(--accent); border-radius: 0 6px 6px 0; }
+    :is(#keep-alive-table, #rules-table) td:last-child { text-align: right; }
     #keep-alive-table button {
       border: 1px solid light-dark(#ddd, #444);
       background: none;
@@ -456,7 +429,7 @@
       </select>
     </label>
     <label><input type="checkbox" id="panelView" /> Share filter, scope, sort and search across side panels <span class="muted">(every open panel follows a change; off = each panel keeps its own view)</span></label>
-    <label><input type="checkbox" id="showDisabledInPanel" /> Show disabled tags and paused keep-alive marks in the side panel <span class="muted">(struck through on the rows, in the hover tip and in the Tags picker; off = hidden until switched on again)</span></label>
+    <label><input type="checkbox" id="showDisabledInPanel" /> Show disabled tags, disabled protected sites and paused keep-alive marks in the side panel <span class="muted">(struck through on the rows, in the hover tip and in the Tags picker; off = hidden until switched on again)</span></label>
     <label>Tab order within window groups
       <select id="groupByWindowTabsOrder">
         <option value="recent">Recently used</option>
@@ -498,14 +471,17 @@
   <section class="card">
     <h2>Protected Sites</h2>
     <p class="muted">Exact host (<code>mail.google.com</code>), domain with subdomains (<code>*.github.com</code>) or one exact page (<code>https://app.example.com/board</code>).</p>
-    <ul id="rules"></ul>
+    <table id="rules-table">
+      <thead><tr><th>#</th><th>On</th><th>Pattern</th><th>Expires</th><th>Time left</th><th></th></tr></thead>
+      <tbody id="rules"></tbody>
+    </table>
     <div class="row">
       <input type="text" id="new-rule" placeholder="*.example.com" />
       <button id="add-rule">Add</button>
       <p class="muted" id="rule-error" hidden></p>
     </div>
     <hr class="card-divider" />
-    <p class="muted">Removes every protected site. Settings stay unchanged. Any removal (a chip's ✕, an unprotect from the side panel or page menu, Remove all) can be undone, newest first.</p>
+    <p class="muted">Removes every protected site. Settings stay unchanged. Any removal (a row's Remove, an unprotect from the side panel or page menu, an expired rule, Remove all) can be undone, newest first.</p>
     <div class="row">
       <button id="clear-protected">Remove all protected sites</button>
       <button id="restore-protected" hidden>Restore last removal</button>
@@ -519,7 +495,7 @@
     <div id="keep-alive-body" hidden>
       <label>Default value <select id="keepAliveMinutes"></select> minutes (copied onto each new mark)</label>
       <table id="keep-alive-table">
-        <thead><tr><th>#</th><th></th><th>Page</th><th>Reload each (min)</th><th>Tabs</th><th>Next reload</th><th></th></tr></thead>
+        <thead><tr><th>#</th><th></th><th>Page</th><th>Reload each (min)</th><th>Tabs</th><th>Next reload</th><th>Expires</th><th>Time left</th><th></th></tr></thead>
         <tbody id="keep-alive-rows"></tbody>
       </table>
       <div class="row">

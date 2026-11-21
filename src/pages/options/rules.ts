@@ -1,55 +1,65 @@
-// Protected-sites card: the rule chips with their remove buttons, the Add row,
-// Remove all and Restore last removal (every removal is undoable, newest first).
+// Protected-sites card: the rules as a table in the keep-alive shape — number, On checkbox,
+// pattern (click to edit), Expires dropdown, Time left, Remove, draggable onto another row to
+// reorder — the Add row, Remove all and Restore last removal (every removal is undoable, newest first).
 import { renderRestoreButton } from "./restore-button.ts";
 import { makeRule } from "../../app/core.ts";
-import { setRulePattern } from "../../app/protection-rules.ts";
+import { setRuleEnabled, setRuleExpiry, setRulePattern } from "../../app/protection-rules.ts";
 import { popRemoval } from "../../app/removal-trash.ts";
 import { dropProtectionRules, editProtectionRules, localStore, restoreProtectionRules } from "../../app/storage.ts";
 import type { AppState, ProtectionRule, Removal } from "../../app/types.ts";
 import { getElementById } from "../../lib/dom.ts";
+import { moveItemTo } from "../../lib/list.ts";
 import { onBusyClick } from "../../lib/ui/busy-button.ts";
 import { inlineEdit } from "../../lib/ui/inline-edit.ts";
+import { dragGrip, initRowReorder } from "../../lib/ui/row-reorder.ts";
+import { expirySelect, timeLeftCell } from "./expiry-cells.ts";
 import { hasRule } from "./model.ts";
 import { flashSaved, render, showError } from "./page-state.ts";
 import { pluralize } from "../../app/plural.ts";
 
 export async function renderRules(state: AppState): Promise<void> {
-  const list = getElementById("rules");
-  list.textContent = "";
+  const rows = getElementById("rules");
+  if (rows.querySelector(".rename-input")) {
+    return; // a pattern edit in progress: the table catches up when it ends (the editor's finish renders)
+  }
+  rows.textContent = "";
   if (state.protectionRules.length === 0) {
-    const li = document.createElement("li");
-    li.className = "muted";
-    li.textContent = "No protected sites yet.";
-    list.append(li);
+    const cell = document.createElement("td");
+    cell.className = "muted";
+    cell.colSpan = 6;
+    cell.textContent = "No protected sites yet.";
+    const empty = document.createElement("tr");
+    empty.append(cell);
+    rows.append(empty);
   }
-  for (const rule of state.protectionRules) {
-    list.append(ruleChip(rule));
-  }
+  state.protectionRules.forEach((rule, index) => {
+    rows.append(ruleRow(rule, index + 1));
+  });
   const { protectionTrash = [] } = await localStore.get("protectionTrash");
   renderRestore(protectionTrash);
 }
 
-// the pattern is editable in place (click → input, lib/ui/inline-edit): blur / Enter
-// commit through makeRule, Escape cancels; the list re-renders either way so an
-// ignored value snaps back
-// what the pattern covers, for the chip's tooltip (the chip itself clips long patterns)
+function cell(...children: (Node | string)[]): HTMLTableCellElement {
+  const element = document.createElement("td");
+  element.append(...children);
+  return element;
+}
+
+// what the pattern covers, for the cell's tooltip (the cell clips long patterns)
 const RULE_KIND: Record<ProtectionRule["type"], string> = {
   host: "Exact host",
   domain: "Domain and its subdomains",
   url: "Exact page",
 };
 
-function ruleChip(rule: ProtectionRule): HTMLLIElement {
-  const li = document.createElement("li");
+// the pattern is editable in place (click → input, lib/ui/inline-edit): blur / Enter commit
+// through makeRule, Escape cancels; the table re-renders either way so an ignored value snaps back
+function patternCell(rule: ProtectionRule): HTMLTableCellElement {
   const span = document.createElement("span");
+  span.className = "pattern";
   span.textContent = rule.pattern;
   span.title = `${RULE_KIND[rule.type]}: ${rule.pattern}\nClick to edit the pattern`;
   span.addEventListener("click", () => {
-    // freeze the chip at its current width (0 in the DOM-less tests: skip) so the editor
-    // fills the text's slot instead of resizing the chip; the re-render on finish drops it
-    if (li.offsetWidth > 0) {
-      li.style.width = `${li.offsetWidth}px`;
-    }
     inlineEdit(span, {
       initial: rule.pattern,
       placeholder: "*.example.com",
@@ -63,17 +73,56 @@ function ruleChip(rule: ProtectionRule): HTMLLIElement {
       finish: render,
     });
   });
+  return cell(span);
+}
+
+// every row edit goes through the stored-list writer (a rule added meanwhile survives); nothing
+// written, nothing flashed when the edit changed nothing
+async function save(edit: (rules: ProtectionRule[]) => ProtectionRule[] | undefined): Promise<boolean> {
+  let changed = false;
+  await editProtectionRules((rules) => {
+    const next = edit(rules);
+    changed = next !== undefined;
+    return next;
+  });
+  if (changed) {
+    flashSaved();
+    render();
+  }
+  return changed;
+}
+
+function ruleRow(rule: ProtectionRule, number: number): HTMLTableRowElement {
+  // off: the rule stays listed and protects nothing (the panel strikes its badge through)
+  const on = document.createElement("input");
+  on.type = "checkbox";
+  on.checked = !rule.disabled;
+  on.title = "Protect the pages this rule covers";
+  on.addEventListener("change", () => save((rules) => setRuleEnabled(rules, rule.id, on.checked)));
+  // a temporary rule: picked in the row menu or here; the expiry sweep removes it when it ends
+  const expires = expirySelect(rule.expiresAt, rule.pattern, (expiresAt) =>
+    save((rules) => setRuleExpiry(rules, rule.id, expiresAt)),
+  );
   const remove = document.createElement("button");
-  remove.innerHTML =
-    '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg>';
-  remove.title = remove.ariaLabel = `Remove ${rule.pattern}`;
+  remove.textContent = "Remove";
+  remove.title = `Remove ${rule.pattern}`;
   remove.addEventListener("click", async () => {
-    await dropProtectionRules((rules) => rules.filter((r) => r.id !== rule.id));
+    await dropProtectionRules((rules) => rules.filter((candidate) => candidate.id !== rule.id));
     flashSaved();
     render();
   });
-  li.append(span, remove);
-  return li;
+  const row = document.createElement("tr");
+  row.draggable = true; // drag onto another row to reorder (initRowReorder); the grip shares the # cell
+  row.dataset.key = rule.id;
+  row.append(
+    cell(dragGrip(), String(number)),
+    cell(on),
+    patternCell(rule),
+    cell(expires),
+    timeLeftCell(rule.expiresAt),
+    cell(remove),
+  );
+  return row;
 }
 
 // "Restore last removal (N sites)" — only while an action exists; hovering lists what
@@ -123,6 +172,10 @@ async function restoreLastRemoval(): Promise<void> {
 }
 
 export function initRules(): void {
+  // the stored order is the table's order (the # column), nothing else reads it
+  initRowReorder(getElementById("rules"), (dragged, target) =>
+    save((rules) => moveItemTo(rules, (rule) => rule.id, dragged, target)),
+  );
   getElementById("add-rule").addEventListener("click", addRule);
   getElementById("clear-protected").addEventListener("click", clearAllRules);
   onBusyClick(getElementById<HTMLButtonElement>("restore-protected"), restoreLastRemoval);

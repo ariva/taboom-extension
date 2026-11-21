@@ -1600,3 +1600,89 @@ test("Service Worker - Keyboard snooze that is refused flashes the action badge"
     `badge flashed: ${calls.filter((c) => c.startsWith("action.")).join(" | ")}`,
   );
 });
+
+test("Service Worker - Expiry: protect-hosts / protect-urls / keep-alive-set with hours stamp a temporary entry and arm the expiry alarm", {
+  skip: !KEEP_ALIVE_ON,
+}, async () => {
+  const before = Date.now();
+  stored.keepAlive = [];
+  calls.length = 0;
+  await send({ type: "protect-hosts", hosts: ["temp.example.net"], hours: 6 });
+  await send({ type: "protect-urls", urls: ["https://temp.example.net/page"], hours: 24 });
+  await send({ type: "keep-alive-set", tabIds: [1], kept: true, hours: 1 });
+  const host = stored.protectionRules.find((rule) => rule.pattern === "temp.example.net");
+  const url = stored.protectionRules.find((rule) => rule.pattern === "https://temp.example.net/page");
+  assert.ok(host && url, "both rules added");
+  assert.ok(
+    host.expiresAt !== undefined && host.expiresAt >= before + 6 * HOUR && host.expiresAt <= Date.now() + 6 * HOUR,
+  );
+  assert.ok(
+    url.expiresAt !== undefined && url.expiresAt >= before + 24 * HOUR && url.expiresAt <= Date.now() + 24 * HOUR,
+  );
+  const mark = stored.keepAlive[0];
+  assert.ok(mark?.expiresAt !== undefined && mark.expiresAt >= before + HOUR && mark.expiresAt <= Date.now() + HOUR);
+  assert.ok(calls.includes('alarms.create expiry {"periodInMinutes":1}'), "something can expire: the sweep alarm runs");
+  // no duration: permanent, no key
+  await send({ type: "protect-hosts", hosts: ["forever.example.net"] });
+  assert.ok(!("expiresAt" in (stored.protectionRules.find((rule) => rule.pattern === "forever.example.net") ?? {})));
+  stored.protectionRules = stored.protectionRules.filter((rule) => !rule.pattern.includes("example.net"));
+  stored.keepAlive = [];
+});
+
+test("Service Worker - Expiry: the sweep drops expired rules and marks into their trash, leaves the running ones, clears the alarm once nothing can expire", {
+  skip: !KEEP_ALIVE_ON,
+}, async () => {
+  const now = Date.now();
+  stored.protectionRules = [
+    { id: "keep", type: "host", pattern: "mail.google.com" },
+    { id: "gone", type: "host", pattern: "work.example.com", expiresAt: now - 1 },
+    { id: "fresh", type: "host", pattern: "fresh.example.com", expiresAt: now + HOUR },
+  ];
+  stored.keepAlive = [
+    { url: "https://old.example.com/a", title: "Old", minutes: 25, nextReload: now + HOUR, expiresAt: now - 1 },
+    { url: "https://work.example.com/doc", title: "Doc", minutes: 25, nextReload: now + HOUR, expiresAt: now + HOUR },
+  ];
+  stored.protectionTrash = [];
+  stored.keepAliveTrash = [];
+  const protectedTab = tabs.find((tab) => tab.id === 1);
+  if (protectedTab) {
+    protectedTab.autoDiscardable = false; // as the rule left it while it ran
+  }
+  calls.length = 0;
+  await chrome.alarms.onAlarm.fire({ name: "expiry" });
+  await tick();
+  await tick();
+  await tick();
+  assert.deepEqual(
+    stored.protectionRules.map((rule) => rule.id),
+    ["keep", "fresh"],
+  );
+  assert.deepEqual(
+    stored.protectionTrash.map((action) => action.items.map((rule) => rule.pattern)),
+    [["work.example.com"]],
+    "an expired rule is a removal: Restore last removal brings it back",
+  );
+  assert.ok(
+    calls.some((c) => c.startsWith("tabs.update 1") && c.includes('"autoDiscardable":true')),
+    "the tab the expired rule protected is discardable again",
+  );
+  assert.deepEqual(
+    stored.keepAlive.map((entry) => entry.url),
+    ["https://work.example.com/doc"],
+  );
+  assert.deepEqual(
+    stored.keepAliveTrash.map((action) => action.items.map((entry) => entry.url)),
+    [["https://old.example.com/a"]],
+  );
+  assert.ok(calls.includes('alarms.create expiry {"periodInMinutes":1}'), "a fresh entry remains: the alarm stays");
+  // nothing temporary left: the alarm goes
+  stored.protectionRules = [{ id: "keep", type: "host", pattern: "mail.google.com" }];
+  stored.keepAlive = [];
+  calls.length = 0;
+  await chrome.alarms.onAlarm.fire({ name: "expiry" });
+  await tick();
+  await tick();
+  assert.ok(calls.includes("alarms.clear expiry"), "no entry can expire: no alarm");
+  stored.protectionTrash = [];
+  stored.keepAliveTrash = [];
+});

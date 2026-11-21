@@ -136,14 +136,14 @@ function hasSiteMark(list: KeepAliveTab[], tab: chrome.tabs.Tab): boolean {
   return site !== "" && list.some((entry) => entry.url === site);
 }
 
-async function markTabs(tabs: chrome.tabs.Tab[], scope: KeepAliveScope): Promise<boolean> {
+async function markTabs(tabs: chrome.tabs.Tab[], scope: KeepAliveScope, expiresAt?: number): Promise<boolean> {
   const [{ settings }, { keepAlive = [] }] = await Promise.all([loadState(), localStore.get("keepAlive")]);
   const minutes = settings.keepAliveMinutes;
   const pages = tabs.map((tab) => ({
     url: scope === "site" ? siteKeyOf(tab) : keepAliveKey(tab.url),
     title: tab.title,
   }));
-  const next = markKeepAlive(keepAlive, pages, minutes, nextReloadAt(minutes, Date.now()));
+  const next = markKeepAlive(keepAlive, pages, minutes, nextReloadAt(minutes, Date.now()), expiresAt);
   if (!next) {
     return false;
   }
@@ -151,14 +151,20 @@ async function markTabs(tabs: chrome.tabs.Tab[], scope: KeepAliveScope): Promise
   return true;
 }
 
-export async function setTabsKeepAlive(tabs: chrome.tabs.Tab[], kept: boolean, scope?: KeepAliveScope): Promise<void> {
+// expiresAt: a temporary mark (the row menu's duration); the expiry sweep drops it at its time
+export async function setTabsKeepAlive(
+  tabs: chrome.tabs.Tab[],
+  kept: boolean,
+  scope?: KeepAliveScope,
+  expiresAt?: number,
+): Promise<void> {
   if (!(await keepAliveActive())) {
     return;
   }
   // unmark goes through the shared writer so the marks land in the restorable trash; a page
   // unmark hands the tab url in (the writer drops the mark covering it), a site unmark the site
   const keys = tabs.map((tab) => (scope === "site" ? siteKeyOf(tab) : tab.url));
-  const changed = kept ? await markTabs(tabs, scope) : await removeKeepAlive(keys);
+  const changed = kept ? await markTabs(tabs, scope, expiresAt) : await removeKeepAlive(keys);
   if (!changed) {
     return;
   }

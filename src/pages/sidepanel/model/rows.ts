@@ -1,6 +1,7 @@
 // Pure row-level view models: what one tab row shows (badges, highlights, favicon, dot),
 // the bulk-selection summary and the empty-list message. No DOM, no chrome.*.
 import { formatAge, isSupportedUrl } from "../../../app/core.ts";
+import { formatTimeLeft } from "../../../app/expiry.ts";
 import { type TagOrigin, tagColorHex, tagMatches, usesDarkText } from "../../../app/tags.ts";
 import type { Tag } from "../../../app/types.ts";
 import { isUnloaded } from "../../../app/core.ts";
@@ -102,8 +103,8 @@ const TEXT_SCALE = 0.85 / 0.77; // the host and age are set in the meta's font, 
 
 export function badges(
   tab: Pick<Tab, "discarded" | "status" | "pinned" | "audible" | "splitViewId">,
-  isProtectedTab: boolean,
-  isKeptAliveTab: boolean | "paused" = false,
+  isProtectedTab: boolean | "off" | "temporary",
+  isKeptAliveTab: boolean | "paused" | "temporary" = false,
   tags: Tag[] = [],
   hitTagIds: ReadonlySet<string> = new Set(),
   origins: ReadonlyMap<string, TagOrigin> = new Map(),
@@ -113,12 +114,18 @@ export function badges(
   if (isUnloaded(tab)) {
     list.push(["snoozed", "warn"]);
   }
+  // a temporary rule / mark says so in the badge (the hover tip adds the time left); a disabled
+  // rule or a paused mark is struck through
   if (isProtectedTab) {
-    list.push(["protected", "ok"]);
+    list.push([
+      isProtectedTab === "temporary" ? "temporary protected" : "protected",
+      isProtectedTab === "off" ? "ok off" : "ok",
+    ]);
   }
   if (isKeptAliveTab) {
-    // same colour as protected: both mean "auto-snooze leaves this alone"; a paused mark is struck through
-    list.push(["kept alive", isKeptAliveTab === "paused" ? "ok off" : "ok"]);
+    // same colour as protected: both mean "auto-snooze leaves this alone"
+    const label = isKeptAliveTab === "temporary" ? "temporary keep alive" : "kept alive";
+    list.push([label, isKeptAliveTab === "paused" ? "ok off" : "ok"]);
   }
   if (tab.pinned) {
     list.push(["pinned", ""]);
@@ -294,8 +301,8 @@ export function rowViewModel(
       ...(parked ? [["parked", ""] satisfies Badge] : []),
       ...badges(
         tab,
-        d.protected,
-        d.keepAlivePaused ? "paused" : d.keptAlive,
+        d.protectionOff ? "off" : d.protectedUntil === undefined ? d.protected : "temporary",
+        d.keepAlivePaused ? "paused" : d.keptUntil === undefined ? d.keptAlive : "temporary",
         d.tags,
         hitTagIds,
         d.tagOrigins,
@@ -310,7 +317,17 @@ export function rowViewModel(
   );
   // the tip's states line reads the plain badges back; the tags get their own colored line, the
   // search-only "url match" stays out
-  const tipBadges = badgeList.filter(([label, kind]) => label !== "url match" && !kind.startsWith("tag"));
+  // a temporary state's badge in the tip carries the time left ("temporary protected · 5h 40m left")
+  const until: Record<string, number | undefined> = {
+    "temporary protected": d.protectedUntil,
+    "temporary keep alive": d.keptUntil,
+  };
+  const tipBadges = badgeList
+    .filter(([label, kind]) => label !== "url match" && !kind.startsWith("tag"))
+    .map(([label, kind]): Badge => {
+      const ends = until[label];
+      return ends === undefined ? [label, kind] : [`${label} · ${formatTimeLeft(ends, now)} left`, kind];
+    });
   return {
     classes: [
       "row",

@@ -6,6 +6,8 @@ import {
   addUrlRules,
   removeRulesFor,
   restoreRuleRemoval,
+  setRuleEnabled,
+  setRuleExpiry,
   setRulePattern,
 } from "../../src/app/protection-rules.ts";
 import { recordRemoval } from "../../src/app/removal-trash.ts";
@@ -81,4 +83,47 @@ test("Core - SetRulePattern: re-keys one rule through makeRule (type follows), i
   assert.equal(setRulePattern([github, mail], "m", "   "), undefined, "blank");
   assert.equal(setRulePattern([github, mail], "m", "mail.google.com"), undefined, "same pattern");
   assert.equal(setRulePattern([github, mail], "m", "*.GitHub.com"), undefined, "another rule's pattern");
+});
+
+test("Protection rules - a temporary rule: addHostRules / addUrlRules stamp expiresAt, setRuleExpiry re-bases or clears it", () => {
+  const NOW = 1_700_000_000_000;
+  const hosts = addHostRules([], ["a.test"], NOW + 3_600_000);
+  assert.equal(hosts[0]?.expiresAt, NOW + 3_600_000);
+  const urls = addUrlRules([], ["https://b.test/x"], NOW + 7_200_000);
+  assert.equal(urls[0]?.expiresAt, NOW + 7_200_000);
+  assert.ok(!("expiresAt" in (addHostRules([], ["c.test"])[0] ?? {})), "no duration: no key");
+  const rules = [...hosts, ...urls];
+  const id = hosts[0]?.id ?? "";
+  assert.equal(setRuleExpiry(rules, id, NOW + 10)?.[0]?.expiresAt, NOW + 10);
+  const cleared = setRuleExpiry(rules, id, undefined);
+  assert.ok(cleared && !("expiresAt" in (cleared[0] ?? {})), "Never: the key goes");
+  assert.equal(setRuleExpiry(rules, id, NOW + 3_600_000), undefined, "unchanged: no write");
+  assert.equal(setRuleExpiry(rules, "nope", undefined), undefined, "unknown rule");
+});
+
+test("Protection rules - disabled rules (T-0157): setRuleEnabled adds / drops the key; Protect over a page only disabled rules cover switches them back on", () => {
+  const github = rule("g", "*.github.com");
+  const off = setRuleEnabled([github], "g", false);
+  assert.deepEqual(off, [{ ...github, disabled: true }]);
+  assert.equal(setRuleEnabled(off ?? [], "g", false), undefined, "unchanged: no write");
+  const on = setRuleEnabled(off ?? [], "g", true);
+  assert.deepEqual(on, [github], "on: the key goes");
+  assert.equal(setRuleEnabled([github], "nope", false), undefined, "unknown rule");
+  // the row menu's Protect domain / URL over a disabled covering rule: the rule returns with the pick's
+  // duration (Always clears an old one) — no second rule for the same site
+  const stale = { ...github, disabled: true, expiresAt: 1 };
+  assert.deepEqual(addHostRules([stale], ["gist.github.com"], 5), [{ ...github, expiresAt: 5 }]);
+  assert.deepEqual(addHostRules([stale], ["gist.github.com"]), [github], "Always: permanent again");
+  assert.deepEqual(
+    addHostRules([github, stale], ["gist.github.com"]),
+    [github, stale],
+    "a live rule covers: nothing to do",
+  );
+  const page = { ...rule("u", "https://x.test/a"), disabled: true };
+  assert.deepEqual(addUrlRules([page], ["https://x.test/a"]), [rule("u", "https://x.test/a")]);
+  assert.deepEqual(
+    addUrlRules([stale], ["https://github.com/a"]).map((candidate) => candidate.pattern),
+    ["*.github.com", "https://github.com/a"],
+    "a disabled host rule is not a url rule: a url rule is added",
+  );
 });

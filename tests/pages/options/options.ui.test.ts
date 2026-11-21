@@ -73,14 +73,14 @@ test("UI - Options - 'Snooze inactive tabs now' asks the worker for a pass and r
 });
 
 test("UI - Options - Protection rules render as removable entries", async () => {
-  const li = q(document, "#rules li");
+  const li = q(document, "#rules tr");
   assert.match(li.textContent, /\*\.github\.com/);
   stored.protectionTrash = [];
   q(li, "button").click();
   await tick();
   await tick();
   assert.deepEqual(stored.protectionRules, [], "rule removed");
-  assert.match(q(document, "#rules li").textContent, /No protected sites yet/);
+  assert.match(q(document, "#rules tr").textContent, /No protected sites yet/);
   assert.deepEqual(
     stored.protectionTrash.map((action) => action.items.map((rule) => rule.pattern)),
     [["*.github.com"]],
@@ -92,7 +92,7 @@ test("UI - Options - Protection rules render as removable entries", async () => 
   await tick();
 });
 
-test("UI - Options - Protected site chip: click the pattern to edit it in place; blur / Enter save, Escape cancels", async () => {
+test("UI - Options - Protected site row: click the pattern to edit it in place; blur / Enter save, Escape cancels", async () => {
   stored.protectionRules = [
     { id: "r1", type: "domain", pattern: "*.github.com" },
     { id: "r2", type: "host", pattern: "mail.google.com" },
@@ -100,19 +100,19 @@ test("UI - Options - Protected site chip: click the pattern to edit it in place;
   await chrome.storage.onChanged.fire({ protectionRules: {} }, "local");
   await tick();
   await tick();
-  const chip = () => qa(document, "#rules li")[0]!;
+  const chip = () => qa(document, "#rules tr")[0]!;
   const key = (name: string) => new window.KeyboardEvent("keydown", { key: name, bubbles: true });
   assert.equal(chip().querySelector("input"), null, "pattern shown as text at first");
   assert.equal(
-    q(chip(), "span").title,
+    q(chip(), ".pattern").title,
     "Domain and its subdomains: *.github.com\nClick to edit the pattern",
     "tooltip names the kind and the full pattern, like a keep-alive row",
   );
   assert.equal(
-    q(qa(document, "#rules li")[1]!, "span").title,
+    q(qa(document, "#rules tr")[1]!, ".pattern").title,
     "Exact host: mail.google.com\nClick to edit the pattern",
   );
-  q(chip(), "span").click();
+  q(chip(), ".pattern").click();
   const input = q<HTMLInputElement>(chip(), "input.rename-input");
   assert.equal(input.value, "*.github.com");
   assert.equal(qa(chip(), "button").length, 1, "the ✕ stays while editing");
@@ -181,7 +181,7 @@ test("UI - Options - Adding a rule saves it and clears the input", async () => {
   const saved = calls.find((c) => c.includes("example.org"));
   assert.ok(saved, "normalized rule persisted");
   assert.equal(input.value, "");
-  assert.match(q(document, "#rules li").textContent, /\*\.example\.org/);
+  assert.match(q(document, "#rules tr").textContent, /\*\.example\.org/);
 });
 
 test("UI - Options - Changing a setting persists and flashes Saved", async () => {
@@ -269,7 +269,7 @@ test("UI - Options - External rule change re-renders the protection list", async
   await chrome.storage.onChanged.fire({ protectionRules: {} }, "local");
   await tick();
   await tick();
-  assert.match(q(document, "#rules li").textContent, /elsewhere\.example\.com/);
+  assert.match(q(document, "#rules tr").textContent, /elsewhere\.example\.com/);
 });
 
 // the page re-renders on every storage write (keep-alive reload bookkeeping, a panel pref click):
@@ -475,7 +475,7 @@ test("UI - Options - Clear protected sites empties rules but keeps settings; Res
     "Clear all lives in the Protected Sites card",
   );
 
-  q(qa(document, "#rules li")[1]!, "button").click(); // mail chip ✕
+  q(qa(document, "#rules tr")[1]!, "button").click(); // mail chip ✕
   await tick();
   await tick();
   assert.equal(restore.hidden, false);
@@ -512,7 +512,7 @@ test("UI - Options - Clear protected sites empties rules but keeps settings; Res
     ["*.github.com", "mail.google.com"],
   );
   assert.equal(restore.hidden, true, "stack empty: button gone");
-  assert.equal(qa(document, "#rules li").length, 2, "chips re-rendered");
+  assert.equal(qa(document, "#rules tr").length, 2, "chips re-rendered");
 
   // a double-click must pop one removal, not two: the button is busy until the first write lands
   stored.protectionRules = [];
@@ -836,7 +836,7 @@ test("UI - Options - Keep-alive table: per-row pause, interval, countdown and re
   const rows = qa(byId("keep-alive-rows"), "tr");
   assert.equal(rows.length, 2);
   const cells = qa(rows[0]!, "td");
-  assert.equal(cells.length, 7, "number, enable, page, interval, tabs, next reload, remove");
+  assert.equal(cells.length, 9, "number, enable, page, interval, tabs, next reload, expires, time left, remove");
   const tabsOf = (row: Element) => qa<HTMLSelectElement>(row, "select")[1]!;
   assert.equal(tabsOf(rows[0]!).value, "one", "default: one tab per reload");
   assert.equal(tabsOf(rows[1]!).value, "all", "reloadAll mark shows All tabs");
@@ -1829,7 +1829,7 @@ test("UI - Options - Keep-alive table: drag a row by its grip onto another to re
     "rows are drag handles",
   );
   assert.ok(must(rows()[0]).querySelector("td:first-child .drag-grip svg"), "the grip sits in the # cell");
-  assert.equal(qa(must(rows()[0]), "td").length, 7, "no extra column");
+  assert.equal(qa(must(rows()[0]), "td").length, 9, "no extra column (the grip shares the # cell)");
   must(rows()[0]).dispatchEvent(new window.Event("dragstart", { bubbles: true }));
   must(rows()[2]).dispatchEvent(new window.Event("dragover", { bubbles: true, cancelable: true }));
   assert.ok(must(rows()[2]).classList.contains("drop-target"), "target row highlighted");
@@ -2067,4 +2067,166 @@ test("UI - Options - Customizations: 'Show disabled tags and paused keep-alive m
   await tick();
   await tick();
   assert.equal(stored.settings.showDisabledInPanel, true);
+});
+
+const EXPIRY_OPTIONS = ["Never", "1 hour", "2 hours", "3 hours", "6 hours", "12 hours", "1 day", "1 week"];
+
+test("UI - Options - Keep-alive table (T-0157): the Expires dropdown shows the picked duration and re-bases it from now; Time left counts down", async () => {
+  const { applyExperimental, featureEnabled } = await import("../../../src/app/core.ts");
+  if (!featureEnabled(applyExperimental(RAW_FEATURES, stored.ui?.showExperimental ?? false), "KEEP_ALIVE")) {
+    return;
+  }
+  const now = Date.now();
+  const HOUR = 3_600_000;
+  stored.keepAlive = [
+    {
+      url: "https://dash.example.com/board",
+      title: "Board",
+      minutes: 25,
+      nextReload: now + HOUR,
+      expiresAt: now + 5 * HOUR + 30 * 60_000,
+    },
+    { url: "https://mail.example.com/", title: "Mail", minutes: 5, nextReload: now + HOUR },
+  ];
+  await chrome.storage.onChanged.fire({ keepAlive: {} }, "local");
+  await tick();
+  await tick();
+  const rows = () => qa(byId("keep-alive-rows"), "tr");
+  const expiresOf = (row: Element) => qa<HTMLSelectElement>(row, "select")[2]!;
+  assert.deepEqual(
+    qa<HTMLOptionElement>(expiresOf(rows()[0]!), "option").map((option) => option.textContent),
+    EXPIRY_OPTIONS,
+  );
+  assert.equal(expiresOf(rows()[0]!).value, "6", "5h 30m left reads as the 6 hours pick");
+  assert.equal(expiresOf(rows()[1]!).value, "", "permanent: Never");
+  assert.equal(q(rows()[0]!, ".time-left").textContent, "5h 29m");
+  assert.equal(q(rows()[1]!, ".time-left").textContent, "—");
+  assert.ok(qa(byId("keep-alive-table"), "th").some((th) => th.textContent === "Expires"));
+  assert.ok(qa(byId("keep-alive-table"), "th").some((th) => th.textContent === "Time left"));
+  const mail = expiresOf(rows()[1]!);
+  mail.value = "24";
+  mail.dispatchEvent(new window.Event("change", { bubbles: true }));
+  await tick();
+  await tick();
+  const until = stored.keepAlive[1]?.expiresAt ?? 0;
+  assert.ok(until >= now + 24 * HOUR && until <= Date.now() + 24 * HOUR, "1 day from now");
+  const board = expiresOf(rows()[0]!);
+  board.value = "";
+  board.dispatchEvent(new window.Event("change", { bubbles: true }));
+  await tick();
+  await tick();
+  assert.ok(!("expiresAt" in (stored.keepAlive[0] ?? {})), "Never: the key goes");
+  assert.equal(q(rows()[0]!, ".time-left").textContent, "—");
+  stored.keepAlive = [];
+  await chrome.storage.onChanged.fire({ keepAlive: {} }, "local");
+  await tick();
+  await tick();
+});
+
+test("UI - Options - Protected sites are a table (T-0157): number, On, pattern, Expires, Time left, Remove; the On box disables the rule, the dropdown writes its expiry", async () => {
+  const now = Date.now();
+  const HOUR = 3_600_000;
+  stored.protectionRules = [
+    { id: "r1", type: "domain", pattern: "*.github.com", expiresAt: now + 2 * 24 * HOUR + 3 * HOUR + 30 * 60_000 },
+    { id: "r2", type: "host", pattern: "mail.google.com" },
+  ];
+  await chrome.storage.onChanged.fire({ protectionRules: {} }, "local");
+  await tick();
+  await tick();
+  const rows = () => qa(byId("rules"), "tr");
+  assert.equal(rows().length, 2);
+  assert.deepEqual(
+    qa(byId("rules-table"), "th").map((th) => th.textContent),
+    ["#", "On", "Pattern", "Expires", "Time left", ""],
+  );
+  assert.deepEqual(
+    rows().map((row) => q(row, "td").textContent),
+    ["1", "2"],
+    "rows numbered",
+  );
+  assert.equal(q(rows()[0]!, ".pattern").textContent, "*.github.com");
+  const onBox = (row: Element) => q<HTMLInputElement>(row, "input[type=checkbox]");
+  assert.ok(onBox(rows()[0]!).checked, "a rule without the key is on");
+  onBox(rows()[0]!).click();
+  await tick();
+  await tick();
+  assert.equal(stored.protectionRules[0]?.disabled, true, "unticked: the rule is kept but protects nothing");
+  assert.equal(onBox(rows()[0]!).checked, false);
+  onBox(rows()[0]!).click();
+  await tick();
+  await tick();
+  assert.ok(!("disabled" in (stored.protectionRules[0] ?? {})), "ticked again: the key goes");
+  const expiresOf = (row: Element) => q<HTMLSelectElement>(row, "select");
+  assert.deepEqual(
+    qa<HTMLOptionElement>(expiresOf(rows()[0]!), "option").map((option) => option.textContent),
+    EXPIRY_OPTIONS,
+  );
+  assert.equal(expiresOf(rows()[0]!).value, "168", "2d 3h left reads as the 1 week pick");
+  assert.equal(q(rows()[0]!, ".time-left").textContent, "2d 3h");
+  assert.equal(expiresOf(rows()[1]!).value, "");
+  assert.equal(q(rows()[1]!, ".time-left").textContent, "—");
+  assert.equal(q<HTMLButtonElement>(rows()[0]!, "button").textContent, "Remove");
+  const mail = expiresOf(rows()[1]!);
+  mail.value = "3";
+  mail.dispatchEvent(new window.Event("change", { bubbles: true }));
+  await tick();
+  await tick();
+  const until = stored.protectionRules[1]?.expiresAt ?? 0;
+  assert.ok(until >= now + 3 * HOUR && until <= Date.now() + 3 * HOUR, "3 hours from now");
+  const github = expiresOf(rows()[0]!);
+  github.value = "";
+  github.dispatchEvent(new window.Event("change", { bubbles: true }));
+  await tick();
+  await tick();
+  assert.ok(!("expiresAt" in (stored.protectionRules[0] ?? {})), "Never: the key goes");
+  stored.protectionRules = [];
+  await chrome.storage.onChanged.fire({ protectionRules: {} }, "local");
+  await tick();
+  await tick();
+});
+
+test("UI - Options - Protected sites table: drag a row by its grip onto another to reorder the rules (T-0157)", async () => {
+  stored.protectionRules = [
+    { id: "a", type: "host", pattern: "a.test" },
+    { id: "b", type: "host", pattern: "b.test" },
+    { id: "c", type: "host", pattern: "c.test" },
+  ];
+  await chrome.storage.onChanged.fire({ protectionRules: {} }, "local");
+  await tick();
+  await tick();
+  const rows = () => qa<HTMLTableRowElement>(byId("rules"), "tr");
+  assert.ok(
+    rows().every((row) => row.draggable),
+    "rows are drag handles",
+  );
+  assert.ok(must(rows()[0]).querySelector("td:first-child .drag-grip svg"), "the grip sits in the # cell");
+  assert.equal(qa(must(rows()[0]), "td").length, 6, "no extra column (the grip shares the # cell)");
+  must(rows()[0]).dispatchEvent(new window.Event("dragstart", { bubbles: true }));
+  must(rows()[2]).dispatchEvent(new window.Event("dragover", { bubbles: true, cancelable: true }));
+  assert.ok(must(rows()[2]).classList.contains("drop-target"), "target row highlighted");
+  must(rows()[2]).dispatchEvent(new window.Event("drop", { bubbles: true, cancelable: true }));
+  await tick();
+  await tick();
+  assert.deepEqual(
+    stored.protectionRules.map((rule) => rule.id),
+    ["b", "c", "a"],
+    "dragged down: lands after the target",
+  );
+  await chrome.storage.onChanged.fire({ protectionRules: {} }, "local");
+  await tick();
+  await tick();
+  must(rows()[2]).dispatchEvent(new window.Event("dragstart", { bubbles: true }));
+  must(rows()[0]).dispatchEvent(new window.Event("dragover", { bubbles: true, cancelable: true }));
+  must(rows()[0]).dispatchEvent(new window.Event("drop", { bubbles: true, cancelable: true }));
+  await tick();
+  await tick();
+  assert.deepEqual(
+    stored.protectionRules.map((rule) => rule.id),
+    ["a", "b", "c"],
+    "dragged up: lands before the target",
+  );
+  stored.protectionRules = [];
+  await chrome.storage.onChanged.fire({ protectionRules: {} }, "local");
+  await tick();
+  await tick();
 });

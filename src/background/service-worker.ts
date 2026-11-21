@@ -10,6 +10,7 @@ import {
   syncKeepAliveMenu,
   syncKeepAliveMenuOnNavigation,
 } from "./keep-alive.ts";
+import { onExpiryAlarm } from "./expiry.ts";
 import { init, noteUpdateAvailable } from "./lifecycle.ts";
 import { handleMessage } from "./messages.ts";
 import { reprotectOnNavigation, syncProtectMenu } from "./protection.ts";
@@ -44,6 +45,10 @@ chrome.alarms.onAlarm.addListener(onAlarm);
 
 chrome.alarms.onAlarm.addListener(onKeepAliveAlarm);
 chrome.runtime.onStartup.addListener(staggerOverdueKeepAlive); // marks due while Chrome was closed: one every 30–60 s
+
+// ---------- temporary rules and marks ----------
+
+chrome.alarms.onAlarm.addListener(onExpiryAlarm);
 
 // ---------- messages from side panel / options ----------
 

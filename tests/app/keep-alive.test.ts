@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "vitest";
 import {
   dueKeepAlive,
+  setKeepAliveExpiry,
   formatCountdown,
   isKeptAlive,
   KEEP_ALIVE_MINUTES,
@@ -111,6 +112,33 @@ test("Keep alive - isKeptAlive / keepAliveEntry go through matchesKeepAlive, fra
   assert.deepEqual(keepAliveEntries([page, domain], "https://github.com/pr/1"), [page, domain]);
   assert.deepEqual(keepAliveEntries([page, domain], "https://github.com/pr/2"), [domain]);
   assert.deepEqual(keepAliveEntries([page, domain], "chrome://extensions/"), []);
+  // a temporary mark counts until its time; expired (still stored until the sweep) it covers nothing
+  const temporary: KeepAliveTab = { ...page, expiresAt: NOW + 1000 };
+  assert.equal(isKeptAlive([temporary], "https://github.com/pr/1", NOW), true);
+  assert.equal(isKeptAlive([temporary], "https://github.com/pr/1", NOW + 1000), false, "expired");
+  assert.deepEqual(keepAliveEntries([temporary, domain], "https://github.com/pr/1", NOW + 1000), [domain]);
+  assert.equal(
+    keepAliveEntry([temporary], "https://github.com/pr/1"),
+    temporary,
+    "the writers still find it (to drop it)",
+  );
+});
+
+test("Keep alive - dueKeepAlive skips an expired mark; markKeepAlive stamps the expiry; setKeepAliveExpiry re-bases or clears it", () => {
+  const expired: KeepAliveTab = { ...list[0]!, url: "https://gone.example.com/", expiresAt: NOW - 1 };
+  assert.deepEqual(dueKeepAlive([...list, expired], NOW), [list[0]], "due, not paused, not expired");
+  const marked = markKeepAlive([], [{ url: "https://a.test/", title: "A" }], 25, NOW + 1, NOW + 3_600_000);
+  assert.deepEqual(marked, [
+    { url: "https://a.test/", title: "A", minutes: 25, nextReload: NOW + 1, expiresAt: NOW + 3_600_000 },
+  ]);
+  const forever = markKeepAlive([], [{ url: "https://a.test/", title: "A" }], 25, NOW + 1);
+  assert.ok(!("expiresAt" in (forever?.[0] ?? {})), "no duration: no key");
+  const set = setKeepAliveExpiry(marked ?? [], "https://a.test/", NOW + 7_200_000);
+  assert.equal(set?.[0]?.expiresAt, NOW + 7_200_000);
+  const cleared = setKeepAliveExpiry(marked ?? [], "https://a.test/", undefined);
+  assert.ok(cleared && !("expiresAt" in (cleared[0] ?? {})), "Never: the key goes");
+  assert.equal(setKeepAliveExpiry(marked ?? [], "https://a.test/", NOW + 3_600_000), undefined, "unchanged: no write");
+  assert.equal(setKeepAliveExpiry(marked ?? [], "https://nope.test/", undefined), undefined, "unknown mark");
 });
 
 test("Keep alive - nextReloadAt jitters ±55 s around the interval, never under 30 s", () => {

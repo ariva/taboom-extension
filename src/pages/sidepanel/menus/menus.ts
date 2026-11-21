@@ -1,5 +1,6 @@
 // Context menus of the tab list: row menu, tab-group menu, window header menu, and the
 // item builders they share with the windows popover's menus.
+import { EXPIRY_CHOICES } from "../../../app/expiry.ts";
 import { pluralize } from "../../../app/plural.ts";
 import { keepAliveEntries, keepAliveKindLabel, keepAliveOpenUrl } from "../../../app/keep-alive.ts";
 import { parkedGroupRef, parkedNewestFirst, parkedRef, parkedWindowLabel } from "../../../app/parked.ts";
@@ -67,21 +68,44 @@ type TabGroup = chrome.tabGroups.TabGroup;
 export function appendCtxActions(ids: number[], alwaysCount = false): void {
   // filter(Boolean) drops the misses — TS cannot see that through the Boolean constructor
   const targets = ids.map((id) => tabById(id)).filter(Boolean) as PanelTab[];
-  const actions: [label: string, run: () => void][] = [
+  // run(hours): a duration makes the rule temporary (the single-row submenu); no hours = Always
+  type Action = [label: string, run: (hours?: number) => void, durations?: true];
+  const actions: Action[] = [
     ["Snooze", () => snooze(ids)],
     ["Wake", () => wake(ids)],
-    ["Protect domain", () => protectTabs(ids)],
-    ["Protect URL", () => protectUrls(ids)],
+    ["Protect domain", (hours) => protectTabs(ids, hours), true],
+    ["Protect URL", (hours) => protectUrls(ids, hours), true],
     ["Unprotect", () => unprotectTabs(ids)],
     // Pin/Unpin only when they would do something for at least one target tab
-    ...(targets.some((tab) => !tab.pinned) ? [["Pin", () => pinTabs(ids, true)] satisfies [string, () => void]] : []),
-    ...(targets.some((tab) => tab.pinned) ? [["Unpin", () => pinTabs(ids, false)] satisfies [string, () => void]] : []),
+    ...(targets.some((tab) => !tab.pinned) ? [["Pin", () => pinTabs(ids, true)] satisfies Action] : []),
+    ...(targets.some((tab) => tab.pinned) ? [["Unpin", () => pinTabs(ids, false)] satisfies Action] : []),
     ["Close", () => closeTabs(ids)],
   ];
   const suffix = ` ${pluralize(ids.length, "tab")}`;
-  for (const [label, run] of actions) {
-    ctxAppend(ctxItem(ids.length > 1 || alwaysCount ? label + suffix : label, run));
+  // a selection or a window menu protects permanently: one click over many tabs stays one click
+  const single = ids.length === 1 && !alwaysCount;
+  for (const [label, run, durations] of actions) {
+    if (single && durations) {
+      appendWithDurations(label, run);
+    } else {
+      ctxAppend(ctxItem(ids.length > 1 || alwaysCount ? label + suffix : label, () => run()));
+    }
   }
+}
+
+// Protect / Keep alive on a single row (T-0157): the parent click is the permanent action, as
+// before; its submenu offers Always and the seven durations of a temporary rule or mark
+function appendWithDurations(label: string, run: (hours?: number) => void): void {
+  const { btn, submenu } = ctxSubmenu(label, () => run());
+  submenu.classList.add("durations"); // the tests tell it from the Move-to and Tag submenus
+  submenu.append(
+    ctxItem("Always (default)", () => run()),
+    ctxDivider(),
+  );
+  for (const choice of EXPIRY_CHOICES) {
+    submenu.append(ctxItem(choice.label, () => run(choice.hours)));
+  }
+  ctxAppend(btn, submenu);
 }
 
 // a list menu stays open across renders (a title tick, a favicon) while every row it names is
@@ -117,8 +141,8 @@ export function openRowMenu(event: MouseEvent, tabId: number): void {
     // running → Pause (the mark stays), paused → Resume — and its own, separately named Remove
     const marks = keepAliveEntries(state.keepAlive, clicked?.url);
     if (marks.length === 0) {
-      ctxAppend(ctxItem("Keep alive domain", () => keepAlive(ids, true, "site")));
-      ctxAppend(ctxItem("Keep alive URL", () => keepAlive(ids, true)));
+      appendWithDurations("Keep alive domain", (hours) => keepAlive(ids, true, "site", hours));
+      appendWithDurations("Keep alive URL", (hours) => keepAlive(ids, true, undefined, hours));
     }
     for (const mark of marks) {
       ctxAppend(...markItems(mark));

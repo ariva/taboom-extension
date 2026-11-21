@@ -12,6 +12,7 @@ import {
   keepAliveUrlFromInput,
   markKeepAlive,
   nextReloadAt,
+  setKeepAliveExpiry,
   setKeepAliveMinutes,
   setKeepAliveReloadAll,
   setKeepAliveUrl,
@@ -32,6 +33,7 @@ import { moveItemTo } from "../../lib/list.ts";
 import { onBusyClick } from "../../lib/ui/busy-button.ts";
 import { inlineEdit } from "../../lib/ui/inline-edit.ts";
 import { dragGrip, initRowReorder } from "../../lib/ui/row-reorder.ts";
+import { expirySelect, tickTimeLeft, timeLeftCell } from "./expiry-cells.ts";
 import { flashSaved, getFeatures, render } from "./page-state.ts";
 import { pluralize } from "../../app/plural.ts";
 
@@ -70,7 +72,7 @@ export async function renderKeepAlive(state: AppState): Promise<void> {
   if (keepAlive.length === 0) {
     const cell = document.createElement("td");
     cell.className = "muted";
-    cell.colSpan = 7;
+    cell.colSpan = 9;
     cell.textContent = "No tabs marked yet.";
     const empty = document.createElement("tr");
     empty.append(cell);
@@ -177,6 +179,11 @@ function keepAliveRow(entry: KeepAliveTab, number: number): HTMLTableRowElement 
   countdown.className = "countdown";
   countdown.dataset.nextReload = entry.paused ? "" : String(entry.nextReload);
 
+  // a temporary mark: picked in the row menu or here; the expiry sweep removes it when it ends
+  const expires = expirySelect(entry.expiresAt, entry.title || entry.url, (expiresAt) => {
+    save((list) => setKeepAliveExpiry(list, entry.url, expiresAt));
+  });
+
   const remove = document.createElement("button");
   remove.textContent = "Remove";
   remove.title = `Remove the keep-alive mark for ${entry.title}`;
@@ -197,18 +204,22 @@ function keepAliveRow(entry: KeepAliveTab, number: number): HTMLTableRowElement 
     cell(select),
     cell(tabsSelect),
     cell(countdown),
+    cell(expires),
+    timeLeftCell(entry.expiresAt),
     cell(remove),
   );
   return row;
 }
 
-// the countdown cells carry their due time; one timer repaints them all
+// the countdown cells carry their due time; one timer repaints them all — and the Time left
+// cells of both tables (expiry-cells.ts), so the page runs one interval
 function tickCountdowns(): void {
   const now = Date.now();
   for (const element of document.querySelectorAll<HTMLElement>("#keep-alive-rows .countdown")) {
     const nextReload = element.dataset.nextReload ?? "";
     element.textContent = nextReload === "" ? "paused" : formatCountdown(Number(nextReload), now);
   }
+  tickTimeLeft(now);
 }
 
 // Add row: a page not open anywhere (or a future one) marked by typing its address — or a host /

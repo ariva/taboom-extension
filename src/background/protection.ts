@@ -39,12 +39,13 @@ export async function toggleSiteProtection(tab: chrome.tabs.Tab): Promise<{ prot
   return { protected: true };
 }
 
-export async function protectHosts(hosts: string[]): Promise<void> {
-  await applyAutoDiscardable(await editProtectionRules((rules) => addHostRules(rules, hosts)));
+// expiresAt: a temporary rule (the row menu's duration); the expiry sweep drops it at its time
+export async function protectHosts(hosts: string[], expiresAt?: number): Promise<void> {
+  await applyAutoDiscardable(await editProtectionRules((rules) => addHostRules(rules, hosts, expiresAt)));
 }
 
-export async function protectUrls(urls: string[]): Promise<void> {
-  await applyAutoDiscardable(await editProtectionRules((rules) => addUrlRules(rules, urls)));
+export async function protectUrls(urls: string[], expiresAt?: number): Promise<void> {
+  await applyAutoDiscardable(await editProtectionRules((rules) => addUrlRules(rules, urls, expiresAt)));
 }
 
 // drops host rules covering the pages as well as exact url rules for them
