@@ -28,3 +28,20 @@ test("Tooling - Build script - packs the Firefox flavour and lints it after the 
   assert.ok(chromePack > 0 && firefoxPack > chromePack, "Firefox packed after Chrome");
   assert.ok(lint > firefoxPack && e2e > lint, "linted before the e2e smoke");
 });
+
+// the Firefox film follows the Chrome one under the same guard: the dist/firefox packed above, its own
+// take folder, published to its own docs folder (the Chrome encode owns the stills)
+test("Tooling - Build script - with RECORD_DEMO=1 the Firefox demo is recorded and encoded after the Chrome one", () => {
+  const chromeEncode = script.indexOf("./demo/encode.sh");
+  const firefoxRecord = script.indexOf("demo/record.ts --browser firefox");
+  const firefoxEncode = script.indexOf("DEMO_PUBLISH=docs/assets/demo/firefox ./demo/encode.sh");
+  assert.ok(firefoxRecord > chromeEncode, "Firefox recorded after the Chrome encode");
+  assert.ok(firefoxEncode > firefoxRecord, "Firefox take encoded into docs/assets/demo/firefox");
+  assert.match(
+    script.slice(firefoxRecord, firefoxEncode + 80),
+    /DEMO_DIR="dist\/demo\/.+-firefox"/,
+    "from its own take folder",
+  );
+  const guardEnd = script.indexOf("\nelse", chromeEncode);
+  assert.ok(firefoxEncode < guardEnd, "inside the RECORD_DEMO branch: a plain build films nothing");
+});

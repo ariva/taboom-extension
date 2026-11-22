@@ -54,8 +54,8 @@ Playwright cannot load an extension into Firefox, so `demo/firefox/` speaks WebD
 
 ## Rerunning
 
-`just publish` records and encodes as its last step, against the `dist/chrome` it packed, so a
-release always ships with a current tour; a plain `just build` stops at the zip and keeps the
+`just publish` records and encodes as its last steps — Chrome against the `dist/chrome` it packed, then
+Firefox against its `dist/firefox` — so a release always ships with a current tour in both browsers; a plain `just build` stops at the zip and keeps the
 previous film and screenshots.
 
 ```bash

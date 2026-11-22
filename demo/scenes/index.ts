@@ -4,12 +4,14 @@ import type { Stage } from "../stage.ts";
 import { duplicates, snoozeProtect } from "./actions.ts";
 import { grouping } from "./grouping.ts";
 import { keepAliveDomain } from "./keep-alive.ts";
+import { keyboardMenu } from "./keyboard-menu.ts";
 import { settingsReorder } from "./reorder.ts";
 import { tabNames } from "./tab-names.ts";
 import { tagFragment } from "./tag-fragment.ts";
 import { temporaryProtection } from "./temporary.ts";
 import { filters, search } from "./search.ts";
 import { settings } from "./settings.ts";
+import { settingsTabs } from "./settings-tabs.ts";
 import { sharedView } from "./shared-view.ts";
 import { snoozeNow } from "./snooze-now.ts";
 import { tags } from "./tags.ts";
@@ -37,6 +39,8 @@ export const SCENES: Scene[] = [
   keepAliveDomain,
   settingsReorder,
   tagFragment,
+  keyboardMenu,
+  settingsTabs,
   sharedView,
   snoozeNow,
   tags,

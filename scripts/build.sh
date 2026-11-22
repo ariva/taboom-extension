@@ -6,7 +6,8 @@
 #   - versions match, > previous release, notes entry exists (scripts/validate_versions.sh)
 #   - every hash in CHANGES.md exists in git history (scripts/validate_hashes.sh)
 #   - with RECORD_DEMO=1 (`just publish`) the feature demo and every screenshot are re-recorded
-#     against the packed build (demo/README.md) so the README tour never lags a release;
+#     against the packed build (demo/README.md) so the README tour never lags a release — in
+#     Chrome, then the film again in Firefox;
 #     a plain `just build` stops at the zip (quick repack, no ffmpeg)
 set -euo pipefail
 ROOT_PATH="$(cd "$(dirname "$0")/.." && pwd)"
@@ -26,6 +27,11 @@ if [ "${RECORD_DEMO:-}" = "1" ]; then
   # films the dist/chrome packed above (no rebuild); a scene that fails fails the release
   node demo/record.ts
   ./demo/encode.sh
+  # the same scenes in a real headless Firefox, against the dist/firefox packed above (what
+  # `just demo-firefox` does after its own build): its own take folder and its own docs folder —
+  # the stills the docs embed stay the Chrome take's
+  node demo/record.ts --browser firefox
+  DEMO_DIR="dist/demo/$(node -p "require('./package.json').version")-firefox" DEMO_PUBLISH=docs/assets/demo/firefox ./demo/encode.sh
 else
-  echo "demo not re-recorded (just publish does) — docs/assets/demo/chrome/ and docs/assets/features/chrome/ keep the previous take"
+  echo "demo not re-recorded (just publish does) — docs/assets/demo/chrome/, docs/assets/demo/firefox/ and docs/assets/features/chrome/ keep the previous take"
 fi

@@ -19,7 +19,7 @@ Every command goes through [`just`](https://github.com/casey/just) — run `just
 | `just test-e2e` | Builds `dist/chrome`, then runs the Playwright tests against the real extension. | Anything that depends on what Chrome really does. |
 | `just build` | The release gate: every check below, then `dist/taboom-tabs-manager-v<version>-chrome.zip` and `…-firefox.zip` (version from `package.json`). No recording: `docs/assets/demo/` and `docs/assets/features/` keep their files. | A packed build to test or to repack quickly. |
 | `just build minify=true`, `just publish minify=true` | Same, minified output: `dist/taboom-tabs-manager-v<version>-chrome-min.zip` / `…-firefox-min.zip`. | Only if you want the smaller zip — see [Minified build](#minified-build). |
-| `just publish` | `just build`, then the demo film, the feature stills and the README screenshots re-recorded against the packed build and copied into `docs/assets/` (about 5 minutes, needs ffmpeg). | Producing the store upload: a release ships with a current tour. |
+| `just publish` | `just build`, then the demo film, the feature stills and the README screenshots re-recorded against the packed build and copied into `docs/assets/` (about 5 minutes, needs ffmpeg), then the film once more in Firefox (as `just demo-firefox`, without its rebuild; needs a Firefox). | Producing the store upload: a release ships with a current tour. |
 | `just lint`, `just typecheck`, `just format` | The pieces of `check` on their own; `format` applies Biome's formatting and safe fixes. | |
 | `just clean` | Removes `dist/`. | |
 | `just demo-firefox`, `just demo-encode-firefox` | The demo in Firefox: the Firefox build in a real headless Firefox (WebDriver BiDi), the same scenes, into `dist/demo/<version>-firefox/`, films copied to `docs/assets/demo/firefox/`. | Checking the Firefox look, store screenshots for AMO. |
@@ -71,6 +71,7 @@ Type errors appear in the same terminal but never block the rebuild — Vite onl
 5. `scripts/pack.sh` — production build into `dist/chrome`, zipped to `dist/taboom-tabs-manager-v<version>-chrome.zip`; then `TARGET=firefox scripts/pack.sh` — the Firefox build into `dist/firefox`, zipped to `…-firefox.zip`, and `web-ext lint` on it (AMO's own validator).
 6. `npx playwright test` — the e2e tests, against the `dist/chrome` that was just packed.
 7. `node demo/record.ts` + `demo/encode.sh` — the feature demo, filmed against that same `dist/chrome` and copied to `docs/assets/demo/chrome/`, with the feature stills and the README screenshots (`readme-*`) to `docs/assets/features/chrome/` (about 5 minutes, needs ffmpeg). A scene that fails fails the release. Only `just publish` runs this step; `just build` stops after step 6 and keeps the previous recording.
+8. `node demo/record.ts --browser firefox` + `demo/encode.sh` — the same scenes in a real headless Firefox, against the `dist/firefox` packed in step 5, into `dist/demo/<version>-firefox/` and copied to `docs/assets/demo/firefox/` (films only: the stills in the docs are the Chrome take's). Also `just publish` only.
 
 Inside step 3, the test suite also pins what ships: the zip's file list and manifest, no dev or tooling files, no dev-loop or network code, no source maps.
 

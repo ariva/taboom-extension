@@ -159,7 +159,8 @@ build minify="false":
     MINIFY={{ if minify =~ '^(minify=)?true$' { "1" } else { "" } }} ./scripts/build.sh
 
 # the same gate and zip, then the demo film, the feature stills and the README screenshots
-# re-recorded against the packed build (~5 min, needs ffmpeg) — what a release ships with
+# re-recorded against the packed build, and the film again in Firefox (what `just demo-firefox`
+# does) — minutes each, needs ffmpeg and a Firefox; what a release ships with
 publish minify="false":
     MINIFY={{ if minify =~ '^(minify=)?true$' { "1" } else { "" } }} RECORD_DEMO=1 ./scripts/build.sh
 

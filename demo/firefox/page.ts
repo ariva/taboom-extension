@@ -37,6 +37,7 @@ const KEYS: Record<string, string> = {
   Control: "\uE009",
   Alt: "\uE00A",
   Meta: "\uE03D",
+  F10: "\uE03A", // WebDriver numbers F1…F12 from \uE031; only the one a scene presses (Shift+F10) is listed
   Space: " ",
 };
 const BUTTONS: Record<MouseButton, number> = { left: 0, right: 2 };
