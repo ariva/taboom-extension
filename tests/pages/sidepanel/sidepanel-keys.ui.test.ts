@@ -82,6 +82,16 @@ test("UI - Sidepanel Keyboard - Enter activates the cursor tab", keyNavSkip, asy
   );
 });
 
+test("UI - Sidepanel Keyboard - Focus leaving the panel drops the cursor", keyNavSkip, () => {
+  key("ArrowDown");
+  key("ArrowDown");
+  assert.ok(document.querySelector(".row.cursor") !== null, "cursor shown while the panel has focus");
+  window.dispatchEvent(new window.Event("blur"));
+  assert.ok(document.querySelector(".row.cursor") === null, "no outline left behind");
+  key("ArrowDown");
+  assert.equal(cursorTitle(), q(document, ".row .title").textContent, "the next arrow starts from the first row");
+});
+
 test("UI - Sidepanel Keyboard - Single visible window: header not collapsible", () => {
   const sel = byId<HTMLSelectElement>("sort");
   sel.value = "window";

@@ -70,4 +70,14 @@ export function initKeyboardNav(): void {
       }
     }
   });
+  // The cursor belongs to one stretch of keyboard use: focus leaving the panel (the page, another
+  // window) ends it. Left in place, its outline reads as a second selection next to the active
+  // tab's, and the next arrow press would resume from a row the user no longer has in mind.
+  window.addEventListener("blur", () => {
+    if (state.cursor < 0) {
+      return;
+    }
+    state.cursor = -1;
+    listEl.querySelector(".row.cursor")?.classList.remove("cursor");
+  });
 }
