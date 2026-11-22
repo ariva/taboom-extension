@@ -2,7 +2,15 @@ import assert from "node:assert/strict";
 import { test } from "vitest";
 import type { KeepAliveTab, LocalStorageSchema, ProtectionRule, Removal } from "../../../src/app/types.ts";
 import { byId, q, qa } from "../../helpers/dom.ts";
-import { makeChrome, loadPage, tick, RAW_FEATURES, TEST_EXPERIMENTAL, TEST_FEATURES } from "../../helpers/ui.ts";
+import {
+  makeChrome,
+  loadPage,
+  tick,
+  FIREFOX,
+  RAW_FEATURES,
+  TEST_EXPERIMENTAL,
+  TEST_FEATURES,
+} from "../../helpers/ui.ts";
 
 const calls: string[] = [];
 const TAB_NAMES_ON = TEST_FEATURES.TAB_NAMES?.enabled === true;
@@ -2459,4 +2467,55 @@ test("UI - Options - Settings tabs: General first; a tab shows its pane and sets
     assert.equal(must(tabs().find((tab) => tab.dataset.pane === "tags")).hidden, false);
   }
   window.location.hash = "";
+});
+
+test("UI - Options - Useful Links: Chrome's addresses open through the tabs API", { skip: FIREFOX }, () => {
+  assert.equal(byId("links").hidden, false);
+  assert.equal(byId("links-note").hidden, false);
+  assert.equal(byId("links-firefox").hidden, true, "Firefox's list stays out of sight");
+  calls.length = 0;
+  q(byId("links"), 'a[data-url="chrome://discards"]').click();
+  assert.ok(calls.some((call) => call.startsWith("tabs.create") && call.includes("chrome://discards")));
+});
+
+test("UI - Options - Useful Links: Firefox gets its own pages, as addresses to copy", { skip: !FIREFOX }, async () => {
+  assert.equal(byId("links").hidden, true, "no chrome:// address on Firefox");
+  assert.equal(byId("links-note").hidden, true);
+  const list = byId("links-firefox");
+  assert.equal(list.hidden, false);
+  assert.deepEqual(
+    qa(list, "code").map((code) => code.textContent),
+    ["about:addons", "about:unloads", "about:processes", "about:debugging#/runtime/this-firefox"],
+  );
+  // Firefox refuses tabs.create for its internal pages: nothing in this list is a link
+  assert.equal(qa(list, "a").length, 0);
+  // …except the shortcut page, which has an API of its own
+  const open = byId("open-shortcut-settings");
+  assert.equal(open.hidden, false);
+  calls.length = 0;
+  open.click();
+  await tick();
+  assert.deepEqual(calls, ["commands.openShortcutSettings"]);
+});
+
+test("UI - Options - Useful Links: Firefox rows without an Open button copy their address", {
+  skip: !FIREFOX,
+}, async () => {
+  const copied: string[] = [];
+  // the test DOM has no clipboard; the page only needs writeText
+  Object.defineProperty(navigator, "clipboard", {
+    value: { writeText: async (text: string) => void copied.push(text) },
+    configurable: true,
+  });
+  const rows = qa(byId("links-firefox"), "li");
+  assert.deepEqual(
+    rows.map((row) => q(row, "button").textContent),
+    ["Open", "Copy", "Copy", "Copy"],
+    "every row has its action",
+  );
+  const button = q(must(rows[1]), "button");
+  button.click();
+  await tick();
+  assert.deepEqual(copied, ["about:unloads"]);
+  assert.equal(button.textContent, "Copied", "the button says it worked");
 });

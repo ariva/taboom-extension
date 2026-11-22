@@ -15,6 +15,14 @@ export function sidebarAction(): SidebarAction | undefined {
   return namespaces.browser?.sidebarAction ?? (chrome as unknown as { sidebarAction?: SidebarAction }).sidebarAction;
 }
 
+// Firefox 137+ on desktop: opens the browser's shortcut page for extensions (about:addons →
+// Manage Extension Shortcuts), which an extension cannot open by address. Chrome and Firefox for
+// Android have no such call; typed here because @types/chrome cannot know it
+export function shortcutSettingsOpener(): (() => Promise<void>) | undefined {
+  const commands = chrome.commands as unknown as { openShortcutSettings?: () => Promise<void> } | undefined;
+  return commands?.openShortcutSettings;
+}
+
 export const capabilities = {
   get tabGroups(): boolean {
     return Boolean(chrome.tabGroups);

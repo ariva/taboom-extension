@@ -323,10 +323,13 @@
     }
     :is(#keep-alive-table, #rules-table, #tab-names-table) button:hover { background: var(--hover); }
 
-    #links li { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid light-dark(#eee, #333); }
-    #links li:last-child { border-bottom: none; }
+    :is(#links, #links-firefox) li { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid light-dark(#eee, #333); }
+    :is(#links, #links-firefox) li:last-child { border-bottom: none; }
     #links a { white-space: nowrap; color: var(--accent); }
-    #links span { text-align: right; margin-left: 16px; }
+    #links-firefox code { white-space: nowrap; user-select: all; } /* one click selects the whole address: it is there to be copied */
+    :is(#links, #links-firefox) span { text-align: right; margin-left: 16px; }
+    #links-firefox li span { margin-left: auto; padding-left: 16px; } /* the Open button, when there, sits after the note */
+    #links-firefox button { margin-left: 8px; }
 
     button { cursor: pointer; font: inherit; }
     .row { display: flex; gap: 8px; margin-top: 8px; }
@@ -509,7 +512,18 @@
       <li><a href="#" data-url="chrome://discards">chrome://discards</a><span class="muted">per-tab discard state, verify snoozing</span></li>
       <li><a href="#" data-url="chrome://extensions">chrome://extensions</a><span class="muted">reload extension, view service-worker logs</span></li>
     </ul>
-    <p class="muted">Chrome Task Manager (<kbd>Shift+Esc</kbd>) shows per-tab memory; snoozed tabs have no process row.</p>
+    <p class="muted" id="links-note">Chrome Task Manager (<kbd>Shift+Esc</kbd>) shows per-tab memory; snoozed tabs have no process row.</p>
+    <!-- Firefox: shown instead of the list above (useful-links.ts). No links: an extension cannot open about: pages -->
+    <div id="links-firefox" hidden>
+      <p class="muted">Firefox does not let an extension open its internal pages (but its shortcut page) — copy an address and paste it into the address bar.</p>
+      <ul>
+        <li><code>about:addons</code><span class="muted">⚙ → Manage Extension Shortcuts: configure keyboard shortcuts</span> <button type="button" id="open-shortcut-settings" hidden>Open</button></li>
+        <li><code>about:unloads</code><span class="muted">loaded tabs, ranked for Firefox's own low-memory unloading</span> <button type="button" class="copy-address">Copy</button></li>
+        <li><code>about:processes</code><span class="muted">Task Manager (<kbd>Shift+Esc</kbd>): per-tab memory</span> <button type="button" class="copy-address">Copy</button></li>
+        <li><code>about:debugging#/runtime/this-firefox</code><span class="muted">reload extension, inspect its background script</span> <button type="button" class="copy-address">Copy</button></li>
+      </ul>
+      <p class="muted">Sidebar side: the sidebar's own settings (<b>Customize sidebar</b>) → Move sidebar to the right / left.</p>
+    </div>
   </section>
 
   <section class="card danger-zone">

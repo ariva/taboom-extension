@@ -294,7 +294,11 @@ export function makeChrome<
       },
       onAlarm: makeEvent<typeof chrome.alarms.onAlarm>(),
     },
-    commands: { onCommand: makeEvent<typeof chrome.commands.onCommand>() },
+    commands: {
+      onCommand: makeEvent<typeof chrome.commands.onCommand>(),
+      // Firefox 137+ only: the one door to its shortcut page (about:addons cannot be opened by an extension)
+      ...(firefox ? { openShortcutSettings: async () => void calls.push("commands.openShortcutSettings") } : {}),
+    },
     contextMenus: {
       removeAll: (done?: () => void) => {
         calls.push("contextMenus.removeAll");

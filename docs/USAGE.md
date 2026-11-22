@@ -74,7 +74,7 @@ Opening a row's menu:
 
 - `.` — outside text fields. In the search it stays a character.
 - `Menu` key and `Shift+F10` — the same action, and they work from the search field too.
-- The Chrome command **Side panel: open the menu of the highlighted row** — listed at `chrome://extensions/shortcuts`, unassigned. This is the rebindable one: a bare `.` cannot be listed there, Chrome requires `Ctrl` or `Alt` in a command key (see [Changing the key bindings](#changing-the-key-bindings)).
+- The browser command **Side panel: open the menu of the highlighted row** — listed at `chrome://extensions/shortcuts` (Firefox: `about:addons` → ⚙ → Manage Extension Shortcuts), unassigned. This is the rebindable one: a bare `.` cannot be listed there, Chrome requires `Ctrl` or `Alt` in a command key (see [Changing the key bindings](#changing-the-key-bindings)).
 - The menu opens for the cursor row. With no cursor: for this window's active tab.
 
 Inside a menu:
@@ -147,6 +147,8 @@ Enable **Settings → Show experimental features**; needs Chrome 155 or newer (a
 The browser-wide shortcuts are Chrome commands, so you change them in Chrome, not in Taboom's options: open `chrome://extensions/shortcuts`, find **Taboom - Tabs Manager**, click the pencil next to a command and press the new combination. Taboom registers six commands — open side panel, tab history back, tab history forward, snooze current tab, toggle site protection, open the menu of the highlighted row — and Chrome adds its own "Activate the extension" row (the toolbar-icon click). Snooze, toggle protection and the row menu ship unassigned; give them a key here. The row menu command is the rebindable twin of the panel's `.` (Chrome takes no key without `Ctrl` or `Alt` on this page, so `.` itself cannot be listed): it opens the menu in the side panel of the focused window, and unlike `.` it works while the search field has focus. A snooze the browser refuses (the only tab of a window playing audio, an internal page) flashes `!` on the toolbar icon for two seconds, since a keyboard command has no panel to report in. Chrome rejects keys another extension already uses, and a shortcut set to "In Chrome" works only while a Chrome window is focused ("Global" works everywhere). The in-panel keys (`/`, `.`, arrows, `Enter`, `Esc`) are fixed.
 
 ![Taboom commands on chrome://extensions/shortcuts](assets/change_key_bindings.png)
+
+In Firefox the same commands are listed at `about:addons` → ⚙ → **Manage Extension Shortcuts** (Settings → General → Useful Links has an **Open** button for it). A key another add-on already uses is accepted without a warning there, and the row menu command is desktop-only like the sidebar itself.
 
 ## Automatic snooze
 
@@ -225,6 +227,38 @@ Both keep automatic snooze away from a page; they differ in what else happens. P
 | Where to manage | Settings → Protected Sites | Settings → Keep Tabs Alive |
 
 Rule of thumb: protect what would break if reloaded; keep alive what would go stale or log you out if it were not.
+
+## Useful browser pages
+
+The browser's own pages that show what Taboom did, and where its keys and its panel are configured. Settings → General → **Useful Links** lists the ones for the browser you are in. Chrome's open with a click; Firefox does not let an extension open its internal pages, so there each address has a **Copy** button — paste it into the address bar (the shortcut page is the exception: it has an **Open** button).
+
+| For | Chrome | Firefox |
+|---|---|---|
+| Keyboard shortcuts of the extension | `chrome://extensions/shortcuts` | `about:addons` → ⚙ → **Manage Extension Shortcuts** (the **Open** button in Useful Links goes straight there) |
+| Which tabs are unloaded | `chrome://discards` — per-tab discard state, the direct check that a snooze happened | `about:unloads` — the loaded tabs, ranked for Firefox's own low-memory unloading; it has no per-tab state column |
+| Memory per tab | Task Manager, `Shift+Esc` — a snoozed tab has no process row | `about:processes`, also `Shift+Esc` |
+| The browser's own tab unloading | `chrome://settings/performance` — Memory Saver, the ring on snoozed tabs | no setting; `about:unloads` describes what Firefox does by itself |
+| Panel on the left or the right | `chrome://settings/appearance` — side panel position | the sidebar's own settings (**Customize sidebar**) → Move sidebar to the right / left |
+| Reload the extension, read its logs | `chrome://extensions` — the service worker link | `about:debugging#/runtime/this-firefox` → Inspect |
+| Open / close the panel from the keyboard | `Ctrl+Shift+Space` (Taboom's command) | `Ctrl+Shift+Space` (Taboom's command); `Ctrl+Alt+Z` is Firefox's own sidebar toggle |
+
+Copy an address into the address bar.
+
+Some official help pages:
+
+- Chrome
+  - [Install and manage extensions](https://support.google.com/chrome_webstore/answer/2664769) — the extensions page (`chrome://extensions`).
+  - [Chrome keyboard shortcuts](https://support.google.com/chrome/answer/157179) — the browser's own keys, Task Manager's `Shift+Esc` among them.
+  - [Personalize Chrome performance](https://support.google.com/chrome/answer/12929150) — Memory Saver.
+  - [Manage Chrome side panel](https://support.google.com/chrome/answer/13156494) — the panel's side, in Appearance.
+- Firefox
+  - [Manage extension shortcuts in Firefox](https://support.mozilla.org/en-US/kb/manage-extension-shortcuts-firefox)
+  - [Unload inactive tabs to save system memory in Firefox](https://support.mozilla.org/en-US/kb/unload-inactive-tabs-save-system-memory-firefox) — `about:unloads`.
+  - [Task Manager — see whether tabs or extensions are slowing down Firefox](https://support.mozilla.org/en-US/kb/task-manager-tabs-or-extensions-are-slowing-firefox) — `about:processes`.
+  - [Use the sidebar to access tools and vertical tabs](https://support.mozilla.org/en-US/kb/use-sidebar-access-tools-and-vertical-tabs) — Customize Sidebar, its side.
+  - [about:debugging](https://firefox-source-docs.mozilla.org/devtools-user/about_colon_debugging/index.html) — reload a temporary add-on, inspect it.
+
+`chrome://discards` and `chrome://extensions/shortcuts` have no help page of their own.
 
 ## Context menu
 

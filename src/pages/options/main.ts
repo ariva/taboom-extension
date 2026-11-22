@@ -4,7 +4,7 @@
 import { loadFeatures, loadState } from "../../app/storage.ts";
 import type { Features, UiPrefs } from "../../app/types.ts";
 import { getReleaseVersion, markDevPage } from "../../app/env.ts";
-import { closest, getElementById } from "../../lib/dom.ts";
+import { getElementById } from "../../lib/dom.ts";
 import { aboutText, settingsTitle } from "./model.ts";
 import { registerRender, setFeatures } from "./page-state.ts";
 // The feature modules register nothing when evaluated: each wires its listeners in an
@@ -16,6 +16,7 @@ import { initKeepAlive, renderKeepAlive } from "./keep-alive.ts";
 import { initTags, renderTags } from "./tags.ts";
 import { initTabNames, renderTabNames } from "./tab-names.ts";
 import { initPerfPanel } from "./perf-panel.ts";
+import { initUsefulLinks } from "./useful-links.ts";
 import { initDangerZone, renderDangerZone } from "./danger-zone.ts";
 import { initWhatsNew } from "./whats-new.ts";
 import { initSettingsTabs, syncSettingsTabs } from "./nav.ts";
@@ -49,15 +50,7 @@ initKeepAlive();
 initTags();
 initTabNames();
 
-// chrome:// URLs can't be plain hrefs — open via tabs API
-getElementById("links").addEventListener("click", (event) => {
-  const link = closest(event.target, "a[data-url]");
-  if (!link) {
-    return;
-  }
-  event.preventDefault();
-  chrome.tabs.create({ url: link.dataset.url });
-});
+initUsefulLinks();
 
 initPerfPanel();
 initDangerZone();
