@@ -19,10 +19,10 @@ The pages are filmed at device scale 2 (`DEVICE_SCALE` in `demo/browser.ts`,
 `devicePixelRatio` 1 (Playwright's viewport emulation), so layout and the stills are the 1:1
 ones. Takes are about four times the size of 1:1 frames.
 
-Every encode also copies the 1440×940 film and the GIF to `docs/assets/demo/chrome/taboom-demo.mp4` /
-`.gif` (no version in the name, so links stay put; the 1080p film stays in `dist/`, too big for
-the repo); `DEMO_PUBLISH=<dir>` sends the copies elsewhere, and an encode of a `DEMO_DIR`
-scratch take copies nothing.
+Every encode also copies the GIF to `docs/assets/demo/chrome/taboom-demo.gif` (no version in the
+name, so links stay put). The films stay in `dist/`: they are watched on YouTube, and a film per
+release would grow the repository by megabytes each time. `DEMO_PUBLISH=<dir>` sends the copy
+elsewhere, and an encode of a `DEMO_DIR` scratch take copies nothing.
 
 Nothing on screen is real: hosts end in `.test` and are served from a local HTTP server
 (`fixture.ts` holds every title, window name and tag), the profile is a fresh temp directory,
@@ -48,7 +48,7 @@ fixed slugs, unique across scenes, at least one per scene (`tests/demo/stills.te
 
 ## Firefox
 
-`just demo-firefox` films the same scenes in a real headless **Firefox** with the Firefox build (`dist/firefox`), into `dist/demo/<version>-firefox/`, and copies the films to `docs/assets/demo/firefox/taboom-demo.mp4` / `.gif` (the Chrome films and the stills the docs embed stay where they are; a Firefox take publishes no stills). `just demo-firefox scene=search` retakes one scene, `just demo-encode-firefox` re-encodes from the takes.
+`just demo-firefox` films the same scenes in a real headless **Firefox** with the Firefox build (`dist/firefox`), into `dist/demo/<version>-firefox/`, and copies the GIF to `docs/assets/demo/firefox/taboom-demo.gif` (the Chrome GIF and the stills the docs embed stay where they are; a Firefox take publishes no stills, and its films stay in `dist/` like Chrome's). `just demo-firefox scene=search` retakes one scene, `just demo-encode-firefox` re-encodes from the takes.
 
 Playwright cannot load an extension into Firefox, so `demo/firefox/` speaks WebDriver BiDi to Firefox itself: a fresh profile whose prefs pin the extension's internal UUID (a known `moz-extension://` origin), send every request through a PAC proxy to the fake-site server (anything outside `*.test` is refused and reported, like Chromium's route) and render at device scale 2 (`layout.css.devPixelsPerPx` — BiDi cannot emulate a scale on an extension page); `webExtension.install` loads the built add-on; BiDi navigates the first tab to the panel page (`MOZ_REMOTE_ALLOW_SYSTEM_ACCESS=1` allows the `moz-extension://` navigation), but that tab only bootstraps: a tab navigated that way never gets the focus in headless Firefox, and without window focus no focus/blur events fire — the inline edits (rename, new group) commit on blur. So the bootstrap page has the extension open the real panel into a popup window of its own (a window the extension opens does take the focus; `windows.update` brings it back after the world's windows and the asides — Firefox ignores `focused: false` on `windows.create`), the bootstrap window is closed, and that panel page doubles as the "worker" the world builder talks to — an extension page has the same `chrome.*`. Pages are sized through their windows (`chrome.windows.update` until the inner size matches; BiDi's viewport emulation refuses extension pages), input goes through `input.performActions` (a locator waits for a stable box like Playwright does — a click into a smooth-scrolling Settings pane would land elsewhere), and the recorder polls `browsingContext.captureScreenshot` every 120 ms per stream, keeping changed frames only — BiDi has no screencast. The system Firefox is used (`FIREFOX_BIN` overrides), Playwright's as a fallback.
 

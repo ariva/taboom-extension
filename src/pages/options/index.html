@@ -325,7 +325,7 @@
 
     :is(#links, #links-firefox) li { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid light-dark(#eee, #333); }
     :is(#links, #links-firefox) li:last-child { border-bottom: none; }
-    #links a { white-space: nowrap; color: var(--accent); }
+    :is(#links, #links-firefox) a { white-space: nowrap; color: var(--accent); }
     #links-firefox code { white-space: nowrap; user-select: all; } /* one click selects the whole address: it is there to be copied */
     :is(#links, #links-firefox) span { text-align: right; margin-left: 16px; }
     #links-firefox li span { margin-left: auto; padding-left: 16px; } /* the Open button, when there, sits after the note */
@@ -511,6 +511,7 @@
       <li><a href="#" data-url="chrome://settings/appearance">chrome://settings/appearance</a><span class="muted">side panel position: left / right</span></li>
       <li><a href="#" data-url="chrome://discards">chrome://discards</a><span class="muted">per-tab discard state, verify snoozing</span></li>
       <li><a href="#" data-url="chrome://extensions">chrome://extensions</a><span class="muted">reload extension, view service-worker logs</span></li>
+      <li><a href="https://github.com/ariva/taboom-extension" target="_blank" rel="noopener">github.com/ariva/taboom-extension</a><span class="muted">source code, issues, releases</span></li>
     </ul>
     <p class="muted" id="links-note">Chrome Task Manager (<kbd>Shift+Esc</kbd>) shows per-tab memory; snoozed tabs have no process row.</p>
     <!-- Firefox: shown instead of the list above (useful-links.ts). No links: an extension cannot open about: pages -->
@@ -521,6 +522,7 @@
         <li><code>about:unloads</code><span class="muted">loaded tabs, ranked for Firefox's own low-memory unloading</span> <button type="button" class="copy-address">Copy</button></li>
         <li><code>about:processes</code><span class="muted">Task Manager (<kbd>Shift+Esc</kbd>): per-tab memory</span> <button type="button" class="copy-address">Copy</button></li>
         <li><code>about:debugging#/runtime/this-firefox</code><span class="muted">reload extension, inspect its background script</span> <button type="button" class="copy-address">Copy</button></li>
+        <li><a href="https://github.com/ariva/taboom-extension" target="_blank" rel="noopener">github.com/ariva/taboom-extension</a><span class="muted">source code, issues, releases</span></li>
       </ul>
       <p class="muted">Sidebar side: the sidebar's own settings (<b>Customize sidebar</b>) → Move sidebar to the right / left.</p>
     </div>

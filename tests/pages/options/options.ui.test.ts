@@ -2487,8 +2487,12 @@ test("UI - Options - Useful Links: Firefox gets its own pages, as addresses to c
     qa(list, "code").map((code) => code.textContent),
     ["about:addons", "about:unloads", "about:processes", "about:debugging#/runtime/this-firefox"],
   );
-  // Firefox refuses tabs.create for its internal pages: nothing in this list is a link
-  assert.equal(qa(list, "a").length, 0);
+  // Firefox refuses tabs.create for its internal pages: no about: address is a link — the one
+  // link of the list is the repository's web address
+  assert.deepEqual(
+    qa(list, "a").map((link) => link.getAttribute("href")),
+    ["https://github.com/ariva/taboom-extension"],
+  );
   // …except the shortcut page, which has an API of its own
   const open = byId("open-shortcut-settings");
   assert.equal(open.hidden, false);
@@ -2507,7 +2511,7 @@ test("UI - Options - Useful Links: Firefox rows without an Open button copy thei
     value: { writeText: async (text: string) => void copied.push(text) },
     configurable: true,
   });
-  const rows = qa(byId("links-firefox"), "li");
+  const rows = qa(byId("links-firefox"), "li").filter((row) => row.querySelector("code")); // the browser's pages
   assert.deepEqual(
     rows.map((row) => q(row, "button").textContent),
     ["Open", "Copy", "Copy", "Copy"],
@@ -2518,4 +2522,15 @@ test("UI - Options - Useful Links: Firefox rows without an Open button copy thei
   await tick();
   assert.deepEqual(copied, ["about:unloads"]);
   assert.equal(button.textContent, "Copied", "the button says it worked");
+});
+
+test("UI - Options - Useful Links: the last entry of the shown list is the project's repository, a plain web link", () => {
+  const shown = byId(FIREFOX ? "links-firefox" : "links");
+  const last = must(qa(shown, "li").at(-1));
+  const link = q<HTMLAnchorElement>(last, "a");
+  assert.equal(link.getAttribute("href"), "https://github.com/ariva/taboom-extension");
+  assert.equal(link.target, "_blank");
+  assert.equal(link.rel, "noopener");
+  // a web address needs no tabs API detour: the click is the browser's own
+  assert.equal(link.dataset.url, undefined);
 });

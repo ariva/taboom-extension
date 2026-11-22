@@ -36,3 +36,14 @@ test("Demo - Layout - encode.sh composes at the device scale the recorder films 
   assert.equal(size("SCALE"), DEVICE_SCALE);
   assert.ok(DEVICE_SCALE >= 2, "a 1080p film needs more than 1:1 frames of the 1440 px canvas");
 });
+
+// the film is on YouTube: only the GIF (the README's clip) is copied into the repository — an MP4
+// per release would grow the history by megabytes each time
+test("Demo - Layout - encode.sh publishes the GIF, never the film", () => {
+  const publish = encode.slice(encode.lastIndexOf('[[ -n "$PUBLISH" ]] || exit 0'));
+  assert.match(publish, /cp "\$GIF" "\$PUBLISH\/taboom-demo\.gif"/);
+  assert.doesNotMatch(publish, /\.mp4/, "no film copied into docs/");
+  for (const page of ["README.md", "docs/FEATURES.md"]) {
+    assert.doesNotMatch(readFileSync(page, "utf8"), /taboom-demo\.mp4/, `${page} links no film file`);
+  }
+});

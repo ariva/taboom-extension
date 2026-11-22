@@ -15,7 +15,6 @@ Taboom - Tabs Manager frees memory by snoozing (discarding) tabs you haven't use
 </p>
 
 * **[Watch the full demo on YouTube](https://youtu.be/HDdjwM7mcYY)** (5 minutes, with chapters) — every feature with the matching Settings section beside the panel.
-* The same film as a file: [taboom-demo.mp4](docs/assets/demo/chrome/taboom-demo.mp4) in this repository.
 
 ## Buy me Pizza/Coffee/Tea
 * Like what I do? Taboom is free and stays free. If it saved you time or memory, you can support the next release: **[Buy me a coffee ☕](https://buymeacoffee.com/ariva)** — or scan the code.
@@ -33,7 +32,7 @@ Taboom - Tabs Manager frees memory by snoozing (discarding) tabs you haven't use
 3. **Open it**: click the moon icon. The side panel opens with every tab of every window; it stays open while you switch tabs.
 
 ### Firefox
-The same extension builds for Firefox 140+ (`just pack-firefox` → `dist/taboom-tabs-manager-v<version>-firefox.zip`); the Firefox Add-ons listing is in preparation. Until it is published: `about:debugging` → This Firefox → **Load Temporary Add-on** → the `manifest.json` inside the zip's folder (a temporary add-on is gone after a restart). The panel lives in Firefox's sidebar: the toolbar button toggles it, `Ctrl+Shift+Space` opens it. Two Chrome-only things are not there: split view (Chrome 155+) and cached favicons — Firefox rows show the site's initial instead, because showing the site's own icon would mean a request to the site. The same tour filmed in Firefox: [taboom-demo.gif](docs/assets/demo/firefox/taboom-demo.gif) / [taboom-demo.mp4](docs/assets/demo/firefox/taboom-demo.mp4).
+The same extension builds for Firefox 140+ (`just pack-firefox` → `dist/taboom-tabs-manager-v<version>-firefox.zip`); the Firefox Add-ons listing is in preparation. Until it is published: `about:debugging` → This Firefox → **Load Temporary Add-on** → the `manifest.json` inside the zip's folder (a temporary add-on is gone after a restart). The panel lives in Firefox's sidebar: the toolbar button toggles it, `Ctrl+Shift+Space` opens it. Two Chrome-only things are not there: split view (Chrome 155+) and cached favicons — Firefox rows show the site's initial instead, because showing the site's own icon would mean a request to the site. The same tour filmed in Firefox: [taboom-demo.gif](docs/assets/demo/firefox/taboom-demo.gif).
 
 ### Local Installation
 * Developers: [docs/LOCAL_DEV.md](docs/LOCAL_DEV.md) — build from source and load unpacked in Chrome or as a temporary add-on in Firefox, requirements, troubleshooting

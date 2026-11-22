@@ -240,6 +240,7 @@ The browser's own pages that show what Taboom did, and where its keys and its pa
 | The browser's own tab unloading | `chrome://settings/performance` — Memory Saver, the ring on snoozed tabs | no setting; `about:unloads` describes what Firefox does by itself |
 | Panel on the left or the right | `chrome://settings/appearance` — side panel position | the sidebar's own settings (**Customize sidebar**) → Move sidebar to the right / left |
 | Reload the extension, read its logs | `chrome://extensions` — the service worker link | `about:debugging#/runtime/this-firefox` → Inspect |
+| Source code, issues, releases | [github.com/ariva/taboom-extension](https://github.com/ariva/taboom-extension) | the same |
 | Open / close the panel from the keyboard | `Ctrl+Shift+Space` (Taboom's command) | `Ctrl+Shift+Space` (Taboom's command); `Ctrl+Alt+Z` is Firefox's own sidebar toggle |
 
 Copy an address into the address bar.

@@ -123,9 +123,12 @@ if (( ${#GIF_PARTS[@]} > 0 )); then
   echo "wrote $GIF ($(du -h "$GIF" | cut -f1), $(ffprobe -v error -show_entries format=duration -of csv=p=0 "$DIR/gif-source.mp4" | cut -d. -f1) s)"
 fi
 
+# Only the GIF goes into the repository (the README's clip): the films stay here in dist/ and
+# are watched on YouTube — a film per release would grow the git history by megabytes each time
 [[ -n "$PUBLISH" ]] || exit 0
 mkdir -p "$PUBLISH"
-cp "$MP4" "$PUBLISH/taboom-demo.mp4"
-[[ -f "${GIF:-}" ]] && cp "$GIF" "$PUBLISH/taboom-demo.gif"
-echo "copied to $PUBLISH/taboom-demo.{mp4,gif}"
+if [[ -f "${GIF:-}" ]]; then
+  cp "$GIF" "$PUBLISH/taboom-demo.gif"
+  echo "copied to $PUBLISH/taboom-demo.gif"
+fi
 publish_stills

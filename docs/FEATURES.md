@@ -1,6 +1,6 @@
 # Taboom - Tabs Manager - Features
 
-A picture per feature, in the order the [demo](assets/demo/chrome/taboom-demo.mp4) shows them. The
+A picture per feature, in the order the [demo](https://youtu.be/HDdjwM7mcYY) shows them. The
 long version of each is in [Usage](USAGE.md); the images are the demo's own stills
 (`docs/assets/features/chrome/`, retaken on every `just build`), so they always match the shipped
 version.

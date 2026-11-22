@@ -184,7 +184,7 @@ demo-encode:
 
 # The demo in Firefox (T-0152): the Firefox build in a real headless Firefox (WebDriver BiDi), the same
 # scenes, filmed by screenshot polling into dist/demo/<version>-firefox/ and published to
-# docs/assets/demo/firefox/ (the Chrome films live in docs/assets/demo/chrome/, the stills in docs/assets/features/chrome/)
+# docs/assets/demo/firefox/ — the GIF only, like Chrome's in docs/assets/demo/chrome/ (the films stay in dist/; the stills in docs/assets/features/chrome/)
 demo-firefox scene="":
     TARGET=firefox npx vite build --logLevel warn
     node demo/record.ts --browser firefox {{ if scene != "" { "--scene " + scene } else { "" } }}
