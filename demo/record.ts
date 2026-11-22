@@ -21,6 +21,7 @@ import {
   shiftedGif,
 } from "./scenes/index.ts";
 import { installOverlay, makeStage, storyChecklist, storyScene } from "./stage.ts";
+import { documentOf, missingStreams, streamOfUrl } from "./streams.ts";
 import { storyHtml } from "./story.ts";
 
 const { values } = parseArgs({
@@ -80,21 +81,17 @@ try {
     tabIds: [world.panelTabId, story.tabId, settings.tabId],
     windowIds: [world.panelWindowId, story.windowId, settings.windowId],
   };
-  const streamOfUrl = (url: string): Stream | undefined => {
-    if (url === STORY_URL) {
-      return "story";
-    }
-    return url === settingsUrl ? "settings" : undefined;
-  };
+  const paneOfUrl = (url: string): Stream | undefined => streamOfUrl(url, { story: STORY_URL, settings: settingsUrl });
   await panel.waitForTimeout(1500); // names, badges and counts settle
   // a Set does not survive evaluate's serialization: the worker hands back an array
-  const activeUrls = async () =>
-    new Set(
-      await browser.worker.evaluate(async () =>
-        (await chrome.tabs.query({ active: true })).map((tab) => tab.url ?? ""),
-      ),
+  // (and with fragments removed: the recorders compare pages as documents — streams.ts)
+  const activeUrls = async () => {
+    const urls = await browser.worker.evaluate(async () =>
+      (await chrome.tabs.query({ active: true })).map((tab) => tab.url ?? ""),
     );
-  const recorder = browser.recorder(outDir, streamOfUrl, activeUrls);
+    return new Set(urls.map(documentOf));
+  };
+  const recorder = browser.recorder(outDir, paneOfUrl, activeUrls);
   await recorder.start(panel, log);
   if (stillsKind === undefined) {
     // Right after the world is built the panes may not have painted yet: such a page answers no
@@ -149,8 +146,16 @@ try {
       );
     }
     if (filmed) {
+      const ended = recorder.endScene();
+      const missing = missingStreams(ended.streams);
+      if (missing.length > 0) {
+        stage.check(
+          false,
+          `${scene.id}: no frames of ${missing.join(", ")} — that pane will be a dark tile in the film`,
+        );
+      }
       takes.push({
-        ...recorder.endScene(),
+        ...ended,
         leadMs,
         title: sceneHeading(scene, version),
         stills: [...stage.stills],

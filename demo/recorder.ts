@@ -10,6 +10,7 @@ import { join } from "node:path";
 import type { BrowserContext, CDPSession, Page } from "@playwright/test";
 import type { DemoPage, FrameRecorder, Stream } from "./page-api.ts";
 import type { PlaywrightPage } from "./playwright-page.ts";
+import { documentOf } from "./streams.ts";
 
 export const STREAMS: Stream[] = ["panel", "story", "settings"];
 
@@ -35,7 +36,7 @@ export class Recorder implements FrameRecorder {
   private readonly streamOfUrl: (url: string) => Stream | undefined;
   private readonly activeUrls: () => Promise<Set<string>>;
 
-  // activeUrls: the urls of the windows' active tabs (from the worker) — the only pages that
+  // activeUrls: the urls of the windows' active tabs, fragments removed (from the worker) — the only pages that
   // paint, and the only ones safe to talk to: a discarded tab's page never answers (the
   // recorded pages are all active tabs of their own windows; the guard stays for safety)
   constructor(
@@ -126,7 +127,12 @@ export class Recorder implements FrameRecorder {
     const done = new Set<Stream>();
     for (const [page, session] of this.sessions) {
       const stream = this.streamOf(page);
-      if (!stream || done.has(stream) || page.isClosed() || (stream !== "panel" && !active.has(page.url()))) {
+      if (
+        !stream ||
+        done.has(stream) ||
+        page.isClosed() ||
+        (stream !== "panel" && !active.has(documentOf(page.url())))
+      ) {
         continue;
       }
       try {

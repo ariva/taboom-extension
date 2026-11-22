@@ -29,6 +29,20 @@ Nothing on screen is real: hosts end in `.test` and are served from a local HTTP
 and any other network request is refused and reported. Two runs of one commit produce the same
 world (seeded).
 
+## Which page is which pane
+
+The recorder films three pages: the panel (one page, told apart by identity), the story pane and
+the Settings page — the last two by address (`demo/streams.ts` `streamOfUrl`). Addresses are
+compared as documents, fragment aside (`documentOf`): the Settings page keeps its selected tab in
+the address (`#tags`), and matched whole it stopped being "the Settings page" at the first tab
+switch — every later frame was dropped and `encode.sh` composed a dark tile in its place. The
+same holds for "is this page the active tab of its window": the browser's tab list names the
+fragment, and a Firefox page object does not hear of it (BiDi reports navigations only).
+
+A filmed scene whose take lacks a pane is named when it ends — `check failed: <scene>: no frames
+of settings — that pane will be a dark tile in the film` — and carries that in its `warnings` in
+`scenes.json`: look for such lines before publishing a film.
+
 ## Feature checklist
 
 Every take opens with the list of what the film shows, on the story pane, for 5 s (`CHECKLIST_MS`):

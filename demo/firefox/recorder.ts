@@ -5,6 +5,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { DemoPage, FrameRecorder, Stream } from "../page-api.ts";
+import { documentOf } from "../streams.ts";
 import type { FirefoxPage } from "./page.ts";
 
 const STREAMS: Stream[] = ["panel", "story", "settings"];
@@ -69,7 +70,12 @@ export class FirefoxRecorder implements FrameRecorder {
     const targets = new Map<Stream, FirefoxPage>();
     for (const page of this.pages()) {
       const stream = this.streamOf(page);
-      if (stream && !targets.has(stream) && !page.isClosed() && (stream === "panel" || active.has(page.url()))) {
+      if (
+        stream &&
+        !targets.has(stream) &&
+        !page.isClosed() &&
+        (stream === "panel" || active.has(documentOf(page.url())))
+      ) {
         targets.set(stream, page);
       }
     }
