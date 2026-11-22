@@ -19,6 +19,7 @@ import { initPerfPanel } from "./perf-panel.ts";
 import { initUsefulLinks } from "./useful-links.ts";
 import { initDangerZone, renderDangerZone } from "./danger-zone.ts";
 import { initWhatsNew } from "./whats-new.ts";
+import { renderNewInRelease } from "./new-in-release.ts";
 import { initSettingsTabs, syncSettingsTabs } from "./nav.ts";
 
 // before markDevPage: the dev prefix goes in front of the final heading
@@ -125,4 +126,5 @@ chrome.storage.onChanged.addListener(async (changes, area) => {
   syncSettingsTabs();
 });
 
+renderNewInRelease(getReleaseVersion()); // at once, from bundled data; initWhatsNew adds the date when CHANGES.md is read
 initWhatsNew();

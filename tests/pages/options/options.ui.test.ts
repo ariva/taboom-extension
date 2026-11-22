@@ -2534,3 +2534,33 @@ test("UI - Options - Useful Links: the last entry of the shown list is the proje
   // a web address needs no tabs API detour: the click is the browser's own
   assert.equal(link.dataset.url, undefined);
 });
+
+test("UI - Options - New in this release: hidden for a release without highlights", () => {
+  // the test manifest's version (0.0.0-test) has no entry in src/app/release-highlights.ts
+  assert.equal(byId("new-in-release").hidden, true);
+  assert.ok(byId("pane-changes").contains(byId("new-in-release")), "the card lives in the Changes pane");
+  const cards = qa(byId("pane-changes"), "section.card");
+  assert.ok(cards[0] === byId("new-in-release"), "above the release list");
+});
+
+test("UI - Options - New in this release: the installed release's highlights as a plain list, with its date", async () => {
+  const { renderNewInRelease } = await import("../../../src/pages/options/new-in-release.ts");
+  const { releaseHighlights } = await import("../../../src/app/release-highlights.ts");
+  renderNewInRelease("1.1.0", "2026-11-22");
+  const card = byId("new-in-release");
+  assert.equal(card.hidden, false);
+  assert.equal(byId("new-in-title").textContent, "New in v1.1.0");
+  assert.equal(byId("new-in-date").textContent, "2026-11-22");
+  assert.deepEqual(
+    qa(card, "#new-in-list li").map((line) => line.textContent),
+    releaseHighlights("1.1.0"),
+  );
+  assert.equal(qa(card, "a").length, 0, "plain bullets, no links");
+  // no date known (CHANGES.md missing from a dev checkout): the list still shows
+  renderNewInRelease("1.1.0");
+  assert.equal(byId("new-in-date").hidden, true);
+  assert.equal(qa(card, "#new-in-list li").length, releaseHighlights("1.1.0").length, "rendered once, not appended");
+  // back to the test release: nothing to list, the card goes
+  renderNewInRelease("0.0.0-test");
+  assert.equal(card.hidden, true);
+});

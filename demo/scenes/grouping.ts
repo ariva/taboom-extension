@@ -1,10 +1,11 @@
+import { everythingElseText } from "../../src/app/release-highlights.ts";
 import type { Scene } from "./index.ts";
 
 export const grouping: Scene = {
   id: "grouping",
   settings: "#groupByWindowTabsOrder",
   title: "Sort and group",
-  feature: "Sort, group, move tabs",
+  feature: everythingElseText("sort-group-move"),
   async run(stage) {
     await stage.caption("Group by window is the default; group by domain, title, tab groups or tags", 1600);
     await stage.select("#sort", "group-domain");

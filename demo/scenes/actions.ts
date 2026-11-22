@@ -1,10 +1,11 @@
+import { everythingElseText } from "../../src/app/release-highlights.ts";
 import type { Scene } from "./index.ts";
 
 export const snoozeProtect: Scene = {
   id: "snooze-protect",
   settings: "#autoSnoozeEnabled",
   title: "Snooze, protect, bulk actions",
-  feature: "Snooze, protect, bulk actions",
+  feature: everythingElseText("snooze-protect"),
   async run(stage) {
     await stage.caption("Snooze a tab by hand: it frees its memory and reloads on click", 1600);
     const row = stage.awakeRow("Morning briefing");
@@ -35,7 +36,7 @@ export const duplicates: Scene = {
   id: "duplicates",
   settings: "#page-title",
   title: "Duplicates",
-  feature: "Duplicates",
+  feature: everythingElseText("duplicates"),
   async run(stage) {
     await stage.caption("The same page open in several windows? Quick launch lists the dupes", 1600);
     await stage.click(stage.panel.locator("#win-list-btn"));

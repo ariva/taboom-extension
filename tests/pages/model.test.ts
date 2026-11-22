@@ -437,6 +437,7 @@ const {
   clampFontSize,
   clampedNumber,
   hasRule,
+  releaseDate,
   releaseNotes,
   releaseSections,
   stepFontSize,
@@ -1198,4 +1199,13 @@ test("Model - Parked scope: Awake and Snoozed select nothing and count 0 — a p
   assert.equal(counts.awake, 0);
   assert.equal(counts.snoozed, 0);
   assert.equal(countsByFilter(tabs, derived).awake, 1, "live scope: as before");
+});
+
+test("Options Model - releaseDate reads the date of the release's own CHANGES.md entry", () => {
+  const sections = releaseSections("# CHANGES\n\n## v1.1.0 — 2026-11-22\n\nnew\n\n## v1.0.9 — 2026-11-08\n\nold\n");
+  assert.equal(releaseDate(sections, "1.1.0"), "2026-11-22");
+  assert.equal(releaseDate(sections, "1.0.9"), "2026-11-08");
+  assert.equal(releaseDate(sections, "1.1"), undefined, "a version is matched whole, not as a prefix");
+  assert.equal(releaseDate(sections, "2.0.0"), undefined, "no entry for that release");
+  assert.equal(releaseDate(releaseSections("## v1.1.0\n\nno date\n"), "1.1.0"), undefined);
 });

@@ -1,3 +1,4 @@
+import { everythingElseText } from "../../src/app/release-highlights.ts";
 import type { Scene } from "./index.ts";
 
 // the shared view: a second panel page in a popup window off screen (its tab and window are hidden
@@ -7,7 +8,7 @@ export const sharedView: Scene = {
   id: "shared-view",
   settings: "#panelView",
   title: "Open side panels share one view",
-  feature: "Open panels share one view",
+  feature: everythingElseText("shared-view"),
   newIn: "1.0.8",
   covers: /across side panels/i,
   async run(stage) {

@@ -16,6 +16,7 @@ import {
   sceneHeading,
   shiftedGif,
 } from "../../demo/scenes/index.ts";
+import { everythingElse, RELEASE_HIGHLIGHTS, releaseHighlights } from "../../src/app/release-highlights.ts";
 
 const version = (JSON.parse(readFileSync("package.json", "utf8")) as { version: string }).version;
 
@@ -196,4 +197,44 @@ test("Demo - Checklist - the list is held 5 s, at the film's start and between s
   assert.equal(CHECKLIST_MS, 5_000);
   assert.deepEqual(shiftedGif([3, 9], 5_250), [8.25, 14.25]);
   assert.deepEqual(shiftedGif([3, 9], undefined), [3, 9], "a take from before the checklist has no lead");
+});
+
+// ---------- the release's lines are shared with Settings (src/app/release-highlights.ts) ----------
+
+test("Demo - Checklist - the film's New in <version> lines are the release's highlights, in the same order", () => {
+  const fresh = checklist(version, "finished").groups.find((group) => group.heading === `New in ${version}`);
+  assert.deepEqual(
+    (fresh?.items ?? []).map((item) => item.label),
+    releaseHighlights(version),
+    "Settings → Changes and the film's opening card must list the same features",
+  );
+});
+
+test("Demo - Checklist - the film's Everything else lines are the shared everything-else array, in the same order", () => {
+  const rest = checklist(version, "finished").groups.find((group) => group.heading === "Everything else");
+  assert.deepEqual(
+    (rest?.items ?? []).map((item) => item.label),
+    everythingElse(),
+    "the older features the film lists must be src/app/release-highlights.ts EVERYTHING_ELSE",
+  );
+});
+
+test("Demo - Checklist - every scene takes its line by key from src/app/release-highlights.ts, never as its own text", () => {
+  for (const file of readdirSync("demo/scenes").filter((name) => name.endsWith(".ts") && name !== "index.ts")) {
+    const source = readFileSync(join("demo/scenes", file), "utf8");
+    // each scene object: from its `id:` to the next one's (or the file's end)
+    for (const block of source.split(/(?=^\s+id: ")/m).filter((part) => /^\s+feature: /m.test(part))) {
+      const id = block.match(/id: "([^"]+)"/)?.[1];
+      assert.match(
+        block,
+        /^\s+feature: (highlightText|everythingElseText)\(/m,
+        `${file} ${id}: feature must be highlightText(version, key) or everythingElseText(key)`,
+      );
+      // a scene marked new for a release that has highlights names that release's line
+      const newIn = block.match(/^\s+newIn: "([^"]+)"/m)?.[1];
+      if (newIn && newIn in RELEASE_HIGHLIGHTS) {
+        assert.match(block, /^\s+feature: highlightText\(/m, `${file} ${id}: new in ${newIn}, so highlightText`);
+      }
+    }
+  }
 });

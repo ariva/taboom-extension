@@ -1,3 +1,4 @@
+import { everythingElseText } from "../../src/app/release-highlights.ts";
 import type { Scene } from "./index.ts";
 
 // the Settings page is the pane right of the panel the whole time: this scene walks its
@@ -5,7 +6,7 @@ import type { Scene } from "./index.ts";
 export const settings: Scene = {
   id: "settings",
   title: "Settings",
-  feature: "Settings",
+  feature: everythingElseText("settings"),
   settings: "#page-title",
   covers: /settings heading|protected sites/i, // the version in the heading, the protected-site chips
   async run(stage) {

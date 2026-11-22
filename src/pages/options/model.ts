@@ -81,6 +81,13 @@ export function releaseSections(markdown: string, count = Infinity): ReleaseSect
     });
 }
 
+// The date in the title of `version`'s own entry ("v1.1.0 — 2026-11-22"); undefined when the
+// release has no entry or its title carries no date.
+export function releaseDate(sections: ReleaseSection[], version: string): string | undefined {
+  const entry = sections.find((section) => section.title.split(/\s/)[0] === `v${version}`);
+  return entry?.title.match(/\d{4}-\d{2}-\d{2}/)?.[0];
+}
+
 // Section of CHANGES.md for `version`, falling back to the newest section.
 // Returns { title, body } or null when the markdown has no "## " sections.
 export function releaseNotes(markdown: string, version: string): ReleaseSection | null {

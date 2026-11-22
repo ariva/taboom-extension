@@ -1,10 +1,11 @@
+import { everythingElseText } from "../../src/app/release-highlights.ts";
 import type { Scene } from "./index.ts";
 
 export const tour: Scene = {
   id: "tour",
   settings: "#page-title",
   title: "Every window, every tab, one panel",
-  feature: "Every window, every tab, one panel",
+  feature: everythingElseText("tour"),
   gif: [0, 6],
   async run(stage) {
     await stage.caption("Taboom — 10 windows, 500 tabs, one side panel", 1800);

@@ -1,10 +1,11 @@
+import { everythingElseText } from "../../src/app/release-highlights.ts";
 import type { Scene } from "./index.ts";
 
 export const tags: Scene = {
   id: "tags",
   settings: "#tags-section",
   title: "Custom tags",
-  feature: "Custom tags",
+  feature: everythingElseText("tags"),
   newIn: "1.0.5",
   covers: /tag/i,
   gif: [0, 8],

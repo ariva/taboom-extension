@@ -1,3 +1,4 @@
+import { everythingElseText } from "../../src/app/release-highlights.ts";
 import type { Scene } from "./index.ts";
 
 const popover = (stage: Parameters<Scene["run"]>[0]) => stage.panel.locator("#windows-pop");
@@ -6,7 +7,7 @@ export const windows: Scene = {
   id: "windows",
   settings: "#windowNamesEnabled",
   title: "Windows: names, colors, pins",
-  feature: "Windows: names, colors, pins",
+  feature: everythingElseText("windows"),
   gif: [0, 8],
   async run(stage) {
     await stage.caption("Quick launch: every window with its counts", 1200);
@@ -48,7 +49,7 @@ export const moveTab: Scene = {
   id: "move-tab",
   settings: "#page-title",
   title: "Move tabs between windows",
-  feature: "Sort, group, move tabs",
+  feature: everythingElseText("sort-group-move"),
   async run(stage) {
     await stage.caption("Move a tab to another window from its menu", 1200);
     const row = stage.awakeRow("Noise-cancelling");
@@ -79,7 +80,7 @@ export const parked: Scene = {
   id: "parked",
   settings: "#askBeforePark",
   title: "Park a window, restore it later",
-  feature: "Park a window, restore it later",
+  feature: everythingElseText("parked"),
   newIn: "1.0.5",
   covers: /park/i,
   async run(stage) {

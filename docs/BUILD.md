@@ -75,7 +75,7 @@ Type errors appear in the same terminal but never block the rebuild — Vite onl
 
 Inside step 3, the test suite also pins what ships: the zip's file list and manifest, no dev or tooling files, no dev-loop or network code, no source maps.
 
-To cut a release: bump `version` in `package.json`, write the `CHANGES.md` entry, run `just publish`, tag `release-v<version>`. The Firefox zip goes to addons.mozilla.org together with a source zip (`just source-zip`, AMO reviews bundled code against its source); the Firefox demo (`just demo-firefox`) is run on demand, not by `just publish`.
+To cut a release: bump `version` in `package.json`, write the `CHANGES.md` entry, add the release's new features to `src/app/release-highlights.ts` (a few words each — Settings → Changes lists them and the demo's new scenes take their line from there; none for a fixes-only release; earlier releases' entries are kept, never removed — and the release that stops being the newest gets its lines added to `EVERYTHING_ELSE` there, in the film's order: the demo registry test fails until the two lists match the film), run `just publish`, tag `release-v<version>`. The Firefox zip goes to addons.mozilla.org together with a source zip (`just source-zip`, AMO reviews bundled code against its source); the Firefox demo (`just demo-firefox`) is run on demand, not by `just publish`.
 
 ## Minified build
 

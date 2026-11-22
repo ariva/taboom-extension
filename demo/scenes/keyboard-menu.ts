@@ -1,3 +1,4 @@
+import { highlightText } from "../../src/app/release-highlights.ts";
 import type { Scene } from "./index.ts";
 
 // the row menu without the mouse: arrows put the amber cursor on a row, Shift+F10 (the Menu key,
@@ -6,7 +7,7 @@ import type { Scene } from "./index.ts";
 export const keyboardMenu: Scene = {
   id: "keyboard-menu",
   title: "Row menus from the keyboard",
-  feature: "Row menus from the keyboard",
+  feature: highlightText("1.1.0", "keyboard-menu"),
   settings: "#page-title",
   newIn: "1.1.0",
   covers: /cursor row's menu|Shift\+F10/i,

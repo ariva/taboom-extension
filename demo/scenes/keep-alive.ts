@@ -1,3 +1,4 @@
+import { highlightText } from "../../src/app/release-highlights.ts";
 import type { Scene } from "./index.ts";
 
 // keep alive by domain (T-0155) and the struck-through paused mark (T-0156): a news tab's row
@@ -7,7 +8,7 @@ export const keepAliveDomain: Scene = {
   id: "keep-alive-domain",
   settings: "#keep-alive-section",
   title: "Keep alive by domain",
-  feature: "Keep alive by domain",
+  feature: highlightText("1.1.0", "keep-alive-domain"),
   newIn: "1.1.0",
   covers: /keep alive.*domain|disabled tags|paused keep-alive|struck/i,
   async run(stage) {

@@ -35,7 +35,11 @@ Every take opens with the list of what the film shows, on the story pane, for 5 
 the whole list at the film's start, then before each scene with the finished lines ticked and the
 coming one marked — a viewer can tell what was shown and
 what is still to come; during a scene the pane's header counts ("6 / 18"). A line is a scene's
-`feature` (`demo/scenes/*.ts`): scenes naming the same line share it and it is ticked after the
+`feature` (`demo/scenes/*.ts`), always taken by key from `src/app/release-highlights.ts`: a scene
+marked new in a release that has an entry there uses `highlightText(version, key)` — the film
+and Settings → Changes share that array — and every other scene `everythingElseText(key)`. The
+registry test fails when the film's **New in** group differs from the release's highlights, or
+its **Everything else** group from `EVERYTHING_ELSE`. Scenes naming the same line share it and it is ticked after the
 last of them; the outro and the stills-only scene have none. This release's lines come first under
 **New in <version>**, the rest under **Everything else** (`checklist()` in `demo/scenes/index.ts`).
 
