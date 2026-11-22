@@ -7,6 +7,7 @@ export const snoozeNow: Scene = {
   id: "snooze-now",
   settings: "#snooze-now",
   title: "Snooze inactive tabs now",
+  feature: "Snooze inactive tabs now",
   newIn: "1.0.6",
   covers: /snooze now/i,
   async run(stage) {

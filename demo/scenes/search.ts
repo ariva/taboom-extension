@@ -4,6 +4,7 @@ export const search: Scene = {
   id: "search",
   settings: "#experimental_fuzzySearch",
   title: "Search across every window",
+  feature: "Search and filters",
   gif: [0, 7],
   async run(stage) {
     const box = stage.panel.locator("#search");
@@ -30,6 +31,7 @@ export const filters: Scene = {
   id: "filters",
   settings: "#rules",
   title: "Filters with live counts",
+  feature: "Search and filters",
   async run(stage) {
     const chip = (name: string) => stage.panel.locator(`#filters button[data-filter="${name}"]`);
     await stage.caption("Awake, snoozed, protected — the counts are live", 1200);

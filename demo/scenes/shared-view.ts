@@ -7,6 +7,7 @@ export const sharedView: Scene = {
   id: "shared-view",
   settings: "#panelView",
   title: "Open side panels share one view",
+  feature: "Open panels share one view",
   newIn: "1.0.8",
   covers: /across side panels/i,
   async run(stage) {

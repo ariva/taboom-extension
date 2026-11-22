@@ -23,6 +23,7 @@ import { moveTab, parked, windows } from "./windows.ts";
 export interface Scene {
   id: string;
   title: string;
+  feature?: string; // its line in the feature checklist; scenes naming the same line share it (ticked after the last)
   settings: string; // an #id of options/index.html: the Settings pane scrolls to its card when the scene starts
   newIn?: string; // the release this scene demonstrates something new of (CHANGES.md version)
   covers?: RegExp; // which "### New Features" bullets of the current CHANGES.md entry it shows (new scene or not)
@@ -79,4 +80,59 @@ export function releaseMark(newIn: string | undefined, version: string): string 
 export function sceneHeading(scene: Pick<Scene, "title" | "newIn">, version: string): string {
   const mark = releaseMark(scene.newIn, version);
   return mark ? `${mark} · ${scene.title}` : scene.title;
+}
+
+// ---------- the feature checklist ----------
+// The list of what the film shows, held on the story pane before every scene: the whole list at
+// the film's start, then the same list between scenes with the finished lines ticked — so a
+// viewer can tell what was shown and what is still to come. Five seconds each time, the opening
+// included: longer and the film drags (a viewer can pause).
+export const CHECKLIST_MS = 5_000;
+
+export interface ChecklistItem {
+  label: string;
+  state: "done" | "now" | "todo";
+}
+export interface Checklist {
+  groups: { heading: string; items: ChecklistItem[] }[];
+  done: number;
+  total: number;
+}
+
+// the list as it stands right before `sceneId` plays: a line is done when every scene naming it
+// has played, "now" when the coming scene is one of them (or one of them already played)
+export function checklist(version: string, sceneId: string, scenes: Scene[] = SCENES): Checklist {
+  const ordered = orderedForRelease(version, scenes);
+  const current = ordered.findIndex((scene) => scene.id === sceneId);
+  const labels = [...new Set(ordered.map((scene) => scene.feature).filter((label) => label !== undefined))];
+  const items = labels.map((label) => {
+    const at = ordered.flatMap((scene, index) => (scene.feature === label ? [index] : []));
+    const played = at.filter((index) => index < current).length;
+    const underWay = played > 0 || at.includes(current);
+    const state: ChecklistItem["state"] = played === at.length ? "done" : underWay ? "now" : "todo";
+    const fresh = ordered[at[0] ?? -1]?.newIn === version;
+    return { label, state, fresh };
+  });
+  const strip = (list: typeof items): ChecklistItem[] => list.map(({ label, state }) => ({ label, state }));
+  const fresh = items.filter((item) => item.fresh);
+  const rest = items.filter((item) => !item.fresh);
+  const groups =
+    fresh.length > 0
+      ? [
+          { heading: `New in ${version}`, items: strip(fresh) },
+          { heading: "Everything else", items: strip(rest) },
+        ]
+      : [{ heading: "Features", items: strip(rest) }];
+  return {
+    groups: groups.filter((group) => group.items.length > 0),
+    done: items.filter((item) => item.state === "done").length,
+    total: items.length,
+  };
+}
+
+// a scene's GIF clip is given from the scene's own start; the take begins with the checklist,
+// `leadMs` long (absent on a take from before the checklist existed)
+export function shiftedGif(gif: [number, number], leadMs: number | undefined): [number, number] {
+  const lead = leadMs ?? 0;
+  return [(gif[0] * 1000 + lead) / 1000, (gif[1] * 1000 + lead) / 1000]; // in ms, then back: no float tails in scenes.json
 }

@@ -33,6 +33,7 @@ export const settingsReorder: Scene = {
   id: "settings-reorder",
   settings: "#keep-alive-table",
   title: "Reorder keep-alive marks and tagged page rules",
+  feature: "Reorder lists in Settings",
   newIn: "1.1.0",
   covers: /reorder/i,
   async run(stage) {

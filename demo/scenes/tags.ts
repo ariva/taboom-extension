@@ -4,6 +4,7 @@ export const tags: Scene = {
   id: "tags",
   settings: "#tags-section",
   title: "Custom tags",
+  feature: "Custom tags",
   newIn: "1.0.5",
   covers: /tag/i,
   gif: [0, 8],

@@ -6,6 +6,7 @@ export const tagFragment: Scene = {
   id: "tag-fragment",
   settings: "#tagPagesKeepFragment",
   title: "Tagged pages keep their #fragment",
+  feature: "Tagged pages keep their #fragment",
   newIn: "1.1.0",
   covers: /fragment/i,
   async run(stage) {

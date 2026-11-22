@@ -1,5 +1,6 @@
 // The story pane of the MP4: the scene's title, the caption being shown, and the captions
-// already shown (newest first, earlier scenes dimmed). A plain page served by the fake-site
+// already shown (newest first, earlier scenes dimmed). Before every scene it turns into the
+// feature checklist for a few seconds (scenes/index.ts checklist): what was shown, what is next. A plain page served by the fake-site
 // server as http://story.test/ — the recorder films it like any other page, and stage.ts
 // feeds it through window.__story. System font, no requests: the run stays offline.
 export function storyHtml(version: string): string {
@@ -18,17 +19,31 @@ li::before{content:"✓";position:absolute;left:3px;color:#81c995}
 li.scene{margin-top:6px;padding-left:0;color:#9aa0a6;font-size:12px;letter-spacing:.04em;text-transform:uppercase}
 li.scene::before{content:none}
 li.old{opacity:.55}
+.progress{margin-left:auto;font-variant-numeric:tabular-nums}
+#list{position:fixed;inset:0;box-sizing:border-box;padding:12px 24px;background:#202124;display:flex;flex-direction:column}
+#list[hidden]{display:none}
+#beat{position:absolute;right:0;bottom:0;width:1px;height:1px}
+#list .cols{display:grid;grid-template-columns:1fr 1fr;gap:0 28px;margin-top:6px}
+#list h2{margin:0 0 2px;color:#9aa0a6;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;line-height:18px}
+#list p{position:relative;margin:0;padding-left:22px;font-size:14px;line-height:20px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#e8eaed}
+#list p::before{content:"○";position:absolute;left:2px;color:#5f6368}
+#list p.done{color:#80868b}
+#list p.done::before{content:"✓";color:#81c995}
+#list p.now{color:#fff;font-weight:700}
+#list p.now::before{content:"▶";color:#ff6b35;font-size:11px}
 </style></head><body>
-<header><b>Taboom</b> v${version} · feature tour</header>
+<header><b>Taboom</b> v${version} · feature tour<span id="progress" class="progress"></span></header>
 <h1 id="title"></h1>
 <div id="now"></div>
 <ol id="done"></ol>
+<div id="list" hidden><header><b>Taboom</b> v${version} · the features in this tour<span id="list-progress" class="progress"></span></header><div class="cols"></div><i id="beat"></i></div>
 <script>
 const title = document.getElementById("title");
 const now = document.getElementById("now");
 const done = document.getElementById("done");
 let current = "";
 let sceneTitle = "";
+let beatTimer = 0;
 const add = (text, className) => {
   const item = document.createElement("li");
   item.className = className;
@@ -46,7 +61,41 @@ const settle = () => {
   }
 };
 window.__story = {
-  scene(next) {
+  // the checklist over the whole pane (null: back to the story); built with textContent only
+  checklist(state) {
+    const list = document.getElementById("list");
+    list.hidden = !state;
+    // The recorder gets a frame only when the page changes, and drops one that lands while the
+    // previous is still on its way: a card that then stands still for seconds would never show.
+    // One pixel in the corner flips twice a second between two shades nobody can tell apart
+    // (a timer, not a CSS animation: that would send a frame per refresh)
+    clearInterval(beatTimer);
+    if (!state) {
+      return;
+    }
+    const beat = document.getElementById("beat");
+    beatTimer = setInterval(() => {
+      beat.style.background = beat.style.background ? "" : "#212225";
+    }, 500);
+    document.getElementById("list-progress").textContent = state.done + " of " + state.total + " shown";
+    const cols = list.querySelector(".cols");
+    cols.textContent = "";
+    for (const group of state.groups) {
+      const col = document.createElement("div");
+      const heading = document.createElement("h2");
+      heading.textContent = group.heading;
+      col.append(heading);
+      for (const item of group.items) {
+        const line = document.createElement("p");
+        line.className = item.state;
+        line.textContent = item.label;
+        col.append(line);
+      }
+      cols.append(col);
+    }
+  },
+  scene(next, progress) {
+    document.getElementById("progress").textContent = progress || "";
     settle();
     if (sceneTitle) {
       for (const item of done.children) {

@@ -5,6 +5,7 @@ import type { Scene } from "./index.ts";
 export const settingsTabs: Scene = {
   id: "settings-tabs",
   title: "Settings in tabs",
+  feature: "Settings in tabs",
   settings: "#page-title",
   newIn: "1.1.0",
   covers: /tabbed panes/i,

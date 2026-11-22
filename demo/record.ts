@@ -9,8 +9,18 @@ import { parseArgs } from "node:util";
 import { buildWorld, launch, PANEL_VIEWPORT, SETTINGS_VIEWPORT, STORY_URL, STORY_VIEWPORT } from "./browser.ts";
 import { buildTabs, WINDOWS } from "./fixture.ts";
 import type { BrowserName, Stream } from "./page-api.ts";
-import { GIF_MAX_SECONDS, orderedForRelease, releaseMark, type Scene, SCENES, sceneHeading } from "./scenes/index.ts";
-import { installOverlay, makeStage, storyScene } from "./stage.ts";
+import {
+  CHECKLIST_MS,
+  checklist,
+  GIF_MAX_SECONDS,
+  orderedForRelease,
+  releaseMark,
+  type Scene,
+  SCENES,
+  sceneHeading,
+  shiftedGif,
+} from "./scenes/index.ts";
+import { installOverlay, makeStage, storyChecklist, storyScene } from "./stage.ts";
 import { storyHtml } from "./story.ts";
 
 const { values } = parseArgs({
@@ -86,6 +96,13 @@ try {
     );
   const recorder = browser.recorder(outDir, streamOfUrl, activeUrls);
   await recorder.start(panel, log);
+  if (stillsKind === undefined) {
+    // Right after the world is built the panes may not have painted yet: such a page answers no
+    // opening still and sends no frame, and the film's first seconds — the feature list — would
+    // show the pane as it was. A screenshot waits until the page can paint.
+    await story.page.screenshot({ path: join(outDir, "warm-up.png") });
+    await panel.screenshot({ path: join(outDir, "warm-up.png") });
+  }
   const stillsDir = join(outDir, "features");
   mkdirSync(stillsDir, { recursive: true });
   const stage = makeStage(panel, browser, world, { story: story.page, settings: settings.page }, log, stillsDir);
@@ -93,6 +110,7 @@ try {
     id: string;
     title: string;
     durationMs: number;
+    leadMs?: number; // the feature checklist the take opens with (absent: a take from before it existed)
     streams: Stream[];
     stills: string[];
     gif?: [number, number];
@@ -105,12 +123,24 @@ try {
     stage.warnings.length = 0;
     stage.stills.length = 0;
     const filmed = !scene.stillsOnly && stillsKind === undefined;
+    const list = checklist(version, scene.id);
+    const takeStarted = Date.now();
     if (filmed) {
+      // the feature list is on the pane before the take starts, so the take's opening still is the list
+      await storyChecklist(stage.aside, list);
       await recorder.startScene(scene.id);
     }
     stage.release = releaseMark(scene.newIn, version);
+    let leadMs = 0;
     try {
-      await storyScene(stage.aside, sceneHeading(scene, version));
+      if (filmed) {
+        // CHECKLIST_MS from the take's first frame, not on top of what starting the take cost
+        await stage.pause(Math.max(0, CHECKLIST_MS - (Date.now() - takeStarted)));
+        await storyChecklist(stage.aside, null);
+        leadMs = Date.now() - takeStarted;
+      }
+      const place = scene.feature ? `${Math.min(list.done + 1, list.total)} / ${list.total}` : "";
+      await storyScene(stage.aside, sceneHeading(scene, version), place);
       await stage.settings(scene.settings);
       await scene.run(stage);
     } catch (error) {
@@ -121,9 +151,10 @@ try {
     if (filmed) {
       takes.push({
         ...recorder.endScene(),
+        leadMs,
         title: sceneHeading(scene, version),
         stills: [...stage.stills],
-        ...(scene.gif ? { gif: scene.gif } : {}),
+        ...(scene.gif ? { gif: shiftedGif(scene.gif, leadMs) } : {}),
         ...(scene.newIn ? { newIn: scene.newIn } : {}),
         ...(stage.warnings.length > 0 ? { warnings: [...stage.warnings] } : {}),
       });
@@ -149,7 +180,8 @@ try {
     const previous: typeof takes = existsSync(manifestPath)
       ? (JSON.parse(readFileSync(manifestPath, "utf8")) as { scenes: typeof takes }).scenes
       : [];
-    // an earlier take keeps its film and length; title, GIF clip and release mark follow the registry
+    // an earlier take keeps its film, its length and its lead; title, GIF clip (moved past that
+    // take's own lead) and release mark follow the registry
     const merged = orderedForRelease(version)
       .map((scene) => {
         const take =
@@ -162,12 +194,12 @@ try {
         return {
           ...kept,
           title: sceneHeading(scene, version),
-          ...(scene.gif ? { gif: scene.gif } : {}),
+          ...(scene.gif ? { gif: shiftedGif(scene.gif, take.leadMs) } : {}),
           ...(scene.newIn ? { newIn: scene.newIn } : {}),
         };
       })
       .filter((take): take is (typeof takes)[number] => take !== undefined);
-    const gifSeconds = merged.reduce((sum, take) => sum + (take.gif ? take.gif[1] - take.gif[0] : 0), 0);
+    const gifSeconds = Math.round(merged.reduce((sum, take) => sum + (take.gif ? take.gif[1] - take.gif[0] : 0), 0));
     writeFileSync(
       manifestPath,
       `${JSON.stringify({ version, recordedAt: new Date().toISOString(), gifSeconds, scenes: merged }, null, 2)}\n`,

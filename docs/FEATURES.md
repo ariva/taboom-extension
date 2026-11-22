@@ -190,7 +190,7 @@ order) and the tagged page rules.
   <img src="assets/features/chrome/settings-reorder-tag-pages.png" alt="Settings - dragging a tagged page rule onto another row" width="460">
 </p>
 
-Protect or keep alive for a while: hover **Protect domain ▸** / **Protect URL ▸** / **Keep alive domain ▸** /
+Temporary protection or keep-alive: hover **Protect domain ▸** / **Protect URL ▸** / **Keep alive domain ▸** /
 **Keep alive URL ▸** in a row's menu for *Always (default)* or 1 hour to 1 week (the click itself is
 Always). The row reads **temporary protected** / **temporary keep alive**, the hover tip adds the time left,
 and the rule or mark removes itself when the time is up (Restore last removal brings it back).

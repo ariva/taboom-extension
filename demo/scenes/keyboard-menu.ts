@@ -6,6 +6,7 @@ import type { Scene } from "./index.ts";
 export const keyboardMenu: Scene = {
   id: "keyboard-menu",
   title: "Row menus from the keyboard",
+  feature: "Row menus from the keyboard",
   settings: "#page-title",
   newIn: "1.1.0",
   covers: /cursor row's menu|Shift\+F10/i,

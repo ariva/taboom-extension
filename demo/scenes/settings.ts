@@ -5,6 +5,7 @@ import type { Scene } from "./index.ts";
 export const settings: Scene = {
   id: "settings",
   title: "Settings",
+  feature: "Settings",
   settings: "#page-title",
   covers: /settings heading|protected sites/i, // the version in the heading, the protected-site chips
   async run(stage) {

@@ -5,7 +5,17 @@ import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "vitest";
-import { GIF_MAX_SECONDS, orderedForRelease, releaseMark, SCENES, sceneHeading } from "../../demo/scenes/index.ts";
+import {
+  CHECKLIST_MS,
+  checklist,
+  GIF_MAX_SECONDS,
+  orderedForRelease,
+  releaseMark,
+  type Scene,
+  SCENES,
+  sceneHeading,
+  shiftedGif,
+} from "../../demo/scenes/index.ts";
 
 const version = (JSON.parse(readFileSync("package.json", "utf8")) as { version: string }).version;
 
@@ -115,4 +125,75 @@ test("Demo - Registry - a scene names its release relative to the recorded one: 
     const source = readFileSync(join("demo/scenes", file), "utf8");
     assert.doesNotMatch(source, /"New in \d/, `${file}: captions open with \${stage.release}, never a literal release`);
   }
+});
+
+// ---------- the feature checklist shown before every scene ----------
+
+const scene = (id: string, feature?: string, newIn?: string): Scene => ({
+  id,
+  title: id,
+  settings: "#page-title",
+  ...(feature ? { feature } : {}),
+  ...(newIn ? { newIn } : {}),
+  run: async () => {},
+});
+// registry order: the 2.0.0 scene is listed last but plays first
+const SAMPLE = [
+  scene("search", "Search and filters"),
+  scene("filters", "Search and filters"),
+  scene("tags", "Tags"),
+  scene("names", "Tab names", "2.0.0"),
+  scene("finished"),
+];
+const states = (id: string) =>
+  checklist("2.0.0", id, SAMPLE).groups.map((group) => [
+    group.heading,
+    ...group.items.map((item) => `${item.state} ${item.label}`),
+  ]);
+
+test("Demo - Checklist - the opening list: this release's features first, nothing ticked, the first one next", () => {
+  assert.deepEqual(states("names"), [
+    ["New in 2.0.0", "now Tab names"],
+    ["Everything else", "todo Search and filters", "todo Tags"],
+  ]);
+  assert.deepEqual(
+    { done: checklist("2.0.0", "names", SAMPLE).done, total: checklist("2.0.0", "names", SAMPLE).total },
+    { done: 0, total: 3 },
+  );
+});
+
+test("Demo - Checklist - a feature filmed in two scenes is ticked after the second", () => {
+  assert.deepEqual(states("filters")[1], ["Everything else", "now Search and filters", "todo Tags"]);
+  assert.deepEqual(states("tags")[1], ["Everything else", "done Search and filters", "now Tags"]);
+  assert.equal(checklist("2.0.0", "tags", SAMPLE).done, 2);
+});
+
+test("Demo - Checklist - before the outro everything is ticked; without a release mark there is one plain group", () => {
+  assert.deepEqual(states("finished"), [
+    ["New in 2.0.0", "done Tab names"],
+    ["Everything else", "done Search and filters", "done Tags"],
+  ]);
+  assert.deepEqual(
+    checklist("3.0.0", "search", SAMPLE).groups.map((group) => group.heading),
+    ["Features"],
+  );
+});
+
+test("Demo - Checklist - every filmed scene but the outro names its line, short enough for the story pane's column", () => {
+  for (const each of SCENES) {
+    const listed = !each.stillsOnly && each.id !== "finished";
+    assert.equal(each.feature !== undefined, listed, `${each.id}: feature line`);
+    assert.ok((each.feature ?? "").length <= 36, `${each.id}: "${each.feature}" is too long for a column`);
+  }
+  const { groups, total } = checklist(version, "finished");
+  assert.equal(total, new Set(SCENES.map((each) => each.feature).filter(Boolean)).size);
+  for (const group of groups) {
+    assert.ok(group.items.length <= 11, `${group.heading}: ${group.items.length} lines do not fit the pane`);
+  }
+});
+
+test("Demo - Checklist - the list is held 5 s, at the film's start and between scenes alike; the GIF clip moves by that lead", () => {
+  assert.equal(CHECKLIST_MS, 5_000);
+  assert.deepEqual(shiftedGif([3, 9], 5_250), [8.25, 14.25]);
+  assert.deepEqual(shiftedGif([3, 9], undefined), [3, 9], "a take from before the checklist has no lead");
 });

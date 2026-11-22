@@ -7,6 +7,7 @@
 import { join } from "node:path";
 import { CAPTION_BAND, PANEL_VIEWPORT, type World } from "./browser.ts";
 import type { DemoBrowser, DemoLocator, DemoPage, Evaluator } from "./page-api.ts";
+import type { Checklist } from "./scenes/index.ts";
 
 export interface Stage {
   panel: DemoPage;
@@ -45,7 +46,8 @@ interface OverlayApi {
 }
 type DemoWindow = Window & { __demo?: OverlayApi };
 interface StoryApi {
-  scene: (title: string) => void;
+  scene: (title: string, progress: string) => void;
+  checklist: (state: Checklist | null) => void;
   caption: (text: string) => void;
 }
 type StoryWindow = Window & { __story?: StoryApi };
@@ -243,8 +245,17 @@ export interface Aside {
   settings: DemoPage;
 }
 
-export function storyScene(aside: Aside, title: string): Promise<void> {
-  return aside.story.evaluate((value) => (window as StoryWindow).__story?.scene(value), title);
+// `progress`: the scene's place in the feature checklist ("6 / 18"), shown in the pane's header
+export function storyScene(aside: Aside, title: string, progress = ""): Promise<void> {
+  return aside.story.evaluate(([heading, place]) => (window as StoryWindow).__story?.scene(heading, place), [
+    title,
+    progress,
+  ] as const);
+}
+
+// the feature checklist over the story pane; null puts the story back
+export function storyChecklist(aside: Aside, state: Checklist | null): Promise<void> {
+  return aside.story.evaluate((value) => (window as StoryWindow).__story?.checklist(value), state);
 }
 
 export function makeStage(

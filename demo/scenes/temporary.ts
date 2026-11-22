@@ -7,7 +7,8 @@ import { type DragArgs, dragRows } from "./reorder.ts";
 export const temporaryProtection: Scene = {
   id: "temporary-protection",
   settings: "#rules-table",
-  title: "Protect or keep alive for a while",
+  title: "Temporary protection or keep-alive",
+  feature: "Temporary protection or keep-alive",
   newIn: "1.1.0",
   covers: /temporar|expir|duration|disabled protected|protected sites/i,
   async run(stage) {

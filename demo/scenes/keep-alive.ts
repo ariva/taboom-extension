@@ -7,6 +7,7 @@ export const keepAliveDomain: Scene = {
   id: "keep-alive-domain",
   settings: "#keep-alive-section",
   title: "Keep alive by domain",
+  feature: "Keep alive by domain",
   newIn: "1.1.0",
   covers: /keep alive.*domain|disabled tags|paused keep-alive|struck/i,
   async run(stage) {

@@ -6,6 +6,7 @@ export const tabNames: Scene = {
   id: "tab-names",
   settings: "#tab-names-table",
   title: "Name a tab yourself",
+  feature: "Name a tab yourself",
   newIn: "1.1.0",
   covers: /tab name|rename/i,
   async run(stage) {

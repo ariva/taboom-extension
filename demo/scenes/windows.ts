@@ -6,6 +6,7 @@ export const windows: Scene = {
   id: "windows",
   settings: "#windowNamesEnabled",
   title: "Windows: names, colors, pins",
+  feature: "Windows: names, colors, pins",
   gif: [0, 8],
   async run(stage) {
     await stage.caption("Quick launch: every window with its counts", 1200);
@@ -47,6 +48,7 @@ export const moveTab: Scene = {
   id: "move-tab",
   settings: "#page-title",
   title: "Move tabs between windows",
+  feature: "Sort, group, move tabs",
   async run(stage) {
     await stage.caption("Move a tab to another window from its menu", 1200);
     const row = stage.awakeRow("Noise-cancelling");
@@ -77,6 +79,7 @@ export const parked: Scene = {
   id: "parked",
   settings: "#askBeforePark",
   title: "Park a window, restore it later",
+  feature: "Park a window, restore it later",
   newIn: "1.0.5",
   covers: /park/i,
   async run(stage) {

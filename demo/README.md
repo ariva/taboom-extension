@@ -29,6 +29,23 @@ Nothing on screen is real: hosts end in `.test` and are served from a local HTTP
 and any other network request is refused and reported. Two runs of one commit produce the same
 world (seeded).
 
+## Feature checklist
+
+Every take opens with the list of what the film shows, on the story pane, for 5 s (`CHECKLIST_MS`):
+the whole list at the film's start, then before each scene with the finished lines ticked and the
+coming one marked — a viewer can tell what was shown and
+what is still to come; during a scene the pane's header counts ("6 / 18"). A line is a scene's
+`feature` (`demo/scenes/*.ts`): scenes naming the same line share it and it is ticked after the
+last of them; the outro and the stills-only scene have none. This release's lines come first under
+**New in <version>**, the rest under **Everything else** (`checklist()` in `demo/scenes/index.ts`).
+
+The list is part of the scene's take, so a `--scene` retake brings its own, and each take records
+how long it led with (`leadMs` in `scenes.json`): a scene's `gif` clip is still given from the
+scene's own start, and the recorder moves it past the lead — the GIF shows no list. The story page
+flips one invisible pixel twice a second while the list is up: the screencast sends a frame only
+when a page changes and can drop one, and a card standing still for seconds would otherwise not
+make it onto the film.
+
 ## Feature stills
 
 Captions are painted into a dark band below the panel (72 px, `CAPTION_BAND` in `demo/browser.ts`):
