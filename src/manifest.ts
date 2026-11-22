@@ -69,6 +69,10 @@ export function manifest(version: string, target: BuildTarget = "chrome"): Manif
       "toggle-protection": {
         description: "Toggle site protection for current tab",
       },
+      // no suggested key: the panel's own "." serves by default, this is the rebindable one
+      "open-row-menu": {
+        description: "Side panel: open the menu of the highlighted row",
+      },
       // "<" and ">" keys: free in Chrome on every platform and, unlike Ctrl+Shift+Arrow,
       // they steal no text-editing shortcut from web pages (commands are browser-wide).
       // Chrome allows at most 4 commands with a suggested key — this uses 3.

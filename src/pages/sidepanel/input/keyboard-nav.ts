@@ -4,7 +4,7 @@ import { featureEnabled } from "../../../app/core.ts";
 import { parkedRef } from "../../../app/parked.ts";
 import { closest } from "../../../lib/dom.ts";
 import { activate } from "../ops/actions.ts";
-import { openParkedTabMenu } from "../menus/parked-menus.ts";
+import { openMenuAtCursor } from "./row-menu-keys.ts";
 import { listEl, searchInput } from "../foundation/elements.ts";
 import { isPopoverOpen } from "../history/history-nav.ts";
 import { state } from "../foundation/state.ts";
@@ -56,10 +56,7 @@ export function initKeyboardNav(): void {
     const cursorTab = keyboardNav && state.cursor >= 0 ? state.visible[state.cursor] : undefined;
     if (event.key === "Enter" && cursorTab) {
       if (parkedRef(cursorTab.id)) {
-        // a snapshot row has no tab to activate: its menu is the way in, as for a click
-        const rect = listEl.querySelectorAll(".row")[state.cursor]?.getBoundingClientRect();
-        // `as`: the menu reads only the coordinates
-        openParkedTabMenu({ clientX: rect?.left ?? 0, clientY: rect?.bottom ?? 0 } as MouseEvent, cursorTab.id);
+        openMenuAtCursor(); // a snapshot row has no tab to activate: its menu is the way in, as for a click
         return;
       }
       activate(cursorTab);

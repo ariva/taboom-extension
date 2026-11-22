@@ -61,7 +61,30 @@ Panel position (left or right) is a global Chrome setting: `chrome://settings/ap
 - **Quick actions (☰)** — top-right menu (opening it closes any other popup: quick launch, history list, a dropdown): **Open Settings**, **Snooze inactive tabs now** (snoozes every tab the automatic-snooze rules allow, ignoring the inactivity threshold; the toast says how many), **Cleanup Duplicates (N)**, which runs *There can be only one* over every duplicated page at once (N = tabs it would close; greyed out when nothing is duplicated; confirmed first), and **Undo last remove in Parked windows**.
 - **Select all** — checkbox left of the scope selector selects/unselects every tab currently shown (i.e. matching the active search and filter). Search first, select all, then bulk-act.
 
-Keyboard: `/` focus search (a character inside a text field) · `↑`/`↓` move the amber row cursor (it goes away when focus leaves the panel; the next arrow starts from the top) · `Enter` activate (on a parked row: its menu) · `Esc` clear search (inside a dialog or picker it only closes that).
+### Keyboard
+
+In the list:
+
+- `/` — focus the search (a character inside a text field).
+- `↑` / `↓` — move the amber row cursor. It goes away when focus leaves the panel; the next arrow starts from the top.
+- `Enter` — activate the cursor row's tab (on a parked row: open its menu).
+- `Esc` — clear the search (inside a dialog, picker or menu it only closes that).
+
+Opening a row's menu:
+
+- `.` — outside text fields. In the search it stays a character.
+- `Menu` key and `Shift+F10` — the same action, and they work from the search field too.
+- The Chrome command **Side panel: open the menu of the highlighted row** — listed at `chrome://extensions/shortcuts`, unassigned. This is the rebindable one: a bare `.` cannot be listed there, Chrome requires `Ctrl` or `Alt` in a command key (see [Changing the key bindings](#changing-the-key-bindings)).
+- The menu opens for the cursor row. With no cursor: for this window's active tab.
+
+Inside a menu:
+
+- `↑` / `↓` move between items and wrap at the ends; `Home` / `End` jump to the first / last.
+- `→` or `Enter` enters a submenu, `←` leaves it.
+- `Enter` runs the item; `Esc` closes the menu and returns focus to where it was.
+- The arrows also enter a menu opened with the mouse.
+- The row cursor behind the menu does not move, and `Enter` runs only the menu item — never the cursor row's tab as well.
+- This holds for every menu of the panel: row, window header, tab group, split, ☰ and the quick launch's.
 
 ### Duplicates
 
@@ -121,7 +144,7 @@ Enable **Settings → Show experimental features**; needs Chrome 155 or newer (a
 
 ### Changing the key bindings
 
-The browser-wide shortcuts are Chrome commands, so you change them in Chrome, not in Taboom's options: open `chrome://extensions/shortcuts`, find **Taboom - Tabs Manager**, click the pencil next to a command and press the new combination. Taboom registers five commands — open side panel, tab history back, tab history forward, snooze current tab, toggle site protection — and Chrome adds its own "Activate the extension" row (the toolbar-icon click). Snooze and toggle protection ship unassigned; give them a key here. A snooze the browser refuses (the only tab of a window playing audio, an internal page) flashes `!` on the toolbar icon for two seconds, since a keyboard command has no panel to report in. Chrome rejects keys another extension already uses, and a shortcut set to "In Chrome" works only while a Chrome window is focused ("Global" works everywhere). The in-panel keys (`/`, arrows, `Enter`, `Esc`) are fixed.
+The browser-wide shortcuts are Chrome commands, so you change them in Chrome, not in Taboom's options: open `chrome://extensions/shortcuts`, find **Taboom - Tabs Manager**, click the pencil next to a command and press the new combination. Taboom registers six commands — open side panel, tab history back, tab history forward, snooze current tab, toggle site protection, open the menu of the highlighted row — and Chrome adds its own "Activate the extension" row (the toolbar-icon click). Snooze, toggle protection and the row menu ship unassigned; give them a key here. The row menu command is the rebindable twin of the panel's `.` (Chrome takes no key without `Ctrl` or `Alt` on this page, so `.` itself cannot be listed): it opens the menu in the side panel of the focused window, and unlike `.` it works while the search field has focus. A snooze the browser refuses (the only tab of a window playing audio, an internal page) flashes `!` on the toolbar icon for two seconds, since a keyboard command has no panel to report in. Chrome rejects keys another extension already uses, and a shortcut set to "In Chrome" works only while a Chrome window is focused ("Global" works everywhere). The in-panel keys (`/`, `.`, arrows, `Enter`, `Esc`) are fixed.
 
 ![Taboom commands on chrome://extensions/shortcuts](assets/change_key_bindings.png)
 

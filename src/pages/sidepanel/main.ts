@@ -38,6 +38,7 @@ import { initGroupReorder } from "./windows-popover/groups.ts";
 import { initTabDnd } from "./dnd/tab-dnd.ts";
 import { initListContextMenu } from "./menus/list-context-menu.ts";
 import { initGlobalKeys } from "./input/global-keys.ts";
+import { initRowMenuKeys } from "./input/row-menu-keys.ts";
 import { initUpdateBanner } from "./banners/update-banner.ts";
 import { initHistoryNav } from "./history/history-nav.ts";
 import { initRestoreBanner } from "./banners/restore-banner.ts";
@@ -78,6 +79,7 @@ initGlobalKeys();
 // wired here, at their original spot in the listener order (toolbar-events.ts, keyboard-nav.ts)
 initBulkButtons();
 initKeyboardNav();
+initRowMenuKeys();
 initQuickActions();
 initTagsChip(); // after the filter-bar handler in toolbar-events.ts: the chip click filters first, then opens the picker
 initMetaFit(() => render(false)); // the pill fit follows the panel's width

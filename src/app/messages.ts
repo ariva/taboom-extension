@@ -46,6 +46,10 @@ export type Message =
       asGroup?: boolean;
     };
 
+// What the worker tells the open side panels (runtime.sendMessage reaches every extension page; a
+// panel acts only on a message naming its own window). No answer is read.
+export type PanelMessage = { type: "open-row-menu"; windowId: number }; // the Chrome command (gestures.ts)
+
 // where moved parked tabs open: a live window (null = a new one) or a live tab group
 export type ParkedTarget = { windowId: number | null } | { groupId: number };
 

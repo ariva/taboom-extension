@@ -1614,6 +1614,13 @@ test("Service Worker - Keyboard snooze that is refused flashes the action badge"
   );
 });
 
+test("Service Worker - Command open-row-menu is forwarded to the panels with the focused window", async () => {
+  calls.length = 0;
+  await chrome.commands.onCommand.fire("open-row-menu");
+  await tick();
+  assert.ok(calls.includes("sendMessage open-row-menu"), `forwarded: ${calls.join(" | ")}`);
+});
+
 test("Service Worker - Expiry: protect-hosts / protect-urls / keep-alive-set with hours stamp a temporary entry and arm the expiry alarm", {
   skip: !KEEP_ALIVE_ON,
 }, async () => {

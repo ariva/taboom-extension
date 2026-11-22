@@ -54,6 +54,9 @@
       "toggle-protection": {
         "description": "Toggle site protection for current tab"
       },
+      "open-row-menu": {
+        "description": "Side panel: open the menu of the highlighted row"
+      },
       "history-back": {
         "suggested_key": {
           "default": "Ctrl+Shift+Comma",

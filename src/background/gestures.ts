@@ -1,6 +1,7 @@
 // User gestures outside the pages — keyboard commands and context-menu clicks —
 // routed to the feature modules.
 import { isSupportedUrl } from "../app/core.ts";
+import type { PanelMessage } from "../app/messages.ts";
 import { openPanel } from "../lib/platform/panel.ts";
 import { KEEP_ALIVE_MENU_ID, KEEP_ALIVE_SITE_MENU_ID, toggleTabKeepAlive } from "./keep-alive.ts";
 import { toggleSiteProtection } from "./protection.ts";
@@ -32,6 +33,11 @@ export async function runCommand(command: string): Promise<void> {
       break;
     case "toggle-protection":
       await toggleSiteProtection(tab);
+      break;
+    case "open-row-menu":
+      // the menu lives in the panel: its window's panel opens it. No panel open there = no
+      // receiver, and sendMessage rejects — nothing to do then
+      await chrome.runtime.sendMessage<PanelMessage>({ type: "open-row-menu", windowId: tab.windowId }).catch(() => {});
       break;
   }
 }

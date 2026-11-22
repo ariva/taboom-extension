@@ -1,6 +1,6 @@
-// Generic popover menu (#ctx-menu): show/hide, items, titles, dividers and
-// hover-intent accordion submenus with flyout placement. What a menu CONTAINS is
-// the caller's business — builders fill it through clearCtxMenu / ctxAppend.
+// Generic popover menu (#ctx-menu): show/hide, items, titles, dividers,
+// hover-intent accordion submenus with flyout placement, and the keys that walk it.
+// What a menu CONTAINS is the caller's business — builders fill it through clearCtxMenu / ctxAppend.
 
 // right-click on a row: in-page menu moving the tab (or the selection, when
 // the clicked row is part of it) to another window / a new window
@@ -11,7 +11,13 @@ ctxMenu.hidden = true;
 // popover (plain z-index never beats the top layer). "manual" = no light
 // dismiss, our own click-away/Escape handlers keep working.
 ctxMenu.setAttribute("popover", "manual");
+ctxMenu.setAttribute("role", "menu");
 document.body.append(ctxMenu);
+
+// submenu toggle → how to fold / unfold it, and whether a click on it is the toggle's own action
+const toggles = new WeakMap<Element, { setOpen: (open: boolean) => void; ownAction: boolean }>();
+// what had focus before the keyboard took it into the menu: it gets it back when the menu closes
+let returnFocus: HTMLElement | null = null;
 
 // set by showCtxMenu: whether the menu may stay open across a host render — a toolbar menu
 // always (() => true), a list-bound menu while every row it names is still there; a menu
@@ -19,11 +25,18 @@ document.body.append(ctxMenu);
 let staysWhile: (() => boolean) | null = null;
 
 export function hideCtxMenu(): void {
+  const back = returnFocus;
+  returnFocus = null;
+  // focus the user moved elsewhere meanwhile (a click into the search) is theirs to keep
+  const focusInside = ctxMenu.contains(document.activeElement);
   ctxMenu.hidden = true;
   try {
     ctxMenu.hidePopover();
   } catch {
     // not open / no popover API (tests) — the hidden attr already did the job
+  }
+  if (back && focusInside) {
+    back.focus();
   }
 }
 
@@ -56,6 +69,7 @@ export function ctxAppend(...nodes: (Node | string)[]): void {
 export function ctxItem(label: string, run: () => void): HTMLButtonElement {
   const item = document.createElement("button");
   item.className = "ctx-item";
+  item.setAttribute("role", "menuitem");
   item.textContent = label;
   item.addEventListener("click", () => {
     hideCtxMenu();
@@ -73,12 +87,16 @@ const SUBMENU_HOVER_DELAY_MS = 500;
 export function ctxSubmenu(label: string, onClick?: () => void): { btn: HTMLButtonElement; submenu: HTMLDivElement } {
   const btn = document.createElement("button");
   btn.className = "ctx-item ctx-move";
+  btn.setAttribute("role", "menuitem");
+  btn.setAttribute("aria-haspopup", "menu");
+  btn.setAttribute("aria-expanded", "false");
   const caret = document.createElement("span");
   caret.className = "ctx-caret";
   caret.textContent = "▸";
   btn.append(`${label} `, caret); // caret pushed right via CSS for breathing room
   const submenu = document.createElement("div");
   submenu.className = "ctx-submenu";
+  submenu.setAttribute("role", "menu");
   submenu.hidden = true;
   // caret mirrors the expanded state: ▸ folded, ▾ open (like group headers)
   const setOpen = (open: boolean): void => {
@@ -86,6 +104,7 @@ export function ctxSubmenu(label: string, onClick?: () => void): { btn: HTMLButt
       for (const other of ctxMenu.querySelectorAll<HTMLElement>(".ctx-submenu")) {
         if (other !== submenu && !other.hidden) {
           other.hidden = true;
+          other.previousElementSibling?.setAttribute("aria-expanded", "false");
           const otherCaret = other.previousElementSibling?.querySelector(".ctx-caret");
           if (otherCaret) {
             otherCaret.textContent = "▸";
@@ -94,6 +113,7 @@ export function ctxSubmenu(label: string, onClick?: () => void): { btn: HTMLButt
       }
     }
     submenu.hidden = !open;
+    btn.setAttribute("aria-expanded", String(open));
     caret.textContent = open ? "▾" : "▸";
     if (open) {
       position(); // after unhide — offsetWidth/Height need layout
@@ -132,6 +152,7 @@ export function ctxSubmenu(label: string, onClick?: () => void): { btn: HTMLButt
     hoverTimer = setTimeout(() => setOpen(true), SUBMENU_HOVER_DELAY_MS);
   });
   btn.addEventListener("mouseleave", () => clearTimeout(hoverTimer));
+  toggles.set(btn, { setOpen, ownAction: onClick !== undefined });
   return { btn, submenu };
 }
 
@@ -187,3 +208,73 @@ export function showCtxMenu(
 
 document.addEventListener("click", hideCtxMenu);
 window.addEventListener("blur", hideCtxMenu); // focus left for another window/tab
+
+// ---------- keyboard ----------
+
+// the enabled items of one level: the menu's own (null), or one open submenu's
+function levelItems(level: Element | null): HTMLButtonElement[] {
+  const items = (level ?? ctxMenu).querySelectorAll<HTMLButtonElement>("button.ctx-item:not(:disabled)");
+  return [...items].filter((item) => item.closest(".ctx-submenu") === level);
+}
+
+function focusItem(item: HTMLElement | undefined): void {
+  // `as`: activeElement is typed Element; whatever holds focus in a page can take it back
+  const active = document.activeElement as HTMLElement | null;
+  if (active && !ctxMenu.contains(active)) {
+    returnFocus = active;
+  }
+  item?.focus();
+}
+
+// a menu opened from the keyboard: its first item takes focus, so Enter and the arrows work at once
+export function focusCtxMenu(): void {
+  if (!ctxMenu.hidden) {
+    focusItem(levelItems(null)[0]);
+  }
+}
+
+// Capture phase, and the handled keys stop here: the host's own arrow / Enter handlers (a row
+// cursor behind the menu) must not act on a key the open menu took. Escape is the host's.
+document.addEventListener(
+  "keydown",
+  (event) => {
+    if (ctxMenu.hidden) {
+      return;
+    }
+    const active = document.activeElement;
+    const inside = active !== null && ctxMenu.contains(active);
+    const level = inside ? active.closest(".ctx-submenu") : null;
+    const items = levelItems(level);
+    const candidates: readonly Element[] = items; // widened: activeElement is typed Element
+    const index = inside ? candidates.indexOf(active) : -1;
+    const toggle = inside ? toggles.get(active) : undefined;
+    const entersSubmenu = event.key === "ArrowRight" || (event.key === "Enter" && toggle?.ownAction === false);
+    let target: HTMLElement | undefined;
+    if (event.key === "ArrowDown") {
+      target = items[(index + 1) % items.length];
+    } else if (event.key === "ArrowUp") {
+      target = items[(index <= 0 ? items.length : index) - 1];
+    } else if (inside && event.key === "Home") {
+      target = items[0];
+    } else if (inside && event.key === "End") {
+      target = items.at(-1);
+    } else if (toggle && entersSubmenu) {
+      toggle.setOpen(true);
+      target = levelItems(active?.nextElementSibling ?? null)[0];
+    } else if (level && event.key === "ArrowLeft") {
+      const parent = level.previousElementSibling;
+      toggles.get(parent ?? level)?.setOpen(false);
+      // `as`: a submenu's previous sibling is its toggle button (ctxSubmenu's caller appends the pair)
+      target = (parent as HTMLElement | null) ?? undefined;
+    } else if (inside && (event.key === "Enter" || event.key === " ")) {
+      event.stopPropagation(); // the item's own click (the key's default) is the whole effect
+      return;
+    } else {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    focusItem(target);
+  },
+  true,
+);

@@ -13,6 +13,7 @@ const {
   ctxMenuContains,
   ctxSubmenu,
   ctxTitle,
+  focusCtxMenu,
   hideCtxMenu,
   hideCtxMenuForRender,
   isCtxMenuOpen,
@@ -151,4 +152,136 @@ test("Lib - UI - Context menu - Submenu hover intent: opens after the cursor set
   move.btn.click();
   vi.advanceTimersByTime(1000);
   assert.equal(move.submenu.hidden, true);
+});
+
+// ---------- keyboard ----------
+
+const press = (key: string, target: EventTarget = document.activeElement ?? document) => {
+  const event = new win.KeyboardEvent("keydown", { key, bubbles: true, cancelable: true });
+  target.dispatchEvent(event as unknown as Event); // happy-dom's event class, the DOM's dispatch signature
+  return event;
+};
+const focusedLabel = () => document.activeElement?.textContent;
+
+function buildKeyboardMenu(ran: string[]): void {
+  const move = ctxSubmenu("Move to");
+  move.submenu.append(
+    ctxItem("Window #1", () => ran.push("w1")),
+    ctxItem("Window #2", () => ran.push("w2")),
+  );
+  const disabled = ctxItem("Disabled", () => ran.push("disabled"));
+  disabled.disabled = true;
+  ctxAppend(
+    ctxTitle("Tab"),
+    ctxItem("Copy URL", () => ran.push("copy")),
+    disabled,
+    move.btn,
+    move.submenu,
+    ctxItem("Close tab", () => ran.push("close")),
+  );
+  showCtxMenu(at(0, 0));
+}
+
+test("Lib - UI - Context menu - focusCtxMenu puts focus on the first item; closing gives it back", () => {
+  const search = document.createElement("input");
+  document.body.append(search);
+  search.focus();
+  buildKeyboardMenu([]);
+  focusCtxMenu();
+  assert.equal(focusedLabel(), "Copy URL");
+  hideCtxMenu();
+  assert.ok(document.activeElement === search, "focus back where it was");
+  search.remove();
+});
+
+test("Lib - UI - Context menu - Arrows walk the enabled items of one level and wrap", () => {
+  buildKeyboardMenu([]);
+  focusCtxMenu();
+  press("ArrowDown");
+  assert.equal(focusedLabel(), "Move to ▸", "the disabled item and the title are skipped");
+  press("ArrowDown");
+  assert.equal(focusedLabel(), "Close tab", "the folded submenu's items are not on this level");
+  press("ArrowDown");
+  assert.equal(focusedLabel(), "Copy URL", "wraps to the top");
+  press("ArrowUp");
+  assert.equal(focusedLabel(), "Close tab", "wraps to the bottom");
+  press("Home");
+  assert.equal(focusedLabel(), "Copy URL");
+  press("End");
+  assert.equal(focusedLabel(), "Close tab");
+});
+
+test("Lib - UI - Context menu - A first arrow enters a menu opened by the mouse", () => {
+  buildKeyboardMenu([]);
+  const event = press("ArrowDown", document);
+  assert.equal(focusedLabel(), "Copy URL");
+  assert.equal(event.defaultPrevented, true);
+});
+
+test("Lib - UI - Context menu - Right enters a submenu, Left leaves it", () => {
+  buildKeyboardMenu([]);
+  focusCtxMenu();
+  press("ArrowDown");
+  press("ArrowRight");
+  assert.equal(focusedLabel(), "Window #1");
+  assert.deepEqual(carets(), ["▾"]);
+  press("ArrowDown");
+  assert.equal(focusedLabel(), "Window #2");
+  press("ArrowDown");
+  assert.equal(focusedLabel(), "Window #1", "wraps inside the submenu");
+  press("ArrowLeft");
+  assert.equal(focusedLabel(), "Move to ▸");
+  assert.deepEqual(carets(), ["▸"]);
+});
+
+test("Lib - UI - Context menu - Enter on a plain submenu toggle enters it; on one with its own action it is left to the click", () => {
+  buildKeyboardMenu([]);
+  focusCtxMenu();
+  press("ArrowDown");
+  const entered = press("Enter");
+  assert.equal(focusedLabel(), "Window #1");
+  assert.equal(entered.defaultPrevented, true, "no click on top that would fold it again");
+  hideCtxMenu();
+  clearCtxMenu();
+  const protect = ctxSubmenu("Protect", () => {});
+  protect.submenu.append(ctxItem("1 hour", () => {}));
+  ctxAppend(protect.btn, protect.submenu);
+  showCtxMenu(at(0, 0));
+  focusCtxMenu();
+  const left = press("Enter");
+  assert.equal(left.defaultPrevented, false, "the button's own click runs the action");
+  assert.equal(focusedLabel(), "Protect ▸");
+});
+
+test("Lib - UI - Context menu - Keys on a focused item stay in the menu; keys do nothing while it is closed", () => {
+  const seen: string[] = [];
+  const listener = (event: Event) => seen.push((event as unknown as KeyboardEvent).key); // happy-dom's event
+  document.addEventListener("keydown", listener);
+  buildKeyboardMenu([]);
+  focusCtxMenu();
+  press("ArrowDown");
+  press("Enter");
+  press(" ");
+  assert.deepEqual(seen, [], "the host's arrow / Enter handlers never see them");
+  hideCtxMenu();
+  const closed = press("ArrowDown", document);
+  assert.deepEqual(seen, ["ArrowDown"]);
+  assert.equal(closed.defaultPrevented, false);
+  document.removeEventListener("keydown", listener);
+});
+
+test("Lib - UI - Context menu - Menu roles for assistive technology", () => {
+  buildKeyboardMenu([]);
+  assert.equal(menu.getAttribute("role"), "menu");
+  const toggle = menu.querySelector(".ctx-move") as HTMLElement; // `as`: built above
+  assert.equal(toggle.getAttribute("aria-haspopup"), "menu");
+  assert.equal(toggle.getAttribute("aria-expanded"), "false");
+  assert.deepEqual(
+    [...menu.querySelectorAll(".ctx-item")].map((item) => item.getAttribute("role")),
+    ["menuitem", "menuitem", "menuitem", "menuitem", "menuitem", "menuitem"],
+  );
+  focusCtxMenu();
+  press("ArrowDown");
+  press("ArrowRight");
+  assert.equal(toggle.getAttribute("aria-expanded"), "true");
 });

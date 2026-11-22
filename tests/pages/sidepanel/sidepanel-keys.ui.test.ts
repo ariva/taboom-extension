@@ -31,7 +31,8 @@ const tabs: ChromeMockOptions["tabs"] = [
 ];
 
 const calls: string[] = [];
-loadPage("src/pages/sidepanel/index.html", makeChrome({ tabs, calls, stored: {} }));
+const mock = makeChrome({ tabs, calls, stored: {} });
+loadPage("src/pages/sidepanel/index.html", mock);
 await import("../../../src/pages/sidepanel/main.ts");
 await tick();
 await tick();
@@ -91,6 +92,80 @@ test("UI - Sidepanel Keyboard - Focus leaving the panel drops the cursor", keyNa
   key("ArrowDown");
   assert.equal(cursorTitle(), q(document, ".row .title").textContent, "the next arrow starts from the first row");
 });
+
+// ---------- the row menu from the keyboard ----------
+
+const menu = () => byId("ctx-menu");
+const menuTitle = () => q(menu(), ".ctx-title").textContent;
+// a key as Chrome delivers it: to the focused element, bubbling up (the menu's keys stop on the way)
+const keyOn = (target: EventTarget, k: string, init: KeyboardEventInit = {}) =>
+  target.dispatchEvent(new window.KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true, ...init }));
+const closeMenu = () => keyOn(document, "Escape");
+
+test("UI - Sidepanel Keyboard - Period opens the cursor row's menu with its first item focused", keyNavSkip, () => {
+  key("ArrowDown");
+  const title = cursorTitle();
+  assert.equal(menu().hidden, true);
+  key(".");
+  assert.equal(menu().hidden, false);
+  assert.equal(menuTitle(), title);
+  const focused = document.activeElement;
+  assert.ok(focused?.classList.contains("ctx-item"), "focus is on a menu item");
+  // the arrows now belong to the menu: the row cursor behind it stays put
+  keyOn(focused ?? document, "ArrowDown");
+  assert.equal(cursorTitle(), title);
+  assert.ok(document.activeElement !== focused, "the menu's own focus moved");
+  closeMenu();
+  assert.equal(menu().hidden, true);
+});
+
+test("UI - Sidepanel Keyboard - No cursor: Period opens the menu of this window's active tab", keyNavSkip, () => {
+  window.dispatchEvent(new window.Event("blur")); // drops the cursor
+  key(".");
+  assert.equal(menu().hidden, false);
+  assert.equal(menuTitle(), q(document, ".row.active-tab.current .title").textContent);
+  closeMenu();
+});
+
+test(
+  "UI - Sidepanel Keyboard - Period is a character in the search; the Menu key and Shift+F10 open the menu from there",
+  keyNavSkip,
+  () => {
+    const search = byId("search");
+    keyOn(search, ".");
+    assert.equal(menu().hidden, true, "typing a dot opens nothing");
+    keyOn(search, "ContextMenu");
+    assert.equal(menu().hidden, false);
+    closeMenu();
+    keyOn(search, "F10");
+    assert.equal(menu().hidden, true, "plain F10 is not the menu key");
+    keyOn(search, "F10", { shiftKey: true });
+    assert.equal(menu().hidden, false);
+    // the browser's own menu for that key press never shows on top of ours
+    const native = new window.MouseEvent("contextmenu", { bubbles: true, cancelable: true });
+    search.dispatchEvent(native);
+    assert.equal(native.defaultPrevented, true);
+    closeMenu();
+  },
+);
+
+test("UI - Sidepanel Keyboard - Row menu keys do nothing while flag off", { skip: KEY_NAV_ON }, () => {
+  key(".");
+  keyOn(byId("search"), "ContextMenu");
+  assert.equal(menu().hidden, true);
+});
+
+test(
+  "UI - Sidepanel Keyboard - The Chrome command opens the menu in the panel of the window it names",
+  keyNavSkip,
+  async () => {
+    await mock.runtime.onMessage.fire({ type: "open-row-menu", windowId: 2 });
+    assert.equal(menu().hidden, true, "another window's panel: not this one");
+    await mock.runtime.onMessage.fire({ type: "open-row-menu", windowId: 1 });
+    assert.equal(menu().hidden, false);
+    closeMenu();
+  },
+);
 
 test("UI - Sidepanel Keyboard - Single visible window: header not collapsible", () => {
   const sel = byId<HTMLSelectElement>("sort");
