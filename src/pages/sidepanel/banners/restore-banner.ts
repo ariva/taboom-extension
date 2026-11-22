@@ -2,6 +2,7 @@
 import { send } from "../../../app/messages.ts";
 import { localStore } from "../../../app/storage.ts";
 import { getElementById } from "../../../lib/dom.ts";
+import { capabilities } from "../../../lib/platform/capabilities.ts";
 import { openPanel } from "../../../lib/platform/panel.ts";
 
 // ---------- panel-open tracking + restore banner ----------
@@ -37,7 +38,9 @@ export function initRestoreBanner(): void {
     const { ui } = await localStore.get("ui");
     const mode = ui?.onExtensionUpdate ?? "banner";
     const forget = () => send({ type: "panels-restore-dismiss", windowIds: windows });
-    if (mode === "none") {
+    // Firefox: its sidebar opens in the active window only, so the offer could not be kept —
+    // no banner, no attempt; forgetting keeps the windows from piling up as "to restore"
+    if (mode === "none" || !capabilities.panelInAnyWindow) {
       forget(); // same as dismissing the banner — those windows aren't offered again
       return;
     }

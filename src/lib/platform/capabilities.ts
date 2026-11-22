@@ -31,6 +31,11 @@ export const capabilities = {
   get sidePanel(): boolean {
     return Boolean(chrome.sidePanel);
   },
+  // a panel can be opened in a window of choice: sidePanel.open takes a windowId, while Firefox's
+  // sidebarAction.open opens in the active window only — "reopen the panel over there" needs this
+  get panelInAnyWindow(): boolean {
+    return Boolean(chrome.sidePanel);
+  },
   // Firefox's sidebar (sidebarAction.open / toggle)
   get sidebar(): boolean {
     return sidebarAction() !== undefined;

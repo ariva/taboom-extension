@@ -2564,3 +2564,9 @@ test("UI - Options - New in this release: the installed release's highlights as 
   renderNewInRelease("0.0.0-test");
   assert.equal(card.hidden, true);
 });
+
+test("UI - Options - On extension update: offered only where a panel can be reopened in another window", () => {
+  // Firefox opens its sidebar in the active window only: the restore banner never shows there,
+  // so the setting that picks it would do nothing
+  assert.equal(byId("onExtensionUpdate-label").hidden, FIREFOX);
+});

@@ -4,6 +4,7 @@ import { applyExperimental, featureEnabled, resolveColorScheme, resolveNavMode }
 import { loadState, saveState } from "../../app/storage.ts";
 import type { AppState, FeatureName, UiPrefs } from "../../app/types.ts";
 import { getElementById, mustQuery } from "../../lib/dom.ts";
+import { capabilities } from "../../lib/platform/capabilities.ts";
 import { isBeingTyped } from "../../lib/ui/typing.ts";
 import { clampFontSize, FONT_SIZE_STEPS, stepFontSize } from "./model.ts";
 import { flashSaved, getFeatures } from "./page-state.ts";
@@ -28,6 +29,8 @@ export function renderUiPrefs(state: AppState): void {
   getElementById("historyNav-label").hidden = !featureEnabled(appliedFeatures, "OPTIONS_NAVIGATION_STACK");
   getElementById("windowNamesEnabled-label").hidden = !featureEnabled(appliedFeatures, "WINDOW_NAMES");
   getElementById("askBeforePark-label").hidden = !featureEnabled(appliedFeatures, "PARKED_WINDOWS");
+  // the restore banner this picks never shows where a panel cannot be reopened in another window (Firefox)
+  getElementById("onExtensionUpdate-label").hidden = !capabilities.panelInAnyWindow;
   // The dropdown shows the EFFECTIVE mode, not the raw stored value: a stored
   // mode whose flag got disabled falls back (traditional ↔ compact, disabled
   // when neither is available). The stored preference itself is NOT rewritten,
