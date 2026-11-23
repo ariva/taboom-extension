@@ -1,4 +1,4 @@
-import { highlightText } from "../../src/app/release-highlights.ts";
+import { everythingElseText } from "../../src/app/release-highlights.ts";
 import type { Scene } from "./index.ts";
 
 // tagged pages keep their #fragment (T-0153): a wiki tab navigates to an anchor, Tag URL… stores
@@ -7,7 +7,7 @@ export const tagFragment: Scene = {
   id: "tag-fragment",
   settings: "#tagPagesKeepFragment",
   title: "Tagged pages keep their #fragment",
-  feature: highlightText("1.1.0", "tag-fragment"),
+  feature: everythingElseText("tags"),
   newIn: "1.1.0",
   covers: /fragment/i,
   async run(stage) {

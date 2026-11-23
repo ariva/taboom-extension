@@ -23,6 +23,7 @@ import {
 import { installOverlay, makeStage, storyChecklist, storyScene } from "./stage.ts";
 import { documentOf, missingStreams, streamOfUrl } from "./streams.ts";
 import { storyHtml } from "./story.ts";
+import { featureRelease } from "../src/app/release-highlights.ts";
 
 const { values } = parseArgs({
   options: {
@@ -55,7 +56,10 @@ if (stillsKind !== undefined && !["all", "features", "readme"].includes(stillsKi
 const stillsOf = (scene: Scene) =>
   stillsKind === "features" ? !scene.stillsOnly : stillsKind === "readme" ? scene.stillsOnly === true : true;
 const wanted = values.scene ?? [];
-const scenes = orderedForRelease(version)
+// a fixes-only release has nothing of its own to open with: the film keeps presenting the last
+// release that had features as the new one
+const featured = featureRelease(version);
+const scenes = orderedForRelease(featured)
   .filter((scene) => wanted.length === 0 || wanted.includes(scene.id))
   .filter(stillsOf);
 const unknown = wanted.filter((id) => !SCENES.some((scene) => scene.id === id));
@@ -120,14 +124,14 @@ try {
     stage.warnings.length = 0;
     stage.stills.length = 0;
     const filmed = !scene.stillsOnly && stillsKind === undefined;
-    const list = checklist(version, scene.id);
+    const list = checklist(featured, scene.id);
     const takeStarted = Date.now();
     if (filmed) {
       // the feature list is on the pane before the take starts, so the take's opening still is the list
       await storyChecklist(stage.aside, list);
       await recorder.startScene(scene.id);
     }
-    stage.release = releaseMark(scene.newIn, version);
+    stage.release = releaseMark(scene.newIn, featured);
     let leadMs = 0;
     try {
       if (filmed) {
@@ -137,7 +141,7 @@ try {
         leadMs = Date.now() - takeStarted;
       }
       const place = scene.feature ? `${Math.min(list.done + 1, list.total)} / ${list.total}` : "";
-      await storyScene(stage.aside, sceneHeading(scene, version), place);
+      await storyScene(stage.aside, sceneHeading(scene, featured), place);
       await stage.settings(scene.settings);
       await scene.run(stage);
     } catch (error) {
@@ -157,7 +161,7 @@ try {
       takes.push({
         ...ended,
         leadMs,
-        title: sceneHeading(scene, version),
+        title: sceneHeading(scene, featured),
         stills: [...stage.stills],
         ...(scene.gif ? { gif: shiftedGif(scene.gif, leadMs) } : {}),
         ...(scene.newIn ? { newIn: scene.newIn } : {}),
@@ -187,7 +191,7 @@ try {
       : [];
     // an earlier take keeps its film, its length and its lead; title, GIF clip (moved past that
     // take's own lead) and release mark follow the registry
-    const merged = orderedForRelease(version)
+    const merged = orderedForRelease(featured)
       .map((scene) => {
         const take =
           takes.find((candidate) => candidate.id === scene.id) ??
@@ -198,7 +202,7 @@ try {
         const { gif: _gif, newIn: _newIn, ...kept } = take;
         return {
           ...kept,
-          title: sceneHeading(scene, version),
+          title: sceneHeading(scene, featured),
           ...(scene.gif ? { gif: shiftedGif(scene.gif, take.leadMs) } : {}),
           ...(scene.newIn ? { newIn: scene.newIn } : {}),
         };

@@ -5,6 +5,7 @@ import { duplicates, snoozeProtect } from "./actions.ts";
 import { grouping } from "./grouping.ts";
 import { keepAliveDomain } from "./keep-alive.ts";
 import { keyboardMenu } from "./keyboard-menu.ts";
+import { keyboardSelect } from "./keyboard-select.ts";
 import { settingsReorder } from "./reorder.ts";
 import { tabNames } from "./tab-names.ts";
 import { tagFragment } from "./tag-fragment.ts";
@@ -41,6 +42,7 @@ export const SCENES: Scene[] = [
   settingsReorder,
   tagFragment,
   keyboardMenu,
+  keyboardSelect,
   settingsTabs,
   sharedView,
   snoozeNow,

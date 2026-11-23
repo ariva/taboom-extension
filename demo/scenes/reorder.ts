@@ -1,4 +1,4 @@
-import { highlightText } from "../../src/app/release-highlights.ts";
+import { everythingElseText } from "../../src/app/release-highlights.ts";
 import type { Scene } from "./index.ts";
 
 // drag reorder of the Settings tables (T-0154): the Settings pane has no cursor, so the drag is
@@ -34,7 +34,7 @@ export const settingsReorder: Scene = {
   id: "settings-reorder",
   settings: "#keep-alive-table",
   title: "Reorder keep-alive marks and tagged page rules",
-  feature: highlightText("1.1.0", "settings-reorder"),
+  feature: everythingElseText("settings"),
   newIn: "1.1.0",
   covers: /reorder/i,
   async run(stage) {

@@ -1,4 +1,4 @@
-import { highlightText } from "../../src/app/release-highlights.ts";
+import { everythingElseText } from "../../src/app/release-highlights.ts";
 import type { Scene } from "./index.ts";
 
 // Settings as six panes behind a tab strip: one pane at a time, the address names it — the
@@ -6,7 +6,7 @@ import type { Scene } from "./index.ts";
 export const settingsTabs: Scene = {
   id: "settings-tabs",
   title: "Settings in tabs",
-  feature: highlightText("1.1.0", "settings-tabs"),
+  feature: everythingElseText("settings"),
   settings: "#page-title",
   newIn: "1.1.0",
   covers: /tabbed panes/i,

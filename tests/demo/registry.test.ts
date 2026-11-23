@@ -16,9 +16,11 @@ import {
   sceneHeading,
   shiftedGif,
 } from "../../demo/scenes/index.ts";
-import { everythingElse, RELEASE_HIGHLIGHTS, releaseHighlights } from "../../src/app/release-highlights.ts";
+import { everythingElse, featureRelease, releaseHighlights } from "../../src/app/release-highlights.ts";
 
-const version = (JSON.parse(readFileSync("package.json", "utf8")) as { version: string }).version;
+const packageVersion = (JSON.parse(readFileSync("package.json", "utf8")) as { version: string }).version;
+// what the film presents as new: this release, or the last one that had features (a fixes-only release)
+const version = featureRelease(packageVersion);
 
 // features the demo browser cannot run: Playwright's bundled Chromium (153) has no split view
 // (Chrome 155+), so a scene would film nothing — exempt until that Chromium catches up, then
@@ -188,9 +190,11 @@ test("Demo - Checklist - every filmed scene but the outro names its line, short 
   }
   const { groups, total } = checklist(version, "finished");
   assert.equal(total, new Set(SCENES.map((each) => each.feature).filter(Boolean)).size);
-  for (const group of groups) {
-    assert.ok(group.items.length <= 11, `${group.heading}: ${group.items.length} lines do not fit the pane`);
-  }
+  // demo/story.ts: two columns of 12 rows (a heading is one); groups of up to 11 lines get a
+  // column each, a longer one runs on from the first column into the second
+  const ownColumns = groups.length <= 2 && groups.every((group) => group.items.length <= 11);
+  const rows = groups.reduce((sum, group) => sum + 1 + group.items.length, 0);
+  assert.ok(ownColumns || rows <= 23, `${rows} rows do not fit the pane's two columns`);
 });
 
 test("Demo - Checklist - the list is held 5 s, at the film's start and between scenes alike; the GIF clip moves by that lead", () => {
@@ -230,11 +234,11 @@ test("Demo - Checklist - every scene takes its line by key from src/app/release-
         /^\s+feature: (highlightText|everythingElseText)\(/m,
         `${file} ${id}: feature must be highlightText(version, key) or everythingElseText(key)`,
       );
-      // a scene marked new for a release that has highlights names that release's line
+      // a scene new in the release the film presents names that release's line; an older
+      // release's scenes have been folded into the everything-else list
       const newIn = block.match(/^\s+newIn: "([^"]+)"/m)?.[1];
-      if (newIn && newIn in RELEASE_HIGHLIGHTS) {
-        assert.match(block, /^\s+feature: highlightText\(/m, `${file} ${id}: new in ${newIn}, so highlightText`);
-      }
+      const helper = newIn === version ? "highlightText" : "everythingElseText";
+      assert.ok(block.includes(`feature: ${helper}(`), `${file} ${id}: new in ${newIn ?? "no release"}, so ${helper}`);
     }
   }
 });

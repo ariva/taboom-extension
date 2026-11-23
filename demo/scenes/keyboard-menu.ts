@@ -1,13 +1,14 @@
-import { highlightText } from "../../src/app/release-highlights.ts";
+import { everythingElseText } from "../../src/app/release-highlights.ts";
 import type { Scene } from "./index.ts";
 
 // the row menu without the mouse: arrows put the amber cursor on a row, Shift+F10 (the Menu key,
 // or "." outside the search) opens its menu with the first item focused, arrows walk it, Right
-// enters a submenu, Left leaves it, Esc closes and hands the focus back to the search
+// enters a submenu, Left leaves it, Esc closes the menu only (the arrows took the focus out of the
+// search: the keys stay the list's)
 export const keyboardMenu: Scene = {
   id: "keyboard-menu",
   title: "Row menus from the keyboard",
-  feature: highlightText("1.1.0", "keyboard-menu"),
+  feature: everythingElseText("keyboard-menu"),
   settings: "#page-title",
   newIn: "1.1.0",
   covers: /cursor row's menu|Shift\+F10/i,
@@ -44,7 +45,7 @@ export const keyboardMenu: Scene = {
     await stage.press("ArrowDown");
     await stage.still("keyboard-row-submenu");
     await stage.press("ArrowLeft");
-    await stage.caption("Esc closes the menu — the focus is back in the search, the cursor where it was", 600);
+    await stage.caption("Esc closes the menu — the cursor is where it was", 600);
     await stage.press("Escape");
     await stage.pause(900);
     // a second Esc clears the (empty) search, and the cursor with it: the next scene starts clean

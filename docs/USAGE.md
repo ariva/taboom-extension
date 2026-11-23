@@ -67,12 +67,15 @@ In the list:
 
 - `/` — focus the search (a character inside a text field).
 - `↑` / `↓` — move the amber row cursor. It goes away when focus leaves the panel; the next arrow starts from the top.
+- An arrow pressed in the search also takes the focus out of it: from then on the keys belong to the list and nothing is typed into the query. `↑` on the first row (or `/`) goes back to the search, the caret at the end of the query.
+- `Space` — tick / untick the cursor row, the same as a click on its checkbox; the cursor stays, so `↓` `Space` `↓` `Space` ticks a run for the bulk bar. In the search it stays a character; on a focused button or checkbox it keeps its own job.
+- `←` / `→` — once out of the search: the previous / next filter chip (All, Awake, Snoozed, Protected, Tags), stopping at the ends. Tags picked this way filters by the tags already ticked and opens no picker. In the search they move the caret.
 - `Enter` — activate the cursor row's tab (on a parked row: open its menu).
 - `Esc` — clear the search (inside a dialog, picker or menu it only closes that).
 
 Opening a row's menu:
 
-- `.` — outside text fields. In the search it stays a character.
+- `.` — outside text fields, so also right after arrowing out of the search. In the search it stays a character.
 - `Menu` key and `Shift+F10` — the same action, and they work from the search field too.
 - The browser command **Side panel: open the menu of the highlighted row** — listed at `chrome://extensions/shortcuts` (Firefox: `about:addons` → ⚙ → Manage Extension Shortcuts), unassigned. This is the rebindable one: a bare `.` cannot be listed there, Chrome requires `Ctrl` or `Alt` in a command key (see [Changing the key bindings](#changing-the-key-bindings)).
 - The menu opens for the cursor row. With no cursor: for this window's active tab.

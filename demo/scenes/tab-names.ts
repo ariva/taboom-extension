@@ -1,4 +1,4 @@
-import { highlightText } from "../../src/app/release-highlights.ts";
+import { everythingElseText } from "../../src/app/release-highlights.ts";
 import type { Scene } from "./index.ts";
 
 // custom tab names: Rename tab… in the row menu (before Copy URL), the dialog, the renamed row
@@ -7,7 +7,7 @@ export const tabNames: Scene = {
   id: "tab-names",
   settings: "#tab-names-table",
   title: "Name a tab yourself",
-  feature: highlightText("1.1.0", "tab-names"),
+  feature: everythingElseText("tab-names"),
   newIn: "1.1.0",
   covers: /tab name|rename/i,
   async run(stage) {

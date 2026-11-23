@@ -1,4 +1,4 @@
-import { highlightText } from "../../src/app/release-highlights.ts";
+import { everythingElseText } from "../../src/app/release-highlights.ts";
 import type { Scene } from "./index.ts";
 import { type DragArgs, dragRows } from "./reorder.ts";
 
@@ -9,7 +9,7 @@ export const temporaryProtection: Scene = {
   id: "temporary-protection",
   settings: "#rules-table",
   title: "Temporary protection or keep-alive",
-  feature: highlightText("1.1.0", "temporary-protection"),
+  feature: everythingElseText("temporary-domain"),
   newIn: "1.1.0",
   covers: /temporar|expir|duration|disabled protected|protected sites/i,
   async run(stage) {

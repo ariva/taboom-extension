@@ -12,7 +12,7 @@ const focused = () => document.activeElement as HTMLElement;
 const cursorTitle = () => document.querySelector(".row.cursor .title")?.textContent;
 const activated = () => panel.calls.filter((call) => /^windows\.update|"active":true/.test(call));
 
-test("Shift+F10 from the search opens the cursor row's menu, focus on its first item; Escape gives focus back", async () => {
+test("Shift+F10 after arrowing from the search opens the cursor row's menu, focus on its first item; Escape closes only the menu", async () => {
   await userEvent.click(search());
   await userEvent.keyboard("{ArrowDown}{ArrowDown}");
   const title = cursorTitle();
@@ -31,7 +31,7 @@ test("Shift+F10 from the search opens the cursor row's menu, focus on its first 
   expect(cursorTitle()).toBe(title); // the arrow went to the menu, not to the list
   await userEvent.keyboard("{Escape}");
   expect(menu().matches(":popover-open")).toBe(false);
-  expect(focused()).toBe(search());
+  expect(focused()).not.toBe(search()); // the arrows left the search: the keys stay the list's
   expect(cursorTitle()).toBe(title); // Escape closed the menu only
 });
 
@@ -56,7 +56,6 @@ test("Right enters a submenu and Left leaves it", async () => {
 test("Period outside a text field opens the menu; Enter runs the focused item and nothing else", async () => {
   await userEvent.click(search());
   await userEvent.keyboard("{ArrowDown}");
-  search().blur();
   await userEvent.keyboard(".");
   await settle();
   expect(menu().matches(":popover-open")).toBe(true);
@@ -75,4 +74,39 @@ test("A period typed into the search is a character", async () => {
   await settle();
   expect((search() as HTMLInputElement).value).toBe(".");
   expect(menu().matches(":popover-open")).toBe(false);
+});
+
+test("Arrows leave the search: Space ticks the cursor row once, typing stays out of the query, Left / Right step the filter, Up from the top returns", async () => {
+  const field = search() as HTMLInputElement;
+  field.value = "";
+  field.dispatchEvent(new Event("input", { bubbles: true }));
+  await settle();
+  await userEvent.click(field);
+  await userEvent.keyboard("{ArrowDown}{ArrowDown}");
+  expect(focused()).not.toBe(field);
+  const box = () => document.querySelector('.row.cursor input[type="checkbox"]') as HTMLInputElement;
+  const title = cursorTitle();
+  await userEvent.keyboard(" ");
+  await settle();
+  expect(box().checked).toBe(true);
+  expect(cursorTitle()).toBe(title);
+  await userEvent.keyboard("x");
+  expect(field.value).toBe("");
+  const pressed = () => document.querySelector('#filters button[aria-pressed="true"]')?.getAttribute("data-filter");
+  await userEvent.keyboard("{ArrowRight}");
+  await settle();
+  expect(pressed()).toBe("awake");
+  await userEvent.keyboard("{ArrowLeft}");
+  await settle();
+  expect(pressed()).toBe("all");
+  expect(cursorTitle()).toBe(title);
+  await userEvent.keyboard(" ");
+  await settle();
+  expect(box().checked).toBe(false);
+  await userEvent.keyboard("{ArrowUp}{ArrowUp}");
+  expect(focused()).toBe(field);
+  expect(document.querySelector(".row.cursor")).toBeNull();
+  await userEvent.keyboard("ab cd");
+  expect(field.value).toBe("ab cd");
+  await userEvent.keyboard("{Escape}");
 });

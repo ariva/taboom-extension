@@ -129,11 +129,13 @@ threshold does not apply, and a toast says how many.
 
 **Row menus from the keyboard** — `↓` / `↑` move the amber cursor, `Shift+F10`, the `Menu` key or `.`
 (outside the search) opens that row's menu with its first item in focus; arrows walk it, `→` enters a
-submenu, `←` leaves it, `Esc` closes. Every menu of the panel works the same way.
+submenu, `←` leaves it, `Esc` closes. Every menu of the panel works the same way. `Space` ticks or unticks
+the cursor row for the bulk bar; `←` / `→` step through the filter chips; `↑` on the first row goes back to the search.
 
 <p>
   <img src="assets/features/chrome/keyboard-row-menu.png" alt="Row menu opened from the keyboard, first item in focus" width="360">
   <img src="assets/features/chrome/keyboard-row-submenu.png" alt="Row menu - a submenu entered with the right arrow" width="360">
+  <img src="assets/features/chrome/keyboard-select.png" alt="Three rows ticked with Space, the cursor on the last" width="360">
 </p>
 
 → [Usage: Duplicates](USAGE.md#duplicates) · [Usage: Keyboard](USAGE.md#keyboard)

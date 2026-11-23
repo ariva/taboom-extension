@@ -50,8 +50,14 @@ the whole list at the film's start, then before each scene with the finished lin
 coming one marked — a viewer can tell what was shown and
 what is still to come; during a scene the pane's header counts ("6 / 18"). A line is a scene's
 `feature` (`demo/scenes/*.ts`), always taken by key from `src/app/release-highlights.ts`: a scene
-marked new in a release that has an entry there uses `highlightText(version, key)` — the film
-and Settings → Changes share that array — and every other scene `everythingElseText(key)`. The
+new in the release the film presents uses `highlightText(version, key)` — the film
+and Settings → Changes share that array — and every other scene `everythingElseText(key)`.
+The release presented is the recorded one, or — for a fixes-only release, which has no lines —
+the last one that had features (`featureRelease()`): its scenes keep playing first under **New in**.
+When a release with features follows, the previous one's scenes move to `everythingElseText`
+and its lines are folded into `EVERYTHING_ELSE` (fewer, broader lines, or an existing line). A
+column of the card holds 11 lines: groups that fit get a column each, a longer **Everything
+else** starts under **New in** and runs on into the second column (23 rows at most, headings counted). The
 registry test fails when the film's **New in** group differs from the release's highlights, or
 its **Everything else** group from `EVERYTHING_ELSE`. Scenes naming the same line share it and it is ticked after the
 last of them; the outro and the stills-only scene have none. This release's lines come first under

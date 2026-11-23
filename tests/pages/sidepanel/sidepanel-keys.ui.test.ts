@@ -66,8 +66,7 @@ test("UI - Sidepanel Keyboard - Arrow keys move the cursor and clamp at both end
   assert.equal(cursorTitle(), "Gamma", "clamped at last row");
   key("ArrowUp");
   key("ArrowUp");
-  key("ArrowUp");
-  assert.equal(cursorTitle(), "Alpha", "clamped at first row");
+  assert.equal(cursorTitle(), "Alpha", "back on the first row");
 });
 
 test("UI - Sidepanel Keyboard - Enter activates the cursor tab", keyNavSkip, async () => {
@@ -91,6 +90,111 @@ test("UI - Sidepanel Keyboard - Focus leaving the panel drops the cursor", keyNa
   assert.ok(document.querySelector(".row.cursor") === null, "no outline left behind");
   key("ArrowDown");
   assert.equal(cursorTitle(), q(document, ".row .title").textContent, "the next arrow starts from the first row");
+});
+
+// ---------- list mode: the arrows take the keys away from the search ----------
+
+const search = () => byId<HTMLInputElement>("search");
+const cursorBox = () => q<HTMLInputElement>(document, '.row.cursor input[type="checkbox"]');
+const ticked = () => document.querySelectorAll('.row input[type="checkbox"]:checked').length;
+
+test("UI - Sidepanel Keyboard - An arrow out of the search leaves the field", keyNavSkip, () => {
+  window.dispatchEvent(new window.Event("blur")); // no cursor
+  search().focus();
+  key("ArrowDown");
+  assert.ok(document.querySelector(".row.cursor") !== null, "cursor on a row");
+  assert.ok(document.activeElement !== search(), "the search is no longer typed into");
+});
+
+test("UI - Sidepanel Keyboard - Space ticks and unticks the cursor row, the cursor stays", keyNavSkip, () => {
+  const title = cursorTitle();
+  assert.equal(cursorBox().checked, false);
+  const space = new window.KeyboardEvent("keydown", { key: " ", bubbles: true, cancelable: true });
+  document.dispatchEvent(space);
+  assert.equal(space.defaultPrevented, true, "the list does not scroll by a page");
+  assert.equal(cursorBox().checked, true);
+  assert.equal(cursorTitle(), title);
+  assert.equal(ticked(), 1);
+  key(" ");
+  assert.equal(cursorBox().checked, false);
+  assert.equal(ticked(), 0);
+});
+
+test("UI - Sidepanel Keyboard - Space on a focused control keeps its own job", keyNavSkip, () => {
+  const button = byId("bulk-clear");
+  const space = new window.KeyboardEvent("keydown", { key: " ", bubbles: true, cancelable: true });
+  button.dispatchEvent(space);
+  assert.equal(space.defaultPrevented, false);
+  assert.equal(ticked(), 0);
+});
+
+test("UI - Sidepanel Keyboard - Up on the first row goes back to the search", keyNavSkip, () => {
+  assert.equal(cursorTitle(), q(document, ".row .title").textContent, "on the first row");
+  key("ArrowUp");
+  assert.ok(document.activeElement === search(), "search focused");
+  assert.ok(document.querySelector(".row.cursor") === null, "empty query: no cursor");
+});
+
+test("UI - Sidepanel Keyboard - Space in the search is a character", keyNavSkip, () => {
+  search().value = "a"; // every title has one: the typing puts the cursor on the first row
+  search().dispatchEvent(new window.Event("input", { bubbles: true }));
+  assert.ok(document.querySelector(".row.cursor") !== null);
+  const space = new window.KeyboardEvent("keydown", { key: " ", bubbles: true, cancelable: true });
+  search().dispatchEvent(space);
+  assert.equal(space.defaultPrevented, false);
+  assert.equal(ticked(), 0);
+  key("ArrowDown");
+  key("ArrowUp");
+  key("ArrowUp");
+  assert.ok(document.activeElement === search(), "back in the search");
+  assert.equal(cursorTitle(), q(document, ".row .title").textContent, "a query keeps the first row for Enter");
+  key("Escape");
+  search().blur();
+  window.dispatchEvent(new window.Event("blur"));
+});
+
+const pressedFilter = () => q<HTMLElement>(document, '#filters button[aria-pressed="true"]').dataset.filter;
+
+test("UI - Sidepanel Keyboard - Left and Right step through the filter chips, stopping at the ends", keyNavSkip, () => {
+  assert.equal(pressedFilter(), "all");
+  key("ArrowRight");
+  assert.equal(pressedFilter(), "awake");
+  key("ArrowRight");
+  assert.equal(pressedFilter(), "snoozed");
+  key("ArrowLeft");
+  key("ArrowLeft");
+  assert.equal(pressedFilter(), "all");
+  key("ArrowLeft");
+  assert.equal(pressedFilter(), "all", "no wrap at the first chip");
+  const last = [...document.querySelectorAll<HTMLElement>("#filters button[data-filter]")].filter(
+    (chip) => !chip.hidden,
+  );
+  for (const _ of last) {
+    key("ArrowRight");
+  }
+  assert.equal(pressedFilter(), last.at(-1)?.dataset.filter, "no wrap at the last chip");
+  assert.equal(byId("tags-pop").matches(":popover-open"), false, "the Tags chip reached by key opens no picker");
+  for (const _ of last) {
+    key("ArrowLeft");
+  }
+  assert.equal(pressedFilter(), "all");
+});
+
+test("UI - Sidepanel Keyboard - Left and Right in the search move the caret, not the filter", keyNavSkip, () => {
+  const arrow = new window.KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true, cancelable: true });
+  search().dispatchEvent(arrow);
+  assert.equal(arrow.defaultPrevented, false);
+  assert.equal(pressedFilter(), "all");
+});
+
+test("UI - Sidepanel Keyboard - Left and Right do nothing while flag off", { skip: KEY_NAV_ON }, () => {
+  key("ArrowRight");
+  assert.equal(pressedFilter(), "all");
+});
+
+test("UI - Sidepanel Keyboard - Space does nothing while flag off", { skip: KEY_NAV_ON }, () => {
+  key(" ");
+  assert.equal(ticked(), 0);
 });
 
 // ---------- the row menu from the keyboard ----------

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "vitest";
 import {
   EVERYTHING_ELSE,
+  featureRelease,
   everythingElse,
   everythingElseText,
   highlightText,
@@ -47,9 +48,13 @@ test("Release highlights - keys are unique slugs per release and every line is s
 
 test("Release highlights - everything else: the features from before the newest release, in their written order", () => {
   assert.deepEqual(everythingElse(), [
+    "Name a tab yourself",
+    "Temporary and per-domain rules",
+    "Settings",
+    "Custom tags",
+    "Row menus from the keyboard",
     "Open panels share one view",
     "Snooze inactive tabs now",
-    "Custom tags",
     "Park a window, restore it later",
     "Every window, every tab, one panel",
     "Search and filters",
@@ -57,7 +62,6 @@ test("Release highlights - everything else: the features from before the newest 
     "Sort, group, move tabs",
     "Snooze, protect, bulk actions",
     "Duplicates",
-    "Settings",
   ]);
 });
 
@@ -73,4 +77,10 @@ test("Release highlights - everything else: unique slug keys, lines short enough
     assert.match(line.key, /^[a-z0-9]+(-[a-z0-9]+)*$/, line.key);
     assert.ok(line.text.length > 0 && line.text.length <= 36, `"${line.text}"`);
   }
+});
+
+test("Release highlights - the release the film presents: itself when it has lines, else the newest that has", () => {
+  assert.equal(featureRelease("1.1.0"), "1.1.0");
+  const newest = Object.keys(RELEASE_HIGHLIGHTS).find((release) => (RELEASE_HIGHLIGHTS[release]?.length ?? 0) > 0);
+  assert.equal(featureRelease("99.0.0"), newest, "a fixes-only release: the last one with features");
 });

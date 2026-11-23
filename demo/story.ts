@@ -23,7 +23,10 @@ li.old{opacity:.55}
 #list{position:fixed;inset:0;box-sizing:border-box;padding:12px 24px;background:#202124;display:flex;flex-direction:column}
 #list[hidden]{display:none}
 #beat{position:absolute;right:0;bottom:0;width:1px;height:1px}
-#list .cols{display:grid;grid-template-columns:1fr 1fr;gap:0 28px;margin-top:6px}
+#list .cols{flex:1;min-height:0;margin-top:6px;columns:2;column-gap:28px;column-fill:auto}
+#list .cols div.own{break-before:column}
+#list .cols div+div:not(.own) h2{margin-top:6px}
+#list h2{break-after:avoid}
 #list h2{margin:0 0 2px;color:#9aa0a6;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;line-height:18px}
 #list p{position:relative;margin:0;padding-left:22px;font-size:14px;line-height:20px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#e8eaed}
 #list p::before{content:"○";position:absolute;left:2px;color:#5f6368}
@@ -80,8 +83,12 @@ window.__story = {
     document.getElementById("list-progress").textContent = state.done + " of " + state.total + " shown";
     const cols = list.querySelector(".cols");
     cols.textContent = "";
+    // a column holds 11 lines under a heading: groups that each fit get a column of their own;
+    // a longer one starts under the group before it and runs on into the second column
+    const ownColumns = state.groups.every((group) => group.items.length <= 11);
     for (const group of state.groups) {
       const col = document.createElement("div");
+      col.className = ownColumns ? "own" : "";
       const heading = document.createElement("h2");
       heading.textContent = group.heading;
       col.append(heading);

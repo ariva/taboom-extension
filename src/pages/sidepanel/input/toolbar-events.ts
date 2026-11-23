@@ -167,9 +167,14 @@ filterBar.addEventListener("click", (event) => {
   }
   // per-filter scroll memory applies while searching too, but in-search
   // positions live in their own map so pre-search spots survive the search
+  setFilter(button.dataset.filter!); // the button matched [data-filter]
+});
+
+// A filter chosen by the user: a click on its chip, or a step with the keyboard (keyboard-nav.ts).
+export function setFilter(filter: string): void {
   const scrollMap = state.query ? searchScrollByFilter : scrollByFilter;
   scrollMap.set(state.filter, listEl.scrollTop);
-  state.filter = button.dataset.filter!; // the button matched [data-filter]
+  state.filter = filter;
   state.filterBeforeSearch = null; // the user's choice, search or not
   state.pendingScroll = scrollMap.get(state.filter) ?? 0;
   state.revealCurrent = true; // the current row at the top, when this view holds it
@@ -177,7 +182,7 @@ filterBar.addEventListener("click", (event) => {
   // mid-search the old/new filtered sets barely overlap — a view transition
   // cross-fades two unrelated lists (reads as ghosting), so skip animation
   render(!state.query);
-});
+}
 
 // scope/sort change = a different list — start at top (the current row at the top when the
 // list holds it), and saved per-filter positions from the old view are meaningless now
