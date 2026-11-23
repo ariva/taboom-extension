@@ -2392,6 +2392,20 @@ test("UI - Options - TAB_NAMES: the Tab names card after Tags — #, On, Pattern
   assert.equal(q(byId("tab-name-rows"), "td").textContent, "No tab names yet.");
 });
 
+test('UI - Options - Every "Remove all …" button wears the destructive style, in every pane alike', () => {
+  const css = [...document.querySelectorAll("style")].map((sheet) => sheet.textContent).join("\n");
+  // the one rule that paints them red: it lists its buttons by id
+  const rule = css.match(/#danger,[^{]*\{/)?.[0] ?? "";
+  const removeAll = qa<HTMLButtonElement>(document.body, 'button[id^="clear-"]');
+  assert.ok(removeAll.length >= 4, "protected sites, keep-alive, tags, tab names");
+  for (const button of removeAll) {
+    assert.ok(
+      rule.includes(`#${button.id},`) || rule.includes(`#${button.id} `),
+      `#${button.id} is not in the destructive rule`,
+    );
+  }
+});
+
 test("UI - Options - Settings tabs: no pane name is also an element id (the browser would scroll to it on the tab's click)", () => {
   for (const tab of qa<HTMLElement>(byId("settings-tabs"), "[role=tab]")) {
     const pane = tab.dataset.pane ?? "";
