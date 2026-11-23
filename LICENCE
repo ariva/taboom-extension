@@ -1,10 +1,10 @@
 Taboom — Tabs Manager
 Copyright (c) 2026 Arunas Ivanauskas. All rights reserved.
 
-Non-Monetized Use Licence
+Non-Monetized Use License
 
 1. Grant
-   Permission is hereby granted, free of charge, to any person or organisation
+   Permission is hereby granted, free of charge, to any person or organization
    obtaining a copy of this software and associated files (the "Software") to
    use, copy, modify, and run the Software as a browser extension, for personal
    use or in the course of business, provided the Software itself is not
@@ -14,7 +14,7 @@ Non-Monetized Use Licence
    "Non-monetized" means that no one is charged for the Software or for access
    to it, and the Software is not offered as part of anything that is charged
    for. Installing and using the Software at work, in a company or in an
-   organisation, free of charge, is non-monetized use and needs no permission.
+   organization, free of charge, is non-monetized use and needs no permission.
 
 3. Monetized use
    Monetizing the Software, in whole or in part, requires the prior explicit
@@ -30,18 +30,18 @@ Non-Monetized Use Licence
      arunas.work.hg@gmail.com
 
 4. Redistribution
-   Copies and derivative works made under Section 1 must retain this licence
+   Copies and derivative works made under Section 1 must retain this license
    text and the copyright notice above, and must be distributed under these
    same terms.
 
 5. No trademark rights
-   This licence grants no rights to use the name "Taboom" or the project's
+   This license grants no rights to use the name "Taboom" or the project's
    icons and images beyond what is necessary to run the Software.
 
 6. Disclaimer
    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+   FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. IN NO EVENT SHALL THE
    COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
    WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
    IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
@@ -49,4 +49,4 @@ Non-Monetized Use Licence
 
 7. Termination
    Any breach of these terms automatically terminates the rights granted under
-   this licence.
+   this license.

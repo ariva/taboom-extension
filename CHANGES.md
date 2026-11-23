@@ -1,5 +1,41 @@
 # CHANGES
 
+## v1.1.0 — 2026-11-22
+
+### Summary
+Custom tab names, temporary protection and keep-alive, keep alive by domain, keyboard-driven menus, tabbed Settings, and a Firefox extension build
+
+### New Features
+- Add . / Menu key / Shift+F10 and a rebindable Chrome command to open the cursor row's menu (1fd7b96)
+- Refactor UI of settings page - split the page into tabbed panes (0359ebb)
+- Add custom tab names (1768578)
+- Add expiring protection and keep-alive entries, plus enable/disable of protected sites in Settings (942e6ff)
+- Show disabled tags and paused keep-alive marks struck through in the side panel (f494670)
+- Add keep alive per domain (aeb0cc6)
+- Add reorder possibility in Settings page for keep-alive and tagged pages lists (5fa1b78)
+- Let tagged pages keep their #fragment (3fd407b)
+
+### Fixes
+- Hide the restore banner on firefox - it does not allow to do it on non-active windows (7eba9dd)
+- Useful Links into its own module with a per-browser list (eb6f592)
+- Clear the stale amber row cursor on window blur (7090371)
+- The right-click that brings a panel's window forward opens no menu (d533461)
+- Show the playing-audio position (bd0f071)
+- Match a pattern with a port against that port only (266059a)
+
+### Other
+- Keep filming the Settings pane after a tab switch changes (373b154)
+- List the new features in settings changes tab (454a906)
+- Show a feature checklist on the story pane before every scene (4b3eda7)
+- Stop copying the MP4 into docs/assets/demo/ (ad48743)
+- Add demo scenes and feature screenshots for keyboard row menus and tabbed Settings (be11232)
+- Context menu changes for parked windows and protected tabs (b4cdb38)
+- Cap the test tiers at 8 GB via systemd-run, log heap per file, add just test / test-heap recipes and ban DOM nodes in equality asserts (a27ab59)
+- Add demo scene and feature screenshots for temporary protection and keep-alive (4037e43)
+- Demo scenes for the 1.1.0 features (2511178)
+- Add cross browser docs (ca67ebd)
+- Build and ship for Firefox as well - prepare code to be deployed on firefox store (814a1f1)
+
 ## v1.0.9 — 2026-11-08
 
 ### Summary
