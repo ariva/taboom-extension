@@ -28,9 +28,12 @@
     }
 
     /* the demo film's checklist look: one ticked line per feature */
-    #new-in-date { margin-left: 0.625rem; font-size: 0.75em; font-weight: 400; }
-    #new-in-list li { position: relative; padding: 0.1875rem 0 0.1875rem 1.625rem; }
-    #new-in-list li::before { content: "✓"; position: absolute; left: 0.25rem; font-weight: 700; color: light-dark(#188038, #81c995); }
+    .new-in-block + .new-in-block { margin-top: 0.75rem; }
+    .new-in-block h3 { margin: 0 0 0.125rem; font-size: 1em; }
+    .new-in-block ul { list-style: none; margin: 0; padding: 0; }
+    .new-in-date { margin-left: 0.625rem; font-size: 0.75em; font-weight: 400; }
+    .new-in-block li { position: relative; padding: 0.1875rem 0 0.1875rem 1.625rem; }
+    .new-in-block li::before { content: "✓"; position: absolute; left: 0.25rem; font-weight: 700; color: light-dark(#188038, #81c995); }
     #whats-new .changes-entry + .changes-entry { margin-top: 0.75rem; }
     /* non-collapsable entry heading (OPTION_COLLAPSABLE_CHANGE_LOG_ITEMS off) */
     #whats-new .changes-title { margin: 0; padding: 0.25rem 0; }
@@ -681,10 +684,10 @@
   </section>
   </div>
   <div id="pane-changes" class="pane" role="tabpanel" aria-labelledby="tab-changes" hidden>
-  <!-- the installed release's new features in a few words each (new-in-release.ts); hidden for a release with none -->
+  <!-- the new features of the latest releases in a few words each (new-in-release.ts); hidden with none to list -->
   <section class="card" id="new-in-release" hidden>
-    <h2><span id="new-in-title"></span><span id="new-in-date" class="muted" hidden></span></h2>
-    <ul id="new-in-list"></ul>
+    <h2>Highlights</h2>
+    <div id="new-in-blocks"></div>
   </section>
   <section class="card">
     <h2>Changes</h2>

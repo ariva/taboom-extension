@@ -2542,34 +2542,79 @@ test("UI - Options - Useful Links: the last entry of the shown list is the proje
   assert.equal(link.dataset.url, undefined);
 });
 
-test("UI - Options - New in this release: hidden for a release without highlights", () => {
-  // the test manifest's version (0.0.0-test) has no entry in src/app/release-highlights.ts
-  assert.equal(byId("new-in-release").hidden, true);
+test("UI - Options - New in: shown at boot whatever the installed version, on top of the Changes pane", () => {
+  // the test manifest's version (0.0.0-test) has no highlights: the listed releases show all the same
+  assert.equal(byId("new-in-release").hidden, false);
   assert.ok(byId("pane-changes").contains(byId("new-in-release")), "the card lives in the Changes pane");
   const cards = qa(byId("pane-changes"), "section.card");
   assert.ok(cards[0] === byId("new-in-release"), "above the release list");
 });
 
-test("UI - Options - New in this release: the installed release's highlights as a plain list, with its date", async () => {
+test("UI - Options - New in, ungrouped: a block per visible release, headed by its version and date, lines as a plain list", async () => {
   const { renderNewInRelease } = await import("../../../src/pages/options/new-in-release.ts");
-  const { releaseHighlights } = await import("../../../src/app/release-highlights.ts");
-  renderNewInRelease("1.1.0", "2026-11-22");
+  const { visibleHighlights } = await import("../../../src/app/release-highlights.ts");
+  const shown = visibleHighlights();
+  assert.ok(shown.length > 0);
+  const [first] = shown;
+  renderNewInRelease((version) => (version === first?.version ? "2026-11-23" : undefined), shown, false);
   const card = byId("new-in-release");
   assert.equal(card.hidden, false);
-  assert.equal(byId("new-in-title").textContent, "New in v1.1.0");
-  assert.equal(byId("new-in-date").textContent, "2026-11-22");
   assert.deepEqual(
-    qa(card, "#new-in-list li").map((line) => line.textContent),
-    releaseHighlights("1.1.0"),
+    qa(card, "h2").map((heading) => heading.textContent),
+    ["Highlights"],
+    "the card's heading, grouped or not",
   );
+  assert.equal(qa(card, "h3").length, shown.length, "a New in heading per release under it");
+  const blocks = qa(card, ".new-in-block");
+  assert.deepEqual(
+    blocks.map((block) => q(block, ".new-in-version").textContent),
+    shown.map((release) => `New in v${release.version}`),
+  );
+  assert.deepEqual(
+    blocks.map((block) => qa(block, "li").map((line) => line.textContent)),
+    shown.map((release) => release.lines),
+  );
+  assert.equal(q(card, ".new-in-block .new-in-date").textContent, "2026-11-23");
+  assert.equal(qa(card, ".new-in-date").length, 1, "a release without a known date shows none");
   assert.equal(qa(card, "a").length, 0, "plain bullets, no links");
-  // no date known (CHANGES.md missing from a dev checkout): the list still shows
-  renderNewInRelease("1.1.0");
-  assert.equal(byId("new-in-date").hidden, true);
-  assert.equal(qa(card, "#new-in-list li").length, releaseHighlights("1.1.0").length, "rendered once, not appended");
-  // back to the test release: nothing to list, the card goes
-  renderNewInRelease("0.0.0-test");
-  assert.equal(card.hidden, true);
+  // a single release on show needs no heading to tell it from another: its lines alone
+  renderNewInRelease(() => "2026-11-23", shown.slice(0, 1), false);
+  assert.equal(qa(card, ".new-in-block").length, 1);
+  assert.equal(qa(card, "h3").length, 0, "no New in header");
+  assert.deepEqual(
+    qa(card, "h2").map((heading) => heading.textContent),
+    ["Highlights"],
+    "the card's own heading stays",
+  );
+  assert.deepEqual(
+    qa(card, "li").map((line) => line.textContent),
+    first?.lines,
+  );
+  // no date known (CHANGES.md missing from a dev checkout): the lists still show, rendered once
+  renderNewInRelease(undefined, shown, false);
+  assert.equal(qa(card, ".new-in-block").length, shown.length);
+  assert.equal(qa(card, ".new-in-date").length, 0);
+});
+
+test("UI - Options - New in, grouped: every visible release's lines under the one heading Highlights", async () => {
+  const { renderNewInRelease } = await import("../../../src/pages/options/new-in-release.ts");
+  const { visibleHighlights } = await import("../../../src/app/release-highlights.ts");
+  const shown = visibleHighlights();
+  renderNewInRelease(() => "2026-11-23", shown, true);
+  const card = byId("new-in-release");
+  assert.deepEqual(
+    qa(card, "h2").map((heading) => heading.textContent),
+    ["Highlights"],
+    "one heading, no release named, no date",
+  );
+  assert.deepEqual(
+    qa(card, "li").map((line) => line.textContent),
+    shown.flatMap((release) => release.lines),
+    "newest release's lines first",
+  );
+  renderNewInRelease(undefined, [], true);
+  assert.equal(card.hidden, true, "nothing to list: no card");
+  renderNewInRelease(); // as the page shows it
 });
 
 test("UI - Options - On extension update: offered only where a panel can be reopened in another window", () => {

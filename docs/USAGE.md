@@ -12,7 +12,7 @@ Pictures of each feature: [Features](FEATURES.md).
 
 Snoozing never closes tabs. Closing only happens when you explicitly close.
 
-**Settings** (the panel's ☰ → **Open Settings**, or the extension's options) opens on the **General** tab — look, automatic snooze, customizations, useful links, data — with **Protected sites**, **Keep alive**, **Tags**, **Tab names** and **Changes** (on top **New in v<version>**: the installed release's new features, a line each — the same list the demo film opens with; below, the notes of every release) as tabs beside it; a tab only shows while its feature is on. "Settings → Tags" below means that tab. The tab is in the page address (`#tags`), so a bookmark or Back brings it back; without one the page opens on General.
+**Settings** (the panel's ☰ → **Open Settings**, or the extension's options) opens on the **General** tab — look, automatic snooze, customizations, useful links, data — with **Protected sites**, **Keep alive**, **Tags**, **Tab names** and **Changes** (on top **Highlights**: the new features of the latest releases, a line each — the same lines the demo film ticks off; below, the notes of every release) as tabs beside it; a tab only shows while its feature is on. "Settings → Tags" below means that tab. The tab is in the page address (`#tags`), so a bookmark or Back brings it back; without one the page opens on General.
 
 **Seeing snoozed state in Chrome's own tab strip:** extensions cannot style the native tab strip. Enable Chrome's indicator instead: `chrome://settings/performance` → turn on **Memory Saver** — discarded tabs get a dotted ring around their favicon and a hover card.
 

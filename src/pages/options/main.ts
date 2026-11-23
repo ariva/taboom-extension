@@ -126,5 +126,5 @@ chrome.storage.onChanged.addListener(async (changes, area) => {
   syncSettingsTabs();
 });
 
-renderNewInRelease(getReleaseVersion()); // at once, from bundled data; initWhatsNew adds the date when CHANGES.md is read
+renderNewInRelease(); // at once, from bundled data; initWhatsNew adds the date when CHANGES.md is read
 initWhatsNew();

@@ -2,7 +2,6 @@
 // behind a flag, with a fold-all toggle and a paginated Show-more.
 import { featureEnabled } from "../../app/core.ts";
 import { FOLD_ICONS, getElementById, setSvgMarkup } from "../../lib/dom.ts";
-import { getReleaseVersion } from "../../app/env.ts";
 import { releaseDate, releaseSections, SHOW_INITIAL_CHANGES, SHOW_MORE_PAGE } from "./model.ts";
 import { renderNewInRelease } from "./new-in-release.ts";
 import { getFeatures } from "./page-state.ts";
@@ -17,9 +16,8 @@ export function initWhatsNew(): void {
       if (sections.length === 0) {
         return;
       }
-      // the card above the list learns its release's date from the notes
-      const version = getReleaseVersion();
-      renderNewInRelease(version, releaseDate(sections, version));
+      // the card above the list learns its releases' dates from the notes
+      renderNewInRelease((version) => releaseDate(sections, version));
       const box = getElementById("whats-new");
       // OPTION_COLLAPSABLE_CHANGE_LOG_ITEMS off: plain always-expanded entries —
       // no per-entry chevrons, no fold-all toggle (pagination still applies)
