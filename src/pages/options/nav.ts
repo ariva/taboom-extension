@@ -36,7 +36,8 @@ function select(name: string, target?: Element): void {
   }
 }
 
-// the hash → the pane: a pane name wins (#tab-names is also a <tbody> id), else the pane
+// the hash → the pane: a pane name wins (and none is an element id: the
+// browser scrolls to the element a new hash names — a test guards it), else the pane
 // holding the element; anything unknown or hidden by a flag reads as General
 function resolve(hash: string): { name: string; target?: Element } {
   const key = hash.replace(/^#/, "");

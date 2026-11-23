@@ -2255,7 +2255,7 @@ test("UI - Options - TAB_NAMES: the Tab names card after Tags — #, On, Pattern
   await chrome.storage.onChanged.fire({ tabNames: {} }, "local");
   await tick();
   await tick();
-  const rows = () => qa<HTMLTableRowElement>(byId("tab-names"), "tr");
+  const rows = () => qa<HTMLTableRowElement>(byId("tab-name-rows"), "tr");
   assert.deepEqual(
     qa(byId("tab-names-table"), "thead th").map((th) => th.textContent),
     ["#", "On", "Pattern", "Name", "Tabs", ""],
@@ -2389,7 +2389,14 @@ test("UI - Options - TAB_NAMES: the Tab names card after Tags — #, On, Pattern
   await chrome.storage.onChanged.fire({ tabNames: {}, tabNamesTrash: {} }, "local");
   await tick();
   await tick();
-  assert.equal(q(byId("tab-names"), "td").textContent, "No tab names yet.");
+  assert.equal(q(byId("tab-name-rows"), "td").textContent, "No tab names yet.");
+});
+
+test("UI - Options - Settings tabs: no pane name is also an element id (the browser would scroll to it on the tab's click)", () => {
+  for (const tab of qa<HTMLElement>(byId("settings-tabs"), "[role=tab]")) {
+    const pane = tab.dataset.pane ?? "";
+    assert.ok(document.getElementById(pane) === null, `#${pane} is an element: the hash would jump to it`);
+  }
 });
 
 test("UI - Options - Settings tabs: General first; a tab shows its pane and sets the hash; a hash naming an element opens the pane holding it; arrows move between tabs; flag-hidden panes have no tab", async () => {

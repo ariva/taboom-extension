@@ -293,8 +293,8 @@
     /* drag reorder of the tag, tagged-page and keep-alive rows, like the side panel's tab rows: the
        dragged row dims, the row under the pointer is highlighted whole (accent frame + tint). The tag
        table gives the grip a column; the other three put it in the # cell */
-    :is(#tag-rows, #tag-page-rows, #keep-alive-rows, #rules, #tab-names) tr[draggable="true"] { cursor: grab; }
-    :is(#tag-rows, #tag-page-rows, #keep-alive-rows, #rules, #tab-names) tr[draggable="false"] .drag-grip { opacity: 0.35; }
+    :is(#tag-rows, #tag-page-rows, #keep-alive-rows, #rules, #tab-name-rows) tr[draggable="true"] { cursor: grab; }
+    :is(#tag-rows, #tag-page-rows, #keep-alive-rows, #rules, #tab-name-rows) tr[draggable="false"] .drag-grip { opacity: 0.35; }
     /* sortable headers: a faint ⇅ invites the click, the active one shows ▲ / ▼ */
     /* sortable headers read in the accent in both tables (the tag table did by a comma slip in the old
        selectors; kept on purpose); the arrow is dim until its sort is active */
@@ -302,18 +302,18 @@
     .sort-button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
     #tag-table th[data-sort] .sort-arrow, #tag-page-table th[data-sort] .sort-arrow { font-size: 10px; opacity: 0.45; }
     #tag-table th[data-sort][data-dir] .sort-arrow, #tag-page-table th[data-sort][data-dir] .sort-arrow { opacity: 1; }
-    :is(#tag-rows, #tag-page-rows, #keep-alive-rows, #rules, #tab-names) .drag-grip { display: inline-flex; color: var(--muted); vertical-align: middle; }
-    :is(#tag-page-rows, #keep-alive-rows, #rules, #tab-names) .drag-grip { margin-right: 6px; }
-    :is(#tag-rows, #tag-page-rows, #keep-alive-rows, #rules, #tab-names) .drag-grip svg { width: 10px; height: 14px; display: block; }
-    :is(#tag-rows, #tag-page-rows, #keep-alive-rows, #rules, #tab-names) tr.dragging td { opacity: 0.4; }
+    :is(#tag-rows, #tag-page-rows, #keep-alive-rows, #rules, #tab-name-rows) .drag-grip { display: inline-flex; color: var(--muted); vertical-align: middle; }
+    :is(#tag-page-rows, #keep-alive-rows, #rules, #tab-name-rows) .drag-grip { margin-right: 6px; }
+    :is(#tag-rows, #tag-page-rows, #keep-alive-rows, #rules, #tab-name-rows) .drag-grip svg { width: 10px; height: 14px; display: block; }
+    :is(#tag-rows, #tag-page-rows, #keep-alive-rows, #rules, #tab-name-rows) tr.dragging td { opacity: 0.4; }
     /* switched off: the row reads muted, the switch itself stays crisp */
     #tag-rows tr.off td:not(:nth-child(3)) { opacity: 0.5; }
-    :is(#tag-rows, #tag-page-rows, #keep-alive-rows, #rules, #tab-names) tr.drop-target td {
+    :is(#tag-rows, #tag-page-rows, #keep-alive-rows, #rules, #tab-name-rows) tr.drop-target td {
       background: color-mix(in srgb, var(--accent) 14%, transparent);
       box-shadow: inset 0 2px 0 var(--accent), inset 0 -2px 0 var(--accent);
     }
-    :is(#tag-rows, #tag-page-rows, #keep-alive-rows, #rules, #tab-names) tr.drop-target td:first-child { box-shadow: inset 2px 2px 0 var(--accent), inset 0 -2px 0 var(--accent); border-radius: 6px 0 0 6px; }
-    :is(#tag-rows, #tag-page-rows, #keep-alive-rows, #rules, #tab-names) tr.drop-target td:last-child { box-shadow: inset -2px 2px 0 var(--accent), inset 0 -2px 0 var(--accent); border-radius: 0 6px 6px 0; }
+    :is(#tag-rows, #tag-page-rows, #keep-alive-rows, #rules, #tab-name-rows) tr.drop-target td:first-child { box-shadow: inset 2px 2px 0 var(--accent), inset 0 -2px 0 var(--accent); border-radius: 6px 0 0 6px; }
+    :is(#tag-rows, #tag-page-rows, #keep-alive-rows, #rules, #tab-name-rows) tr.drop-target td:last-child { box-shadow: inset -2px 2px 0 var(--accent), inset 0 -2px 0 var(--accent); border-radius: 0 6px 6px 0; }
     :is(#keep-alive-table, #rules-table, #tab-names-table) td:last-child { text-align: right; }
     :is(#keep-alive-table, #rules-table, #tab-names-table) button {
       border: 1px solid light-dark(#ddd, #444);
@@ -659,7 +659,7 @@
     <p class="muted">Give a tab your own name: the side panel shows it in place of the page title (the browser's own tab strip keeps the page title — an extension cannot change it without a content script), the hover tip keeps the real title and search finds both. Rename a tab from its side panel row menu (<strong>Rename tab…</strong>, a blank name removes it), or add a rule here: a pattern in the tagged-page forms — an exact address, an address ending in <code>/</code> for every page under it, a host (<code>example.com</code>, with a port <code>app.test:9000</code>), <code>*.example.com</code> or a pattern with <code>*</code> anywhere — and the name every tab it covers shows. The first rule covering a page wins: drag a row by its grip onto another to reorder. Untick <strong>On</strong> to keep a rule without using it. <strong>Tabs</strong> counts the open tabs a rule covers right now.</p>
     <table id="tab-names-table">
       <thead><tr><th>#</th><th>On</th><th>Pattern</th><th>Name</th><th>Tabs</th><th></th></tr></thead>
-      <tbody id="tab-names"></tbody>
+      <tbody id="tab-name-rows"></tbody>
       <!-- the Add row is a table row: the pattern under Pattern, the name under Name -->
       <tfoot>
         <tr id="new-tab-name-row">

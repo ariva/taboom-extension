@@ -29,7 +29,7 @@ export async function renderTabNames(state: AppState): Promise<void> {
     chrome.tabs.query({}), // the Tabs column: counted at render time, so it follows every write and a page open
   ]);
   renderRestore(tabNamesTrash);
-  const rows = getElementById("tab-names");
+  const rows = getElementById("tab-name-rows");
   if (rows.querySelector(".rename-input")) {
     return; // an edit in progress: the table catches up when it ends (the editor's finish renders)
   }
@@ -202,7 +202,7 @@ async function restoreLastRemoval(): Promise<void> {
 
 export function initTabNames(): void {
   // the stored order is the match order: the first rule covering a page names it
-  initRowReorder(getElementById("tab-names"), (dragged, target) =>
+  initRowReorder(getElementById("tab-name-rows"), (dragged, target) =>
     save((list) => moveItemTo(list, (rule) => rule.id, dragged, target)),
   );
   getElementById("add-tab-name").addEventListener("click", addTabName);
