@@ -113,6 +113,18 @@ export async function pinTabs(tabIds: number[], pinned: boolean): Promise<void> 
   refresh(true);
 }
 
+// Chrome's own duplicate: the copy lands beside the original (same window and group, history kept)
+// and Chrome makes it the active tab — the API offers no background copy there
+export async function duplicateTabs(tabIds: number[]): Promise<void> {
+  const results = await Promise.allSettled(tabIds.map((tabId) => chrome.tabs.duplicate(tabId)));
+  const failed = results.find((result) => result.status === "rejected");
+  if (failed) {
+    toastFailure("duplicate every tab", failed.reason);
+  }
+  unselect(tabIds);
+  refresh(true);
+}
+
 // hours: a temporary rule from the row menu's duration submenu; absent = permanent (T-0157)
 const forHours = (hours: number | undefined) => (hours === undefined ? {} : { hours });
 

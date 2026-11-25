@@ -138,6 +138,14 @@ the cursor row for the bulk bar; `←` / `→` step through the filter chips; `�
   <img src="assets/features/chrome/keyboard-select.png" alt="Three rows ticked with Space, the cursor on the last" width="360">
 </p>
 
+**Duplicate tab** — a row's menu has **Duplicate tab** under **Copy URL** (**Duplicate N tabs** over a
+selection): the browser's own duplicate, so the copy opens beside the original, in the same window and tab
+group, with its history.
+
+<p>
+  <img src="assets/features/chrome/duplicate-tab-menu.png" alt="Row menu - Duplicate tab under Copy URL" width="360">
+</p>
+
 → [Usage: Duplicates](USAGE.md#duplicates) · [Usage: Keyboard](USAGE.md#keyboard)
 
 ## Settings

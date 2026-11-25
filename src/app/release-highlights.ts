@@ -23,7 +23,10 @@ export const GROUP_HIGHLIGHTS: boolean = false;
 export const VISIBLE_HIGHLIGHTS_RELEASES: readonly string[] = ["1.1.1", "1.1.0"];
 
 export const RELEASE_HIGHLIGHTS: Readonly<Record<string, readonly ReleaseHighlight[]>> = {
-  "1.1.1": [{ key: "keyboard-select", text: "Select and filter from the keyboard" }],
+  "1.1.1": [
+    { key: "keyboard-select", text: "Select and filter from the keyboard" },
+    { key: "duplicate-tab", text: "Duplicate tab" },
+  ],
   "1.1.0": [
     { key: "tab-names", text: "Custom Tab Names" },
     { key: "temporary-protection", text: "Temporary protection or keep-alive" },

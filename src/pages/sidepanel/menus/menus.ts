@@ -22,6 +22,7 @@ import {
   actionIds,
   closeTabs,
   copyUrls,
+  duplicateTabs,
   keepAlive,
   pinTabs,
   protectTabs,
@@ -163,6 +164,7 @@ export function openRowMenu(event: MouseEvent, tabId: number): void {
     ctxAppend(ctxItem("Rename tab…", () => renameTab(tabId)));
   }
   ctxAppend(ctxItem(ids.length > 1 ? `Copy ${ids.length} URLs` : "Copy URL", () => copyUrls(ids)));
+  ctxAppend(ctxItem(ids.length > 1 ? `Duplicate ${ids.length} tabs` : "Duplicate tab", () => duplicateTabs(ids)));
   appendCtxActions(ids);
   // single tab only: one right-click over a big selection must never mark hundreds
   // of pages for periodic reloads (bulk unmark goes through Settings)

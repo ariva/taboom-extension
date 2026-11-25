@@ -122,6 +122,8 @@ export function makeChrome<
       },
       remove: async (ids: number | number[]) => calls.push(`tabs.remove ${list(ids)}`),
       reload: async (id: number) => calls.push(`tabs.reload ${id}`),
+      duplicate: async (id: number) => calls.push(`tabs.duplicate ${id}`), // log only, like remove: the tab list stays
+
       move: async (ids: number | number[], props?: chrome.tabs.MoveProperties) => {
         calls.push(`tabs.move ${list(ids)} ${JSON.stringify(props ?? {})}`);
         for (const id of list(ids)) {

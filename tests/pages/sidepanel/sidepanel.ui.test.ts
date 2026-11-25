@@ -1144,6 +1144,7 @@ test("UI - Sidepanel - Right-click row offers move-to-window menu (selection-awa
     [
       ...(TAB_NAMES_ON ? ["Rename tab…"] : []), // a single tab's name, before Copy URL
       "Copy URL",
+      "Duplicate tab",
       "Snooze",
       "Wake",
       "Pin",
@@ -1336,6 +1337,29 @@ test("UI - Sidepanel - Context menu actions act on the clicked tab / whole selec
     "close removes only the clicked tab",
   );
   await new Promise((resolve) => setTimeout(resolve, 200));
+});
+
+test("UI - Sidepanel - Context menu Duplicate tab duplicates the clicked tab / whole selection", async () => {
+  const rowOf = (id: number) => q(document, `.row[data-tab-id="${id}"]`);
+  const menu = byId("ctx-menu");
+  const pick = (label: string) => must(qa(menu, ".ctx-item").find((el) => el.textContent === label)).click();
+  const duplicated = () => calls.filter((call) => call.startsWith("tabs.duplicate"));
+  calls.length = 0;
+  rowOf(1).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+  pick("Duplicate tab");
+  await tick();
+  await tick();
+  assert.deepEqual(duplicated(), ["tabs.duplicate 1"], "the clicked tab only");
+
+  byId<HTMLInputElement>("select-all").click();
+  const count = document.querySelectorAll(".row").length;
+  calls.length = 0;
+  rowOf(1).dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+  pick(`Duplicate ${count} tabs`);
+  await tick();
+  await tick();
+  assert.equal(duplicated().length, count, "one call per selected tab");
+  assert.equal(document.querySelectorAll(".row input:checked").length, 0, "the selection is consumed, as by Pin");
 });
 
 test("UI - Sidepanel - Context menu Copy URL copies the clicked tab / whole selection, keeps the selection", async () => {
