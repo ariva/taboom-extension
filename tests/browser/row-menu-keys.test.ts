@@ -55,7 +55,7 @@ test("Right enters a submenu and Left leaves it", async () => {
 
 test("Period outside a text field opens the menu; Enter runs the focused item and nothing else", async () => {
   await userEvent.click(search());
-  await userEvent.keyboard("{ArrowDown}");
+  await userEvent.keyboard("{ArrowDown}{ArrowDown}"); // the group's header, then its first row
   await userEvent.keyboard(".");
   await settle();
   expect(menu().matches(":popover-open")).toBe(true);
@@ -109,4 +109,33 @@ test("Arrows leave the search: Space ticks the cursor row once, typing stays out
   await userEvent.keyboard("ab cd");
   expect(field.value).toBe("ab cd");
   await userEvent.keyboard("{Escape}");
+});
+
+test("The cursor on a group header: Space ticks its tabs, Left folds, Right unfolds", async () => {
+  await userEvent.click(search());
+  await userEvent.keyboard("{ArrowDown}");
+  const header = () => document.querySelector(".group-header.cursor") as HTMLElement;
+  expect(header()).toBeTruthy();
+  expect(focused()).not.toBe(search());
+  const rows = () => document.querySelectorAll(".row").length;
+  const ticks = () => document.querySelectorAll('.row input[type="checkbox"]:checked').length;
+  const before = rows();
+  await userEvent.keyboard(" ");
+  await settle();
+  expect(ticks()).toBeGreaterThan(0);
+  expect((header().querySelector(".group-select") as HTMLInputElement).checked).toBe(true);
+  await userEvent.keyboard(" ");
+  await settle();
+  expect(ticks()).toBe(0);
+  if (header().getAttribute("aria-expanded") !== null) {
+    await userEvent.keyboard("{ArrowLeft}");
+    await settle();
+    expect(rows()).toBeLessThan(before);
+    expect(header()).toBeTruthy(); // the cursor stays on the folded header
+    await userEvent.keyboard("{ArrowRight}");
+    await settle();
+    expect(rows()).toBe(before);
+  }
+  await userEvent.keyboard("{ArrowUp}");
+  expect(focused()).toBe(search());
 });

@@ -172,6 +172,7 @@ export async function refresh(animate = false, preloaded: AppState | null = null
   // flag turned off mid-navigation: drop the cursor so no stale outline lingers
   if (!featureEnabled(state.features, "SIDEBAR_KEYBOARD_NAVIGATION")) {
     state.cursor = -1;
+    state.cursorGroup = null;
   }
   state.navMode = resolveNavMode(state.features, state.ui);
   // flag-gated sorts: hide options whose flag is off, and show the effective

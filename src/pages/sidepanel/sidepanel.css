@@ -204,6 +204,7 @@ main.compact .row.in-group { padding: 0.1875rem 0.5rem 0.1875rem 1.5625rem; }
 .row.active-tab .title { font-weight: 600; }
 /* keyboard cursor: amber, so it can't be confused with the accent-blue active-tab border */
 .row.cursor { outline: 0.125rem solid var(--warn-fg); outline-offset: -0.125rem; }
+.group-header.cursor { outline: 0.125rem solid var(--warn-fg); outline-offset: -0.125rem; color: var(--warn-fg); }
 
 /* per-window color dot (rows, group headers, history popup) — present only
    when tabs span multiple windows */

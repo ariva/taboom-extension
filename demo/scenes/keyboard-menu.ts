@@ -16,9 +16,10 @@ export const keyboardMenu: Scene = {
     await stage.caption(`${stage.release} — every row action without the mouse`, 1800);
     await stage.click(stage.panel.locator("#search"));
     await stage.caption("↓ and ↑ move the amber cursor over the list", 600);
-    await stage.press("ArrowDown");
-    await stage.press("ArrowDown");
-    await stage.press("ArrowDown");
+    // headers are stops too: the current window's header and tab, the next header, then two rows
+    for (let step = 0; step < 5; step++) {
+      await stage.press("ArrowDown");
+    }
     await stage.pause(600);
     await stage.caption("Shift+F10 or the Menu key opens that row's menu — so does . outside the search", 800);
     await stage.press("Shift+F10");

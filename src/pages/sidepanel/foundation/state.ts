@@ -54,6 +54,7 @@ export interface PanelState {
   searchCollapsedGroups: Set<GroupKey>;
   selected: Set<number>;
   cursor: number;
+  cursorGroup: string | null; // the keyboard cursor on a group header (its data-group-key); then cursor is -1
   currentWindowId: number | null; // null until the first refresh() resolves
   panelWindowId: number | null; // the window this panel lives in (chrome.windows.getCurrent), read on the first refresh()
   focusHint: FocusHint | null; // shown as current instead of Chrome's focus record while it lives (model/focus-intent.ts)
@@ -115,6 +116,7 @@ export const state: PanelState = {
   searchCollapsedGroups: new Set(),
   selected: new Set(),
   cursor: -1,
+  cursorGroup: null,
   currentWindowId: null, // until the first refresh() resolves
   panelWindowId: null,
   // the window this or another panel asked Chrome to focus, or proved focused by a press in it

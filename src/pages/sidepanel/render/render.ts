@@ -231,6 +231,10 @@ function renderList(): void {
     });
   }
   listEl.replaceChildren(frag);
+  // the header under the keyboard cursor is gone (its group emptied, another grouping): so is the cursor
+  if (state.cursorGroup !== null && !listEl.querySelector(".group-header.cursor")) {
+    state.cursorGroup = null;
+  }
   syncRowHeight();
   syncHeaderHeight();
   renderCollapseAllButton(foldableGroups, anythingToFold);

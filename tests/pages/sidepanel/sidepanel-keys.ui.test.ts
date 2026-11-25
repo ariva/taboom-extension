@@ -55,6 +55,18 @@ test("UI - Sidepanel Keyboard - Arrows do nothing while flag off", { skip: KEY_N
   assert.ok(document.querySelector(".row.cursor") === null, "no cursor appears");
 });
 
+function setSort(value: string): void {
+  const sel = byId<HTMLSelectElement>("sort");
+  sel.value = value;
+  sel.dispatchEvent(new window.Event("change", { bubbles: true }));
+}
+
+// the row tests below run on a flat list: the default grouping's header is a cursor stop of its
+// own (tested at the end of this file)
+test("UI - Sidepanel Keyboard - (setup) a flat sort for the row tests", () => {
+  setSort("recent");
+});
+
 test("UI - Sidepanel Keyboard - Arrow keys move the cursor and clamp at both ends", keyNavSkip, () => {
   assert.ok(document.querySelector(".row.cursor") === null, "no cursor initially");
   key("ArrowDown");
@@ -284,4 +296,130 @@ test("UI - Sidepanel Keyboard - Single visible window: header not collapsible", 
   assert.equal(document.querySelectorAll(".row").length, 3, "click does nothing");
   sel.value = "recent";
   sel.dispatchEvent(new window.Event("change", { bubbles: true }));
+});
+
+// ---------- group headers as cursor stops (three one-tab groups: a.com, b.com, c.com) ----------
+const cursorHeader = () => document.querySelector(".group-header.cursor");
+const leaveList = () => {
+  window.dispatchEvent(new window.Event("blur"));
+  setSort("recent");
+};
+
+test("UI - Sidepanel Keyboard - A group header is a cursor stop between the rows", keyNavSkip, () => {
+  setSort("group-domain");
+  const headers = [...document.querySelectorAll(".group-header")];
+  assert.equal(headers.length, 3);
+  key("ArrowDown");
+  assert.ok(cursorHeader() === headers[0], "first stop: the first header");
+  assert.ok(document.querySelector(".row.cursor") === null, "one cursor only");
+  key("ArrowDown");
+  assert.ok(cursorHeader() === null);
+  assert.ok(document.querySelector(".row.cursor") === document.querySelector(".row"), "then its row");
+  key("ArrowDown");
+  assert.ok(cursorHeader() === headers[1], "then the next header");
+  key("ArrowUp");
+  key("ArrowUp");
+  key("ArrowUp");
+  assert.ok(document.activeElement === search(), "Up from the first header: the search");
+  assert.ok(cursorHeader() === null);
+  leaveList();
+});
+
+test("UI - Sidepanel Keyboard - Left folds the cursor header, Right unfolds, the chips stay", keyNavSkip, () => {
+  setSort("group-domain");
+  key("ArrowDown");
+  const filter = pressedFilter();
+  key("ArrowRight");
+  assert.equal(document.querySelectorAll(".row").length, 3, "already open: Right does nothing");
+  key("ArrowLeft");
+  assert.equal(document.querySelectorAll(".row").length, 2, "folded");
+  assert.ok(cursorHeader() === document.querySelector(".group-header"), "the cursor stays on the header");
+  key("ArrowLeft");
+  assert.equal(document.querySelectorAll(".row").length, 2, "already folded: Left does nothing");
+  key("ArrowDown");
+  assert.ok(cursorHeader() === document.querySelectorAll(".group-header")[1], "a folded group's rows are skipped");
+  key("ArrowUp");
+  key("ArrowRight");
+  assert.equal(document.querySelectorAll(".row").length, 3, "unfolded");
+  assert.equal(pressedFilter(), filter, "on a header the arrows are not the chips'");
+  leaveList();
+});
+
+test("UI - Sidepanel Keyboard - Space on the cursor header ticks its tabs, again unticks", keyNavSkip, () => {
+  setSort("group-domain");
+  key("ArrowDown");
+  const space = new window.KeyboardEvent("keydown", { key: " ", bubbles: true, cancelable: true });
+  document.dispatchEvent(space);
+  assert.equal(space.defaultPrevented, true);
+  assert.equal(ticked(), 1, "the group's one tab");
+  assert.ok(cursorHeader() !== null, "the cursor stays");
+  key(" ");
+  assert.equal(ticked(), 0);
+  leaveList();
+});
+
+test(
+  "UI - Sidepanel Keyboard - A lone group's header is a stop too: Space ticks all, nothing folds",
+  keyNavSkip,
+  () => {
+    setSort("window");
+    key("ArrowDown");
+    assert.ok(cursorHeader() !== null, "first stop: the lone header");
+    key(" ");
+    assert.equal(ticked(), 3);
+    key(" ");
+    assert.equal(ticked(), 0);
+    key("ArrowLeft");
+    key("Enter");
+    assert.equal(document.querySelectorAll(".row").length, 3, "a lone group does not fold");
+    key("ArrowDown");
+    assert.equal(cursorTitle(), q(document, ".row .title").textContent, "then the first row");
+    leaveList();
+  },
+);
+
+test("UI - Sidepanel Keyboard - Period on a window header opens the window's menu, not a row's", keyNavSkip, () => {
+  setSort("window");
+  key("ArrowDown");
+  assert.ok(cursorHeader() !== null);
+  key(".");
+  const windowMenu = menu().hidden === false;
+  // what a right-click on the same header opens is the reference: the shortcut must match it
+  closeMenu();
+  q(document, ".group-header").dispatchEvent(new window.MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
+  const byMouse = menu().hidden === false;
+  const mouseTitle = byMouse ? menuTitle() : "";
+  closeMenu();
+  assert.equal(windowMenu, byMouse, "the shortcut opens a menu exactly when the right-click does");
+  if (byMouse) {
+    key("ArrowDown");
+    key("ArrowUp");
+    key(".");
+    assert.equal(menuTitle(), mouseTitle, "the same menu");
+    assert.ok(document.activeElement?.matches("#ctx-menu > .ctx-item"), "its first item in focus");
+    closeMenu();
+  }
+  leaveList();
+});
+
+test("UI - Sidepanel Keyboard - Period on a header without a menu opens none", keyNavSkip, () => {
+  setSort("group-domain");
+  key("ArrowDown");
+  key(".");
+  assert.equal(menu().hidden, true, "a domain group has no menu — and no row's menu opens in its place");
+  leaveList();
+});
+
+test("UI - Sidepanel Keyboard - Typing in the search and leaving the panel drop the header cursor", keyNavSkip, () => {
+  setSort("group-domain");
+  key("ArrowDown");
+  window.dispatchEvent(new window.Event("blur"));
+  assert.ok(cursorHeader() === null, "panel left");
+  key("ArrowDown");
+  assert.ok(cursorHeader() !== null);
+  search().value = "a";
+  search().dispatchEvent(new window.Event("input", { bubbles: true }));
+  assert.ok(cursorHeader() === null, "typing: the cursor is the first result's");
+  key("Escape");
+  leaveList();
 });

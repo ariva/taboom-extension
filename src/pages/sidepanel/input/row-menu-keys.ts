@@ -6,36 +6,31 @@ import type { Message, PanelMessage } from "../../../app/messages.ts";
 import { closest } from "../../../lib/dom.ts";
 import { isAskDialogOpen } from "../../../lib/ui/ask-dialog.ts";
 import { focusCtxMenu } from "../../../lib/ui/context-menu.ts";
-import { listEl, searchInput, winPop } from "../foundation/elements.ts";
+import { listEl, searchInput } from "../foundation/elements.ts";
 import { state } from "../foundation/state.ts";
-import { openRowMenu } from "../menus/menus.ts";
-import { hideHoverTip } from "../render/hover-tip.ts";
+import { openListMenu } from "../menus/list-context-menu.ts";
 import { isTagAssignPickerOpen } from "./tag-assign-picker.ts";
 import { isTagsPickerOpen } from "./tags-chip.ts";
 
 const enabled = (): boolean => featureEnabled(state.features, "SIDEBAR_KEYBOARD_NAVIGATION");
 
-// The menu of the cursor row — or, with no cursor, of this window's active tab: the row the
-// user is on before any arrow was pressed. Anchored under the row, its first item focused.
+// The menu of the cursor row or cursor header — or, with no cursor, of this window's active tab:
+// the row the user is on before any arrow was pressed. Anchored under it, its first item focused.
 export function openMenuAtCursor(): void {
   const ownWindowId = state.panelWindowId ?? state.currentWindowId;
   const index =
     state.cursor >= 0 ? state.cursor : state.visible.findIndex((tab) => tab.active && tab.windowId === ownWindowId);
-  const tab = state.visible[index];
-  const row = listEl.querySelectorAll(".row")[index];
-  if (!tab || !row) {
+  const place =
+    state.cursorGroup === null ? listEl.querySelectorAll(".row")[index] : listEl.querySelector(".group-header.cursor");
+  if (!place) {
     return; // the active tab is filtered out of the list: no row to hang a menu on
   }
-  row.scrollIntoView({ block: "nearest" });
-  const rect = row.getBoundingClientRect();
-  hideHoverTip();
-  // one popup at a time, as for a right-click on the list
-  try {
-    winPop.hidePopover?.();
-  } catch {} // already hidden
-  // `as`: the menus read only the coordinates
-  openRowMenu({ clientX: rect.left, clientY: rect.bottom } as MouseEvent, tab.id);
-  focusCtxMenu();
+  place.scrollIntoView({ block: "nearest" });
+  const rect = place.getBoundingClientRect();
+  // `as`: the menus read only the coordinates. A header without a menu (a domain group) opens none
+  if (openListMenu(place, { clientX: rect.left, clientY: rect.bottom } as MouseEvent)) {
+    focusCtxMenu();
+  }
 }
 
 export function initRowMenuKeys(): void {

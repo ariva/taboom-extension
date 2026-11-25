@@ -1,6 +1,7 @@
 // Keyboard navigation of the panel: "/" focuses search, Esc clears it, arrows move
-// the row cursor (and take the focus out of the search; Up from the first row gives it back),
-// Enter activates the row under it, Space ticks it, Left / Right step through the filter chips.
+// the cursor over rows and group headers (and take the focus out of the search; Up from the first
+// stop gives it back), Enter activates the row under it, Space ticks it, Left / Right step through
+// the filter chips. On a header: Space ticks / unticks its tabs, Left folds, Right unfolds, Enter toggles.
 import { featureEnabled } from "../../../app/core.ts";
 import { parkedRef } from "../../../app/parked.ts";
 import { closest } from "../../../lib/dom.ts";
@@ -11,6 +12,8 @@ import { isPopoverOpen } from "../history/history-nav.ts";
 import { render } from "../foundation/scheduler.ts";
 import { state } from "../foundation/state.ts";
 import { clearSearch, setFilter } from "./toolbar-events.ts";
+
+const HEADER_KEYS = new Set(["ArrowLeft", "ArrowRight", " ", "Enter"]);
 
 export function initKeyboardNav(): void {
   document.addEventListener("keydown", (event) => {
@@ -40,23 +43,30 @@ export function initKeyboardNav(): void {
         return;
       }
       event.preventDefault();
-      if (state.visible.length === 0) {
+      // the stops in the order shown: group headers and rows (a folded group is its header alone).
+      // A lone group's header is one too: nothing to fold, but Space ticks the whole list from it
+      const stops = [...listEl.querySelectorAll<HTMLElement>(".group-header, .row")];
+      if (stops.length === 0) {
         return;
       }
-      // Up from the first row is the way back to the search; with a query its first result keeps
+      const current = listEl.querySelector<HTMLElement>(".group-header.cursor, .row.cursor");
+      const at = current ? stops.indexOf(current) : -1;
+      // Up from the first stop is the way back to the search; with a query its first result keeps
       // the cursor, as while typing (Enter opens it)
-      const toSearch = event.key === "ArrowUp" && state.cursor <= 0;
-      const next = toSearch
-        ? Math.min(searchInput.value ? 0 : -1, state.cursor)
-        : event.key === "ArrowDown"
-          ? Math.min(state.cursor + 1, state.visible.length - 1)
-          : state.cursor - 1;
+      const toSearch = event.key === "ArrowUp" && at <= 0;
+      const keepsFirstResult = toSearch && searchInput.value !== "";
+      const next = keepsFirstResult
+        ? listEl.querySelector<HTMLElement>(".row")
+        : toSearch
+          ? null
+          : stops[event.key === "ArrowDown" ? Math.min(at + 1, stops.length - 1) : at - 1];
       // move the cursor class directly — a full render per keypress is ~90ms on big lists
-      const rows = listEl.querySelectorAll(".row");
-      rows[state.cursor]?.classList.remove("cursor");
-      state.cursor = next;
-      rows[next]?.classList.add("cursor");
-      rows[next]?.scrollIntoView({ block: "nearest" });
+      current?.classList.remove("cursor");
+      const onHeader = next?.classList.contains("group-header") === true;
+      state.cursorGroup = onHeader ? (next?.dataset.groupKey ?? null) : null;
+      state.cursor = next && !onHeader ? [...listEl.querySelectorAll(".row")].indexOf(next) : -1;
+      next?.classList.add("cursor");
+      next?.scrollIntoView({ block: "nearest" });
       if (toSearch) {
         searchInput.focus();
         searchInput.setSelectionRange(searchInput.value.length, searchInput.value.length);
@@ -72,6 +82,20 @@ export function initKeyboardNav(): void {
     // a focused field, button, header, dialog or menu keeps its own Space and arrows
     const ownKeys = closest(event.target, "input, textarea, select, button, a, [contenteditable], [role], dialog");
     const listKeys = keyboardNav && !modified && ownKeys === null;
+    // the cursor on a group header: its keys do what its own click and checkbox do
+    const cursorHeader = state.cursorGroup === null ? null : listEl.querySelector<HTMLElement>(".group-header.cursor");
+    if (cursorHeader && listKeys && HEADER_KEYS.has(event.key)) {
+      event.preventDefault();
+      const expanded = cursorHeader.getAttribute("aria-expanded");
+      const folds = event.key === "ArrowLeft" && expanded === "true";
+      const unfolds = event.key === "ArrowRight" && expanded === "false";
+      if (event.key === " ") {
+        cursorHeader.querySelector<HTMLElement>(".group-select")?.click();
+      } else if (folds || unfolds || event.key === "Enter") {
+        cursorHeader.click();
+      }
+      return;
+    }
     if (listKeys && (event.key === "ArrowLeft" || event.key === "ArrowRight")) {
       // the chips shown, in their order; no wrap, so holding a key ends on All or on the last one.
       // Tags reached this way filters without opening its picker — that is the click's
@@ -109,10 +133,8 @@ export function initKeyboardNav(): void {
   // window) ends it. Left in place, its outline reads as a second selection next to the active
   // tab's, and the next arrow press would resume from a row the user no longer has in mind.
   window.addEventListener("blur", () => {
-    if (state.cursor < 0) {
-      return;
-    }
     state.cursor = -1;
-    listEl.querySelector(".row.cursor")?.classList.remove("cursor");
+    state.cursorGroup = null;
+    listEl.querySelector(".cursor")?.classList.remove("cursor");
   });
 }

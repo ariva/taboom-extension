@@ -200,6 +200,8 @@ export function renderGroupHeader(
 ): HTMLElement {
   const header = document.createElement("div");
   header.className = "group-header";
+  header.dataset.groupKey = String(groupKey); // how the keyboard cursor names this header
+  header.classList.toggle("cursor", state.cursorGroup === String(groupKey));
   if (noun === "window") {
     header.dataset.windowId = String(groupKey); // drop target for tab moves
   }
@@ -300,6 +302,7 @@ export function renderGroupHeader(
   arrow.textContent = isCollapsed ? "▸" : "▾";
   header.append(arrow);
   header.setAttribute("role", "button");
+  header.setAttribute("aria-expanded", String(!isCollapsed)); // also what Left / Right on the cursor header read
   header.tabIndex = 0;
   header.dataset.tip = `${info}\nClick to ${isCollapsed ? "expand" : "collapse"}`;
   const toggle = () => {

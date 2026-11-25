@@ -66,8 +66,9 @@ Panel position (left or right) is a global Chrome setting: `chrome://settings/ap
 In the list:
 
 - `/` — focus the search (a character inside a text field).
-- `↑` / `↓` — move the amber row cursor. It goes away when focus leaves the panel; the next arrow starts from the top.
-- An arrow pressed in the search also takes the focus out of it: from then on the keys belong to the list and nothing is typed into the query. `↑` on the first row (or `/`) goes back to the search, the caret at the end of the query.
+- `↑` / `↓` — move the amber cursor over the rows and, in a grouped list (Group by window, by domain …), over the group headers between them: a header is a stop of its own, a folded group is its header alone. The cursor goes away when focus leaves the panel; the next arrow starts from the top.
+- On a group header — `Space` ticks all its tabs (the ones the filter and search show), again unticks them, like its checkbox; `←` folds the group, `→` unfolds it, `Enter` toggles; `Shift+F10`, the `Menu` key or `.` opens a window header's menu (the right-click one: rename, color, park …). The filter chips are not stepped from a header — move to a row first.
+- An arrow pressed in the search also takes the focus out of it: from then on the keys belong to the list and nothing is typed into the query. `↑` on the first stop — the first row, or the first header in a grouped list — (or `/`) goes back to the search, the caret at the end of the query.
 - `Space` — tick / untick the cursor row, the same as a click on its checkbox; the cursor stays, so `↓` `Space` `↓` `Space` ticks a run for the bulk bar. In the search it stays a character; on a focused button or checkbox it keeps its own job.
 - `←` / `→` — once out of the search: the previous / next filter chip (All, Awake, Snoozed, Protected, Tags), stopping at the ends. Tags picked this way filters by the tags already ticked and opens no picker. In the search they move the caret.
 - `Enter` — activate the cursor row's tab (on a parked row: open its menu).

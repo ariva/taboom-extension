@@ -1,9 +1,6 @@
 # Taboom - Tabs Manager - Features
 
-A picture per feature, in the order the [demo](https://youtu.be/HDdjwM7mcYY) shows them. The
-long version of each is in [Usage](USAGE.md); the images are the demo's own stills
-(`docs/assets/features/chrome/`, retaken on every `just build`), so they always match the shipped
-version.
+A picture per feature, in the order the [demo](https://www.youtube.com/watch?v=T3nZY62bdDo) shows them.
 
 ## The side panel
 
@@ -131,10 +128,13 @@ threshold does not apply, and a toast says how many.
 (outside the search) opens that row's menu with its first item in focus; arrows walk it, `→` enters a
 submenu, `←` leaves it, `Esc` closes. Every menu of the panel works the same way. `Space` ticks or unticks
 the cursor row for the bulk bar; `←` / `→` step through the filter chips; `↑` on the first row goes back to the search.
+Group headers are stops too: on a header `Space` ticks or unticks all its tabs, `←` folds the group, `→` unfolds it,
+and the menu keys open the window's menu.
 
 <p>
   <img src="assets/features/chrome/keyboard-row-menu.png" alt="Row menu opened from the keyboard, first item in focus" width="360">
   <img src="assets/features/chrome/keyboard-row-submenu.png" alt="Row menu - a submenu entered with the right arrow" width="360">
+  <img src="assets/features/chrome/keyboard-select-header.png" alt="The cursor on a window header, all its tabs ticked with Space" width="360">
   <img src="assets/features/chrome/keyboard-select.png" alt="Three rows ticked with Space, the cursor on the last" width="360">
 </p>
 

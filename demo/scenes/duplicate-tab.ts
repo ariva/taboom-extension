@@ -14,8 +14,10 @@ export const duplicateTab: Scene = {
     const tabIds = () => stage.panel.evaluate(async () => (await chrome.tabs.query({})).map((tab) => tab.id ?? -1));
     await stage.caption(`${stage.release} — a copy of a tab without leaving the panel`, 1800);
     await stage.click(stage.panel.locator("#search"));
-    await stage.press("ArrowDown");
-    await stage.press("ArrowDown");
+    // headers are stops too: the current window's header and tab, the next header, its first row
+    for (let step = 0; step < 4; step++) {
+      await stage.press("ArrowDown");
+    }
     await stage.caption("A row's menu — right-click, or Shift+F10 on the cursor row", 600);
     await stage.press("Shift+F10");
     await stage.pause(600);

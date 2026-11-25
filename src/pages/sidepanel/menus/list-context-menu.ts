@@ -7,33 +7,40 @@ import { hideHoverTip } from "../render/hover-tip.ts";
 import { appendCtxActions, openRowMenu, openTabGroupMenu, openWindowHeaderMenu } from "./menus.ts";
 import { openSplitMenu } from "./split-menu.ts";
 
+// The menu of whatever `target` sits in — a row, a tab-group or split header, a window header —
+// opened at `at`; false when that place has none. Shared by the right-click and the menu keys.
+export function openListMenu(target: EventTarget | null, at: MouseEvent): boolean {
+  const header = closest(target, ".group-header");
+  const row = closest(target, ".row");
+  const tgHeaderEl = closest(target, "[data-tab-group-id]");
+  // "No group" bucket (-1) is a drop target but has no menu — keep native there
+  const tgHeader = tgHeaderEl && Number(tgHeaderEl.dataset.tabGroupId) !== -1 ? tgHeaderEl : null;
+  const splitHeader = closest(target, "[data-split-view-id]");
+  if (!header?.dataset.windowId && !row && !tgHeader && !splitHeader) {
+    return false; // non-window headers/empty space keep the native menu
+  }
+  hideHoverTip();
+  // one popup at a time: a list menu belongs to the list, not to an open quick launch
+  // (its own rows open their menus over it — popover.ts, untouched here)
+  try {
+    winPop.hidePopover?.();
+  } catch {} // already hidden
+  if (splitHeader) {
+    openSplitMenu(at, Number(splitHeader.dataset.splitViewId), appendCtxActions);
+  } else if (tgHeader) {
+    openTabGroupMenu(at, Number(tgHeader.dataset.tabGroupId));
+  } else if (header?.dataset.windowId) {
+    openWindowHeaderMenu(at, Number(header.dataset.windowId));
+  } else if (row) {
+    openRowMenu(at, Number(row.dataset.tabId));
+  }
+  return true;
+}
+
 export function initListContextMenu(): void {
   listEl.addEventListener("contextmenu", (event) => {
-    const target = event.target;
-    const header = closest(target, ".group-header");
-    const row = closest(target, ".row");
-    const tgHeaderEl = closest(target, "[data-tab-group-id]");
-    // "No group" bucket (-1) is a drop target but has no menu — keep native there
-    const tgHeader = tgHeaderEl && Number(tgHeaderEl.dataset.tabGroupId) !== -1 ? tgHeaderEl : null;
-    const splitHeader = closest(target, "[data-split-view-id]");
-    if (!header?.dataset.windowId && !row && !tgHeader && !splitHeader) {
-      return; // non-window headers/empty space keep the native menu
-    }
-    event.preventDefault();
-    hideHoverTip();
-    // one popup at a time: a list menu belongs to the list, not to an open quick launch
-    // (its own rows open their menus over it — popover.ts, untouched here)
-    try {
-      winPop.hidePopover?.();
-    } catch {} // already hidden
-    if (splitHeader) {
-      openSplitMenu(event, Number(splitHeader.dataset.splitViewId), appendCtxActions);
-    } else if (tgHeader) {
-      openTabGroupMenu(event, Number(tgHeader.dataset.tabGroupId));
-    } else if (header?.dataset.windowId) {
-      openWindowHeaderMenu(event, Number(header.dataset.windowId));
-    } else if (row) {
-      openRowMenu(event, Number(row.dataset.tabId));
+    if (openListMenu(event.target, event)) {
+      event.preventDefault();
     }
   });
   listEl.addEventListener("scroll", hideCtxMenu, { passive: true });

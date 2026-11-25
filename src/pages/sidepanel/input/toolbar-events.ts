@@ -62,6 +62,7 @@ export function setQuery(value: string): void {
     }
   }
   state.cursor = value ? 0 : -1;
+  state.cursorGroup = null;
   state.pendingScroll = value ? 0 : (scrollByFilter.get(state.filter) ?? 0);
   render(false);
   publishSharedSearch(value);
