@@ -31,6 +31,7 @@ export const DEFAULTS = {
     askBeforePark: true, // the park dialog's "Don't ask again" flips it; Settings turns it back on
     tagPagesKeepFragment: true, // hash-routed pages (about:debugging#/setup, app/#/mail) are one page per route
     showDisabledInPanel: true, // a switched-off tag or paused mark stays visible, struck through (T-0156)
+    snoozeOnStartupSeconds: 30, // 0 = never; does nothing until the SNOOZE_ON_STARTUP flag is on for this user
   },
   protectionRules: [],
   ui: {

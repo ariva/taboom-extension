@@ -1,12 +1,18 @@
-// Snoozing (tab discard): the auto-snooze alarm and its pass, manual snooze of
-// one tab, and the manual-wake timestamps that reset the inactivity clock.
-import { isSupportedUrl, isUnloaded, selectAutoSnoozeTargets } from "../app/core.ts";
+// Snoozing (tab discard): the auto-snooze alarm and its pass, the pass after a browser
+// start, manual snooze of one tab, and the manual-wake timestamps that reset the inactivity clock.
+import { featureEnabled, isSupportedUrl, isUnloaded, selectAutoSnoozeTargets } from "../app/core.ts";
 import { loadState, sessionStore } from "../app/storage.ts";
 import type { Settings, WakeTimes } from "../app/types.ts";
 import { isKeptAlive } from "../app/keep-alive.ts";
 import { activeKeepAliveList } from "./keep-alive.ts";
+import { effectiveFeatures } from "./nav-mode.ts";
 
 const ALARM_NAME = "auto-snooze";
+const STARTUP_ALARM_NAME = "snooze-on-startup";
+// Chrome fires no alarm sooner than 30 s after it is set (a shorter delay is raised to 30 s in a
+// packed extension); below that a timer does it — the start event has just woken the worker,
+// and Chrome keeps it awake 30 s past its last event
+const SHORTEST_ALARM_SECONDS = 30;
 
 export async function ensureAlarm(settings: Settings): Promise<void> {
   await chrome.alarms.create(ALARM_NAME, {
@@ -20,6 +26,38 @@ export function onAlarm(alarm: chrome.alarms.Alarm): void {
   if (alarm.name === ALARM_NAME) {
     loadState().then((state) => (state.settings.autoSnoozeEnabled ? autoSnoozePass() : undefined));
   }
+  if (alarm.name === STARTUP_ALARM_NAME) {
+    void startupSnoozePass();
+  }
+}
+
+// SNOOZE_ON_STARTUP — its own option, not tied to the timer's toggle: it is "Snooze inactive
+// tabs now" on a trigger. Seconds to wait after a browser start; 0 = never (or the flag is off)
+async function startupSnoozeDelay(): Promise<number> {
+  const { state, features } = await effectiveFeatures();
+  return featureEnabled(features, "SNOOZE_ON_STARTUP") ? state.settings.snoozeOnStartupSeconds : 0;
+}
+
+// the delay is over — asked again: the option may have been set to never meanwhile
+async function startupSnoozePass(): Promise<void> {
+  if ((await startupSnoozeDelay()) > 0) {
+    await autoSnoozePass(true);
+  }
+}
+
+// runtime.onStartup (a browser start; not an extension reload or update): the restored tabs
+// are snoozed in one on-demand pass after the delay — every window, the usual rules. The delay
+// lets a session restore create its windows and the user click the tab they came for
+export async function armStartupSnooze(): Promise<void> {
+  const seconds = await startupSnoozeDelay();
+  if (seconds <= 0) {
+    return;
+  }
+  if (seconds < SHORTEST_ALARM_SECONDS) {
+    setTimeout(startupSnoozePass, seconds * 1000);
+    return;
+  }
+  await chrome.alarms.create(STARTUP_ALARM_NAME, { delayInMinutes: seconds / 60 });
 }
 
 // resolves with how many tabs were handed to discard(). onDemand: the user asked

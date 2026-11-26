@@ -460,6 +460,16 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
       Snooze inactive tabs now
     </button>
+    <label id="snoozeOnStartup-label" hidden>Automatically snooze inactive tabs after a browser start
+      <select id="snoozeOnStartupSeconds">
+        <option value="0">Never</option>
+        <option value="10">After 10 seconds</option>
+        <option value="30">After 30 seconds</option>
+        <option value="60">After 1 minute</option>
+        <option value="180">After 3 minutes</option>
+        <option value="300">After 5 minutes</option>
+      </select>
+      <span class="muted">(experimental — the same as the button, once per browser start; works with automatic snooze off)</span></label>
   </section>
 
   <section class="card">

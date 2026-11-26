@@ -1,7 +1,7 @@
 // Service-worker tests: no DOM needed, just the chrome stub with capturing
 // events so we can fire onInstalled / onAlarm / onMessage like Chrome would.
 import assert from "node:assert/strict";
-import { test } from "vitest";
+import { test, vi } from "vitest";
 import type { Message, MessageError, MessageResponses } from "../../src/app/messages.ts";
 import type { KeepAliveTab, LocalStorageSchema, ProtectionRule, Removal, Settings } from "../../src/app/types.ts";
 import { buildFingerprint } from "../../src/app/window-identity.ts";
@@ -21,6 +21,7 @@ const TRADITIONAL_DEFAULT = DEFAULT_MODE === "traditional";
 const COMPACT_AVAILABLE = NAV_STACK_ON && TEST_FEATURES.NAVIGATION_COMPACT_STACK?.enabled === true;
 const KEEP_ALIVE_ON = TEST_FEATURES.KEEP_ALIVE?.enabled === true;
 const TAGS_ON = TEST_FEATURES.TAGS?.enabled === true;
+const SNOOZE_ON_STARTUP_ON = TEST_FEATURES.SNOOZE_ON_STARTUP?.enabled === true;
 
 const NOW = Date.now();
 const HOUR = 3_600_000;
@@ -98,6 +99,7 @@ const stored: {
     askBeforePark: true,
     tagPagesKeepFragment: true,
     showDisabledInPanel: true,
+    snoozeOnStartupSeconds: 30,
   },
   protectionRules: [{ id: "r1", type: "host", pattern: "mail.google.com" }],
 };
@@ -130,7 +132,8 @@ test("Service Worker - Concurrent onInstalled + onStartup coalesce into one init
   await tick();
   assert.equal(calls.filter((c) => c === "contextMenus.removeAll").length, 1, "one menu wipe");
   assert.equal(calls.filter((c) => c === "contextMenus.create root").length, 1, "root created once");
-  assert.equal(calls.filter((c) => c.startsWith("alarms.create")).length, 1, "alarm ensured once");
+  // init's own alarm: the startup listeners beside init may arm theirs (snooze-on-startup)
+  assert.equal(calls.filter((c) => c.startsWith("alarms.create auto-snooze")).length, 1, "alarm ensured once");
 });
 
 // Firefox has no sidePanel to break: the Chrome-only step is the subject here
@@ -1705,4 +1708,114 @@ test("Service Worker - Expiry: the sweep drops expired rules and marks into thei
   assert.ok(calls.includes("alarms.clear expiry"), "no entry can expire: no alarm");
   stored.protectionTrash = [];
   stored.keepAliveTrash = [];
+});
+
+const STARTUP_ALARM = 'alarms.create snooze-on-startup {"delayInMinutes":0.5}';
+
+test("Service Worker - Snooze on startup: a browser start arms the one-shot alarm only with the flag on and a delay set", async () => {
+  calls.length = 0;
+  await chrome.runtime.onStartup.fire();
+  await tick();
+  await tick();
+  assert.equal(calls.includes(STARTUP_ALARM), SNOOZE_ON_STARTUP_ON, "default 30 s: armed iff the flag resolves on");
+
+  try {
+    stored.settings.snoozeOnStartupSeconds = 180;
+    calls.length = 0;
+    await chrome.runtime.onStartup.fire();
+    await tick();
+    await tick();
+    assert.equal(
+      calls.includes('alarms.create snooze-on-startup {"delayInMinutes":3}'),
+      SNOOZE_ON_STARTUP_ON,
+      "the chosen delay",
+    );
+
+    stored.settings.snoozeOnStartupSeconds = 0;
+    calls.length = 0;
+    await chrome.runtime.onStartup.fire();
+    await tick();
+    await tick();
+    assert.ok(!calls.some((c) => c.startsWith("alarms.create snooze-on-startup")), "never: nothing armed");
+  } finally {
+    stored.settings.snoozeOnStartupSeconds = 30;
+  }
+});
+
+test("Service Worker - Snooze on startup: an extension reload or update (onInstalled) arms nothing", async () => {
+  calls.length = 0;
+  await chrome.runtime.onInstalled.fire();
+  await tick();
+  await tick();
+  assert.ok(!calls.some((c) => c.startsWith("alarms.create snooze-on-startup")));
+});
+
+const restoredTab = {
+  id: 81,
+  windowId: 1,
+  active: false,
+  discarded: false,
+  pinned: false,
+  audible: false,
+  autoDiscardable: true,
+  url: "https://restored.example.com/one",
+  title: "Restored one",
+  lastAccessed: NOW, // just restored: the inactivity threshold must not apply
+};
+
+test("Service Worker - Snooze on startup: the alarm runs the on-demand pass over every window", async () => {
+  const fresh = { ...restoredTab };
+  const otherWindow = { ...fresh, id: 82, windowId: 2, url: "https://restored.example.com/two" };
+  const pinned = { ...fresh, id: 83, windowId: 2, pinned: true, url: "https://restored.example.com/pinned" };
+  tabs.push(fresh, otherWindow, pinned);
+  try {
+    calls.length = 0;
+    await chrome.alarms.onAlarm.fire({ name: "snooze-on-startup" });
+    await tick();
+    await tick();
+    await tick();
+    const discards = calls.filter((c) => c.startsWith("tabs.discard"));
+    if (!SNOOZE_ON_STARTUP_ON) {
+      assert.deepEqual(discards, [], "flag off: a stale alarm snoozes nothing");
+      return;
+    }
+    assert.ok(discards.includes("tabs.discard 81"), "window 1");
+    assert.ok(discards.includes("tabs.discard 82"), "window 2");
+    assert.ok(!discards.includes("tabs.discard 83"), "pinned stays");
+    assert.ok(!discards.includes("tabs.discard 1") && !discards.includes("tabs.discard 4"), "active tabs stay");
+    assert.ok(!discards.includes("tabs.discard 3"), "protected stays");
+
+    // set to never during the delay: the alarm still fires, nothing is snoozed
+    fresh.discarded = false;
+    stored.settings.snoozeOnStartupSeconds = 0;
+    calls.length = 0;
+    await chrome.alarms.onAlarm.fire({ name: "snooze-on-startup" });
+    await tick();
+    await tick();
+    await tick();
+    assert.equal(calls.filter((c) => c.startsWith("tabs.discard")).length, 0);
+  } finally {
+    stored.settings.snoozeOnStartupSeconds = 30;
+    tabs.splice(tabs.indexOf(fresh), 3);
+  }
+});
+
+test("Service Worker - Snooze on startup: a delay under Chrome's 30 s alarm floor runs on a timer, no alarm", async () => {
+  const fresh = { ...restoredTab };
+  tabs.push(fresh);
+  stored.settings.snoozeOnStartupSeconds = 10;
+  vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+  try {
+    calls.length = 0;
+    await chrome.runtime.onStartup.fire();
+    await vi.advanceTimersByTimeAsync(9_000);
+    assert.ok(!calls.some((c) => c.startsWith("alarms.create snooze-on-startup")), "no alarm for 10 s");
+    assert.ok(!calls.includes("tabs.discard 81"), "not before the delay");
+    await vi.advanceTimersByTimeAsync(2_000);
+    assert.equal(calls.includes("tabs.discard 81"), SNOOZE_ON_STARTUP_ON, "after 10 s, iff the flag resolves on");
+  } finally {
+    vi.useRealTimers();
+    stored.settings.snoozeOnStartupSeconds = 30;
+    tabs.splice(tabs.indexOf(fresh), 1);
+  }
 });

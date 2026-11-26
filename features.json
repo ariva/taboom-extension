@@ -18,10 +18,11 @@
   "GROUP_BY_URL": { "enabled": true },
   "SEARCH_AUTO_SELECT_ALL": { "enabled": true },
   "OPTION_COLLAPSABLE_CHANGE_LOG_ITEMS": { "enabled": false },
-  "FUZZY_SEARCH": { "enabled": false, "experimental": true },
+  "FUZZY_SEARCH": { "enabled": false, "experimental": false },
   "KEEP_ALIVE": { "enabled": true, "experimental": false },
   "DUPLICATES": { "enabled": true, "experimental": false },
   "PARKED_WINDOWS": { "enabled": true, "experimental": false },
   "SPLIT_VIEW": { "enabled": true, "experimental": false },
-  "TAB_NAMES": { "enabled": true, "experimental": false }
+  "TAB_NAMES": { "enabled": true, "experimental": false },
+  "SNOOZE_ON_STARTUP": { "enabled": false, "experimental": true }
 }

@@ -29,6 +29,7 @@ export function renderUiPrefs(state: AppState): void {
   getElementById("historyNav-label").hidden = !featureEnabled(appliedFeatures, "OPTIONS_NAVIGATION_STACK");
   getElementById("windowNamesEnabled-label").hidden = !featureEnabled(appliedFeatures, "WINDOW_NAMES");
   getElementById("askBeforePark-label").hidden = !featureEnabled(appliedFeatures, "PARKED_WINDOWS");
+  getElementById("snoozeOnStartup-label").hidden = !featureEnabled(appliedFeatures, "SNOOZE_ON_STARTUP");
   // the restore banner this picks never shows where a panel cannot be reopened in another window (Firefox)
   getElementById("onExtensionUpdate-label").hidden = !capabilities.panelInAnyWindow;
   // The dropdown shows the EFFECTIVE mode, not the raw stored value: a stored

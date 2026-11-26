@@ -14,7 +14,7 @@ import { onExpiryAlarm } from "./expiry.ts";
 import { init, noteUpdateAvailable } from "./lifecycle.ts";
 import { handleMessage } from "./messages.ts";
 import { reprotectOnNavigation, syncProtectMenu } from "./protection.ts";
-import { onAlarm } from "./snooze.ts";
+import { armStartupSnooze, onAlarm } from "./snooze.ts";
 import { onStorageChanged } from "./storage-changes.ts";
 import {
   dropClosedTabs,
@@ -40,6 +40,7 @@ chrome.runtime.onUpdateAvailable.addListener(noteUpdateAvailable);
 // ---------- auto snooze ----------
 
 chrome.alarms.onAlarm.addListener(onAlarm);
+chrome.runtime.onStartup.addListener(armStartupSnooze); // experimental: one "snooze now" pass shortly after a browser start
 
 // ---------- keep-it-alive sweep ----------
 

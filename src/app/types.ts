@@ -16,6 +16,7 @@ export interface Settings {
   askBeforePark: boolean; // PARKED_WINDOWS: confirm "Park window…" (the dialog's "Don't ask again" clears it)
   tagPagesKeepFragment: boolean; // TAGS: a tagged page keeps its #fragment (hash-routed pages are one page per route)
   showDisabledInPanel: boolean; // the side panel shows disabled tags and paused keep-alive marks struck through instead of hiding them
+  snoozeOnStartupSeconds: number; // SNOOZE_ON_STARTUP: one "Snooze inactive tabs now" pass this long after a browser start; 0 = never
 }
 
 // one keep-it-alive mark (storage.local.keepAlive[]): keyed by page url without

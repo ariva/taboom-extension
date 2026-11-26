@@ -21,6 +21,7 @@ const SETTING_IDS: (keyof Settings)[] = [
   "askBeforePark",
   "tagPagesKeepFragment",
   "showDisabledInPanel",
+  "snoozeOnStartupSeconds", // a <select>, like keepAliveMinutes
 ];
 
 export function renderSettings(state: AppState): void {

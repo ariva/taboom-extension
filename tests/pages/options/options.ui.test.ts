@@ -1201,6 +1201,30 @@ test("UI - Options - Restore last removal: every removal (row, Clear all) is und
   stored.keepAliveTrash = [];
 });
 
+test("UI - Options - SNOOZE_ON_STARTUP: the 'after a browser start' delay follows the flag and persists settings.snoozeOnStartupSeconds", async () => {
+  const { applyExperimental, featureEnabled } = await import("../../../src/app/core.ts");
+  const effective = applyExperimental(RAW_FEATURES, stored.ui?.showExperimental ?? false);
+  const flagOn = featureEnabled(effective, "SNOOZE_ON_STARTUP");
+  assert.equal(byId("snoozeOnStartup-label").hidden, !flagOn, "visible iff the flag resolves on");
+  const select = byId<HTMLSelectElement>("snoozeOnStartupSeconds");
+  assert.equal(select.value, "30", "default: 30 seconds");
+  assert.deepEqual(
+    [...select.options].map((option) => option.value),
+    ["0", "10", "30", "60", "180", "300"],
+  );
+  select.value = "0";
+  select.dispatchEvent(new window.Event("change", { bubbles: true }));
+  await tick();
+  assert.ok(
+    calls.some((c) => c.startsWith("storage.set") && c.includes('"snoozeOnStartupSeconds":0')),
+    "never",
+  );
+  select.value = "30";
+  select.dispatchEvent(new window.Event("change", { bubbles: true }));
+  await tick();
+  assert.ok(calls.some((c) => c.startsWith("storage.set") && c.includes('"snoozeOnStartupSeconds":30')));
+});
+
 test("UI - Options - PARKED_WINDOWS: 'Ask before parking' checkbox follows the flag and persists settings.askBeforePark", async () => {
   const { applyExperimental, featureEnabled } = await import("../../../src/app/core.ts");
   const effective = applyExperimental(RAW_FEATURES, stored.ui?.showExperimental ?? false);
