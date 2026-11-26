@@ -32,7 +32,10 @@ Taboom - Tabs Manager frees memory by snoozing (discarding) tabs you haven't use
 3. **Open it**: click the moon icon. The side panel opens with every tab of every window; it stays open while you switch tabs.
 
 ### Firefox
-The same extension builds for Firefox 140+ (`just pack-firefox` → `dist/taboom-tabs-manager-v<version>-firefox.zip`); the Firefox Add-ons listing is in preparation. Until it is published: `about:debugging` → This Firefox → **Load Temporary Add-on** → the `manifest.json` inside the zip's folder (a temporary add-on is gone after a restart). The panel lives in Firefox's sidebar: the toolbar button toggles it, `Ctrl+Shift+Space` opens it. Two Chrome-only things are not there: split view (Chrome 155+) and cached favicons — Firefox rows show the site's initial instead, because showing the site's own icon would mean a request to the site. The same tour filmed in Firefox: [taboom-demo.gif](docs/assets/demo/firefox/taboom-demo.gif).
+1. **[Install from Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/taboom/)** — click **Add to Firefox**, confirm. Firefox 140+.
+2. **Open it**: click the toolbar button. The panel lives in Firefox's sidebar.
+
+Three Chrome-only things are not there: split view (Chrome 155+), cached favicons — Firefox rows show the site's initial instead, because showing the site's own icon would mean a request to the site — and reopening the panel in other windows after an extension update or a browser restart: Firefox opens its sidebar in the active window only, so open it again per window.
 
 ### Local Installation
 * Developers: [docs/LOCAL_DEV.md](docs/LOCAL_DEV.md) — build from source and load unpacked in Chrome or as a temporary add-on in Firefox, requirements, troubleshooting
