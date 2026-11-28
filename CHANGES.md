@@ -1,5 +1,26 @@
 # CHANGES
 
+## v1.1.1 — 2026-11-28
+
+### Summary
+Tab audio with mute and audio filter, duplicate tab, keyboard selection and filters, and snooze after a browser start
+
+### New Features
+- Add tab audio — mute button on playing tabs, Mute/Unmute row menu actions, audio filter chip and :audio search (b937e2f)
+- Add experimental option to snooze inactive tabs after a browser start (f958003)
+- Add Duplicate tab functionality (ec9e05c)
+- Let the arrows take the keys out of the search so Space ticks the cursor row and ← / → switch filters (87629ca)
+
+### Fixes
+- Fix keyboard cursor to work on groups (windows) too (dad44d1)
+- Fix buttons style in settings/tab names (53d2b55)
+- Fix tab names in settings scrolling on menu click (9332247)
+
+### Other
+- Add firefox store link to readme (69a4f32)
+- Change how highlights are displayed, show few last releases (b0f946a)
+- Update youtube link in readme (2188ca2)
+
 ## v1.1.0 — 2026-11-22
 
 ### Summary

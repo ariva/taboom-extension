@@ -1,6 +1,6 @@
 # Taboom - Tabs Manager - Features
 
-A picture per feature, in the order the [demo](https://www.youtube.com/watch?v=T3nZY62bdDo) shows them.
+A picture per feature, in the order the [demo](https://www.youtube.com/watch?v=Ksm_jtw7-Kc) shows them.
 
 ## The side panel
 
