@@ -40,6 +40,8 @@
       <button data-filter="protected" aria-pressed="false">Protected <span class="count"></span></button>
       <!-- TAGS: a dropdown chip — click filters by tag and opens the picker (one tick per tag) -->
       <button data-filter="tags" aria-pressed="false" hidden title="Tagged tabs — pick which tags"><span class="tag-dot" hidden></span><span class="chip-label">Tags</span> <span class="tag-count"></span><span class="chip-caret">▾</span></button>
+      <!-- TAB_AUDIO: shown only while a tab plays or is muted; last, so its coming and going moves no other chip -->
+      <button data-filter="audio" aria-pressed="false" hidden title="Tabs playing audio or muted">🔊 <span class="audio-count"></span></button>
     </div>
     <div id="tags-pop" popover></div>
     <div class="toolbar">

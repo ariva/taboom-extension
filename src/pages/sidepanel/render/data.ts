@@ -1,6 +1,6 @@
 // refresh(): loads tabs, tab groups, persisted state and window identity into `state`,
 // syncs the flag-gated toolbar bits, then renders.
-import { applyExperimental, featureEnabled, resolveColorScheme, resolveNavMode } from "../../../app/core.ts";
+import { applyExperimental, featureEnabled, hasSound, resolveColorScheme, resolveNavMode } from "../../../app/core.ts";
 import { loadState, localStore, sessionStore } from "../../../app/storage.ts";
 import type { AppState } from "../../../app/types.ts";
 import { parkedLayoutKey, parkedPanelTabs } from "../../../app/parked.ts";
@@ -20,6 +20,7 @@ import {
   parkedScope,
   state,
   tagsActive,
+  audioActive,
 } from "../foundation/state.ts";
 import type { PanelTab } from "../foundation/state.ts";
 
@@ -145,6 +146,16 @@ export async function refresh(animate = false, preloaded: AppState | null = null
     state.allTabs = panel.tabs;
     state.tabGroups = panel.groups;
     state.windowMeta = panel.meta;
+  }
+  // the audio chip exists only while a shown tab has sound; the list it filtered goes back to the
+  // filter it replaced (the last sound stopped, the flag went off, the Parked scope: a snapshot
+  // plays nothing) — All for a panel that opened on the stored "audio". Before the Tags check: the
+  // filter that comes back may be Tags
+  const audioChipShown = audioActive() && state.allTabs.some(hasSound);
+  mustQuery(filterBar, 'button[data-filter="audio"]').hidden = !audioChipShown;
+  if (state.filter === "audio" && !audioChipShown) {
+    state.filter = state.filterBeforeAudio ?? "all";
+    state.filterBeforeAudio = null;
   }
   // static markup: the Tags chip exists in #filters; a stored "tags" filter with the flag off reads as All
   mustQuery(filterBar, 'button[data-filter="tags"]').hidden = !tagsActive();

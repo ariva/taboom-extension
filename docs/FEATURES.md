@@ -18,8 +18,10 @@ address, its states and its tags.
 ## Search and filters
 
 Search matches titles, addresses and tag names; several words must all match. A `#word`
-token searches tags only. The Awake / Snoozed / Protected chips carry live counts, and the
-Tags chip opens a picker to show only tabs carrying one of the ticked tags.
+token searches tags only, and `:audio` keeps the tabs that play audio or are muted — the tokens
+combine with words and with each other (`:audio #work`). The Awake / Snoozed / Protected chips
+carry live counts, the Tags chip opens a picker to show only tabs carrying one of the ticked
+tags, and a 🔊 chip appears while any tab has sound (see **Tab audio** under [Actions and duplicates](#actions-and-duplicates)).
 
 <p>
   <img src="assets/features/chrome/search-words.png" alt="Search - several words" width="360">
@@ -146,7 +148,23 @@ group, with its history.
   <img src="assets/features/chrome/duplicate-tab-menu.png" alt="Row menu - Duplicate tab under Copy URL" width="360">
 </p>
 
-→ [Usage: Duplicates](USAGE.md#duplicates) · [Usage: Keyboard](USAGE.md#keyboard)
+**Tab audio** — the 🔊 after a playing tab's host is a button: click it and the browser mutes the tab, the
+icon turns 🔇; click again to unmute. The row menu has **Mute** / **Unmute** too, for one tab or a selection.
+While any tab plays or is muted, a **🔊 N** chip joins the filters and lists those tabs; when the last sound
+stops, the chip goes and the list is back on the filter it replaced.
+
+**`:audio` in the search** finds the same tabs — every tab that plays or is muted — from the keyboard: type
+`:audio` (or just `:au`), alone or with words and `#tags` (`:audio #work`). Any other `:word` stays ordinary
+text, so `:8080` still finds a port.
+
+<p>
+  <img src="assets/features/chrome/tab-audio-search.png" alt="Search - :audio finds the tab playing audio" width="360">
+  <img src="assets/features/chrome/tab-audio-chip.png" alt="The 🔊 chip pressed: the list shows the one tab playing audio" width="360">
+  <img src="assets/features/chrome/tab-audio-muted.png" alt="A muted tab: 🔇 after its host" width="360">
+  <img src="assets/features/chrome/tab-audio-menu.png" alt="Row menu of a muted tab - Unmute" width="360">
+</p>
+
+→ [Usage: Duplicates](USAGE.md#duplicates) · [Usage: Keyboard](USAGE.md#keyboard) · [Usage: Tab audio](USAGE.md#tab-audio)
 
 ## Settings
 

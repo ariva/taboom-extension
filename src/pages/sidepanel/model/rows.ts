@@ -47,6 +47,7 @@ export interface RowContext {
   parked?: boolean; // the row is a parked snapshot, not a live tab
   fit?: PillFit; // the meta line's measured room for tag pills (absent: happy-dom / first paint)
   splitEdges?: Map<number, SplitEdge>; // where a split's rows sit in the visible order (splitPairEdges)
+  muteControl?: boolean; // TAB_AUDIO: the row's sound icon is a mute toggle and shows 🔇 on a muted tab
 }
 
 // what fitTagPills needs from the DOM (render/meta-fit.ts measures it): the row's line from the
@@ -68,7 +69,9 @@ export interface RowViewModel {
   host: string;
   hostRanges: HighlightRange[];
   age: string | null;
-  audio: boolean; // playing audio: a 🔊 right after the host on the meta line
+  audio: boolean; // the sound icon right after the host on the meta line: 🔊 playing, 🔇 muted
+  muted: boolean; // TAB_AUDIO: the icon reads 🔇 — shown on a silent muted tab too, as the way to unmute it
+  muteControl: boolean; // TAB_AUDIO: a click on the icon mutes / unmutes
   badges: Badge[];
   tip: string; // hover tip text: the url ("" for a url-less tab)
   tipBadges: Badge[]; // the tip's states line: the row's plain badges, same colors (no tags, no "url match")
@@ -249,6 +252,9 @@ export function emptyMessage(query: string, filter: string, parked = false, tags
   if (filter === "protected") {
     return "No protected tabs. Use the shield button on a tab to protect its site.";
   }
+  if (filter === "audio") {
+    return "No tab with sound in this window. Pick All open windows to see the others.";
+  }
   if (filter === "tags") {
     return "No tagged tabs. Tag one from its row menu (Tag URL ▸).";
   }
@@ -278,6 +284,7 @@ export function rowViewModel(
     parked = false,
     fit,
     splitEdges,
+    muteControl = false,
   }: RowContext,
 ): RowViewModel {
   const d = derived.get(tab.id)!; // derived is built from the same tabs (deriveTabs, once per refresh)
@@ -301,6 +308,7 @@ export function rowViewModel(
   // raw URL — say so, otherwise the row looks like a false positive
   const urlOnlyMatch = queryTokens.length > 0 && titleRanges.length === 0 && hostRanges.length === 0;
   const age = !tab.active && tab.lastAccessed ? formatAge(now - tab.lastAccessed) : null;
+  const muted = muteControl && tab.mutedInfo?.muted === true;
   const canSnooze = !parked && !isUnloaded(tab) && isSupportedUrl(tab.url);
   const badgeList = fitTagPills(
     [
@@ -335,7 +343,8 @@ export function rowViewModel(
         const ends = until[label];
         return ends === undefined ? [label, kind] : [`${label} · ${formatTimeLeft(ends, now)} left`, kind];
       }),
-    ...(tab.audible ? [["🔊", ""] satisfies Badge] : []), // the row's 🔊 follows the host; the tip lists it with the states
+    // the row's sound icon follows the host; the tip lists it with the states
+    ...(muted ? [["🔇", ""] satisfies Badge] : tab.audible ? [["🔊", ""] satisfies Badge] : []),
   ];
   return {
     classes: [
@@ -357,7 +366,9 @@ export function rowViewModel(
     host,
     hostRanges,
     age,
-    audio: tab.audible === true,
+    audio: tab.audible === true || muted,
+    muted,
+    muteControl,
     badges: badgeList,
     tip: d.name !== undefined && tab.title ? `${tab.title}\n${tab.url ?? ""}` : (tab.url ?? ""),
     tipBadges,

@@ -16,11 +16,12 @@ import {
   highlightRanges,
   searchCandidates,
   selectVisible,
+  splitQuery,
   windowColor,
   windowMaps,
 } from "../../src/pages/sidepanel/model/index.ts";
 import type { Badge, RowContext, RowViewModel, SearchView, SelectView } from "../../src/pages/sidepanel/model/index.ts";
-import type { ProtectionRule, TabName, Tag, TagPage, UiPrefs } from "../../src/app/types.ts";
+import type { Features, ProtectionRule, TabName, Tag, TagPage, UiPrefs } from "../../src/app/types.ts";
 import { tagGroupName } from "../../src/pages/sidepanel/model/index.ts";
 import { nextTagSort, orderedTags, sortedTags } from "../../src/app/tags.ts";
 import type { TagSort } from "../../src/app/types.ts";
@@ -409,6 +410,7 @@ test("Model - CountsByFilter", () => {
     snoozed: 1,
     protected: 2,
     tags: 0,
+    audio: 0,
   });
 });
 
@@ -1208,4 +1210,76 @@ test("Options Model - releaseDate reads the date of the release's own CHANGES.md
   assert.equal(releaseDate(sections, "1.1"), undefined, "a version is matched whole, not as a prefix");
   assert.equal(releaseDate(sections, "2.0.0"), undefined, "no entry for that release");
   assert.equal(releaseDate(releaseSections("## v1.1.0\n\nno date\n"), "1.1.0"), undefined);
+});
+
+const AUDIO_ON = { TAB_AUDIO: { enabled: true } };
+const muted = { muted: true };
+
+test("Model - TAB_AUDIO: the audio filter keeps playing and muted tabs, the chip counts them", () => {
+  const tabs = [
+    tab({ id: 1, audible: true }),
+    tab({ id: 2 }),
+    tab({ id: 3, mutedInfo: muted }), // muted while silent: still listed, or nothing could unmute it
+    tab({ id: 4, audible: true, mutedInfo: muted, windowId: 2 }),
+  ];
+  const derived = deriveTabs(tabs, []);
+  assert.deepEqual(
+    selectVisible(tabs, view(tabs, { filter: "audio", sort: "title", derived })).map((t) => t.id),
+    [1, 3, 4],
+  );
+  assert.deepEqual(
+    selectVisible(tabs, view(tabs, { filter: "audio", scope: "current-window", derived })).map((t) => t.id),
+    [1, 3],
+    "the filter honours the scope like every other chip",
+  );
+  assert.equal(countsByFilter(tabs, derived).audio, 3);
+  assert.match(emptyMessage("", "audio"), /No tab with sound/);
+});
+
+test("Model - TAB_AUDIO: the :audio search token keeps tabs with sound; off, or unknown, it is plain text", () => {
+  assert.deepEqual(splitQuery(":audio Beta #wo", AUDIO_ON), { text: ["beta"], tags: ["wo"], audio: true });
+  assert.deepEqual(splitQuery(":AU", AUDIO_ON), { text: [], tags: [], audio: true }, "a prefix, like a #tag");
+  assert.deepEqual(splitQuery(": :8080 :audiox", AUDIO_ON), {
+    text: [":", ":8080", ":audiox"],
+    tags: [],
+    audio: false,
+  });
+  assert.deepEqual(splitQuery(":audio", {}), { text: [":audio"], tags: [], audio: false }, "flag off: plain text");
+  assert.deepEqual(splitQuery(":audio", undefined), { text: [":audio"], tags: [], audio: false });
+
+  const tabs = [
+    tab({ id: 1, title: "Alpha", audible: true }),
+    tab({ id: 2, title: "Beta", mutedInfo: muted }),
+    tab({ id: 3, title: "Beta silent" }),
+  ];
+  const derived = deriveTabs(tabs, []);
+  const ids = (query: string, features: Features = AUDIO_ON) =>
+    selectVisible(tabs, view(tabs, { query, derived, features, sort: "title" })).map((t) => t.id);
+  assert.deepEqual(ids(":audio"), [1, 2]);
+  assert.deepEqual(ids(":a beta"), [2], "the token and the words must all match");
+  assert.deepEqual(ids("beta"), [2, 3]);
+  assert.deepEqual(ids(":audio", {}), [], "flag off: no title holds the text ':audio'");
+});
+
+test("Model - TAB_AUDIO: a row says playing or muted; without the mute control a row is as before", () => {
+  const tabs = [tab({ id: 1, audible: true }), tab({ id: 2, mutedInfo: muted }), tab({ id: 3 })];
+  const ctx: RowContext = {
+    index: 0,
+    cursor: -1,
+    now: NOW,
+    currentWindowId: 1,
+    derived: deriveTabs(tabs, []),
+    selected: new Set(),
+    dotColors: new Map(),
+    indexes: new Map(),
+  };
+  const sound = (at: number, muteControl: boolean) => {
+    const vm = rowViewModel(tabs[at]!, { ...ctx, muteControl });
+    return [vm.audio, vm.muted, vm.muteControl, vm.tipBadges.map(([label]) => label).join()];
+  };
+  assert.deepEqual(sound(0, true), [true, false, true, "🔊"]);
+  assert.deepEqual(sound(1, true), [true, true, true, "🔇"], "muted while silent: the icon stays as the handle");
+  assert.deepEqual(sound(2, true), [false, false, true, ""]);
+  assert.deepEqual(sound(0, false), [true, false, false, "🔊"]);
+  assert.deepEqual(sound(1, false), [false, false, false, ""], "no control: a muted silent tab shows nothing");
 });

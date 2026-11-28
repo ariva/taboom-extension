@@ -145,7 +145,10 @@ export class ChromiumBrowser implements DemoBrowser {
         "--disable-component-update",
         "--disable-sync",
         "--metrics-recording-only",
-        "--mute-audio",
+        // no --mute-audio: with it Chromium never reports a tab as audible, and the tab-audio scene
+        // films exactly that. The one sound of the world is that scene's tone, at -54 dBFS (fixture.ts)
+        // the tone starts with no click on the page (a background tab gets none)
+        "--autoplay-policy=no-user-gesture-required",
         `--force-device-scale-factor=${DEVICE_SCALE}`,
         "--remote-debugging-pipe",
         "--host-resolver-rules=MAP *.test 127.0.0.1",

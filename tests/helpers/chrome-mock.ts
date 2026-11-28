@@ -117,6 +117,9 @@ export function makeChrome<
         const tab = tabs.find((t) => t.id === id);
         if (tab) {
           Object.assign(tab, props);
+          if (props?.muted !== undefined) {
+            tab.mutedInfo = { muted: props.muted }; // Chrome reports the mute there, not as a `muted` field
+          }
         }
         return tab;
       },

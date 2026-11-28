@@ -19,6 +19,7 @@ const DUPLICATES_ON = TEST_FEATURES.DUPLICATES?.enabled === true;
 const PARKED_ON = TEST_FEATURES.PARKED_WINDOWS?.enabled === true;
 const TAGS_ON = TEST_FEATURES.TAGS?.enabled === true;
 const TAB_NAMES_ON = TEST_FEATURES.TAB_NAMES?.enabled === true;
+const TAB_AUDIO_ON = TEST_FEATURES.TAB_AUDIO?.enabled === true;
 // the duration submenu of Protect domain / Protect URL / Keep alive domain / Keep alive URL (T-0157)
 const DURATIONS = ["Always (default)", "1 hour", "2 hours", "3 hours", "6 hours", "12 hours", "1 day", "1 week"];
 // split view needs Chrome's API (tabs.createSplit): absent on Firefox, whatever the flag says
@@ -1148,6 +1149,7 @@ test("UI - Sidepanel - Right-click row offers move-to-window menu (selection-awa
       "Snooze",
       "Wake",
       "Pin",
+      ...(TAB_AUDIO_ON ? ["Mute"] : []),
       "Close",
       // protection is its own section under Close; Protect / Keep alive open a duration submenu
       // (its items follow the parent in the DOM)
@@ -1473,6 +1475,7 @@ test("UI - Sidepanel - Window header right-click: window-wide actions + Change o
       "Snooze 2 tabs",
       "Wake 2 tabs",
       "Pin 2 tabs",
+      ...(TAB_AUDIO_ON ? ["Mute 2 tabs"] : []),
       "Close 2 tabs", // both unpinned → no Unpin offered
       "Protect domain 2 tabs",
       "Protect URL 2 tabs", // no Unprotect: neither tab of window 1 is protected
@@ -4771,4 +4774,117 @@ test("Sidepanel - audio indicator: a playing tab shows 🔊 right after its host
   );
   await chrome.tabs.onActivated.fire({});
   await settle();
+});
+
+// one playing tab for the TAB_AUDIO tests; gone again when the returned function runs
+async function withPlayingTab(): Promise<() => Promise<void>> {
+  const refreshed = async () => {
+    await chrome.tabs.onActivated.fire({});
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  };
+  tabs.push({
+    id: 61,
+    windowId: 1,
+    index: 21,
+    active: false,
+    discarded: false,
+    pinned: false,
+    audible: true,
+    url: "https://music.test/live",
+    title: "Live set",
+    lastAccessed: NOW - 1000,
+  });
+  await refreshed();
+  return async () => {
+    tabs.splice(
+      tabs.findIndex((t) => t.id === 61),
+      1,
+    );
+    await refreshed();
+  };
+}
+
+test("Sidepanel - TAB_AUDIO: the 🔊 mutes on click, the 🔊 chip and :audio list the tabs with sound, the menu unmutes", {
+  skip: !TAB_AUDIO_ON,
+}, async () => {
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 200));
+  const chip = q(document, '#filters button[data-filter="audio"]');
+  const shownIds = () => qa(document, ".row").map((row) => row.dataset.tabId);
+  const pressed = (name: string) => q(document, `#filters button[data-filter="${name}"]`).getAttribute("aria-pressed");
+  assert.equal(chip.hidden, true, "silence: no chip");
+  const cleanup = await withPlayingTab();
+  const playing = must(tabs.find((t) => t.id === 61));
+  const icon = () => q(document, '.row[data-tab-id="61"] .audio');
+  assert.equal(chip.hidden, false, "a tab plays: the chip is there");
+  assert.equal(q(chip, ".audio-count").textContent, "1");
+  assert.equal(icon().title, "Playing audio — click to mute");
+
+  calls.length = 0;
+  icon().click();
+  await settle();
+  assert.ok(calls.includes('tabs.update 61 {"muted":true}'), "the click mutes through tabs.update");
+  assert.ok(!calls.some((call) => call.includes('"active":true')), "and does not activate the row's tab");
+  assert.equal(icon().textContent, "🔇");
+  assert.equal(icon().getAttribute("aria-label"), "Muted");
+
+  playing.audible = false; // the page went quiet: the muted tab stays reachable
+  await chrome.tabs.onUpdated.fire(61, { audible: false }, playing);
+  await settle();
+  assert.equal(chip.hidden, false, "muted and silent still counts");
+  assert.equal(icon().textContent, "🔇");
+
+  q(document, '#filters button[data-filter="awake"]').click(); // the filter the chip will replace
+  chip.click();
+  assert.deepEqual(shownIds(), ["61"], "the chip narrows the list to the tabs with sound");
+  assert.equal(pressed("audio"), "true");
+
+  const menu = byId("ctx-menu");
+  q(document, '.row[data-tab-id="61"]').dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+  const labels = qa(menu, ".ctx-item").map((el) => el.textContent);
+  assert.ok(labels.includes("Unmute"), "a muted tab: Unmute");
+  assert.ok(!labels.includes("Mute"), "and no Mute — it would change nothing");
+  calls.length = 0;
+  must(qa(menu, ".ctx-item").find((el) => el.textContent === "Unmute")).click();
+  await settle();
+  assert.ok(calls.includes('tabs.update 61 {"muted":false}'));
+  assert.equal(chip.hidden, true, "nothing plays, nothing is muted: the chip is gone");
+  assert.equal(pressed("awake"), "true", "and the list is back on the filter the chip replaced");
+  assert.ok(shownIds().length > 1);
+  q(document, '#filters button[data-filter="all"]').click();
+
+  playing.audible = true;
+  await chrome.tabs.onUpdated.fire(61, { audible: true }, playing);
+  await settle();
+  const search = byId<HTMLInputElement>("search");
+  search.value = ":audio";
+  search.dispatchEvent(new window.Event("input", { bubbles: true }));
+  assert.deepEqual(shownIds(), ["61"], ":audio finds the tabs with sound");
+  assert.ok(
+    q(document, '.row[data-tab-id="61"]').querySelector(".badge") === null,
+    "no 'url match' badge for the token",
+  );
+  search.value = "";
+  search.dispatchEvent(new window.Event("input", { bubbles: true }));
+  await cleanup();
+});
+
+test("Sidepanel - TAB_AUDIO off: the 🔊 is a plain indicator, no chip, no Mute in the menu, :audio is plain text", {
+  skip: TAB_AUDIO_ON,
+}, async () => {
+  const cleanup = await withPlayingTab();
+  const row = q(document, '.row[data-tab-id="61"]');
+  assert.equal(q(document, '#filters button[data-filter="audio"]').hidden, true);
+  assert.equal(q(row, ".audio").textContent, "🔊");
+  assert.equal(q(row, ".audio").dataset.action, undefined, "nothing to click");
+  row.dispatchEvent(new window.Event("contextmenu", { bubbles: true }));
+  const labels = qa(byId("ctx-menu"), ".ctx-item").map((el) => el.textContent);
+  assert.ok(!labels.includes("Mute") && !labels.includes("Unmute"));
+  byId("ctx-menu").hidden = true;
+  const search = byId<HTMLInputElement>("search");
+  search.value = ":audio";
+  search.dispatchEvent(new window.Event("input", { bubbles: true }));
+  assert.equal(qa(document, ".row").length, 0, "no title or address holds ':audio'");
+  search.value = "";
+  search.dispatchEvent(new window.Event("input", { bubbles: true }));
+  await cleanup();
 });

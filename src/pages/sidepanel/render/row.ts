@@ -86,8 +86,17 @@ function renderRowImpl(tab: Tab, vm: RowViewModel): HTMLElement {
   }
 
   const favicon = mustQuery(row, ".favicon");
+  const audio = mustQuery(row, ".host .audio");
   if (!vm.audio) {
-    mustQuery(row, ".host .audio").remove(); // silent: the host line ends with the host
+    audio.remove(); // silent: the host line ends with the host
+  } else if (vm.muteControl) {
+    // TAB_AUDIO: the icon is the mute toggle (list-events.ts); the row menu's Mute / Unmute is its keyboard path
+    audio.textContent = vm.muted ? "🔇" : "🔊";
+    audio.setAttribute("aria-label", vm.muted ? "Muted" : "Playing audio");
+    audio.title = vm.muted ? "Muted — click to unmute" : "Playing audio — click to mute";
+    audio.dataset.action = "toggle-mute";
+    audio.classList.add("toggle");
+    audio.setAttribute("role", "button");
   }
   // grouped rows carry a small square in the group's color. Placement per view:
   // window view — leftmost + indent (nested under the sub-header's square);

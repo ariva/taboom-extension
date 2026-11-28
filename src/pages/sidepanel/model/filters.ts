@@ -1,6 +1,6 @@
 // Pure filter + sort selection: the filter / scope / sort value types, selectVisible
 // with its grouped and per-window orderings, and the filter-chip counts. No DOM, no chrome.*.
-import { isUnloaded } from "../../../app/core.ts";
+import { hasSound, isUnloaded } from "../../../app/core.ts";
 import { keepSplitPairsTogether } from "../../../app/split.ts";
 import type { UiPrefs } from "../../../app/types.ts";
 import type { DerivedTabs } from "./derived.ts";
@@ -14,7 +14,7 @@ type Tab = chrome.tabs.Tab;
 // allowed values of the filter buttons / scope + sort selects / direction button.
 // The view fields below stay `string`: they arrive unvalidated from the DOM and
 // storage (see UiPrefs), and unknown values simply fall through the switches.
-export type FilterName = "all" | "awake" | "snoozed" | "protected" | "tags";
+export type FilterName = "all" | "awake" | "snoozed" | "protected" | "tags" | "audio";
 export type ScopeName = "all-windows" | "current-window" | "parked-windows";
 export type SortName =
   | "recent"
@@ -81,6 +81,9 @@ export function selectVisible<T extends Tab>(tabs: T[], view: SelectView): T[] {
       break;
     case "tags":
       result = result.filter((tab) => hasWantedTag(derived.get(tab.id)!, view.tagFilter));
+      break;
+    case "audio":
+      result = result.filter(hasSound);
       break;
   }
   const last = (tab: Tab): number => tab.lastAccessed ?? now;
@@ -226,7 +229,14 @@ export function countsByFilter(
   tagFilter?: ReadonlySet<string>,
   parked = false, // the Parked scope: its rows are neither awake nor snoozed (selectVisible agrees)
 ): Record<FilterName, number> {
-  const counts: Record<FilterName, number> = { all: tabs.length, awake: 0, snoozed: 0, protected: 0, tags: 0 };
+  const counts: Record<FilterName, number> = {
+    all: tabs.length,
+    awake: 0,
+    snoozed: 0,
+    protected: 0,
+    tags: 0,
+    audio: 0,
+  };
   for (const tab of tabs) {
     if (parked) {
       // neither chip counts a snapshot
@@ -241,6 +251,9 @@ export function countsByFilter(
     }
     if (hasWantedTag(d, tagFilter)) {
       counts.tags++;
+    }
+    if (hasSound(tab)) {
+      counts.audio++;
     }
   }
   return counts;

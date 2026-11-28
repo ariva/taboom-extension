@@ -2,7 +2,7 @@
 // renderNow() rebuilds the list DOM; plus the chrome that follows every render
 // (row-height feedback, fold-all button, bulk bar).
 import { splitPairEdges } from "../../../app/split.ts";
-import { enabledTags, splitTagQuery, tagColorHex } from "../../../app/tags.ts";
+import { enabledTags, tagColorHex } from "../../../app/tags.ts";
 import { FOLD_ICONS, setSvgMarkup } from "../../../lib/dom.ts";
 import { hideCtxMenuForRender } from "../../../lib/ui/context-menu.ts";
 import {
@@ -24,6 +24,7 @@ import {
   rowViewModel,
   searchCandidates,
   selectVisible,
+  splitQuery,
   tabGroupColor,
   windowMaps,
 } from "../model/index.ts";
@@ -35,7 +36,14 @@ import { revealRow } from "./reveal.ts";
 import { nestedInGroup, renderRow } from "./row.ts";
 import { effectiveCollapsed, GROUPINGS, renderSortDirButton } from "./sorting.ts";
 import type { PanelRun } from "./sorting.ts";
-import { activeCollapsedSet, effectiveSort, nestedTabGroupsActive, parkedScope, state } from "../foundation/state.ts";
+import {
+  activeCollapsedSet,
+  audioActive,
+  effectiveSort,
+  nestedTabGroupsActive,
+  parkedScope,
+  state,
+} from "../foundation/state.ts";
 import type { GroupKey, PanelTab } from "../foundation/state.ts";
 import { refillTagAssignPickerIfOpen } from "../input/tag-assign-picker.ts";
 import { refillTagsPickerIfOpen } from "../input/tags-chip.ts";
@@ -99,9 +107,9 @@ function renderList(): void {
   const byFilter = countsByFilter(counted, state.derived, state.tagFilter, parkedScope());
   for (const button of filterBar.querySelectorAll("button")) {
     const name = button.dataset.filter;
-    // static markup: every filter button has its count span (the Tags chip's is .tag-count, so
-    // the four plain chips stay the ".count" set) and a FilterName in data-filter
-    const count = button.querySelector(".count, .tag-count");
+    // static markup: every filter button has its count span (the Tags chip's is .tag-count and the
+    // audio chip's .audio-count, so the four plain chips stay the ".count" set) and a FilterName in data-filter
+    const count = button.querySelector(".count, .tag-count, .audio-count");
     if (count) {
       count.textContent = String(byFilter[name as FilterName]);
     }
@@ -123,7 +131,7 @@ function renderList(): void {
   const maps = windowMaps(state.allTabs, state.currentWindowId, state.windowMeta);
   const now = Date.now();
   // tokenized once per render — rows highlight their matches while searching (#tokens light badges)
-  const { text: queryTokens, tags: tagTokens } = splitTagQuery(state.query);
+  const { text: queryTokens, tags: tagTokens } = splitQuery(state.query, state.features);
   const splitEdges = splitPairEdges(state.visible); // the render order: where each split's header goes
   // the Split sub-header goes right before a pair's first row, in every render path
   const splitHeaderFor = (tab: PanelTab, nested: boolean): HTMLElement | null => {
@@ -157,6 +165,7 @@ function renderList(): void {
       parked: parkedScope(),
       fit: pillFit(nestedInGroup(tab) || (tab.id !== undefined && splitEdges.has(tab.id))),
       splitEdges,
+      muteControl: audioActive(),
     });
 
   let foldableGroups: PanelRun[] = [];

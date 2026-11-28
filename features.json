@@ -24,5 +24,6 @@
   "PARKED_WINDOWS": { "enabled": true, "experimental": false },
   "SPLIT_VIEW": { "enabled": true, "experimental": false },
   "TAB_NAMES": { "enabled": true, "experimental": false },
-  "SNOOZE_ON_STARTUP": { "enabled": false, "experimental": true }
+  "SNOOZE_ON_STARTUP": { "enabled": false, "experimental": true },
+  "TAB_AUDIO": { "enabled": true, "experimental": false }
 }

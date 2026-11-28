@@ -160,6 +160,13 @@ under ~25 s; `gif: [from, to]` picks its GIF clip.
 - Fake pages come from a local server through `--host-resolver-rules` and
   `--testing-fixed-http-port`, not from route interception: 500 tabs fire their first request
   before interception attaches.
+- No `--mute-audio`: with it Chromium never reports a tab as audible, and the `tab-audio` scene
+  films exactly that state. Every fake page hums a tone while its address ends in `#play`
+  (`HUM_SCRIPT` in `fixture.ts`, -54 dBFS — below hearing, above the browser's -72 dBFS floor);
+  the scene adds the fragment to one music tab and takes it away again, so no other scene has a
+  playing tab in its list. Autoplay is allowed by flag (Chromium) and prefs (Firefox): a
+  background tab gets no click. A browser that still reports no sound is filmed with the tab
+  muted through the API, and the take carries a warning.
 - Native `confirm()` dialogs are accepted (Playwright dismisses them by default).
 - Headless Chromium paints no `<select>` dropdown: `stage.select()` / `stage.settingsSelect()`
   draw the options as a list, mark the current value, then the chosen one, and only then change

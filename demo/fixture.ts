@@ -243,6 +243,27 @@ export const PARKED = {
 
 // the page a tab shows: a colored banner with the host, the title, filler text — enough for a
 // window switch or a wake-up to read on screen
+// every fake page hums a tone while its address ends in #play, and stops when the fragment
+// goes: the way a scene makes a tab audible (the extension has no script access to pages, and
+// wants none) without a playing tab standing in every other scene's list
+const HUM_SCRIPT = `let audio;
+const sync = () => {
+  const play = location.hash === "#play";
+  if (play && !audio) {
+    audio = new AudioContext();
+    const tone = audio.createOscillator();
+    const gain = audio.createGain();
+    gain.gain.value = 0.002; // -54 dBFS: nobody hears it, the browser still counts the tab as audible (its floor is -72)
+    tone.connect(gain).connect(audio.destination);
+    tone.start();
+  } else if (!play && audio) {
+    audio.close();
+    audio = undefined;
+  }
+};
+addEventListener("hashchange", sync);
+sync();`;
+
 export function pageHtml(url: string, tabs: DemoTab[]): string {
   const tab = tabs.find((candidate) => candidate.url === url);
   const { hostname, pathname } = new URL(url);
@@ -263,5 +284,6 @@ main{padding:28px}h1{font-size:30px;margin:0 0 12px}p{color:#5f6368;line-height:
 <p>Placeholder page served from memory for the Taboom demo. No network request was made to load it.</p>
 <div class="card">Section one · lorem ipsum dolor sit amet, consectetur adipiscing elit.</div>
 <div class="card">Section two · sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</div>
-<div class="card">Section three · ut enim ad minim veniam, quis nostrud exercitation.</div></main></body></html>`;
+<div class="card">Section three · ut enim ad minim veniam, quis nostrud exercitation.</div></main>
+<script>${HUM_SCRIPT}</script></body></html>`;
 }

@@ -41,6 +41,9 @@ function userPrefs(proxyPort: number, devicePixelRatio: number): string {
     // BiDi cannot emulate a device scale on an extension page (privileged scope): the browser renders at it
     "layout.css.devPixelsPerPx": String(devicePixelRatio),
     "remote.active-protocols": 1, // WebDriver BiDi
+    // the tab-audio scene's page starts its tone with no click on it (a background tab gets none)
+    "media.autoplay.default": 0,
+    "media.autoplay.blocking_policy": 0,
     "browser.shell.checkDefaultBrowser": false,
     "browser.startup.page": 0,
     "browser.startup.homepage": "about:blank",

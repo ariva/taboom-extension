@@ -1,6 +1,6 @@
 // Pure search logic: fuzzy activation and scoring, query-token highlight ranges and
 // the search + window-scope candidate pool. No DOM, no chrome.*.
-import { featureEnabled } from "../../../app/core.ts";
+import { featureEnabled, hasSound } from "../../../app/core.ts";
 import { splitTagQuery, tagMatches } from "../../../app/tags.ts";
 import type { Features, UiPrefs } from "../../../app/types.ts";
 import type { DerivedTabs } from "./derived.ts";
@@ -36,6 +36,21 @@ export function fuzzyActive(view: FuzzyView): boolean {
     return view.ui?.experimental_fuzzySearch ?? true;
   }
   return true;
+}
+
+// the search as its parts: words, #tag tokens and the ":audio" token (TAB_AUDIO) — any prefix of it
+// from two characters on, like a #tag. Any other ":word" is plain text (":8080" finds a port), and
+// so is ":audio" itself while the flag is off
+export function splitQuery(
+  query: string,
+  features: Features | undefined,
+): { text: string[]; tags: string[]; audio: boolean } {
+  const { text, tags } = splitTagQuery(query);
+  if (!features || !featureEnabled(features, "TAB_AUDIO")) {
+    return { text, tags, audio: false };
+  }
+  const words = text.filter((token) => token.length < 2 || !":audio".startsWith(token));
+  return { text: words, tags, audio: words.length !== text.length };
 }
 
 const isWordChar = (ch: string): boolean => /[a-z0-9]/.test(ch);
@@ -134,11 +149,12 @@ export function highlightRanges(text: string, tokens: string[], fuzzy = false): 
 export function searchCandidates<T extends Tab>(tabs: T[], view: SearchView): T[] {
   const { query, scope, currentWindowId, derived } = view;
   // #tokens name tags (strict prefix, outside the fuzzy ranking); the rest is text
-  const { text: tokens, tags: tagTokens } = splitTagQuery(query);
+  const { text: tokens, tags: tagTokens, audio } = splitQuery(query, view.features);
+  const sounding = audio ? tabs.filter(hasSound) : tabs;
   const tagged =
     tagTokens.length === 0
-      ? tabs
-      : tabs.filter((tab) =>
+      ? sounding
+      : sounding.filter((tab) =>
           // derived.get()!: built from these same tabs
           tagTokens.every((token) => derived.get(tab.id)!.tags.some((tag) => tagMatches(tag, token))),
         );

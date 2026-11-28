@@ -61,6 +61,7 @@ export interface PanelState {
   activeTabId: number | null; // active tab of the current window as of the last refresh()
   filterBeforeSearch: string | null; // the filter a search replaced by All (toolbar-events setQuery); null = the user's own choice is showing
   filterBeforeParked: string | null; // the filter the Parked scope replaced by All; back when a live scope is picked again
+  filterBeforeAudio: string | null; // TAB_AUDIO: the filter showing when the audio chip was picked; back when the chip goes (render/data.ts)
   followCurrent: boolean;
   revealCurrent: boolean; // after the next render: the current row at the top of the list (reveal.ts "start")
   pendingScroll: number | null;
@@ -130,6 +131,7 @@ export const state: PanelState = {
   // ends the search on the same filter (T-0151)
   filterBeforeSearch: null,
   filterBeforeParked: null,
+  filterBeforeAudio: null,
   followCurrent: false,
   // the active tab changed outside the panel (keyboard history command, Ctrl+Tab), the panel
   // opened, or the view changed (filter / scope / sort): the current row — with its Split or
@@ -191,6 +193,12 @@ export function parkedActive(): boolean {
 // TAGS resolved flag — Tag URL ▸ in the row menu, the Tags chip, the badges, the quick launch view
 export function tagsActive(): boolean {
   return featureEnabled(state.features, "TAGS");
+}
+
+// TAB_AUDIO resolved flag — the row's 🔊 / 🔇 as a mute toggle, Mute / Unmute in the row menu, the
+// 🔊 filter chip and the :audio search token
+export function audioActive(): boolean {
+  return featureEnabled(state.features, "TAB_AUDIO");
 }
 
 // TAB_NAMES: custom names in place of tab titles (the row menu's Rename tab…, Settings → Tab names)

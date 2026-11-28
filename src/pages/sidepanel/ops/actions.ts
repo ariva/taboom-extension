@@ -113,6 +113,17 @@ export async function pinTabs(tabIds: number[], pinned: boolean): Promise<void> 
   refresh(true);
 }
 
+// the browser's own per-tab mute (TAB_AUDIO): the tab keeps playing, silently. The selection stays —
+// no row moves, and Unmute over the same tabs is the likely next step
+export async function muteTabs(tabIds: number[], muted: boolean): Promise<void> {
+  const results = await Promise.allSettled(tabIds.map((tabId) => chrome.tabs.update(tabId, { muted })));
+  const failed = results.find((result) => result.status === "rejected");
+  if (failed) {
+    toastFailure(muted ? "mute every tab" : "unmute every tab", failed.reason);
+  }
+  refresh(true);
+}
+
 // Chrome's own duplicate: the copy lands beside the original (same window and group, history kept)
 // and Chrome makes it the active tab — the API offers no background copy there
 export async function duplicateTabs(tabIds: number[]): Promise<void> {

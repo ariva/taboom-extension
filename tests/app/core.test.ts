@@ -6,6 +6,7 @@ import {
   hostnameOf,
   hostOf,
   isEligibleForAutoSnooze,
+  hasSound,
   isUnloaded,
   isProtected,
   isSupportedUrl,
@@ -73,6 +74,13 @@ test("Core - Eligibility", () => {
   assert.equal(isEligibleForAutoSnooze(tab(), settings, rules, NOW), false, "protected excluded");
   const relaxed = { ...settings, excludePinned: false, excludeAudible: false };
   assert.equal(isEligibleForAutoSnooze(tab({ pinned: true, audible: true }), relaxed, [], NOW), true);
+});
+
+test("Core - hasSound: playing, or muted (a muted tab that keeps playing stays audible)", () => {
+  assert.equal(hasSound({ audible: true }), true);
+  assert.equal(hasSound({ audible: false, mutedInfo: { muted: true } }), true);
+  assert.equal(hasSound({ audible: false, mutedInfo: { muted: false } }), false);
+  assert.equal(hasSound({}), false);
 });
 
 test("Core - isUnloaded: discarded by us, or restored by Chrome and never loaded", () => {

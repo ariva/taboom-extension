@@ -2,7 +2,7 @@
 import { send } from "../../../app/messages.ts";
 import { parkedRef } from "../../../app/parked.ts";
 import { openParkedTabMenu } from "../menus/parked-menus.ts";
-import { activate, closeTabs, snooze } from "../ops/actions.ts";
+import { activate, closeTabs, muteTabs, snooze } from "../ops/actions.ts";
 import { listEl } from "../foundation/elements.ts";
 import { hideHoverTip } from "../render/hover-tip.ts";
 import { render } from "../foundation/scheduler.ts";
@@ -39,6 +39,9 @@ export function initListEvents(): void {
         return;
       case "close":
         closeTabs([tabId]);
+        return;
+      case "toggle-mute":
+        muteTabs([tabId], tabById(tabId)?.mutedInfo?.muted !== true);
         return;
     }
     const tab = tabById(tabId);

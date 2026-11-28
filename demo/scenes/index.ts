@@ -7,6 +7,7 @@ import { keepAliveDomain } from "./keep-alive.ts";
 import { keyboardMenu } from "./keyboard-menu.ts";
 import { duplicateTab } from "./duplicate-tab.ts";
 import { keyboardSelect } from "./keyboard-select.ts";
+import { tabAudio } from "./tab-audio.ts";
 import { settingsReorder } from "./reorder.ts";
 import { tabNames } from "./tab-names.ts";
 import { tagFragment } from "./tag-fragment.ts";
@@ -45,6 +46,7 @@ export const SCENES: Scene[] = [
   keyboardMenu,
   keyboardSelect,
   duplicateTab,
+  tabAudio,
   settingsTabs,
   sharedView,
   snoozeNow,

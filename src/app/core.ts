@@ -158,6 +158,12 @@ export function isUnloaded(tab: { discarded?: boolean; status?: string }): boole
   return tab.discarded === true || tab.status === "unloaded";
 }
 
+// a tab with sound: playing, or muted — a muted tab is listed even while silent, or nothing in a
+// list of sounding tabs could unmute it. Both fields are optional on chrome.tabs.Tab
+export function hasSound(tab: { audible?: boolean; mutedInfo?: { muted: boolean } }): boolean {
+  return tab.audible === true || tab.mutedInfo?.muted === true;
+}
+
 // "is this page kept alive" — handed in by the caller (keep-alive.ts owns the match rule and
 // sits above this module: it reads the tagged-page patterns, which read this file)
 export type KeptPredicate = (url: string | undefined) => boolean;

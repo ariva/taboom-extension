@@ -25,6 +25,7 @@ import {
   duplicateTabs,
   keepAlive,
   pinTabs,
+  muteTabs,
   protectTabs,
   protectUrls,
   snooze,
@@ -46,6 +47,7 @@ import {
   tabById,
   tabGroupsActive,
   tagsActive,
+  audioActive,
 } from "../foundation/state.ts";
 import type { PanelTab } from "../foundation/state.ts";
 import { moveTabsToGroup, startRenameTabGroup, ungroupTabs, updateTabGroup } from "../ops/tab-group-ops.ts";
@@ -75,12 +77,17 @@ export function appendCtxActions(ids: number[], alwaysCount = false): void {
   const targets = ids.map((id) => tabById(id)).filter(Boolean) as PanelTab[];
   // run(hours): a duration makes the rule temporary (the single-row submenu); no hours = Always
   type Action = [label: string, run: (hours?: number) => void, durations?: true];
+  const canMute = audioActive() && targets.some((tab) => tab.mutedInfo?.muted !== true);
+  const canUnmute = audioActive() && targets.some((tab) => tab.mutedInfo?.muted === true);
   const actions: Action[] = [
     ["Snooze", () => snooze(ids)],
     ["Wake", () => wake(ids)],
     // Pin/Unpin only when they would do something for at least one target tab
     ...(targets.some((tab) => !tab.pinned) ? [["Pin", () => pinTabs(ids, true)] satisfies Action] : []),
     ...(targets.some((tab) => tab.pinned) ? [["Unpin", () => pinTabs(ids, false)] satisfies Action] : []),
+    // TAB_AUDIO, same rule: Mute also on a silent tab (ahead of the sound), Unmute only where something is muted
+    ...(canMute ? [["Mute", () => muteTabs(ids, true)] satisfies Action] : []),
+    ...(canUnmute ? [["Unmute", () => muteTabs(ids, false)] satisfies Action] : []),
     ["Close", () => closeTabs(ids)],
   ];
   const suffix = ` ${pluralize(ids.length, "tab")}`;

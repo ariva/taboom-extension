@@ -26,6 +26,7 @@ export const RELEASE_HIGHLIGHTS: Readonly<Record<string, readonly ReleaseHighlig
   "1.1.1": [
     { key: "keyboard-select", text: "Select and filter from the keyboard" },
     { key: "duplicate-tab", text: "Duplicate tab" },
+    { key: "tab-audio", text: "Mute tabs, find the ones with sound" },
   ],
   "1.1.0": [
     { key: "tab-names", text: "Custom Tab Names" },

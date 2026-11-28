@@ -172,9 +172,18 @@ filterBar.addEventListener("click", (event) => {
 });
 
 // A filter chosen by the user: a click on its chip, or a step with the keyboard (keyboard-nav.ts).
+// the audio chip is there only while something sounds: what it replaces is remembered, so the list
+// can go back to it when the chip goes (render/data.ts) — call before state.filter changes
+function rememberFilterBeforeAudio(next: string): void {
+  if (next === "audio" && state.filter !== "audio") {
+    state.filterBeforeAudio = state.filter;
+  }
+}
+
 export function setFilter(filter: string): void {
   const scrollMap = state.query ? searchScrollByFilter : scrollByFilter;
   scrollMap.set(state.filter, listEl.scrollTop);
+  rememberFilterBeforeAudio(filter);
   state.filter = filter;
   state.filterBeforeSearch = null; // the user's choice, search or not
   state.pendingScroll = scrollMap.get(state.filter) ?? 0;
@@ -256,6 +265,7 @@ export function adoptStoredView(ui: Partial<UiPrefs>): void {
   state.ui = { ...state.ui, ...ui }; // initialDirFor reads sortDirMode / sortDirections from it (a partial write keeps the rest)
   let changed = false;
   if (ui.defaultFilter !== undefined && ui.defaultFilter !== state.filter) {
+    rememberFilterBeforeAudio(ui.defaultFilter);
     state.filter = ui.defaultFilter;
     state.filterBeforeSearch = null; // a click in another panel: the user's choice here too
     changed = true;

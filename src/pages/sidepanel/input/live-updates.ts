@@ -96,7 +96,7 @@ chrome.windows.onFocusChanged.addListener((windowId) => {
 
 // onUpdated fires for every tab's loading progress — with hundreds of tabs that's
 // a constant stream; only changes the list actually shows should trigger a render
-const RENDERED_TAB_PROPS = ["title", "url", "favIconUrl", "discarded", "audible", "pinned", "groupId"];
+const RENDERED_TAB_PROPS = ["title", "url", "favIconUrl", "discarded", "audible", "mutedInfo", "pinned", "groupId"];
 chrome.tabs.onUpdated.addListener((_tabId, changeInfo) => {
   if (RENDERED_TAB_PROPS.some((prop) => prop in changeInfo)) {
     scheduleRefresh();
